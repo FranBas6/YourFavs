@@ -198,57 +198,59 @@ const totalContenido = totalSeries + totalPeliculas;
         </div>
     </nav>
 
-    <!-- Panel de estadísticas mejorado -->
-    <div class="stats-container grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div class="stat-card bg-gradient-to-br from-blue-100 to-blue-200 p-4 rounded-xl shadow-md">
-            <h3 class="text-blue-800 text-lg font-semibold">Series</h3>
-            <p class="text-3xl font-bold text-blue-900">{totalSeries}</p>
-            <div class="text-xs text-blue-700 mt-1">
-                <div class="flex justify-between mb-1">
-                    <span>Favoritas: {seriesFavoritas.length}</span>
-                    <span>Pendientes: {seriesPendientes.length}</span>
-                    <span>Siguiendo: {seriesSiguiendo.length}</span>
+    <!-- Panel de estadísticas mejorado y responsive -->
+    <div class="stats-container grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+        <div class="stat-card bg-gradient-to-br from-blue-100 to-blue-200 p-3 rounded-xl shadow-md">
+            <h3 class="text-blue-800 text-base md:text-lg font-semibold">Series</h3>
+            <p class="text-2xl md:text-3xl font-bold text-blue-900">{totalSeries}</p>
+            <div class="text-xs mt-1">
+                <div class="grid grid-cols-3 gap-1 text-blue-700">
+                    <span class="text-xs">Fav: {seriesFavoritas.length}</span>
+                    <span class="text-xs">Pend: {seriesPendientes.length}</span>
+                    <span class="text-xs">Sig: {seriesSiguiendo.length}</span>
                 </div>
-                <div class="flex justify-around">
-                    <span>Me gustan: {likedSeries.length}</span>
-                    <span>Vistas: {seriesVistas.length}</span>
+                <div class="grid grid-cols-2 gap-1 mt-1 text-blue-700">
+                    <span class="text-xs">Me gustan: {likedSeries.length}</span>
+                    <span class="text-xs">Vistas: {seriesVistas.length}</span>
                 </div>
             </div>
         </div>
-        <div class="stat-card bg-gradient-to-br from-red-100 to-red-200 p-4 rounded-xl shadow-md">
-            <h3 class="text-red-800 text-lg font-semibold">Películas</h3>
-            <p class="text-3xl font-bold text-red-900">{totalPeliculas}</p>
-            <div class="text-xs text-red-700 mt-1 flex justify-between">
-                <span>Favoritas: {peliculasFavoritas.length}</span>
-                <span>Pendientes: {peliculasPendientes.length}</span>
-                <span>Vistas: {peliculasVistas.length}</span>
+        <div class="stat-card bg-gradient-to-br from-red-100 to-red-200 p-3 rounded-xl shadow-md">
+            <h3 class="text-red-800 text-base md:text-lg font-semibold">Películas</h3>
+            <p class="text-2xl md:text-3xl font-bold text-red-900">{totalPeliculas}</p>
+            <div class="text-xs mt-1">
+                <div class="grid grid-cols-3 gap-1 text-red-700">
+                    <span class="text-xs">Fav: {peliculasFavoritas.length}</span>
+                    <span class="text-xs">Pend: {peliculasPendientes.length}</span>
+                    <span class="text-xs">Vistas: {peliculasVistas.length}</span>
+                </div>
             </div>
         </div>
-        <div class="stat-card bg-gradient-to-br from-indigo-100 to-indigo-200 p-4 rounded-xl shadow-md">
-            <h3 class="text-indigo-800 text-lg font-semibold">Total contenido</h3>
-            <p class="text-3xl font-bold text-indigo-900">{totalContenido}</p>
+        <div class="stat-card bg-gradient-to-br from-indigo-100 to-indigo-200 p-3 rounded-xl shadow-md">
+            <h3 class="text-indigo-800 text-base md:text-lg font-semibold">Total contenido</h3>
+            <p class="text-2xl md:text-3xl font-bold text-indigo-900">{totalContenido}</p>
             <div class="text-xs text-indigo-700 mt-1">
-                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
                     <div class="bg-blue-600 h-2 rounded-full"
                          style={`width: ${(totalSeries / totalContenido) * 100}%`}></div>
                 </div>
-                <div class="flex justify-between mt-1">
-                    <span>Series: {Math.round((totalSeries / totalContenido) * 100)}%</span>
-                    <span>Películas: {Math.round((totalPeliculas / totalContenido) * 100)}%</span>
+                <div class="grid grid-cols-2 gap-1 mt-1">
+                    <span class="text-xs">Series: {Math.round((totalSeries / totalContenido) * 100)}%</span>
+                    <span class="text-xs">Películas: {Math.round((totalPeliculas / totalContenido) * 100)}%</span>
                 </div>
             </div>
         </div>
-        <div class="stat-card bg-gradient-to-br from-purple-100 to-purple-200 p-4 rounded-xl shadow-md">
-            <h3 class="text-purple-800 text-lg font-semibold">Última actualización</h3>
+        <div class="stat-card bg-gradient-to-br from-purple-100 to-purple-200 p-3 rounded-xl shadow-md">
+            <h3 class="text-purple-800 text-base md:text-lg font-semibold">Última actualización</h3>
             <p class="text-sm font-bold text-purple-900">{new Date().toLocaleDateString()}</p>
-            <div class="text-xs text-purple-700 mt-2">
+            <div class="text-xs text-purple-700 mt-1">
                 <div class="flex items-center">
                     <div class="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
-                    <span>Vistos: {seriesVistas.length + peliculasVistas.length}</span>
+                    <span class="text-xs">Vistos: {seriesVistas.length + peliculasVistas.length}</span>
                 </div>
                 <div class="flex items-center mt-1">
                     <div class="h-2 w-2 rounded-full bg-yellow-500 mr-1"></div>
-                    <span>Pendientes: {seriesPendientes.length + peliculasPendientes.length}</span>
+                    <span class="text-xs">Pendientes: {seriesPendientes.length + peliculasPendientes.length}</span>
                 </div>
             </div>
         </div>
