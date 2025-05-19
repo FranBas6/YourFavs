@@ -1,0 +1,256 @@
+---
+import CardMovie from "./CardMovie.astro";
+import { getTopRatedMovies} from "../services/yourfavsMovie";
+
+// Obtener el parámetro de página desde la URL
+const page = Number(Astro.request.url.split('?page=')[1] || 1);
+
+// Cargar las películas y series para la página actual
+const popularMovies = await getTopRatedMovies({ page: page.toString() });
+
+// Total de páginas, puedes obtenerlo del API o mantenerlo como un valor estático
+const totalPages = 500; // Suponiendo 10 páginas de resultados disponibles, ajusta según tu API
+
+// Definir los géneros comunes
+const genresMap = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+---
+
+<section class="container mx-auto px-4 py-4">
+    <header class="mb-8">
+        <h1 class="text-coral-red font-bold text-4xl md:text-5xl lg:text-6xl text-center mb-2">
+            TOP PELÍCULAS
+        </h1>
+        <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
+        <p class="text-gray-600 text-center max-w-2xl mx-auto">
+            Descubre las películas mejor valoradas por la crítica y el público
+        </p>
+    </header>
+
+    <nav aria-label="Paginación" class="flex items-center justify-center mb-8">
+        <!-- En pantallas pequeñas (móviles) - Diseño vertical compacto -->
+        <div class="flex flex-col w-full max-w-xs gap-2 p-2 bg-white rounded-lg shadow-md sm:hidden">
+            <div class="flex justify-center items-center px-2 py-1">
+                <span class="font-medium text-gray-700 text-sm">Página</span>
+                <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold text-sm">{page}</span>
+                <span class="font-medium text-gray-700 text-sm">de {totalPages}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <a href={`?page=${Math.max(1, page - 1)}`}
+                   class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+                   aria-disabled={page === 1}>
+                    <span class="mr-1">←</span> Anterior
+                </a>
+
+                <a href={`?page=${Math.min(totalPages, page + 1)}`}
+                   class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+                   aria-disabled={page === totalPages}>
+                    Siguiente <span class="ml-1">→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- En pantallas medianas y grandes - Diseño horizontal -->
+        <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
+            <a href={`?page=${Math.max(1, page - 1)}`}
+               class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+               aria-disabled={page === 1}>
+                <span class="mr-1">←</span> Anterior
+            </a>
+
+            <div class="flex items-center px-4">
+                <span class="font-medium text-gray-700">Página</span>
+                <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold">{page}</span>
+                <span class="font-medium text-gray-700">de {totalPages}</span>
+            </div>
+
+            <a href={`?page=${Math.min(totalPages, page + 1)}`}
+               class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+               aria-disabled={page === totalPages}>
+                Siguiente <span class="ml-1">→</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5">
+        {
+            popularMovies.map((item) => (
+                    <div class="card-wrapper transform transition-transform duration-300 hover:scale-105">
+                        <CardMovie
+                                id={item.id.toString()}
+                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                title={item.title}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                release_date={item.release_date}
+                                genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
+                                providers={item.providers}
+                        />
+                    </div>
+            ))
+        }
+    </div>
+
+    <div class="mt-12 flex justify-center">
+        <div class="inline-flex rounded-md shadow-sm">
+            {page > 2 && (
+                    <a href="?page=1" class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
+                        1
+                    </a>
+            )}
+
+            {page > 3 && (
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
+                    ...
+                </span>
+            )}
+
+            {page > 1 && (
+                    <a href={`?page=${page - 1}`} class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                        {page - 1}
+                    </a>
+            )}
+
+            <a href={`?page=${page}`} class="px-3 py-2 bg-coral-red text-white border border-coral-red">
+                {page}
+            </a>
+
+            {page < totalPages && (
+                    <a href={`?page=${page + 1}`} class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                        {page + 1}
+                    </a>
+            )}
+
+            {page < totalPages - 2 && (
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
+                    ...
+                </span>
+            )}
+
+            {page < totalPages - 1 && (
+                    <a href={`?page=${totalPages}`} class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
+                        {totalPages}
+                    </a>
+            )}
+        </div>
+    </div>
+</section>
+
+<style is:global>
+    .text-coral-red {
+        color: #E63946;
+    }
+
+    .bg-coral-red {
+        background-color: #E63946;
+    }
+
+    #toggleSidebar:checked ~ #sidebar {
+        transform: translateX(0);
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    .grid > div {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    /* Estilos para asegurar que todas las cards tengan el mismo tamaño */
+    .card-wrapper {
+        height: 100%;
+        display: flex;
+    }
+
+    .card-wrapper > :global(*) {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Si el componente CardMovie tiene su propia estructura interna,
+       estas reglas asegurarán que mantenga proporciones consistentes */
+    .card-wrapper :global(.card),
+    .card-wrapper :global(article),
+    .card-wrapper :global(div) {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Aseguramos que la imagen mantenga proporciones consistentes */
+    .card-wrapper :global(img) {
+        aspect-ratio: 2/3;
+        object-fit: cover;
+        width: 100%;
+    }
+
+    /* Si hay áreas de contenido, les permitimos expandirse según necesidad */
+    .card-wrapper :global(.content),
+    .card-wrapper :global(.card-body) {
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Aseguramos que los títulos tengan altura consistente y manejen overflow */
+    .card-wrapper :global(h2),
+    .card-wrapper :global(h3),
+    .card-wrapper :global(.title) {
+        height: 2.5rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Para descripciones u overviews, también controlamos la altura */
+    .card-wrapper :global(p),
+    .card-wrapper :global(.overview),
+    .card-wrapper :global(.description) {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+    }
+</style>

@@ -1,0 +1,22 @@
+---
+const {href, active} = Astro.props;
+---
+
+
+<a href={href}
+class={`flex items-center justify-center text-white cursor-pointer 
+  rounded-lg px-6 py-3 font-semibold text-lg transition-all duration-300
+  hover:bg-coral-red hover:shadow-lg hover:scale-105
+  focus:ring-2 focus:outline-none focus:ring-white/30
+  ${active ? 'bg-coral-red/80' : 'opacity-85 hover:opacity-100'}`}
+>
+<slot name="before"/>
+<slot/>
+<slot name="after"/>
+</a>
+
+<style is:global>
+    .hover\:bg-coral-red:hover {
+        background-color: #E63946;
+    }
+</style>

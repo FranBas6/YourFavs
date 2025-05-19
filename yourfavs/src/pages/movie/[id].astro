@@ -1,0 +1,808 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import {
+    getMovieById,
+    getMovieCast,
+    getMovieDirectorsAndRoles,
+    getMovieTrailer,
+    fetchAllMoviePosters,
+    getMovieCollectionInfo
+} from "../../services/yourfavsMovie";
+
+import {initializeApp} from "firebase/app";
+import {
+    getFirestore,
+    doc,
+    getDoc,
+    setDoc,
+    deleteDoc
+} from "firebase/firestore";
+
+// Configuración de Firebase
+const firebaseConfig = {
+    apiKey: "AIzaSyBgSBLbdNMNnAwX94CJhccGWHzunl6519E",
+    authDomain: "yourfavsbd.firebaseapp.com",
+    projectId: "yourfavsbd",
+    storageBucket: "yourfavsbd.firebasestorage.app",
+    messagingSenderId: "68077586193",
+    appId: "1:68077586193:web:411867f86654e4a758aeb0",
+    measurementId: "G-BLZX9401GZ"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// Initialize Cloud Firestore
+const db = getFirestore(app);
+
+const {id} = Astro.params; // Obtén el parámetro id de la URL
+
+if (!id) {
+    throw new Error("ID de la película no encontrado en la URL");
+}
+
+// Procesar el formulario cuando se envíe un POST
+if (Astro.request.method === 'POST') {
+    const formData = await Astro.request.formData();
+    const movieId = String(formData.get('id'));
+    const action = String(formData.get('action'));
+    const listType = String(formData.get('list_type'));
+
+    // Procesar géneros en formato JSON
+    let genres = [];
+    try {
+        genres = JSON.parse(String(formData.get('genres')) || '[]'); // Corregido: asignar a la variable genres
+    } catch (error) {
+        console.error("Error al parsear los géneros:", error);
+    }
+
+    // Crear un nuevo objeto con los datos de la película
+    const movieData = {
+        id: movieId,
+        poster_path: String(formData.get('poster_path') || ''),
+        title: String(formData.get('title') || 'Sin nombre'),
+        vote_average: Number(formData.get('vote_average') || 0),
+        overview: String(formData.get('overview') || 'Sin descripción'),
+        added_at: new Date(), // Guardar la fecha y hora actual
+        genres: genres, // Guardar los géneros como array
+        release_date: String(formData.get('release_date') || ''),
+    };
+
+    // Determinar en qué colección de Firestore realizar la operación según el tipo de lista
+    let collectionName;
+    if (listType === 'favorites') {
+        collectionName = 'MovieFavs';
+    } else if (listType === 'pendientes') {
+        collectionName = 'MoviesPendientes';
+    } else if (listType === 'vistas') {
+        collectionName = 'MoviesVistas';
+    }
+
+    if (collectionName) {
+        // Crear referencia al documento en la colección apropiada
+        const docRef = doc(db, collectionName, movieId);
+
+        // Verificar si la película ya existe en la lista correspondiente
+        const docSnap = await getDoc(docRef);
+        const exists = docSnap.exists();
+
+        if (action === 'add' && !exists) {
+            // Insertar la película en Firestore
+            await setDoc(docRef, movieData);
+        } else if (action === 'remove' && exists) {
+            // Eliminar la película de Firestore
+            await deleteDoc(docRef);
+        }
+    }
+
+    // Redirigir de vuelta a la página de la película
+    return Astro.redirect(`/movie/${id}`);
+}
+
+// Obtener datos de la película
+let item = null;
+let cast: string[] = [];
+let directors: { name: string; job: string }[] = [];
+let trailerUrl: string | null = null;
+let title = "Película no encontrada";
+
+if (id) {
+    item = await getMovieById({ id });
+    cast = await getMovieCast(id);
+    directors = await getMovieDirectorsAndRoles(id);
+    trailerUrl = await getMovieTrailer(id);
+    title = item?.title || title;
+}
+
+// Datos que se enviarán al cliente
+const clientData = {
+    id: String(item?.id),
+    poster_path: item?.poster_path || '',
+    title: item?.title || 'Sin nombre',
+    vote_average: item?.vote_average ? Number(item.vote_average) : 0,
+    overview: item?.overview || 'Sin descripción',
+    genres: item?.genres || [], // Asegurar que siempre sea un array
+    release_date: item?.release_date || '',
+};
+
+const docRefFavs = doc(db, "MovieFavs", clientData.id);
+const docRefPendientes = doc(db, "MoviesPendientes", clientData.id);
+const docRefVistas = doc(db, "MoviesVistas", clientData.id);
+
+const [docSnapFavs, docSnapPendientes, docSnapVistas] = await Promise.all([
+    getDoc(docRefFavs),
+    getDoc(docRefPendientes),
+    getDoc(docRefVistas)
+]);
+
+const existingFavs = docSnapFavs.exists();
+const existingPendientes = docSnapPendientes.exists();
+const existingVistas = docSnapVistas.exists();
+
+// Verificar si la película ya está en cada una de las listas
+const isInFavorites = existingFavs;
+const isInPendientes = existingPendientes;
+const isInVistas = existingVistas;
+
+// Formatear la fecha para mejor visualización
+const formatDate = (dateString: string) => {
+    if (!dateString) return "No disponible";
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    }).format(date);
+};
+
+// Lenguajes mapeados para mostrar nombres en español
+const languageMap = {
+    en: "Inglés",
+    es: "Español",
+    fr: "Francés",
+    de: "Alemán",
+    it: "Italiano",
+    pt: "Portugués",
+    ru: "Ruso",
+    ja: "Japonés",
+    ko: "Coreano",
+    zh: "Chino",
+    ar: "Árabe",
+    hi: "Hindi",
+    // Añade más mapeos según necesites
+};
+
+const providerLinks = {
+    'Netflix': 'https://www.netflix.com/',
+    'Disney Plus': 'https://www.disneyplus.com/',
+    'Max': 'https://www.max.com/',
+    'Amazon Prime Video': 'https://www.primevideo.com/',
+    'Apple TV+': 'https://tv.apple.com/',
+    'Filmin': 'https://www.filmin.es/',
+    'Movistar Plus+': 'https://www.movistarplus.es/',
+    'Rakuten TV': 'https://rakuten.tv/',
+    'SkyShowtime': 'https://www.skyshowtime.com/',
+    'MUBI': 'https://mubi.com/',
+    'FlixOlé': 'https://flixole.com/',
+    'Atresplayer': 'https://www.atresplayer.com/',
+    'RTVE Play': 'https://www.rtve.es/play/',
+    'Google Play Movies': 'https://play.google.com/store/movies',
+    'YouTube': 'https://www.youtube.com/',
+    'Microsoft Store': 'https://www.microsoft.com/store/movies',
+    'Plex': 'https://www.plex.tv/',
+    'fuboTV': 'https://www.fubo.tv/',
+    'Hayu': 'https://www.hayu.com/',
+    'Curiosity Stream': 'https://curiositystream.com/',
+    'GuideDoc': 'https://guidedoc.tv/',
+    'MagellanTV': 'https://www.magellantv.com/',
+    'DOCSVILLE': 'https://www.docsville.com/',
+    'WOW Presents Plus': 'https://www.wowpresentsplus.com/',
+    'Mitele': 'https://www.mitele.es/',
+    // Agrega más proveedores según sea necesario
+};
+
+const providerElements = item?.providers?.map((provider) => {
+    const link = providerLinks[provider.provider_name];
+    const hasLogo = !!provider.logo_path;
+    return {
+        name: provider.provider_name,
+        logo: hasLogo ? `https://image.tmdb.org/t/p/w200${provider.logo_path}` : null,
+        link,
+    };
+}) || [];
+
+// Función para convertir rating a estrellas
+const getRatingStars = (rating: number) => {
+    if (!rating) return "";
+    const fullStars = Math.floor(rating / 2);
+    const halfStar = rating % 2 >= 1 ? 1 : 0;
+    const emptyStars = 5 - fullStars - halfStar;
+
+    return "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(emptyStars);
+};
+
+function formatTrailerUrl(url) {
+    // Si ya es una URL de embed, devolverla tal cual
+    if (url.includes('youtube.com/embed/')) {
+        return url;
+    }
+
+    // Convertir URL normal de YouTube a URL de embed
+    let videoId = '';
+
+    // Manejar youtube.com/watch?v=ID
+    if (url.includes('youtube.com/watch')) {
+        const urlObj = new URL(url);
+        videoId = urlObj.searchParams.get('v');
+    }
+    // Manejar youtu.be/ID
+    else if (url.includes('youtu.be/')) {
+        videoId = url.split('youtu.be/')[1].split('?')[0];
+    }
+
+    if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+    }
+
+    // Si no es una URL de YouTube o no se puede extraer el ID, devolver la URL original
+    return url;
+}
+
+import type {PosterImage} from '../../services/yourfavsMovie'; // Asegúrate de exportar este tipo desde tu archivo api.ts
+
+let posters: PosterImage[] = [];
+
+if (id) {
+    try {
+        // Obtener todos los pósters
+        const allPosters = await fetchAllMoviePosters(id);
+        // Limitar a un máximo de 50 pósters
+        posters = allPosters.slice(0, 40);
+    } catch (error) {
+        console.error('Error al obtener pósters:', error);
+    }
+}
+
+// Obtener información de la colección
+let collectionInfo;
+if (item?.belongs_to_collection) {
+    try {
+        collectionInfo = await getMovieCollectionInfo(item.belongs_to_collection.id);
+    } catch (error) {
+        console.error('Error al obtener información de la colección:', error);
+    }
+}
+---
+
+<Layout title={`${title}`}>
+    <article class="bg-gray-50">
+        <!-- Hero Section con backdrop -->
+        <div
+                class="relative w-full h-96 bg-cover bg-center bg-no-repeat"
+                style={`background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(https://image.tmdb.org/t/p/original${item?.backdrop_path})`}
+        >
+            <div class="absolute inset-0 flex items-center justify-center flex-col px-4 text-center">
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
+                    {item?.title}
+                </h1>
+                <div class="flex items-center gap-4 text-white mb-4">
+                    <span class="text-yellow-400 text-xl font-bold">
+                        {item?.vote_average?.toFixed(1)} {getRatingStars(item?.vote_average)}
+                    </span>
+                    <span>{formatDate(item?.release_date)}</span>
+                </div>
+                {item?.genres && (
+                        <div class="flex flex-wrap justify-center gap-2 mb-6">
+                            {item.genres.map((genre) => (
+                                    <span class="bg-gray-800 bg-opacity-80 px-3 py-1 rounded-full text-xs text-white">
+                                {genre.name}
+                            </span>
+                            ))}
+                        </div>
+                )}
+            </div>
+        </div>
+
+        <div class="max-w-6xl mx-auto px-4 py-8">
+            <div class="flex flex-col md:flex-row gap-8">
+                <!-- Columna Izquierda: Poster y Acciones -->
+                <div class="md:w-1/3 flex flex-col items-center">
+                    <div class="w-64 h-auto rounded-lg overflow-hidden shadow-xl mb-6">
+                        <img
+                                class="w-full h-auto transform hover:scale-105 transition-all duration-300"
+                                src={`https://image.tmdb.org/t/p/w500${item?.poster_path}`}
+                                alt={item?.title}
+                        />
+                    </div>
+
+                    <div class="flex flex-col gap-4 w-full">
+                        <!-- Formulario para Personal -->
+                        <form method="POST" class="w-full">
+                            <input type="hidden" name="id" value={item?.id}/>
+                            <input type="hidden" name="poster_path" value={item?.poster_path || ''}/>
+                            <input type="hidden" name="title" value={item?.title || 'Sin nombre'}/>
+                            <input type="hidden" name="vote_average" value={item?.vote_average || 0}/>
+                            <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
+                            <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
+                            <input type="hidden" name="release_date" value={item?.release_date || ''}/>
+                            <input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/>
+                            <input type="hidden" name="list_type" value="favorites"/>
+
+                            {isInFavorites ? (
+                                    <button
+                                            type="submit"
+                                            class="w-full px-6 py-3 bg-red-600 text-white text-lg rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-300 flex items-center justify-center gap-2"
+                                            aria-live="polite"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                             fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                  d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Eliminar de favoritos
+                                    </button>
+                            ) : (
+                                    <button
+                                            type="submit"
+                                            class="w-full px-6 py-3 bg-blue-600 text-white text-lg rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 flex items-center justify-center gap-2"
+                                            aria-live="polite"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                             fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                  d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Añadir a favoritos
+                                    </button>
+                            )}
+                        </form>
+
+                        <!-- Formulario para Películas Pendientes -->
+                        <form method="POST" class="w-full">
+                            <input type="hidden" name="id" value={item?.id}/>
+                            <input type="hidden" name="poster_path" value={item?.poster_path || ''}/>
+                            <input type="hidden" name="title" value={item?.title || 'Sin nombre'}/>
+                            <input type="hidden" name="vote_average" value={item?.vote_average || 0}/>
+                            <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
+                            <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
+                            <input type="hidden" name="release_date" value={item?.release_date || ''}/>
+                            <input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/>
+                            <input type="hidden" name="list_type" value="pendientes"/>
+
+                            {isInPendientes ? (
+                                    <button
+                                            type="submit"
+                                            class="w-full px-6 py-3 bg-orange-600 text-white text-lg rounded-lg shadow-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-300 flex items-center justify-center gap-2"
+                                            aria-live="polite"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                             fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Eliminar de pendientes
+                                    </button>
+                            ) : (
+                                    <button
+                                            type="submit"
+                                            class="w-full px-6 py-3 bg-yellow-500 text-white text-lg rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-400 transition-all duration-300 flex items-center justify-center gap-2"
+                                            aria-live="polite"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                             fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Añadir a pendientes
+                                    </button>
+                            )}
+                        </form>
+
+                        <!-- Formulario para Películas Vistas -->
+                        <form method="POST" class="w-full">
+                            <input type="hidden" name="id" value={item?.id}/>
+                            <input type="hidden" name="poster_path" value={item?.poster_path || ''}/>
+                            <input type="hidden" name="title" value={item?.title || 'Sin nombre'}/>
+                            <input type="hidden" name="vote_average" value={item?.vote_average || 0}/>
+                            <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
+                            <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
+                            <input type="hidden" name="release_date" value={item?.release_date || ''}/>
+                            <input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/>
+                            <input type="hidden" name="list_type" value="vistas"/>
+
+                            {isInVistas ? (
+                                    <button
+                                            type="submit"
+                                            class="w-full px-6 py-3 bg-red-600 text-white text-lg rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all duration-300 flex items-center justify-center gap-2"
+                                            aria-live="polite"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                             fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm-4.707-5.293a1 1 0 001.414 0L10 9.414l3.293 3.293a1 1 0 001.414-1.414l-4-4a1 1 0 00-1.414 0l-4 4a1 1 0 000 1.414z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Eliminar de vistas
+                                    </button>
+                            ) : (
+                                    <button
+                                            type="submit"
+                                            class="w-full px-6 py-3 bg-green-600 text-white text-lg rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all duration-300 flex items-center justify-center gap-2"
+                                            aria-live="polite"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                             fill="currentColor">
+                                            <path fill-rule="evenodd"
+                                                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                                  clip-rule="evenodd"/>
+                                        </svg>
+                                        Marcar como vista
+                                    </button>
+                            )}
+                        </form>
+
+
+                        {(item?.homepage || trailerUrl) && (
+                                <a
+                                        href={item?.homepage || trailerUrl}
+                                        class="w-full px-6 py-3 bg-pink-600 text-white text-lg rounded-lg shadow-md hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all duration-300 flex items-center justify-center gap-2"
+                                        target="_blank"
+                                        rel="noopener"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
+                                         viewBox="0 0 24 24"
+                                         stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                    </svg>
+                                    Ver ahora
+                                </a>
+                        )}
+                    </div>
+
+                    <!-- Info Cards -->
+                    <div class="mt-8 w-full space-y-4">
+                        <div class="bg-white p-4 rounded-lg shadow-md">
+                            <h3 class="text-lg font-bold text-blue-600 mb-2">Información</h3>
+                            <ul class="space-y-2">
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Estreno:</span>
+                                    <span class="font-medium text-gray-600">{formatDate(item?.release_date)}</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Valoración:</span>
+                                    <span class="font-medium text-gray-600">{item?.vote_average?.toFixed(1)}
+                                        ({item?.vote_count} votos)</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Adulto:</span>
+                                    <span class="font-medium text-gray-600">{item?.adult ? "Sí" : "No"}</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Popularidad:</span>
+                                    <span class="font-medium text-gray-600">{item?.popularity?.toFixed(1)}</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Idioma original:</span>
+                                    <span class="font-medium text-gray-600">{languageMap[item?.original_language] || item?.original_language}</span>
+                                </li>
+                                {item?.original_title && item?.original_title !== item?.title && (
+                                        <li class="flex justify-between">
+                                            <span class="text-gray-600">Título original:</span>
+                                            <span class="font-medium text-gray-600">{item?.original_title}</span>
+                                        </li>
+                                )}
+                                {item?.runtime && (
+                                        <li class="flex justify-between">
+                                            <span class="text-gray-600">Duración:</span>
+                                            <span class="font-medium text-gray-600">
+                                                 {Math.floor(item.runtime / 60)} h {item.runtime % 60} min
+                                            </span>
+                                        </li>
+                                )}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Detalles -->
+                <div class="md:w-2/3">
+                    <!-- Sinopsis -->
+                    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                        <h2 class="text-2xl font-bold text-blue-600 mb-4">Sinopsis</h2>
+                        <p class="text-gray-700 leading-relaxed">{item?.overview || "No hay sinopsis disponible."}</p>
+                    </div>
+
+                    <!-- Trailer -->
+                    {trailerUrl && (
+                            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                                <h2 class="text-2xl font-bold text-blue-600 mb-4">Trailer</h2>
+                                <div class="aspect-video w-full">
+                                    <iframe
+                                            class="w-full h-full rounded"
+                                            src={formatTrailerUrl(trailerUrl)}
+                                            frameBorder="0"
+                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                            allowFullScreen
+                                    ></iframe>
+                                </div>
+                            </div>
+                    )}
+
+                    <!-- Colección -->
+                    {item?.belongs_to_collection && collectionInfo && (
+                            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                                <h2 class="text-2xl font-bold text-blue-600 mb-4">Saga / Colección</h2>
+                                <div class="mb-4">
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">{collectionInfo.name}</h3>
+                                    {collectionInfo.overview && (
+                                            <p class="text-gray-700 mb-4">{collectionInfo.overview}</p>
+                                    )}
+                                </div>
+
+                                {collectionInfo.parts && collectionInfo.parts.length > 0 && (
+                                        <div class="mt-4">
+                                            <h4 class="text-lg font-medium text-gray-700 mb-3">Películas en esta
+                                                colección:</h4>
+                                            <div class="carousel-container relative max-w-full overflow-hidden">
+                                                <div class="carousel-track flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                                                    {collectionInfo.parts
+                                                        .sort((a, b) => {
+                                                            const dateA = new Date(a.release_date || '9999-12-31').getTime();
+                                                            const dateB = new Date(b.release_date || '9999-12-31').getTime();
+                                                            return dateA - dateB;
+                                                        })
+                                                        .map((movie) => (
+                                                                <div class="carousel-slide flex-shrink-0 w-36">
+                                                                    <a href={`/movie/${movie.id}`} class="block">
+                                                                        <div class="relative group">
+                                                                            <!-- Contenedor para la imagen con padding condicional -->
+                                                                            <div class={`relative rounded-lg overflow-hidden ${movie.id === item.id ? 'p-1 bg-blue-500' : ''}`}>
+                                                                                <img
+                                                                                        src={movie.poster_path || '/img/no-poster.png'}
+                                                                                        alt={movie.title}
+                                                                                        loading="lazy"
+                                                                                        class="w-full h-48 object-cover rounded-lg shadow-md hover:brightness-90 transition-all duration-200"
+                                                                                />
+                                                                                <!-- Overlay para películas que no son la actual -->
+                                                                                {movie.id !== item.id && (
+                                                                                        <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all duration-200 rounded-lg"></div>
+                                                                                )}
+                                                                            </div>
+
+                                                                            <!-- Etiqueta "Actual" mejorada -->
+                                                                            {movie.id === item.id && (
+                                                                                    <div class="absolute bottom-0 left-0 right-0 bg-blue-600 text-white text-xs py-1 font-medium text-center">
+                                                                                        Actual
+                                                                                    </div>
+                                                                            )}
+                                                                        </div>
+                                                                        <p class="text-gray-600 text-sm font-medium text-center mt-2 line-clamp-2">
+                                                                            {movie.title}
+                                                                        </p>
+                                                                        <p class="text-xs text-gray-600 text-center mt-1">
+                                                                            {movie.release_date ? new Date(movie.release_date).getFullYear() : 'Próximamente'}
+                                                                        </p>
+                                                                    </a>
+                                                                </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                )}
+                            </div>
+                    )}
+
+                    <!-- Pósters -->
+                    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                        <h2 class="text-2xl font-bold text-blue-600 mb-4">Pósters</h2>
+
+                        {posters && posters.length > 0 ? (
+                                <div class="carousel-container relative max-w-full overflow-hidden">
+                                    <div class="carousel-track flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+                                        {posters.slice(0, 40).map((poster, index) => (
+                                                <>
+                                                    <div class="carousel-slide flex-shrink-0 w-48">
+                                                        <a href={`#poster-${index}`}>
+                                                            <img
+                                                                    src={poster.file_path}
+                                                                    alt={`Póster ${poster.vote_average.toFixed(1)}/10`}
+                                                                    loading="lazy"
+                                                                    class="rounded-lg shadow-md w-full h-64 object-cover"
+                                                            />
+                                                        </a>
+                                                    </div>
+
+                                                    {/* Modal de imagen */}
+                                                    <div id={`poster-${index}`} class="modal">
+                                                        <a href="#" class="modal-close">&times;</a>
+                                                        <img src={poster.file_path} alt={`Póster ${poster.vote_average.toFixed(1)}/10`} />
+                                                    </div>
+                                                </>
+                                        ))}
+                                    </div>
+                                </div>
+                        ) : (
+                                <p class="text-gray-600 text-center">No se encontraron pósters para esta serie</p>
+                        )}
+                    </div>
+
+                    <!-- Reparto y Equipo -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        {/* Reparto */}
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto</h2>
+                            <div class="text-gray-600">
+                                {cast?.length > 0 ? (
+                                        <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                            {cast.map((actor) => (
+                                                    <li class="border-b border-gray-100 py-1 last:border-0">
+                                                        <a
+                                                                href={`/actor/${actor}`}
+                                                                class="text-gray-600 hover:text-blue-600 hover:underline transition duration-300"
+                                                        >
+                                                            {actor}
+                                                        </a>
+                                                    </li>
+                                            ))}
+                                        </ul>
+                                ) : (
+                                        <p class="text-gray-500">Información no disponible</p>
+                                )}
+                            </div>
+                        </div>
+
+                        <!-- Equipo -->
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo</h2>
+                            <div class="text-gray-600">
+                                {directors?.length > 0 ? (
+                                        <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                            {directors.map((director) => (
+                                                    <li class="border-b border-gray-100 py-1 last:border-0">
+                                                        <span class="font-medium">{director.job}: </span>
+                                                        <span>{director.name}</span>
+                                                    </li>
+                                            ))}
+                                        </ul>
+                                ) : (
+                                        <p class="text-gray-500">Información no disponible</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Plataformas y Productoras en dos columnas -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <!-- Plataformas -->
+                        {providerElements.length > 0 && (
+                                <div class="bg-white p-6 rounded-lg shadow-md">
+                                    <h2 class="text-2xl font-bold text-blue-600 mb-4">Disponible en</h2>
+                                    <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                        {providerElements.map((provider) => (
+                                                <div class="flex flex-col items-center">
+                                                    {provider.logo ? (
+                                                        provider.link ? (
+                                                                <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                    <img
+                                                                            src={provider.logo}
+                                                                            alt={provider.name}
+                                                                            loading="lazy"
+                                                                            class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
+                                                                    />
+                                                                </a>
+                                                        ) : (
+                                                                <img
+                                                                        src={provider.logo}
+                                                                        alt={provider.name}
+                                                                        loading="lazy"
+                                                                        class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
+                                                                />
+                                                        )
+                                                    ) : (
+                                                            <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                <span class="text-xs text-gray-500">Sin logo</span>
+                                                            </div>
+                                                    )}
+                                                    <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                </div>
+                                        ))}
+                                    </div>
+                                </div>
+                        )}
+
+                        <!-- Productoras -->
+                        {item?.production_companies && item.production_companies.length > 0 && (
+                                <div class="bg-white p-6 rounded-lg shadow-md">
+                                    <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
+                                    <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                        {item.production_companies.map((company) => (
+                                                <div class="flex flex-col items-center">
+                                                    {company?.logo_path ? (
+                                                            <img
+                                                                    src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
+                                                                    alt={company.name}
+                                                                    loading="lazy"
+                                                                    class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
+                                                            />
+                                                    ) : (
+                                                            <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                <span class="text-xs text-gray-500">Sin logo</span>
+                                                            </div>
+                                                    )}
+                                                    <p class="text-xs text-center text-gray-500">{company.name}</p>
+                                                </div>
+                                        ))}
+                                    </div>
+                                </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </article>
+</Layout>
+
+<style>
+    /* Estilos básicos */
+    .transition-all {
+        transition: all 0.3s ease-in-out;
+    }
+
+    .text-yellow-400 {
+        color: #fbbf24;
+    }
+
+    /* Efecto hover para imágenes */
+    img.hover\:scale-105:hover {
+        transform: scale(1.05);
+    }
+
+    /* Gradiente para el texto sobre imágenes oscuras */
+    .text-shadow {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Mejorar legibilidad para estrellas de rating */
+    .rating-stars {
+        letter-spacing: 1px;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .modal:target {
+        display: flex;
+    }
+
+    .modal img {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 0.5rem;
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 2rem;
+        right: 2rem;
+        color: white;
+        font-size: 2rem;
+        text-decoration: none;
+        font-weight: bold;
+    }
+</style>

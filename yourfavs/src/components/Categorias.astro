@@ -1,0 +1,308 @@
+---
+import CardMovie from "./CardMovie.astro";
+import {getMoviesByCategory} from "../services/yourfavsMovie";
+import {getSeriesByCategory} from "../services/yourfavsSerie";
+import CardSerie from "./CardSerie.astro";
+import CategoriasButton from "./CategoriasButton.astro";
+
+// Obtener los parámetros de la URL
+const url = new URL(Astro.request.url);
+const page = Number(url.searchParams.get('page') || 1);
+// Obtener la categoría de los parámetros de búsqueda, con valor predeterminado "proximamente"
+const category = url.searchParams.get('categoria') || 'proximamente';
+
+// Cargar las películas y series para la página y categoría actual
+const latestMovies = await getMoviesByCategory(category, page.toString());
+const latestSeries = await getSeriesByCategory(category, page.toString());
+
+// Total de páginas, puedes obtenerlo del API o mantenerlo como un valor estático
+const totalPages = 190;
+
+// Formatear el nombre de la categoría para mostrar (reemplazar guiones bajos por espacios)
+const formattedCategory = category.replace(/_/g, ' ');
+
+console.log("Categoría seleccionada:", category);
+// Definir los géneros comunes
+const genresMap = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+
+// Modifica esta función para que mantenga la categoría al cambiar páginas
+function generateUrl(newCategory?: string, newPage: number = 1): string {
+    const newParams = new URLSearchParams();
+    newParams.set('categoria', newCategory || category);
+    newParams.set('page', newPage.toString());
+    return `?${newParams.toString()}`;
+}
+---
+<!-- Checkbox to control the visibility of the menu on mobile -->
+<input type="checkbox" id="nav-togglee" class="hidden">
+
+<!-- Label that acts as a button to toggle the menu -->
+<label for="nav-togglee"
+       class="cursor-pointer md:hidden block text-white bg-dark-blue rounded-md px-4 py-2 mt-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center">
+</label>
+
+<nav class="flex flex-col items-center justify-center w-full rounded-b-xl bg-dark-blue text-center md:flex-row md:flex-wrap sticky-navi hidden md:flex"
+     id="nav-menuu">
+    <a href={generateUrl('accion')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'accion' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Acción</a>
+    <a href={generateUrl('comedia')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'comedia' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Comedia</a>
+    <a href={generateUrl('drama')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'drama' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Drama</a>
+    <a href={generateUrl('crimen')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'crimen' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Crimen</a>
+    <a href={generateUrl('aventura')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'aventura' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Aventura</a>
+    <a href={generateUrl('fantasia')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'fantasia' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Fantasía</a>
+    <a href={generateUrl('ciencia_ficcion')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'ciencia_ficcion' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Ciencia
+        Ficción</a>
+    <a href={generateUrl('misterio')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'misterio' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Misterio</a>
+    <a href={generateUrl('terror')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'terror' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Terror</a>
+    <a href={generateUrl('animacion')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'animacion' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Animación</a>
+    <a href={generateUrl('familia')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'familia' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Familia</a>
+    <a href={generateUrl('proximamente')}
+       class={`px-4 py-2 text-white hover:bg-blue-700 focus:outline-none ${category === 'proximamente' ? 'font-bold border-b-2 border-coral-red' : ''}`}>Proximamente</a>
+
+</nav>
+
+
+<h1 class="text-coral-red py-3 px-4 font-bold mt-2 text-3xl sm:text-3xl md:text-4xl lg:text-5xl w-full text-center relative">
+    {formattedCategory.toUpperCase()}
+</h1>
+
+<!-- Paginación Mejorada para Móviles -->
+<nav aria-label="Paginación" class="flex items-center justify-center mb-8">
+    <!-- En pantallas pequeñas (móviles) - Diseño vertical compacto -->
+    <div class="flex flex-col w-full max-w-xs gap-2 p-2 bg-white rounded-lg shadow-md sm:hidden">
+        <div class="flex justify-center items-center px-2 py-1">
+            <span class="font-medium text-gray-700 text-sm">Página</span>
+            <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold text-sm">{page}</span>
+            <span class="font-medium text-gray-700 text-sm">de {totalPages}</span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+            <a href={generateUrl(category, Math.max(1, page - 1))}
+               class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+               aria-disabled={page === 1}>
+                <span class="mr-1">←</span> Anterior
+            </a>
+
+            <a href={generateUrl(category, Math.min(totalPages, page + 1))}
+               class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+               aria-disabled={page === totalPages}>
+                Siguiente <span class="ml-1">→</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- En pantallas medianas y grandes - Diseño horizontal -->
+    <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
+        <a href={generateUrl(category, Math.max(1, page - 1))}
+           class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+           aria-disabled={page === 1}>
+            <span class="mr-1">←</span> Anterior
+        </a>
+
+        <div class="flex items-center px-4">
+            <span class="font-medium text-gray-700">Página</span>
+            <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold">{page}</span>
+            <span class="font-medium text-gray-700">de {totalPages}</span>
+        </div>
+
+        <a href={generateUrl(category, Math.min(totalPages, page + 1))}
+           class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+           aria-disabled={page === totalPages}>
+            Siguiente <span class="ml-1">→</span>
+        </a>
+    </div>
+</nav>
+
+<h2 class="text-coral-red py-3 px-4 font-bold mb-1 text-3xl">PELICULAS</h2>
+<div class="grid gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 w-full">
+    {
+        latestMovies.map((item) => (
+                <CardMovie
+                        id={item.id.toString()}
+                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                        title={item.title}
+                        vote_average={item.vote_average}
+                        overview={item.overview}
+                        release_date={item.release_date}
+                        genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                        providers={item.providers}
+                />
+        ))
+    }
+</div>
+
+<h2 class="text-coral-red py-3 px-4 font-bold mb-1 text-3xl">SERIES</h2>
+<div class="grid gap-6 grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 w-full">
+    {
+        latestSeries.map((item) => (
+                <CardSerie
+                        id={item.id.toString()}
+                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                        name={item.name}
+                        vote_average={item.vote_average}
+                        overview={item.overview}
+                        first_air_date={item.first_air_date}
+                        seasons={item.seasons}
+                        last_episode_to_air={item.last_episode_to_air}
+                        next_episode_to_air={item.next_episode_to_air}
+                        genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                        status={item.status}
+                />
+        ))
+    }
+</div>
+
+<div class="mt-12 flex justify-center">
+    <div class="inline-flex rounded-md shadow-sm">
+        {page > 2 && (
+                <a href={generateUrl(category, 1)}
+                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
+                    1
+                </a>
+        )}
+
+        {page > 3 && (
+                <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
+                    ...
+                </span>
+        )}
+
+        {page > 1 && (
+                <a href={generateUrl(category, page - 1)}
+                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                    {page - 1}
+                </a>
+        )}
+
+        <a href={generateUrl(category, page)} class="px-3 py-2 bg-coral-red text-white border border-coral-red">
+            {page}
+        </a>
+
+        {page < totalPages && (
+                <a href={generateUrl(category, page + 1)}
+                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                    {page + 1}
+                </a>
+        )}
+
+        {page < totalPages - 2 && (
+                <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
+                    ...
+                </span>
+        )}
+
+        {page < totalPages - 1 && (
+                <a href={generateUrl(category, totalPages)}
+                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
+                    {totalPages}
+                </a>
+        )}
+    </div>
+</div>
+
+<style is:global>
+    .text-coral-red {
+        color: #E63946;
+    }
+
+    .bg-coral-red {
+        background-color: #E63946;
+    }
+
+    .bg-dark-blue {
+        background-color: #112d7d;
+    }
+
+    .sticky-navi {
+        position: sticky;
+        top: 0;
+        z-index: 1000;
+        background-color: #112d7d;
+    }
+
+    /* Mostrar el menú cuando el checkbox está marcado */
+    #nav-togglee:checked ~ #nav-menuu {
+        display: flex;
+    }
+
+    /* Estilos para el botón "Categorías" */
+    label[for="nav-togglee"] {
+        text-transform: uppercase; /* Siempre en mayúsculas */
+        width: 100%;
+        text-align: center;
+        padding: 10px 0;
+    }
+
+    /* Asegurar que el texto del botón "Categorías" no cambie */
+    label[for="nav-togglee"]::after {
+        content: "CATEGORÍAS";
+        display: block;
+        text-transform: uppercase; /* Asegurar que siempre esté en mayúsculas */
+    }
+
+    /* Evitar que el texto cambie al abrir el menú */
+    #nav-togglee:checked + label::after {
+        content: "CATEGORÍAS";
+    }
+
+    /* Ajustes para el menú en móviles */
+    @media (max-width: 768px) {
+        #nav-menuu {
+            flex-direction: column;
+            align-items: center;
+        }
+    }
+
+    /* Ajustes para el menú en pantallas más grandes */
+    @media (min-width: 769px) {
+        #nav-menuu {
+            flex-direction: row;
+            justify-content: center;
+        }
+    }
+</style>

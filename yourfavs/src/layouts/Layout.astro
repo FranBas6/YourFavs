@@ -1,0 +1,191 @@
+---
+import Header from "../components/Header.astro";
+import {ViewTransitions} from "astro:transitions";
+import "@fontsource/poppins/400.css";
+import "@fontsource/poppins/500.css";
+import "@fontsource/poppins/600.css";
+import "@fontsource/poppins/700.css";
+
+interface Props {
+    title: string;
+    description?: string;
+}
+
+const {title, description = "Tu plataforma favorita para descubrir películas y series"} = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
+    <meta name="generator" content={Astro.generator}/>
+    <meta name="description" content={description}/>
+    <meta name="theme-color" content="#3B82F6"/>
+    <meta property="og:title" content={title}/>
+    <meta property="og:description" content={description}/>
+    <meta property="og:type" content="website"/>
+    <title>{title}</title>
+    <ViewTransitions/>
+</head>
+<body class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins">
+<Header/>
+<main class="max-w-7xl w-full px-3 sm:px-6 lg:px-8 mx-auto pt-4 sm:pt-6 md:pt-8 lg:pt-10">
+    <slot/>
+</main>
+<footer class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-8 sm:mt-12 md:mt-16 pb-4 sm:pb-6 md:pb-8 text-center text-xs sm:text-sm text-gray-500">
+    <p>&copy; {new Date().getFullYear()} YourFavs. Todos los derechos reservados.</p>
+</footer>
+</body>
+</html>
+
+<style is:global>
+    :root {
+        /* Colores existentes */
+        --color-primary: #3B82F6;
+        --color-secondary: #2563EB;
+        --color-background: #F3F4F6;
+        --color-text: #1F2937;
+        --color-text-light: #6B7280;
+
+        /* Colores adicionales para las tarjetas */
+        --color-midnight-blue: #006ea7;
+        --color-dark-blue: #112d7d;
+        --color-coral-plat: #ffffff;
+        --color-coral-white: #d5d5d2;
+        --color-pastel-yellow: #FACC15;
+    }
+
+    .bg-light-gray {
+        background-color: #F3F4F6;
+    }
+
+    html {
+        font-family: 'Poppins', sans-serif;
+        scroll-behavior: smooth;
+        color-scheme: light;
+        font-size: 16px;
+    }
+
+    @media (max-width: 640px) {
+        html {
+            font-size: 14px;
+        }
+    }
+
+    body {
+        color: var(--color-text);
+        margin: 0;
+        padding: 0;
+        transition: background-color 0.3s ease;
+        width: 100%;
+        overflow-x: hidden;
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    /* Mejoras para accesibilidad en elementos de enfoque */
+    :focus-visible {
+        outline: 2px solid var(--color-primary);
+        outline-offset: 2px;
+    }
+
+    /* Mejoras para el scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    @media (max-width: 640px) {
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 5px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: #a1a1a1;
+    }
+
+    /* Animaciones para transiciones de página */
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    main {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    .container {
+        width: 100%;
+        margin-right: auto;
+        margin-left: auto;
+    }
+
+    /* Grid responsivo básico */
+    .grid {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    @media (min-width: 640px) {
+        .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 768px) {
+        .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+
+    @media (min-width: 1024px) {
+        .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .lg\:grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    }
+
+    /* Media queries para modo oscuro */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --color-background: #1F2937;
+            --color-text: #F9FAFB;
+            --color-text-light: #D1D5DB;
+        }
+
+        body {
+            background-color: var(--color-background);
+            color: var(--color-text);
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #374151;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #6B7280;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9CA3AF;
+        }
+    }
+</style>

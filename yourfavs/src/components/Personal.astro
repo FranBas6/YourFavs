@@ -1,0 +1,811 @@
+---
+import CardMovie from "./CardMovie.astro";
+import CardSerie from "./CardSerie.astro";
+import {
+    getSerieFav,
+    getSeriesPendientes,
+    getSeriesVistas,
+    getSeriesSiguiendo,
+    getLikedSeries,
+    getRecommendedSeries
+} from "../services/yourfavsSerie";
+import {getMovieFav, getMoviesPendientes, getMoviesVistas, getRecommendedMovies} from "../services/yourfavsMovie";
+
+/// Obtener todas las series y películas de las diferentes categorías
+const seriesFavoritas = await getSerieFav();
+const seriesPendientes = await getSeriesPendientes();
+const seriesVistas = await getSeriesVistas();
+const seriesSiguiendo = await getSeriesSiguiendo(); // Añadir esta línea
+const likedSeries = await getLikedSeries();
+const seriesRecomendadas = await getRecommendedSeries() // Añadir esta línea
+
+const peliculasFavoritas = await getMovieFav();
+const peliculasPendientes = await getMoviesPendientes();
+const peliculasVistas = await getMoviesVistas();
+const peliculasRecomendadas = await getRecommendedMovies() // Añadir esta línea
+
+// Determinar qué tipo de contenido mostrar basado en los parámetros
+const filter = Astro.url.searchParams.get("filter") || "todos";
+const showSeries = filter === "series" || filter === "todos";
+const showMovies = filter === "peliculas" || filter === "todos";
+const showAll = filter === "todos";
+
+// Determinar qué categoría mostrar
+const category = Astro.url.searchParams.get("category") || "favoritos";
+const showFavoritos = category === "favoritos" || category === "todos";
+const showPendientes = category === "pendientes" || category === "todos";
+const showVistos = category === "vistos" || category === "todos";
+const showSiguiendo = category === "siguiendo" || category === "todos";
+const showLiked = category === "liked" || category === "todos"; // Add this line
+const showRecomendadas = category === "recomendadas" || category === "todos"; // Add this line
+
+// Definir los géneros comunes
+const genresMap = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+
+// Actualizar los cálculos de estadísticas
+const totalSeries = seriesFavoritas.length + seriesPendientes.length + seriesVistas.length + seriesSiguiendo.length + likedSeries.length;
+const totalPeliculas = peliculasFavoritas.length + peliculasPendientes.length + peliculasVistas.length;
+const totalContenido = totalSeries + totalPeliculas;
+---
+<div class="favorites-container max-w-7xl mx-auto px-4 py-8">
+    <!-- Barra de navegación mejorada con efectos -->
+    <nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 rounded-xl shadow-lg mb-6">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex flex-wrap justify-center gap-4 items-center">
+                <a href={`?filter=todos&category=${category}`}
+                   class={`px-5 py-3 rounded-lg transition-all duration-300 text-white font-medium 
+               ${showAll ? "bg-blue-500 shadow-md transform scale-105" : "bg-blue-700 hover:bg-blue-600"}`}>
+                    Todo el contenido
+                </a>
+                <a href={`?filter=series&category=${category}`}
+                   class={`px-5 py-3 rounded-lg transition-all duration-300 text-white font-medium 
+               ${showSeries && !showAll ? "bg-blue-500 shadow-md transform scale-105" : "bg-blue-700 hover:bg-blue-600"}`}>
+                    Series
+                </a>
+                <a href={`?filter=peliculas&category=${category}`}
+                   class={`px-5 py-3 rounded-lg transition-all duration-300 text-white font-medium 
+               ${showMovies && !showAll ? "bg-blue-500 shadow-md transform scale-105" : "bg-blue-700 hover:bg-blue-600"}`}>
+                    Películas
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Barra de navegación secundaria (Categorías) -->
+    <nav class="bg-gradient-to-r from-gray-100 to-gray-200 rounded-xl shadow-md mb-8">
+        <div class="container mx-auto px-4 py-2">
+            <div class="flex flex-wrap justify-center gap-3 items-center">
+                <a href={`?filter=${filter}&category=favoritos`}
+                   class={`px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700
+               ${showFavoritos ? "bg-white shadow-md transform scale-105" : "bg-gray-200 hover:bg-gray-300"}`}>
+                <span class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-yellow-500" viewBox="0 0 20 20"
+                         fill="currentColor">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                    </svg>
+                    Favoritos
+                </span>
+                </a>
+                <a href={`?filter=${filter}&category=pendientes`}
+                   class={`px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700
+           ${showPendientes ? "bg-white shadow-md transform scale-105" : "bg-gray-200 hover:bg-gray-300"}`}>
+            <span class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-blue-500" viewBox="0 0 20 20"
+                     fill="currentColor">
+                    <path fill-rule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                          clip-rule="evenodd"/>
+                </svg>
+                Pendientes
+            </span>
+                </a>
+
+                {/* Mostrar "Siguiendo" solo si NO está en modo de películas */}
+                {!showMovies || showAll ? (
+                        <a href={`?filter=${filter}&category=siguiendo`}
+                           class={`px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700
+                   ${showSiguiendo ? "bg-white shadow-md transform scale-105" : "bg-gray-200 hover:bg-gray-300"}`}>
+                    <span class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-purple-500" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" width="24"
+                             height="24" stroke-width="2">
+                            <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"></path>
+                            <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"></path>
+                        </svg>
+                        Siguiendo
+                    </span>
+                        </a>
+                ) : null}
+
+                {/* Mostrar "Me gustan" solo si NO está en modo de películas */}
+                {!showMovies || showAll ? (
+                        <a href={`?filter=${filter}&category=liked`}
+                           class={`px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700
+                    ${showLiked ? "bg-white shadow-md transform scale-105" : "bg-gray-200 hover:bg-gray-300"}`}>
+                    <span class="flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-pink-500" viewBox="0 0 20 20"
+                             fill="currentColor">
+                            <path fill-rule="evenodd"
+                                  d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                  clip-rule="evenodd"/>
+                        </svg>
+                        Me gustan
+                    </span>
+                        </a>
+                ) : null}
+
+                <a href={`?filter=${filter}&category=vistos`}
+                   class={`px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700
+               ${showVistos ? "bg-white shadow-md transform scale-105" : "bg-gray-200 hover:bg-gray-300"}`}>
+                <span class="flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-green-500" viewBox="0 0 20 20"
+                         fill="currentColor">
+                        <path fill-rule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clip-rule="evenodd"/>
+                    </svg>
+                    Vistos
+                </span>
+                </a>
+                <a href={`?filter=${filter}&category=recomendadas`}
+                   class={`px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700
+            ${showRecomendadas ? "bg-white shadow-md transform scale-105" : "bg-gray-200 hover:bg-gray-300"}`}>
+            <span class="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-orange-500" viewBox="0 0 20 20"
+                     fill="currentColor">
+                    <path
+                            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                Recomendadas
+            </span>
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Panel de estadísticas mejorado -->
+    <div class="stats-container grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div class="stat-card bg-gradient-to-br from-blue-100 to-blue-200 p-4 rounded-xl shadow-md">
+            <h3 class="text-blue-800 text-lg font-semibold">Series</h3>
+            <p class="text-3xl font-bold text-blue-900">{totalSeries}</p>
+            <div class="text-xs text-blue-700 mt-1">
+                <div class="flex justify-between mb-1">
+                    <span>Favoritas: {seriesFavoritas.length}</span>
+                    <span>Pendientes: {seriesPendientes.length}</span>
+                    <span>Siguiendo: {seriesSiguiendo.length}</span>
+                </div>
+                <div class="flex justify-around">
+                    <span>Me gustan: {likedSeries.length}</span>
+                    <span>Vistas: {seriesVistas.length}</span>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card bg-gradient-to-br from-red-100 to-red-200 p-4 rounded-xl shadow-md">
+            <h3 class="text-red-800 text-lg font-semibold">Películas</h3>
+            <p class="text-3xl font-bold text-red-900">{totalPeliculas}</p>
+            <div class="text-xs text-red-700 mt-1 flex justify-between">
+                <span>Favoritas: {peliculasFavoritas.length}</span>
+                <span>Pendientes: {peliculasPendientes.length}</span>
+                <span>Vistas: {peliculasVistas.length}</span>
+            </div>
+        </div>
+        <div class="stat-card bg-gradient-to-br from-indigo-100 to-indigo-200 p-4 rounded-xl shadow-md">
+            <h3 class="text-indigo-800 text-lg font-semibold">Total contenido</h3>
+            <p class="text-3xl font-bold text-indigo-900">{totalContenido}</p>
+            <div class="text-xs text-indigo-700 mt-1">
+                <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div class="bg-blue-600 h-2 rounded-full"
+                         style={`width: ${(totalSeries / totalContenido) * 100}%`}></div>
+                </div>
+                <div class="flex justify-between mt-1">
+                    <span>Series: {Math.round((totalSeries / totalContenido) * 100)}%</span>
+                    <span>Películas: {Math.round((totalPeliculas / totalContenido) * 100)}%</span>
+                </div>
+            </div>
+        </div>
+        <div class="stat-card bg-gradient-to-br from-purple-100 to-purple-200 p-4 rounded-xl shadow-md">
+            <h3 class="text-purple-800 text-lg font-semibold">Última actualización</h3>
+            <p class="text-sm font-bold text-purple-900">{new Date().toLocaleDateString()}</p>
+            <div class="text-xs text-purple-700 mt-2">
+                <div class="flex items-center">
+                    <div class="h-2 w-2 rounded-full bg-green-500 mr-1"></div>
+                    <span>Vistos: {seriesVistas.length + peliculasVistas.length}</span>
+                </div>
+                <div class="flex items-center mt-1">
+                    <div class="h-2 w-2 rounded-full bg-yellow-500 mr-1"></div>
+                    <span>Pendientes: {seriesPendientes.length + peliculasPendientes.length}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenedor principal de contenido -->
+    <div class="content-sections">
+        {/* SECCIÓN DE FAVORITOS */}
+        {(showFavoritos) && (
+                <div class="favorites-section mb-10 animate-fadeIn">
+                    <div class="section-header flex items-center gap-4 mb-4">
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-yellow-300 to-yellow-500"></div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-yellow-500"
+                                 viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            Contenido Favorito
+                        </h2>
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-yellow-500 to-yellow-300"></div>
+                    </div>
+
+                    {/* Series Favoritas */}
+                    {(showSeries || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-blue-700 mb-4 pl-4 border-l-4 border-blue-500">
+                                    Series Favoritas</h3>
+
+                                {seriesFavoritas.length === 0 ? (
+                                        <div class="empty-state bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-blue-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-blue-700 mb-1">Aún no tienes series
+                                                favoritas</h3>
+                                            <p class="text-blue-600 text-sm">Explora el catálogo y guarda las series que
+                                                más te gusten.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {seriesFavoritas.map((item) => (
+                                                    <CardSerie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            name={item.name}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            first_air_date={item.first_air_date}
+                                                            seasons={item.seasons}
+                                                            last_episode_to_air={item.last_episode_to_air}
+                                                            next_episode_to_air={item.next_episode_to_air}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            status={item.status}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+
+                    {/* Películas Favoritas */}
+                    {(showMovies || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-red-700 mb-4 pl-4 border-l-4 border-red-500">
+                                    Películas Favoritas</h3>
+
+                                {peliculasFavoritas.length === 0 ? (
+                                        <div class="empty-state bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-red-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-red-700 mb-1">Aún no tienes películas
+                                                favoritas</h3>
+                                            <p class="text-red-600 text-sm">Explora el catálogo y guarda las películas
+                                                que más te gusten.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {peliculasFavoritas.map((item) => (
+                                                    <CardMovie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            title={item.title}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            release_date={item.release_date}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            providers={item.providers}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+                </div>
+        )}
+
+        {/* SECCIÓN DE SIGUIENDO (después de PENDIENTES y antes de VISTOS) */}
+        {(showSiguiendo) && (showSeries || showAll) && (
+                <div class="following-section mb-10 animate-fadeIn">
+                    <div class="section-header flex items-center gap-4 mb-4">
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-purple-300 to-purple-500"></div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-purple-500"
+                                 viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Series en Seguimiento
+                        </h2>
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-purple-500 to-purple-300"></div>
+                    </div>
+
+                    {/* Series Siguiendo (solo se muestra si se filtran series o todos) */}
+                    {(showSeries || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-blue-700 mb-4 pl-4 border-l-4 border-blue-500">
+                                    Series en Seguimiento</h3>
+
+                                {seriesSiguiendo.length === 0 ? (
+                                        <div class="empty-state bg-purple-50 border border-purple-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-purple-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-purple-700 mb-1">No estás siguiendo
+                                                ninguna serie</h3>
+                                            <p class="text-purple-600 text-sm">Agrega series que estés viendo
+                                                actualmente para seguir su progreso.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {seriesSiguiendo.map((item) => (
+                                                    <CardSerie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            name={item.name}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            first_air_date={item.first_air_date}
+                                                            seasons={item.seasons}
+                                                            last_episode_to_air={item.last_episode_to_air}
+                                                            next_episode_to_air={item.next_episode_to_air}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            status={item.status}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+                </div>
+        )}
+
+        {/* SECCIÓN DE SERIES ME GUSTAN */}
+        {(showLiked) && (showSeries || showAll) && (
+                <div class="liked-section mb-10 animate-fadeIn">
+                    <div class="section-header flex items-center gap-4 mb-4">
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-pink-300 to-pink-500"></div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-pink-500"
+                                 viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd" />
+                            </svg>
+                            Series Me Gustan
+                        </h2>
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-pink-500 to-pink-300"></div>
+                    </div>
+
+                    {/* Series Me Gustan (solo se muestra si se filtran series o todos) */}
+                    {(showSeries || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-blue-700 mb-4 pl-4 border-l-4 border-blue-500">
+                                    Series Me Gustan</h3>
+
+                                {likedSeries.length === 0 ? (
+                                        <div class="empty-state bg-pink-50 border border-pink-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-pink-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-pink-700 mb-1">Aún no has marcado
+                                                series como "me gusta"</h3>
+                                            <p class="text-pink-600 text-sm">Marca las series que te gustan para
+                                                encontrarlas fácilmente después.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {likedSeries.map((item) => (
+                                                    <CardSerie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            name={item.name}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            first_air_date={item.first_air_date}
+                                                            seasons={item.seasons}
+                                                            last_episode_to_air={item.last_episode_to_air}
+                                                            next_episode_to_air={item.next_episode_to_air}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            status={item.status}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+                </div>
+        )}
+
+        {/* SECCIÓN DE PENDIENTES */}
+        {(showPendientes) && (
+                <div class="pending-section mb-10 animate-fadeIn">
+                    <div class="section-header flex items-center gap-4 mb-4">
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-blue-300 to-blue-500"></div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-blue-500"
+                                 viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Contenido Pendiente
+                        </h2>
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-blue-500 to-blue-300"></div>
+                    </div>
+
+                    {/* Series Pendientes */}
+                    {(showSeries || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-blue-700 mb-4 pl-4 border-l-4 border-blue-500">
+                                    Series Pendientes</h3>
+
+                                {seriesPendientes.length === 0 ? (
+                                        <div class="empty-state bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-blue-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-blue-700 mb-1">No tienes series
+                                                pendientes</h3>
+                                            <p class="text-blue-600 text-sm">¡Todo al día o aún no has añadido series
+                                                para ver después!</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {seriesPendientes.map((item) => (
+                                                    <CardSerie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            name={item.name}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            first_air_date={item.first_air_date}
+                                                            seasons={item.seasons}
+                                                            last_episode_to_air={item.last_episode_to_air}
+                                                            next_episode_to_air={item.next_episode_to_air}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            status={item.status}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+
+                    {/* Películas Pendientes */}
+                    {(showMovies || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-red-700 mb-4 pl-4 border-l-4 border-red-500">
+                                    Películas Pendientes</h3>
+
+                                {peliculasPendientes.length === 0 ? (
+                                        <div class="empty-state bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-red-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-red-700 mb-1">No tienes películas
+                                                pendientes</h3>
+                                            <p class="text-red-600 text-sm">¡Todo al día o aún no has añadido películas
+                                                para ver después!</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {peliculasPendientes.map((item) => (
+                                                    <CardMovie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            title={item.title}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+                </div>
+        )}
+
+        {/* SECCIÓN DE VISTOS */}
+        {(showVistos) && (
+                <div class="watched-section mb-10 animate-fadeIn">
+                    <div class="section-header flex items-center gap-4 mb-4">
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-green-300 to-green-500"></div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-green-500"
+                                 viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Contenido Visto
+                        </h2>
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-green-500 to-green-300"></div>
+                    </div>
+
+                    {/* Series Vistas */}
+                    {(showSeries || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-blue-700 mb-4 pl-4 border-l-4 border-blue-500">
+                                    Series Vistas</h3>
+
+                                {seriesVistas.length === 0 ? (
+                                        <div class="empty-state bg-blue-50 border border-blue-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-blue-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-blue-700 mb-1">Aún no has marcado
+                                                series como vistas</h3>
+                                            <p class="text-blue-600 text-sm">Marca las series que ya has visto para
+                                                llevar un registro.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {seriesVistas.map((item) => (
+                                                    <CardSerie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            name={item.name}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            first_air_date={item.first_air_date}
+                                                            seasons={item.seasons}
+                                                            last_episode_to_air={item.last_episode_to_air}
+                                                            next_episode_to_air={item.next_episode_to_air}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            status={item.status}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+
+                    {/* Películas Vistas */}
+                    {(showMovies || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-red-700 mb-4 pl-4 border-l-4 border-red-500">
+                                    Películas Vistas</h3>
+
+                                {peliculasVistas.length === 0 ? (
+                                        <div class="empty-state bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-red-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-red-700 mb-1">Aún no has marcado
+                                                películas como vistas</h3>
+                                            <p class="text-red-600 text-sm">Marca las películas que ya has visto para
+                                                llevar un registro.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {peliculasVistas.map((item) => (
+                                                    <CardMovie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            title={item.title}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+                </div>
+        )}
+
+        <!-- SECCIÓN DE RECOMENDADAS -->
+        {(showRecomendadas) && (
+                <div class="recommended-section mb-10 animate-fadeIn">
+                    <div class="section-header flex items-center gap-4 mb-4">
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-orange-300 to-orange-500"></div>
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-orange-500"
+                                 viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            Contenido Recomendado
+                        </h2>
+                        <div class="flex-grow h-0.5 bg-gradient-to-r from-orange-500 to-orange-300"></div>
+                    </div>
+
+                    {/* Series Recomendadas */}
+                    {(showSeries || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-blue-700 mb-4 pl-4 border-l-4 border-blue-500">
+                                    Series Recomendadas</h3>
+
+                                {seriesRecomendadas.length === 0 ? (
+                                        <div class="empty-state bg-orange-50 border border-orange-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-orange-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-orange-700 mb-1">No hay series recomendadas</h3>
+                                            <p class="text-orange-600 text-sm">Las recomendaciones se generarán basadas en tus preferencias y contenido visto.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {seriesRecomendadas.map((item) => (
+                                                    <CardSerie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            name={item.name}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            first_air_date={item.first_air_date}
+                                                            seasons={item.seasons}
+                                                            last_episode_to_air={item.last_episode_to_air}
+                                                            next_episode_to_air={item.next_episode_to_air}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            status={item.status}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+
+                    {/* Películas Recomendadas */}
+                    {(showMovies || showAll) && (
+                            <section class="mb-8">
+                                <h3 class="text-xl font-semibold text-red-700 mb-4 pl-4 border-l-4 border-red-500">
+                                    Películas Recomendadas</h3>
+
+                                {peliculasRecomendadas.length === 0 ? (
+                                        <div class="empty-state bg-orange-50 border border-orange-200 rounded-xl p-6 text-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg"
+                                                 class="h-12 w-12 mx-auto text-orange-400 mb-3" fill="none"
+                                                 viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                      d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                                            </svg>
+                                            <h3 class="text-lg font-semibold text-orange-700 mb-1">No hay películas recomendadas</h3>
+                                            <p class="text-orange-600 text-sm">Las recomendaciones se generarán basadas en tus preferencias y contenido visto.</p>
+                                        </div>
+                                ) : (
+                                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                            {peliculasRecomendadas.map((item) => (
+                                                    <CardMovie
+                                                            id={item.id.toString()}
+                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                            title={item.title}
+                                                            vote_average={item.vote_average}
+                                                            overview={item.overview}
+                                                            release_date={item.release_date}
+                                                            genres={item.genre_ids?.map(id => ({
+                                                                id,
+                                                                name: getGenreName(id)
+                                                            }))}
+                                                            providers={item.providers}
+                                                    />
+                                            ))}
+                                        </div>
+                                )}
+                            </section>
+                    )}
+                </div>
+        )}
+    </div>
+</div>
+
+<style>
+    /* Animaciones */
+    .animate-fadeIn {
+        animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Aumentar el tamaño de las tarjetas al pasar el mouse */
+    :global(.favorites-container .grid > div) {
+        transition: all 0.3s ease;
+    }
+
+    :global(.favorites-container .grid > div:hover) {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+</style>

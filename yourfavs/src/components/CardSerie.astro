@@ -1,0 +1,311 @@
+---
+interface Props {
+    id: string;
+    name: string;
+    img: string;
+    vote_average: number;
+    overview: string;
+    first_air_date?: string;
+    seasons?: { air_date: string, episode_count: number, id: number, name: string, overview: string, poster_path: string, season_number: number }[];
+    last_episode_to_air?: { air_date: string, episode_number: number, id: number, name: string, overview: string, production_code: string, season_number: number, still_path: string, vote_average: number, vote_count: number };
+    next_episode_to_air?: { air_date: string, episode_number: number, id: number, name: string, overview: string, production_code: string, season_number: number, still_path: string, vote_average: number, vote_count: number };
+    genres?: { id: number, name: string }[];
+    status?: string; // Estado de la serie (En emisión, Finalizada, etc.)
+}
+
+const {
+    name,
+    img,
+    vote_average,
+    id,
+    overview,
+    first_air_date,
+    seasons,
+    last_episode_to_air,
+    next_episode_to_air,
+    genres,
+    status,
+} = Astro.props;
+
+// Calculate number of seasons
+const numberOfSeasons = seasons?.filter(season => season.season_number !== 0).length || 0;
+
+// Determine if the show is still running
+const isRunning = next_episode_to_air ? true : false;
+
+// Get the last air date from last_episode_to_air if available
+const lastAirDate = last_episode_to_air?.air_date || "";
+
+// Formatear el periodo de emisión correctamente según el estado
+const getAirPeriod = () => {
+    if (!first_air_date) return "";
+
+    const releaseYear = new Date(first_air_date).getFullYear();
+
+    // If there's a next episode, the show is still running
+    if (isRunning) {
+        return `${releaseYear} - Presente`;
+    }
+
+    // If there's a last episode and it's not in the same year as first air date
+    if (lastAirDate) {
+        const endYear = new Date(lastAirDate).getFullYear();
+        if (endYear !== releaseYear) {
+            return `${releaseYear} - ${endYear}`;
+        }
+    }
+
+    // If it's a mini-series (one season)
+    if (numberOfSeasons === 1) {
+        return `${releaseYear}`;
+    }
+
+    // Default case
+    return `${releaseYear}`;
+};
+
+// Limitar géneros a mostrar
+const displayGenres = genres?.slice(0, 2) || [];
+
+// Calcular si la serie es reciente (menos de 3 meses)
+const isRecent = first_air_date ?
+    (new Date().getTime() - new Date(first_air_date).getTime()) < (90 * 24 * 60 * 60 * 1000) :
+    false;
+
+// Calcular si es trending (rating mayor a 8)
+const isTrending = vote_average >= 8.0;
+
+// Color de fondo basado en la calificación
+const getRatingColor = (rating) => {
+    if (rating >= 8) return "bg-emerald-500 text-white";
+    if (rating >= 7) return "bg-green-500 text-white";
+    if (rating >= 6) return "bg-yellow-500 text-gray-900";
+    if (rating >= 5) return "bg-orange-500 text-white";
+    return "bg-red-500 text-white";
+};
+---
+
+<div class="media-card group">
+    <a
+            href={`/serie/${id}`}
+            class="rounded-lg overflow-hidden shadow-xl bg-midnight-blue hover:scale-105 hover:bg-dark-blue transition duration-300 flex flex-col h-full border border-transparent hover:border-coral-plat relative will-change-transform"
+    >
+        <!-- Trending/New Badge -->
+        {(isRecent || isTrending) && (
+                <div class="absolute top-0 left-0 z-10 m-3">
+                    {isRecent && (
+                            <div class="badge bg-teal-500 text-white text-xs font-bold px-2 py-1 rounded-full mb-1 shadow-lg">
+                                NUEVO
+                            </div>
+                    )}
+                    {isTrending && (
+                            <div class="badge bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05c-.867 1.5-1.048 3.11-.967 4.652a.75.75 0 01.551.755c-.03.75.232 1.45.732 1.952.5.502 1.202.763 1.95.732.75.032 1.45-.232 1.952-.732.5-.5.764-1.202.732-1.952a.75.75 0 01.551-.755c.08-.246.176-.486.286-.72.284-.54.64-1.06 1.07-1.518.44-.467.96-.867 1.59-1.117.63-.25 1.34-.324 2.09-.224.51.07.826-.544.63-1.01-.327-.76-.902-1.397-1.673-1.874a6.17 6.17 0 00-2.148-.902C12.878 2.55 12.63 2.535 12.395 2.553z"
+                                          clip-rule="evenodd"/>
+                                </svg>
+                                TRENDING
+                            </div>
+                    )}
+                </div>
+        )}
+
+        <div class="relative overflow-hidden">
+            <!-- Poster Image -->
+            <img
+                    class="w-full h-64 md:h-72 object-cover rounded-t-lg transition-transform duration-500 group-hover:scale-110"
+                    src={img}
+                    alt={`Poster for ${name}`}
+                    loading="lazy"
+            />
+
+            <div class={`rating-badge ${getRatingColor(vote_average)} flex items-center justify-center shadow-lg`}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" viewBox="0 0 20 20"
+                     fill="currentColor">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118l-2.8-2.034c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                <span class="font-semibold">{vote_average ? vote_average.toFixed(1) : "N/A"}</span>
+            </div>
+
+            <!-- Gradient Overlay -->
+            <div class="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-dark-blue via-dark-blue/80 to-transparent"></div>
+        </div>
+
+        <div class="p-4 sm:p-5 flex-grow flex flex-col">
+            <!-- Title -->
+            <h2 class="text-lg sm:text-xl font-bold tracking-tight text-coral-plat leading-tight mb-2 line-clamp-2">
+                {name}
+            </h2>
+
+            {/* Metadata: Temporadas y Periodo */}
+            <div class="flex flex-wrap items-center gap-3 mb-3">
+                {/* Periodo de emisión */}
+                <div class="info-pill text-coral-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="text-xs">{getAirPeriod()}</span>
+                </div>
+
+                {/* Número de temporadas - si está disponible */}
+                {numberOfSeasons > 0 && (
+                        <div class="info-pill text-coral-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <span class="text-xs">
+                {numberOfSeasons} {numberOfSeasons === 1 ? "Temporada" : "Temporadas"}
+            </span>
+                        </div>
+                )}
+            </div>
+
+            <!-- Genres -->
+            {displayGenres.length > 0 && (
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        {displayGenres.map(genre => (
+                                <span class="genre-tag">
+                            {genre.name}
+                        </span>
+                        ))}
+                    </div>
+            )}
+
+            <!-- Overview -->
+            <p class="font-light text-coral-white text-xs sm:text-sm mb-4 flex-grow line-clamp-3">
+                {overview || "Sin descripción disponible."}
+            </p>
+
+            <!-- View Details Button -->
+            <div class="mt-auto pt-3">
+                <span class="view-details-btn">
+                    Ver detalles
+                    <svg xmlns="http://www.w3.org/2000/svg"
+                         class="h-4 w-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </span>
+            </div>
+        </div>
+    </a>
+</div>
+
+<style>
+    .media-card {
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        will-change: transform;
+    }
+
+    .media-card:hover {
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+        z-index: 1;
+    }
+
+    .rating-badge {
+        @apply absolute top-2 right-2 flex items-center text-xs font-bold px-2 py-1 rounded;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .year-badge {
+        @apply text-xs font-medium px-2 py-1 rounded bg-gray-700 text-coral-white text-center;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .genre-tag {
+        @apply text-xs px-2 py-0.5 rounded-full bg-dark-blue text-coral-white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: background-color 0.2s ease, transform 0.2s ease;
+    }
+
+    .genre-tag:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        transform: translateY(-1px);
+    }
+
+    .info-pill {
+        @apply flex items-center gap-1;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .view-details-btn {
+        @apply text-xs flex items-center justify-center py-2 px-4 rounded-full font-medium text-coral-plat bg-dark-blue transition duration-200 backdrop-blur-sm;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background-color: rgba(17, 45, 125, 0.8);
+    }
+
+    .view-details-btn:hover {
+        background-color: #FACC15;
+        color: #111827;
+        box-shadow: 0 2px 8px rgba(250, 204, 21, 0.5);
+    }
+
+    /* Line clamp para limitar líneas de texto */
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .provider-logo {
+        transition: transform 0.2s ease;
+    }
+
+    .provider-logo:hover {
+        transform: scale(1.5);
+        z-index: 2;
+    }
+
+    .badge {
+        backdrop-filter: blur(4px);
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.8;
+        }
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .bg-midnight-blue {
+        background-color: #0F172A;
+    }
+
+    .bg-dark-blue {
+        background-color: #1E3A8A;
+    }
+
+    .text-coral-plat {
+        color: #ffffff;
+    }
+
+    .text-coral-white {
+        color: #d5d5d2;
+    }
+
+    .bg-pastel-yellow {
+        background-color: #FACC15;
+    }
+</style>

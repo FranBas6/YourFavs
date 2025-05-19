@@ -1,0 +1,439 @@
+---
+import CardMovie from "./CardMovie.astro";
+import CardSerie from "./CardSerie.astro";
+import CardActor from "./CardActor.astro";
+import CategoriasButton from "./CategoriasButton.astro";
+import {getMoviesByTitle} from "../services/yourfavsMovie";
+import {getSeriesByTitle} from "../services/yourfavsSerie";
+import {getActorsByName} from "../services/yourfavsActor";
+
+// Obtener el parámetro de query desde la URL
+const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
+const title = queryParams.get('query') || '';
+
+// Definir los géneros comunes
+const genresMap = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+
+// Función para cargar todas las páginas de películas y series
+async function loadAllPages<T>(
+    getDataFunction: (params: { [key: string]: string }) => Promise<T[]>,
+    searchTerm: string,
+    paramName: string = "title"
+): Promise<T[]> {
+    let page = 1;
+    let allItems: T[] = [];
+    let hasMore = true;
+
+    // Limitar a 5 páginas de resultados para evitar demasiadas solicitudes
+    const maxPages = 5;
+
+    while (hasMore && page <= maxPages) {
+        try {
+            const params: { [key: string]: string } = {page: page.toString()};
+            params[paramName] = searchTerm;
+
+            const result = await getDataFunction(params);
+            if (result.length > 0) {
+                allItems = allItems.concat(result);
+                page++;
+            } else {
+                hasMore = false;
+            }
+        } catch (error) {
+            console.error(`Error al cargar la página ${page}:`, error);
+            hasMore = false;
+        }
+    }
+    return allItems;
+}
+
+// Then call them like:
+const allMovies = await loadAllPages(getMoviesByTitle, title, "title");
+const allSeries = await loadAllPages(getSeriesByTitle, title, "title");
+const allActors = await loadAllPages(getActorsByName, title, "name");
+
+// Limitar a 65 elementos por categoría
+const limitedMovies = allMovies.slice(0, 65);
+const limitedSeries = allSeries.slice(0, 65);
+const limitedActors = allActors.slice(0, 30);
+
+// Contadores para mostrar
+const totalResults = limitedMovies.length + limitedSeries.length + limitedActors.length;
+
+// Preparar la interfaz de usuario con animaciones
+const hasResults = totalResults > 0;
+---
+
+<div class="search-results-container max-w-7xl mx-auto px-4 py-6">
+    <!-- Cabecera de resultados con término de búsqueda -->
+    <div class="mb-8 text-center ">
+        <h1 class="text-coral-red font-bold text-3xl sm:text-4xl md:text-5xl mb-2 animate-fade-in">
+            Resultados para: <span class="text-navy-blue">{title}</span>
+        </h1>
+        <p class="text-gray-700 text-lg">
+            {totalResults > 0 ?
+                `Encontramos ${totalResults} resultados (${limitedMovies.length} películas, ${limitedSeries.length} series y ${limitedActors.length} actores)` :
+                'No se encontraron resultados para tu búsqueda'}
+        </p>
+    </div>
+
+    <!-- Menú de navegación sticky -->
+    <nav class="sticky top-0 z-50 bg-navy-blue rounded-lg shadow-lg mb-8 animate-slide-down">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex flex-wrap justify-center items-center p-2">
+                <CategoriasButton href="#top"
+                                  class="m-2 px-6 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors duration-300 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
+                         fill="currentColor">
+                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                    </svg>
+                    Inicio
+                </CategoriasButton>
+
+                {limitedMovies.length > 0 && (
+                        <CategoriasButton href="#peliculas"
+                                          class="m-2 px-6 py-2 rounded-lg bg-coral-red text-white hover:bg-red-600 transition-colors duration-300 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
+                                 fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-6h1V5h-1v2zm-2 0h1V5h-1v2zM9 5v2h1V5H9zM5 5v2h1V5H5zm0 8v2h1v-2H5zm0-2v2h1v-2H5zm2 2v2h1v-2H7zm2 0v2h1v-2H9zm2 0v2h1v-2h-1zm2 0v2h1v-2h-1zm-8-2v2h1v-2H5zm2 0v2h1v-2H7zm2 0v2h1v-2H9z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Películas ({limitedMovies.length})
+                        </CategoriasButton>
+                )}
+
+                {limitedSeries.length > 0 && (
+                        <CategoriasButton href="#series"
+                                          class="m-2 px-6 py-2 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors duration-300 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
+                                 fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                            Series ({limitedSeries.length})
+                        </CategoriasButton>
+                )}
+
+                {limitedActors.length > 0 && (
+                        <CategoriasButton href="#actores"
+                                          class="m-2 px-6 py-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600 transition-colors duration-300 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
+                                 fill="currentColor">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                            </svg>
+                            Actores ({limitedActors.length})
+                        </CategoriasButton>
+                )}
+            </div>
+        </div>
+    </nav>
+
+    {totalResults === 0 ? (
+            <div class="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-gray-400 mb-4" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <h2 class="text-2xl font-bold text-coral-red mb-2">No encontramos resultados para "{title}"</h2>
+                <p class="text-gray-600 mb-6 max-w-lg">Intenta con otro término o revisa la ortografía de tu
+                    búsqueda.</p>
+                <a href="/"
+                   class="px-6 py-3 bg-navy-blue text-white rounded-lg hover:bg-blue-800 transition-colors duration-300 flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
+                         fill="currentColor">
+                        <path fill-rule="evenodd"
+                              d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+                              clip-rule="evenodd"/>
+                    </svg>
+                    Volver al inicio
+                </a>
+            </div>
+    ) : (
+            <div class="space-y-12">
+                {/* Sección de películas */}
+                {limitedMovies.length > 0 && (
+                        <section id="peliculas" class="scroll-mt-24 animate-fade-in">
+                            <div class="flex items-center mb-6">
+                                <h2 class="text-coral-red font-bold text-2xl md:text-3xl">PELÍCULAS</h2>
+                                <div class="ml-4 h-1 bg-coral-red flex-grow rounded-full opacity-50"></div>
+                            </div>
+
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                                {limitedMovies.map((item, index) => (
+                                        <div class="movie-card card-wrapper transform hover:scale-105 transition-transform duration-200" style={`--animation-delay: ${index * 0.05}s`}>
+                                            <CardMovie
+                                                    id={item.id.toString()}
+                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                    title={item.title}
+                                                    vote_average={item.vote_average}
+                                                    overview={item.overview}
+                                                    release_date={item.release_date}
+                                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                                    providers={item.providers}
+                                            />
+                                        </div>
+                                ))}
+                            </div>
+                        </section>
+                )}
+
+                {/* Sección de series */}
+                {limitedSeries.length > 0 && (
+                        <section id="series" class="scroll-mt-24 animate-fade-in">
+                            <div class="flex items-center mb-6">
+                                <h2 class="text-coral-red font-bold text-2xl md:text-3xl">SERIES</h2>
+                                <div class="ml-4 h-1 bg-coral-red flex-grow rounded-full opacity-50"></div>
+                            </div>
+
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                                {limitedSeries.map((item, index) => (
+                                        <div class="series-card card-wrapper transform hover:scale-105 transition-transform duration-200" style={`--animation-delay: ${index * 0.05}s`}>
+                                            <CardSerie
+                                                    id={item.id.toString()}
+                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                    name={item.name}
+                                                    vote_average={item.vote_average}
+                                                    overview={item.overview}
+                                                    first_air_date={item.first_air_date}
+                                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                                    providers={item.providers}
+                                                    last_episode_to_air={item.last_episode_to_air}
+                                                    next_episode_to_air={item.next_episode_to_air}
+                                            />
+                                        </div>
+                                ))}
+                            </div>
+                        </section>
+                )}
+
+                {/* Sección de actores */}
+                {limitedActors.length > 0 && (
+                        <section id="actores" class="scroll-mt-24 animate-fade-in">
+                            <div class="flex items-center mb-6">
+                                <h2 class="text-coral-red font-bold text-2xl md:text-3xl">ACTORES</h2>
+                                <div class="ml-4 h-1 bg-purple-500 flex-grow rounded-full opacity-50"></div>
+                            </div>
+
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                                {limitedActors.map((item, index) => (
+                                        <div class="actor-card card-wrapper transform hover:scale-105 transition-transform duration-200" style={`--animation-delay: ${index * 0.05}s`}>
+                                            <CardActor
+                                                    id={item.id.toString()}
+                                                    imagen={item.imagen ? `https://image.tmdb.org/t/p/w500${item.imagen}` : "/placeholder-actor.jpg"}
+                                                    nombre={item.nombre}
+                                                    popularidad={item.popularidad}
+                                                    lugarNacimiento={item.lugarNacimiento || undefined}
+                                                    fechaNacimiento={item.fechaNacimiento || undefined}
+                                            />
+                                        </div>
+                                ))}
+                            </div>
+                        </section>
+                )}
+            </div>
+    )}
+</div>
+
+<style is:global>
+    /* Variables para colores consistentes */
+    :root {
+        --color-coral-red: #E63946;
+        --color-navy-blue: #112d7d;
+        --color-teal: #2a9d8f;
+        --color-purple: #8b5cf6;
+    }
+
+    .text-coral-red {
+        color: var(--color-coral-red);
+    }
+
+    .bg-coral-red {
+        background-color: var(--color-coral-red);
+    }
+
+    .text-navy-blue {
+        color: var(--color-navy-blue);
+    }
+
+    .bg-navy-blue {
+        background-color: var(--color-navy-blue);
+    }
+
+    .bg-purple-500 {
+        background-color: var(--color-purple);
+    }
+
+    .hover\:bg-purple-600:hover {
+        background-color: #7c3aed;
+    }
+
+    /* Animaciones para las tarjetas */
+    .movie-card, .series-card, .actor-card {
+        opacity: 0;
+        transform: translateY(20px);
+        animation: fade-in-up 0.5s ease forwards;
+        animation-delay: var(--animation-delay, 0s);
+    }
+
+    @keyframes fade-in-up {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fade-in {
+        animation: fade-in 0.5s ease forwards;
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .animate-slide-down {
+        animation: slide-down 0.5s ease forwards;
+    }
+
+    @keyframes slide-down {
+        from {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    /* Estilos para el scroll suave */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Ajuste para la navegación fixed */
+    .sticky {
+        backdrop-filter: blur(8px);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+
+    /* Estilos para el modo oscuro */
+    @media (prefers-color-scheme: dark) {
+        body {
+            background-color: #0f172a;
+            color: #f1f5f9;
+        }
+
+        .text-slate-600 {
+            color: #cbd5e1;
+        }
+
+        .text-gray-600 {
+            color: #cbd5e1;
+        }
+    }
+
+    /* Estilos para asegurar cards del mismo tamaño */
+    .card-wrapper {
+        display: flex;
+        height: 100%;
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Asegurar que todas las imágenes tengan el mismo tamaño */
+    .card-wrapper img {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+    }
+
+    /* Asegurar que los títulos tengan una altura fija */
+    .card-wrapper h3,
+    .card-wrapper h4 {
+        height: 3em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Para el contenido de la tarjeta */
+    .card-wrapper > div {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        background-color: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        height: 100%;
+    }
+
+    /* Para descripciones/overview */
+    .card-wrapper p {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        flex-grow: 1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        .card-wrapper > div {
+            background-color: #1E1E1E;
+            color: #E5E5E5;
+        }
+    }
+</style>
