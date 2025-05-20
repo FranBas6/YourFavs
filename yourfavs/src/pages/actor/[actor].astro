@@ -189,30 +189,30 @@ const topGenres = Object.entries(movieGenres)
         </div>
 
         <!-- Sección de Películas -->
-        <section class="mb-16 content-section">
+        <section class="mb-10 content-section">
             <div class="section-header-container">
-                <h2 class="section-header">
-                    <span class="section-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                        </svg>
-                    </span>
+                <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+            <span class="mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                </svg>
+            </span>
                     PELÍCULAS
                 </h2>
                 <div class="section-header-line"></div>
             </div>
 
             {movies.length === 0 ? (
-                    <div class="empty-state">
+                    <div class="empty-state flex justify-center items-center py-8 text-lg text-gray-500">
                         <p>No se encontraron películas para este actor</p>
                     </div>
             ) : (
-                    <div class="content-grid">
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
                         {
                             movies.map((item) => (
-                                    <div class="card-wrapper">
+                                    <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
                                         <CardMovie
                                                 id={item.id.toString()}
                                                 img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -231,30 +231,30 @@ const topGenres = Object.entries(movieGenres)
         </section>
 
         <!-- Sección de Series -->
-        <section class="mb-16 content-section">
+        <section class="mb-10 content-section">
             <div class="section-header-container">
-                <h2 class="section-header">
-                    <span class="section-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
-                    </span>
+                <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+            <span class="mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+            </span>
                     SERIES
                 </h2>
                 <div class="section-header-line"></div>
             </div>
 
             {series.length === 0 ? (
-                    <div class="empty-state">
+                    <div class="empty-state flex justify-center items-center py-8 text-lg text-gray-500">
                         <p>No se encontraron series para este actor</p>
                     </div>
             ) : (
-                    <div class="content-grid">
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
                         {
                             series.map((item) => (
-                                    <div class="card-wrapper">
+                                    <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
                                         <CardSerie
                                                 id={item.id.toString()}
                                                 img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -741,6 +741,25 @@ const topGenres = Object.entries(movieGenres)
         .empty-state {
             background-color: rgba(255, 90, 103, 0.05);
             color: #9ca3af;
+        }
+    }
+
+    .section-header-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .section-header-line {
+        flex-grow: 1;
+        height: 2px;
+        margin-left: 1rem;
+        background-color: var(--color-coral-red, #FF6B6B);
+    }
+
+    @media (max-width: 640px) {
+        .section-header-line {
+            display: none;
         }
     }
 </style>
