@@ -98,102 +98,123 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
 // Preparar la interfaz de usuario con animaciones
 const hasResults = totalResults > 0;
 ---
+<div class="search-results-container max-w-7xl mx-auto px-4 py-8">
+    <!-- Cabecera mejorada con mejor jerarquía visual -->
+    <header class="results-header mb-12 text-center">
+        <div class="header-content">
+            <h1 class="main-title text-coral-red font-bold text-3xl sm:text-4xl md:text-5xl mb-3">
+                Resultados para: <span class="search-term text-navy-blue">{title}</span>
+            </h1>
+            <div class="results-summary">
+                <p class="text-slate-700 text-lg leading-relaxed">
+                    {totalResults > 0 ? (
+                            <span class="results-count">
+                            Encontramos <strong class="text-coral-red">{totalResults}</strong> resultados
+                            <span class="results-breakdown text-sm block mt-1 text-slate-500">
+                                {limitedMovies.length} películas • {limitedSeries.length} series • {limitedActors.length} actores
+                            </span>
+                        </span>
+                    ) : (
+                            <span class="no-results-text">No se encontraron resultados para tu búsqueda</span>
+                    )}
+                </p>
+            </div>
+        </div>
+    </header>
 
-<div class="search-results-container max-w-7xl mx-auto px-4 py-6">
-    <!-- Cabecera de resultados con término de búsqueda -->
-    <div class="mb-8 text-center ">
-        <h1 class="text-coral-red font-bold text-3xl sm:text-4xl md:text-5xl mb-2 animate-fade-in">
-            Resultados para: <span class="text-navy-blue">{title}</span>
-        </h1>
-        <p class="text-gray-700 text-lg">
-            {totalResults > 0 ?
-                `Encontramos ${totalResults} resultados (${limitedMovies.length} películas, ${limitedSeries.length} series y ${limitedActors.length} actores)` :
-                'No se encontraron resultados para tu búsqueda'}
-        </p>
-    </div>
+    <!-- Navegación sticky mejorada -->
+    <nav class="sticky-nav sticky top-4 z-50 mb-12">
+        <div class="nav-container bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl">
+            <div class="nav-wrapper px-3 py-2">
+                <div class="nav-buttons flex flex-wrap justify-center items-center gap-3">
+                    <CategoriasButton
+                            href="#top"
+                            class="nav-button nav-button--home">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
+                        </svg>
+                        <span>Inicio</span>
+                    </CategoriasButton>
 
-    <!-- Menú de navegación sticky -->
-    <nav class="sticky top-0 z-50 bg-navy-blue rounded-lg shadow-lg mb-8 animate-slide-down">
-        <div class="max-w-7xl mx-auto">
-            <div class="flex flex-wrap justify-center items-center p-2">
-                <CategoriasButton href="#top"
-                                  class="m-2 px-6 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors duration-300 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
-                         fill="currentColor">
-                        <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
-                    </svg>
-                    Inicio
-                </CategoriasButton>
+                    {limitedMovies.length > 0 && (
+                            <CategoriasButton
+                                    href="#peliculas"
+                                    class="nav-button nav-button--movies">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-6h1V5h-1v2zm-2 0h1V5h-1v2zM9 5v2h1V5H9zM5 5v2h1V5H5zm0 8v2h1v-2H5zm0-2v2h1v-2H5zm2 2v2h1v-2H7zm2 0v2h1v-2H9zm2 0v2h1v-2h-1zm2 0v2h1v-2h-1zm-8-2v2h1v-2H5zm2 0v2h1v-2H7zm2 0v2h1v-2H9z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>Películas</span>
+                                <span class="count-badge">{limitedMovies.length}</span>
+                            </CategoriasButton>
+                    )}
 
-                {limitedMovies.length > 0 && (
-                        <CategoriasButton href="#peliculas"
-                                          class="m-2 px-6 py-2 rounded-lg bg-coral-red text-white hover:bg-red-600 transition-colors duration-300 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
-                                 fill="currentColor">
-                                <path fill-rule="evenodd"
-                                      d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-6h1V5h-1v2zm-2 0h1V5h-1v2zM9 5v2h1V5H9zM5 5v2h1V5H5zm0 8v2h1v-2H5zm0-2v2h1v-2H5zm2 2v2h1v-2H7zm2 0v2h1v-2H9zm2 0v2h1v-2h-1zm2 0v2h1v-2h-1zm-8-2v2h1v-2H5zm2 0v2h1v-2H7zm2 0v2h1v-2H9z"
-                                      clip-rule="evenodd"/>
-                            </svg>
-                            Películas ({limitedMovies.length})
-                        </CategoriasButton>
-                )}
+                    {limitedSeries.length > 0 && (
+                            <CategoriasButton
+                                    href="#series"
+                                    class="nav-button nav-button--series">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>Series</span>
+                                <span class="count-badge">{limitedSeries.length}</span>
+                            </CategoriasButton>
+                    )}
 
-                {limitedSeries.length > 0 && (
-                        <CategoriasButton href="#series"
-                                          class="m-2 px-6 py-2 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors duration-300 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
-                                 fill="currentColor">
-                                <path fill-rule="evenodd"
-                                      d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z"
-                                      clip-rule="evenodd"/>
-                            </svg>
-                            Series ({limitedSeries.length})
-                        </CategoriasButton>
-                )}
-
-                {limitedActors.length > 0 && (
-                        <CategoriasButton href="#actores"
-                                          class="m-2 px-6 py-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600 transition-colors duration-300 flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
-                                 fill="currentColor">
-                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
-                            </svg>
-                            Actores ({limitedActors.length})
-                        </CategoriasButton>
-                )}
+                    {limitedActors.length > 0 && (
+                            <CategoriasButton
+                                    href="#actores"
+                                    class="nav-button nav-button--actors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                                </svg>
+                                <span>Actores</span>
+                                <span class="count-badge">{limitedActors.length}</span>
+                            </CategoriasButton>
+                    )}
+                </div>
             </div>
         </div>
     </nav>
 
     {totalResults === 0 ? (
-            <div class="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24 text-gray-400 mb-4" fill="none"
-                     viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-                <h2 class="text-2xl font-bold text-coral-red mb-2">No encontramos resultados para "{title}"</h2>
-                <p class="text-gray-600 mb-6 max-w-lg">Intenta con otro término o revisa la ortografía de tu
-                    búsqueda.</p>
-                <a href="/"
-                   class="px-6 py-3 bg-navy-blue text-white rounded-lg hover:bg-blue-800 transition-colors duration-300 flex items-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20"
-                         fill="currentColor">
-                        <path fill-rule="evenodd"
-                              d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
-                              clip-rule="evenodd"/>
-                    </svg>
-                    Volver al inicio
-                </a>
+        <!-- Estado sin resultados mejorado -->
+            <div class="no-results-container">
+                <div class="no-results-card bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-lg">
+                    <div class="no-results-icon mb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-20 h-20 mx-auto text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <h2 class="no-results-title text-2xl font-bold text-coral-red mb-3">
+                        No encontramos resultados para "{title}"
+                    </h2>
+                    <p class="no-results-description text-slate-700 mb-8 max-w-lg mx-auto leading-relaxed">
+                        Intenta con otro término de búsqueda o revisa la ortografía. También puedes explorar nuestras categorías principales.
+                    </p>
+                    <a href="/" class="back-button inline-flex items-center gap-2 px-6 py-3 bg-navy-blue text-white rounded-xl hover:bg-blue-800 transition-all duration-300 font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>Volver al inicio</span>
+                    </a>
+                </div>
             </div>
     ) : (
-            <div class="space-y-12">
+        <!-- Contenido principal mejorado -->
+            <main class="content-sections space-y-16">
                 {/* Sección de películas */}
                 {limitedMovies.length > 0 && (
-                        <section id="peliculas" class="scroll-mt-24 animate-fade-in">
-                            <div class="flex items-center mb-6">
-                                <h2 class="text-coral-red font-bold text-2xl md:text-3xl">PELÍCULAS</h2>
-                                <div class="ml-4 h-1 bg-coral-red flex-grow rounded-full opacity-50"></div>
+                        <section id="peliculas" class="content-section scroll-mt-28">
+                            <div class="section-header mb-8">
+                                <div class="section-title-wrapper flex items-center">
+                                    <h2 class="section-title text-coral-red font-bold text-2xl md:text-3xl mr-4">
+                                        PELÍCULAS
+                                    </h2>
+                                    <div class="section-divider flex-1 h-0.5 bg-gradient-to-r from-coral-red to-transparent rounded-full opacity-60"></div>
+                                    <div class="section-count ml-4 px-3 py-1 bg-coral-red/10 text-coral-red text-sm font-medium rounded-full">
+                                        {limitedMovies.length} resultados
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -217,10 +238,17 @@ const hasResults = totalResults > 0;
 
                 {/* Sección de series */}
                 {limitedSeries.length > 0 && (
-                        <section id="series" class="scroll-mt-24 animate-fade-in">
-                            <div class="flex items-center mb-6">
-                                <h2 class="text-coral-red font-bold text-2xl md:text-3xl">SERIES</h2>
-                                <div class="ml-4 h-1 bg-coral-red flex-grow rounded-full opacity-50"></div>
+                        <section id="series" class="content-section scroll-mt-28">
+                            <div class="section-header mb-8">
+                                <div class="section-title-wrapper flex items-center">
+                                    <h2 class="section-title text-teal-600 font-bold text-2xl md:text-3xl mr-4">
+                                        SERIES
+                                    </h2>
+                                    <div class="section-divider flex-1 h-0.5 bg-gradient-to-r from-teal-500 to-transparent rounded-full opacity-60"></div>
+                                    <div class="section-count ml-4 px-3 py-1 bg-teal-500/10 text-teal-600 text-sm font-medium rounded-full">
+                                        {limitedSeries.length} resultados
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -246,10 +274,17 @@ const hasResults = totalResults > 0;
 
                 {/* Sección de actores */}
                 {limitedActors.length > 0 && (
-                        <section id="actores" class="scroll-mt-24 animate-fade-in">
-                            <div class="flex items-center mb-6">
-                                <h2 class="text-coral-red font-bold text-2xl md:text-3xl">ACTORES</h2>
-                                <div class="ml-4 h-1 bg-purple-500 flex-grow rounded-full opacity-50"></div>
+                        <section id="actores" class="content-section scroll-mt-28">
+                            <div class="section-header mb-8">
+                                <div class="section-title-wrapper flex items-center">
+                                    <h2 class="section-title text-purple-600 font-bold text-2xl md:text-3xl mr-4">
+                                        ACTORES
+                                    </h2>
+                                    <div class="section-divider flex-1 h-0.5 bg-gradient-to-r from-purple-500 to-transparent rounded-full opacity-60"></div>
+                                    <div class="section-count ml-4 px-3 py-1 bg-purple-500/10 text-purple-600 text-sm font-medium rounded-full">
+                                        {limitedActors.length} resultados
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -268,114 +303,202 @@ const hasResults = totalResults > 0;
                             </div>
                         </section>
                 )}
-            </div>
+            </main>
     )}
 </div>
 
 <style is:global>
-    /* Variables para colores consistentes */
+    /* Variables CSS mejoradas */
     :root {
         --color-coral-red: #E63946;
         --color-navy-blue: #112d7d;
         --color-teal: #2a9d8f;
         --color-purple: #8b5cf6;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 20px;
     }
 
-    .text-coral-red {
-        color: var(--color-coral-red);
+    /* Tipografía mejorada */
+    .search-results-container {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.6;
     }
 
-    .bg-coral-red {
-        background-color: var(--color-coral-red);
+    /* Header mejorado */
+    .results-header {
+        position: relative;
     }
 
-    .text-navy-blue {
-        color: var(--color-navy-blue);
+    .main-title {
+        letter-spacing: -0.025em;
+        line-height: 1.1;
     }
 
-    .bg-navy-blue {
-        background-color: var(--color-navy-blue);
+    .search-term {
+        position: relative;
+        display: inline-block;
     }
 
-    .bg-purple-500 {
-        background-color: var(--color-purple);
+    .search-term::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--color-coral-red), var(--color-navy-blue));
+        border-radius: 2px;
+        animation: underline-grow 0.6s ease-out;
     }
 
-    .hover\:bg-purple-600:hover {
-        background-color: #7c3aed;
+    @keyframes underline-grow {
+        from {
+            transform: scaleX(0);
+        }
+        to {
+            transform: scaleX(1);
+        }
     }
 
-    /* Animaciones para las tarjetas */
-    .movie-card, .series-card, .actor-card {
+    .results-breakdown {
         opacity: 0;
-        transform: translateY(20px);
-        animation: fade-in-up 0.5s ease forwards;
-        animation-delay: var(--animation-delay, 0s);
+        animation: fade-in-delayed 0.8s ease-out 0.3s forwards;
     }
 
-    @keyframes fade-in-up {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
+    /* Navegación sticky mejorada */
+    .sticky-nav {
+        animation: slide-down 0.6s ease-out;
+    }
+
+    .nav-container {
+        border: 1px solid rgb(226 232 240);
+        box-shadow: var(--shadow-xl);
+    }
+
+    .nav-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--radius-md);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .nav-button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .nav-button:hover::before {
+        left: 100%;
+    }
+
+    .nav-button--home {
+        background-color: var(--color-navy-blue);
+        color: white;
+    }
+
+    .nav-button--movies {
+        background-color: var(--color-coral-red);
+        color: white;
+    }
+
+    .nav-button--series {
+        background-color: var(--color-teal);
+        color: white;
+    }
+
+    .nav-button--actors {
+        background-color: var(--color-purple);
+        color: white;
+    }
+
+    .nav-button:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .count-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: inherit;
+        padding: 0.125rem 0.5rem;
+        border-radius: 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Estado sin resultados mejorado */
+    .no-results-container {
+        margin: 2rem 0;
+        animation: fade-in 0.6s ease-out;
+    }
+
+    .no-results-card {
+        max-width: 32rem;
+        margin: 0 auto;
+    }
+
+    .no-results-icon svg {
+        animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+        0%, 100% {
+            transform: translateY(0px);
         }
-        to {
-            opacity: 1;
-            transform: translateY(0);
+        50% {
+            transform: translateY(-10px);
         }
     }
 
-    .animate-fade-in {
-        animation: fade-in 0.5s ease forwards;
+    .back-button:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-xl);
     }
 
-    @keyframes fade-in {
-        from {
-            opacity: 0;
-        }
-        to {
-            opacity: 1;
-        }
+    /* Secciones de contenido mejoradas */
+    .content-section {
+        position: relative;
     }
 
-    .animate-slide-down {
-        animation: slide-down 0.5s ease forwards;
+    .section-header {
+        position: relative;
     }
 
-    @keyframes slide-down {
-        from {
-            transform: translateY(-20px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
+    .section-title {
+        letter-spacing: -0.025em;
     }
 
-    /* Estilos para el scroll suave */
-    html {
-        scroll-behavior: smooth;
+    .section-count {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
     }
 
-    /* Ajuste para la navegación fixed */
-    .sticky {
-        backdrop-filter: blur(8px);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    /* Grid responsivo mejorado */
+    .content-grid {
+        gap: 1.5rem;
     }
 
-    /* Estilos para el modo oscuro */
-    @media (prefers-color-scheme: dark) {
-        body {
-            background-color: #0f172a;
-            color: #f1f5f9;
-        }
-
-        .text-slate-600 {
-            color: #cbd5e1;
-        }
-
-        .text-gray-600 {
-            color: #cbd5e1;
+    @media (min-width: 640px) {
+        .content-grid {
+            gap: 2rem;
         }
     }
 
@@ -434,6 +557,181 @@ const hasResults = totalResults > 0;
         .card-wrapper > div {
             background-color: #1E1E1E;
             color: #E5E5E5;
+        }
+    }
+
+    /* Animaciones mejoradas */
+    @keyframes fade-in-up {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes fade-in {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes fade-in-delayed {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes slide-down {
+        from {
+            transform: translateY(-20px);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
+
+    /* Scroll suave */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Clases utilitarias */
+    .text-coral-red {
+        color: var(--color-coral-red);
+    }
+
+    .bg-coral-red {
+        background-color: var(--color-coral-red);
+    }
+
+    .text-navy-blue {
+        color: var(--color-navy-blue);
+    }
+
+    .bg-navy-blue {
+        background-color: var(--color-navy-blue);
+    }
+
+    .text-teal-600 {
+        color: #0d9488;
+    }
+
+    .from-teal-500 {
+        --tw-gradient-from: #14b8a6;
+    }
+
+    .bg-teal-500\/10 {
+        background-color: rgb(20 184 166 / 0.1);
+    }
+
+    .text-purple-600 {
+        color: #9333ea;
+    }
+
+    .from-purple-500 {
+        --tw-gradient-from: #a855f7;
+    }
+
+    .bg-purple-500\/10 {
+        background-color: rgb(168 85 247 / 0.1);
+    }
+
+    .bg-coral-red\/10 {
+        background-color: rgb(230 57 70 / 0.1);
+    }
+
+    /* Modo oscuro mejorado */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --color-background: #0f172a;
+            --color-card-bg: #1e293b;
+            --color-text-primary: #f1f5f9;
+            --color-text-secondary: #cbd5e1;
+            --color-border: #334155;
+        }
+
+        body {
+            background-color: var(--color-background);
+            color: var(--color-text-primary);
+        }
+
+        .nav-container {
+            background-color: rgba(30, 41, 59, 0.95);
+            border-color: var(--color-border);
+        }
+
+        .no-results-card {
+            background-color: var(--color-card-bg);
+            border-color: var(--color-border);
+            color: var(--color-text-primary);
+        }
+
+        .text-slate-600,
+        .text-gray-600 {
+            color: var(--color-text-secondary);
+        }
+
+    }
+
+    /* Mejoras de accesibilidad */
+    @media (prefers-reduced-motion: reduce) {
+        * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+    }
+
+    /* Focus states mejorados */
+    .nav-button:focus,
+    .back-button:focus {
+        outline: 2px solid var(--color-coral-red);
+        outline-offset: 2px;
+    }
+    /* NAV responsive mejoras */
+    @media (max-width: 640px) {
+        .nav-buttons {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 0.5rem;
+            justify-content: flex-start;
+            padding-bottom: 0.5rem;
+            scrollbar-width: none; /* Firefox */
+        }
+        .nav-buttons::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+        .nav-button {
+            min-width: 44px;
+            padding: 0.5rem 0.5rem;
+            font-size: 0.8rem;
+            border-radius: var(--radius-sm);
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+        .nav-button span:not(.count-badge) {
+            display: none; /* Solo iconos, opcional */
+        }
+        .count-badge {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.4rem;
+            margin-top: 0.1rem;
+        }
+        .nav-container {
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+            padding: 0.2rem 0.2rem;
         }
     }
 </style>
