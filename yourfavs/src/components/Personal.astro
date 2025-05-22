@@ -24,6 +24,38 @@ const peliculasPendientes = await getMoviesPendientes();
 const peliculasVistas = await getMoviesVistas();
 const peliculasRecomendadas = await getRecommendedMovies() // Añadir esta línea
 
+function eliminarDuplicadosPorId(array) {
+    const mapa = new Map();
+    array.forEach(item => {
+        mapa.set(item.id, item); // Elimina duplicados: si ya existe, lo sobrescribe
+    });
+    return Array.from(mapa.values());
+}
+
+// Unificar series y eliminar duplicados
+const todasLasSeries = [
+    ...seriesFavoritas,
+    ...seriesPendientes,
+    ...seriesVistas,
+    ...seriesSiguiendo,
+    ...likedSeries
+];
+const seriesUnicas = eliminarDuplicadosPorId(todasLasSeries);
+
+// Unificar películas y eliminar duplicados
+const todasLasPeliculas = [
+    ...peliculasFavoritas,
+    ...peliculasPendientes,
+    ...peliculasVistas
+];
+const peliculasUnicas = eliminarDuplicadosPorId(todasLasPeliculas);
+
+
+// Actualizar los cálculos de estadísticas
+const totalSeries = seriesUnicas.length;
+const totalPeliculas = peliculasUnicas.length;
+const totalContenido = totalSeries + totalPeliculas;
+
 // Determinar qué tipo de contenido mostrar basado en los parámetros
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
@@ -76,33 +108,29 @@ const genresMap = {
 function getGenreName(id: number): string {
     return genresMap[id] || "Otro";
 }
-
-// Actualizar los cálculos de estadísticas
-const totalSeries = seriesFavoritas.length + seriesPendientes.length + seriesVistas.length + seriesSiguiendo.length + likedSeries.length;
-const totalPeliculas = peliculasFavoritas.length + peliculasPendientes.length + peliculasVistas.length;
-const totalContenido = totalSeries + totalPeliculas;
 ---
 <div class="favorites-container max-w-7xl mx-auto px-4 py-8">
-    <!-- Barra de navegación mejorada con efectos -->
-    <nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 rounded-xl shadow-lg mb-6">
-        <div class="container mx-auto px-4 py-3">
-            <div class="flex flex-wrap justify-center gap-4 items-center">
-                <a href={`?filter=todos&category=${category}`}
-                   class={`px-5 py-3 rounded-lg transition-all duration-300 text-white font-medium 
-               ${showAll ? "bg-blue-500 shadow-md transform scale-105" : "bg-blue-700 hover:bg-blue-600"}`}>
-                    Todo el contenido
-                </a>
-                <a href={`?filter=series&category=${category}`}
-                   class={`px-5 py-3 rounded-lg transition-all duration-300 text-white font-medium 
-               ${showSeries && !showAll ? "bg-blue-500 shadow-md transform scale-105" : "bg-blue-700 hover:bg-blue-600"}`}>
-                    Series
-                </a>
-                <a href={`?filter=peliculas&category=${category}`}
-                   class={`px-5 py-3 rounded-lg transition-all duration-300 text-white font-medium 
-               ${showMovies && !showAll ? "bg-blue-500 shadow-md transform scale-105" : "bg-blue-700 hover:bg-blue-600"}`}>
-                    Películas
-                </a>
-            </div>
+    <!-- Primera barra de navegación -->
+    <nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 backdrop-blur-lg shadow-xl rounded-2xl px-6 py-4">
+        <div class="flex flex-wrap justify-center gap-4">
+            <a href={`?filter=todos&category=${category}`}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                 ${showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                   "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Todo el contenido
+            </a>
+            <a href={`?filter=series&category=${category}`}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                 ${showSeries && !showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                   "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Series
+            </a>
+            <a href={`?filter=peliculas&category=${category}`}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                 ${showMovies && !showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                   "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Películas
+            </a>
         </div>
     </nav>
 
@@ -809,5 +837,9 @@ const totalContenido = totalSeries + totalPeliculas;
     :global(.favorites-container .grid > div:hover) {
         transform: translateY(-5px);
         box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .section-title {
+        @apply text-xl font-semibold mb-4 pl-4 border-l-4;
     }
 </style>

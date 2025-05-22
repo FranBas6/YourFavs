@@ -4,9 +4,11 @@ import HeaderButton from "./HeaderButton.astro";
 
 <header class="py-3 px-5 mx-auto w-full lg:py-10 lg:px-16 bg-gradient-to-r from-blue-600 to-blue-500 rounded-b-2xl shadow-lg">
     <div class="title-container">
-        <h1 class="mb-3 text-4xl tracking-tight font-extrabold text-white animated-text title-3d" data-text="YourFavs">
+        <a href="/personal" class="mb-3 text-4xl tracking-tight font-extrabold text-white animated-text title-3d" data-text="YourFavs">
+          <h1>
             YourFavs
-        </h1>
+          </h1>
+        </a>
     </div>
 
     <!-- Checkbox oculto para controlar la visibilidad del menú en móviles -->
@@ -89,20 +91,34 @@ import HeaderButton from "./HeaderButton.astro";
             </svg>
             Personal
         </HeaderButton>
-        <div class="flex items-center mt-3 md:mt-0 md:ml-2">
-            <form action="/busqueda" method="get" class="flex items-center">
-                <input name="query" type="text" placeholder="Buscar..."
-                       class="w-52 md:w-64 px-4 py-2 rounded-l-lg border-0 bg-white/80 text-black focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow-inner"/>
-                <button type="submit"
-                        class="px-4 py-2 rounded-r-lg bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition-colors duration-300 shadow-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd"
-                              d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                              clip-rule="evenodd"/>
+        <!-- Buscador con botón -->
+        <div class="flex items-center space-x-3">
+            <form action="/busqueda" method="get" class="flex items-center relative">
+                <!-- Input -->
+                <input
+                        name="query"
+                        type="text"
+                        placeholder="Buscar películas, series..."
+                        class="w-64 xl:w-80 pl-10 pr-12 py-2.5 rounded-full border-0 bg-white/90 backdrop-blur-sm text-gray-800 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/50 focus:bg-white transition-all duration-300 shadow-lg"
+                        autocomplete="off"
+                />
+
+                <!-- Ícono de lupa dentro del input -->
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg class="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+
+                <!-- Botón funcional -->
+                <button type="submit" class="absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-300 transition duration-200 shadow-md">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
                     </svg>
                 </button>
             </form>
         </div>
+
         <HeaderButton href="/about">
             <svg class="mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" stroke-width="2">
                 <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"></path>
