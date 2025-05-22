@@ -27,12 +27,20 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
     <meta property="og:description" content={description}/>
     <meta property="og:type" content="website"/>
     <title>{title}</title>
-    <ViewTransitions/>
 </head>
 <body class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins">
 <Header/>
 <main class="max-w-7xl w-full px-3 sm:px-6 lg:px-8 mx-auto pt-4 sm:pt-6 md:pt-8 lg:pt-10">
     <slot/>
+    <!-- Botón flotante para volver arriba -->
+    <div class="back-to-top-container">
+        <a href="#top" class="back-to-top" aria-label="Volver al inicio">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+            </svg>
+        </a>
+    </div>
 </main>
 <footer class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-8 sm:mt-12 md:mt-16 pb-4 sm:pb-6 md:pb-8 text-center text-xs sm:text-sm text-gray-500">
     <p>&copy; {new Date().getFullYear()} YourFavs. Todos los derechos reservados.</p>
@@ -55,6 +63,11 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
         --color-coral-plat: #ffffff;
         --color-coral-white: #d5d5d2;
         --color-pastel-yellow: #FACC15;
+
+        --coral-red: #ff6b7a;
+        --coral-red-light: #ff8f9c;
+        --coral-red-dark: #e8495a;
+        --coral-red-alpha: rgba(255, 107, 122, 0.15);
     }
 
     .bg-light-gray {
@@ -145,22 +158,52 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
         gap: 1rem;
     }
 
-    .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
-    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-cols-1 {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    .grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 
     @media (min-width: 640px) {
-        .sm\:grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .sm\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .sm\:grid-cols-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .sm\:grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
     }
 
     @media (min-width: 768px) {
-        .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        .md\:grid-cols-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .md\:grid-cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .back-to-top-container {
+            bottom: 1rem;
+            right: 1rem;
+        }
+
+        .back-to-top {
+            width: 48px;
+            height: 48px;
+        }
     }
 
     @media (min-width: 1024px) {
-        .lg\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-        .lg\:grid-cols-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        .lg\:grid-cols-4 {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+
+        .lg\:grid-cols-5 {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
     }
 
     /* Media queries para modo oscuro */
@@ -188,4 +231,40 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
             background: #9CA3AF;
         }
     }
+
+    /* Botón flotante para volver arriba */
+    .back-to-top-container {
+        position: fixed;
+        bottom: 2rem;
+        right: 2rem;
+        z-index: 50;
+    }
+
+    .back-to-top {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        height: 56px;
+        background: var(--coral-red);
+        color: white;
+        border-radius: 50%;
+        box-shadow: var(--shadow-large);
+        transition: var(--transition-smooth);
+        text-decoration: none;
+        opacity: 0.9;
+    }
+
+    .back-to-top:hover {
+        transform: translateY(-4px) scale(1.1);
+        opacity: 1;
+        box-shadow: 0 20px 40px -10px rgba(230, 57, 70, 0.4);
+    }
+
+    .back-to-top:focus {
+        outline: none;
+        ring: 3px solid rgba(230, 57, 70, 0.3);
+    }
+
+    .back-to-top:focus-visible,
 </style>

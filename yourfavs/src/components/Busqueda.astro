@@ -127,14 +127,6 @@ const hasResults = totalResults > 0;
         <div class="nav-container bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl">
             <div class="nav-wrapper px-3 py-2">
                 <div class="nav-buttons flex flex-wrap justify-center items-center gap-3">
-                    <CategoriasButton
-                            href="#top"
-                            class="nav-button nav-button--home">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
-                        </svg>
-                        <span>Inicio</span>
-                    </CategoriasButton>
 
                     {limitedMovies.length > 0 && (
                             <CategoriasButton
@@ -144,7 +136,6 @@ const hasResults = totalResults > 0;
                                     <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-6h1V5h-1v2zm-2 0h1V5h-1v2zM9 5v2h1V5H9zM5 5v2h1V5H5zm0 8v2h1v-2H5zm0-2v2h1v-2H5zm2 2v2h1v-2H7zm2 0v2h1v-2H9zm2 0v2h1v-2h-1zm2 0v2h1v-2h-1zm-8-2v2h1v-2H5zm2 0v2h1v-2H7zm2 0v2h1v-2H9z" clip-rule="evenodd"/>
                                 </svg>
                                 <span>Películas</span>
-                                <span class="count-badge">{limitedMovies.length}</span>
                             </CategoriasButton>
                     )}
 
@@ -156,7 +147,6 @@ const hasResults = totalResults > 0;
                                     <path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"/>
                                 </svg>
                                 <span>Series</span>
-                                <span class="count-badge">{limitedSeries.length}</span>
                             </CategoriasButton>
                     )}
 
@@ -168,7 +158,6 @@ const hasResults = totalResults > 0;
                                     <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
                                 </svg>
                                 <span>Actores</span>
-                                <span class="count-badge">{limitedActors.length}</span>
                             </CategoriasButton>
                     )}
                 </div>
@@ -659,6 +648,10 @@ const hasResults = totalResults > 0;
             --color-text-primary: #f1f5f9;
             --color-text-secondary: #cbd5e1;
             --color-border: #334155;
+            --coral-red: #ff6b7a;
+            --coral-red-light: #ff8f9c;
+            --coral-red-dark: #e8495a;
+            --coral-red-alpha: rgba(255, 107, 122, 0.15);
         }
 
         body {
@@ -680,6 +673,15 @@ const hasResults = totalResults > 0;
         .text-slate-600,
         .text-gray-600 {
             color: var(--color-text-secondary);
+        }
+
+        .nav-pill {
+            background: var(--coral-red-alpha);
+            color: var(--coral-red);
+        }
+
+        .section-subtitle {
+            color: var(--coral-red);
         }
 
     }
@@ -732,6 +734,47 @@ const hasResults = totalResults > 0;
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-md);
             padding: 0.2rem 0.2rem;
+        }
+    }
+
+    /* Animaciones */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Mejoras responsivas */
+    @media (max-width: 768px) {
+        .actor-profile {
+            padding: 1.5rem;
+        }
+
+        .profile-image-container {
+            width: 180px;
+            height: 270px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+        }
+
+        .quick-nav {
+            justify-content: center;
+        }
+
+        .nav-pill {
+            font-size: 0.85rem;
+            padding: 0.625rem 1rem;
+        }
+
+        .section-header-line {
+            display: none;
         }
     }
 </style>
