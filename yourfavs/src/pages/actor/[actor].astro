@@ -852,6 +852,16 @@ const topGenres = Object.entries(movieGenres)
 
         .section-title {
             font-size: 1.5rem;
+            white-space: normal; /* Cambiar de nowrap a normal */
+            flex-wrap: wrap; /* Permitir que se envuelva */
+            justify-content: center; /* Centrar en móviles */
+        }
+
+        .section-header-container {
+            flex-direction: column; /* Cambiar a columna en móviles */
+            align-items: center;
+            text-align: center;
+            gap: 0.5rem;
         }
 
         .quick-nav {
@@ -864,9 +874,9 @@ const topGenres = Object.entries(movieGenres)
         }
 
         .section-header-line {
-            display: none;
+            width: 100%;
+            max-width: 200px; /* Limitar el ancho de la línea */
         }
-
     }
 
     @media (max-width: 640px) {
@@ -880,9 +890,16 @@ const topGenres = Object.entries(movieGenres)
 
         .content-grid {
             grid-template-columns: repeat(2, 1fr);
-            gap: 1rem;
+            gap: 0.75rem; /* Reducir de 1rem */
+            padding: 0 0.5rem; /* Añadir padding lateral pequeño */
+        }
+
+        .card-wrapper {
+            min-width: 0; /* Permitir que se compriman */
+            width: 100%;
         }
     }
+
 
     /* Modo oscuro mejorado */
     @media (prefers-color-scheme: dark) {
