@@ -90,16 +90,23 @@ if (Astro.request.method === 'POST') {
     return Astro.redirect(`/movie/${id}`);
 }
 
+// Definir la interfaz para el reparto
+interface MovieCastMember {
+    name: string;
+    character: string;
+    id: number;
+}
+
 // Obtener datos de la película
 let item = null;
-let cast: string[] = [];
+let cast: MovieCastMember[] = []; // Cambio aquí: de string[] a MovieCastMember[]
 let directors: { name: string; job: string }[] = [];
 let trailerUrl: string | null = null;
 let title = "Película no encontrada";
 
 if (id) {
     item = await getMovieById({ id });
-    cast = await getMovieCast(id);
+    cast = await getMovieCast(id); // Ahora retorna MovieCastMember[]
     directors = await getMovieDirectorsAndRoles(id);
     trailerUrl = await getMovieTrailer(id);
     title = item?.title || title;
@@ -631,15 +638,22 @@ if (item?.belongs_to_collection) {
                             <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto</h2>
                             <div class="text-gray-600">
                                 {cast?.length > 0 ? (
-                                        <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                        <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                             {cast.map((actor) => (
-                                                    <li class="border-b border-gray-100 py-1 last:border-0">
-                                                        <a
-                                                                href={`/actor/${actor}`}
-                                                                class="text-gray-600 hover:text-blue-600 hover:underline transition duration-300"
-                                                        >
-                                                            {actor}
-                                                        </a>
+                                                    <li class="border-b border-gray-100 pb-3 last:border-0">
+                                                        <div class="flex flex-col">
+                                                            <a
+                                                                    href={`/actor/${actor.name}`}
+                                                                    class="text-gray-800 font-semibold hover:text-blue-600 hover:underline transition duration-300"
+                                                            >
+                                                                {actor.name}
+                                                            </a>
+                                                            {actor.character && (
+                                                                    <span class="text-sm text-gray-500 mt-1">
+                                    como {actor.character}
+                                </span>
+                                                            )}
+                                                        </div>
                                                     </li>
                                             ))}
                                         </ul>

@@ -1,7 +1,7 @@
 import {type APIMovie, type Movie} from "../types/ApiMovie.ts";
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, orderBy } from "firebase/firestore";
 
 interface MovieFavs {
     id: string,
@@ -53,25 +53,34 @@ interface RecommendedMovie {
 }
 
 // Configuración de Firebase
-import { firebaseConfig } from '../utils/firebaseConfig';
+const firebaseConfig = {
+    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
+    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
+    measurementId: import.meta.env.PUBLIC_FIREBASE_MEASUREMENT_ID,
+};
 
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 // Inicializar Firestore
 const db = getFirestore(app);
 
-// Obtener películas favoritas
+// Obtener películas favoritas ordenadas por fecha de añadido (más reciente primero)
 export const getMovieFav = async (): Promise<MovieFavs[]> => {
     try {
         console.log("Intentando obtener películas favoritas...");
 
-        // Referencia a la colección de películas favoritas
+        // Referencia a la colección de películas favoritas con ordenamiento
         const movieFavsRef = collection(db, "MovieFavs");
+        const q = query(movieFavsRef, orderBy("added_at", "desc"));
 
-        // Obtener documentos
-        const querySnapshot = await getDocs(movieFavsRef);
+        // Obtener documentos ordenados
+        const querySnapshot = await getDocs(q);
 
-        console.log("Resultado de la consulta:", querySnapshot);
+        console.log("Resultado de la consulta ordenado:", querySnapshot);
 
         if (querySnapshot.empty) {
             console.warn("No se encontraron películas favoritas.");
@@ -91,18 +100,19 @@ export const getMovieFav = async (): Promise<MovieFavs[]> => {
     }
 };
 
-// Obtener películas pendientes
+// Obtener películas pendientes ordenadas por fecha de añadido (más reciente primero)
 export const getMoviesPendientes = async (): Promise<MoviesPendientes[]> => {
     try {
         console.log("Intentando obtener películas pendientes...");
 
-        // Referencia a la colección de películas pendientes
+        // Referencia a la colección de películas pendientes con ordenamiento
         const moviesPendientesRef = collection(db, "MoviesPendientes");
+        const q = query(moviesPendientesRef, orderBy("added_at", "desc"));
 
-        // Obtener documentos
-        const querySnapshot = await getDocs(moviesPendientesRef);
+        // Obtener documentos ordenados
+        const querySnapshot = await getDocs(q);
 
-        console.log("Resultado de la consulta:", querySnapshot);
+        console.log("Resultado de la consulta ordenado:", querySnapshot);
 
         if (querySnapshot.empty) {
             console.warn("No se encontraron películas pendientes.");
@@ -122,18 +132,19 @@ export const getMoviesPendientes = async (): Promise<MoviesPendientes[]> => {
     }
 };
 
-// Obtener películas vistas
+// Obtener películas vistas ordenadas por fecha de añadido (más reciente primero)
 export const getMoviesVistas = async (): Promise<MoviesVistas[]> => {
     try {
         console.log("Intentando obtener películas vistas...");
 
-        // Referencia a la colección de películas vistas
+        // Referencia a la colección de películas vistas con ordenamiento
         const moviesVistasRef = collection(db, "MoviesVistas");
+        const q = query(moviesVistasRef, orderBy("added_at", "desc"));
 
-        // Obtener documentos
-        const querySnapshot = await getDocs(moviesVistasRef);
+        // Obtener documentos ordenados
+        const querySnapshot = await getDocs(q);
 
-        console.log("Resultado de la consulta:", querySnapshot);
+        console.log("Resultado de la consulta ordenado:", querySnapshot);
 
         if (querySnapshot.empty) {
             console.warn("No se encontraron películas vistas.");
@@ -492,9 +503,15 @@ export const getMoviesByCategory = async (category: string, page: string = "1"):
     }
 };
 
+// Interfaz para el tipo de datos del reparto de películas
+interface MovieCastMember {
+    name: string;
+    character: string;
+    id: number;
+}
 
-
-export const getMovieCast = async (movieId: string): Promise<string[]> => {
+// Función modificada para obtener el reparto de películas con información del personaje
+export const getMovieCast = async (movieId: string): Promise<MovieCastMember[]> => {
     const url = `https://api.themoviedb.org/3/movie/${movieId}/credits?api_key=${API_KEY}&language=es-ES`;
     try {
         const response = await fetch(url);
@@ -510,7 +527,11 @@ export const getMovieCast = async (movieId: string): Promise<string[]> => {
             return [];
         }
 
-        return data.cast.map((actor: any) => actor.name);
+        return data.cast.map((actor: any) => ({
+            name: actor.name,
+            character: actor.character || "",
+            id: actor.id
+        }));
     } catch (error) {
         console.error("Error al obtener el reparto:", error);
         return [];

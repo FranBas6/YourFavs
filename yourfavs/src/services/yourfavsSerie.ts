@@ -265,7 +265,15 @@ interface RecommendedSeries {
 export type { SeriesFavs, SeriesPendiente, SeriesVistas, SeriesSiguiendo, LikedSeries };
 
 // Configuración de Firebase
-import { firebaseConfig } from '../utils/firebaseConfig';
+const firebaseConfig = {
+    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
+    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
+    measurementId: import.meta.env.PUBLIC_FIREBASE_MEASUREMENT_ID,
+};
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -325,16 +333,17 @@ export const getSerieFav = async (): Promise<SeriesFavs[]> => {
     }
 };
 
-// Función para obtener series pendientes
+// Función para obtener series pendientes ordenadas por fecha de añadido (más reciente primero)
 export const getSeriesPendientes = async (): Promise<SeriesPendiente[]> => {
     try {
         console.log("Intentando obtener series pendientes...");
 
-        // Crear una referencia a la colección
+        // Crear una referencia a la colección con ordenamiento
         const seriesPendientesRef = collection(db, "SeriesPendiente");
+        const q = query(seriesPendientesRef, orderBy("added_at", "desc"));
 
-        // Obtener todos los documentos de la colección
-        const querySnapshot = await getDocs(seriesPendientesRef);
+        // Obtener todos los documentos de la colección ordenados
+        const querySnapshot = await getDocs(q);
 
         // Procesar los resultados
         const result: SeriesPendiente[] = [];
@@ -346,7 +355,7 @@ export const getSeriesPendientes = async (): Promise<SeriesPendiente[]> => {
             } as SeriesPendiente);
         });
 
-        console.log("Resultado de la consulta:", result);
+        console.log("Resultado de la consulta ordenado:", result);
 
         if (result.length === 0) {
             console.warn("No se encontraron series pendientes.");
@@ -361,16 +370,17 @@ export const getSeriesPendientes = async (): Promise<SeriesPendiente[]> => {
     }
 };
 
-// Función para obtener series vistas
+// Función para obtener series vistas ordenadas por fecha de añadido (más reciente primero)
 export const getSeriesVistas = async (): Promise<SeriesVistas[]> => {
     try {
         console.log("Intentando obtener series vistas...");
 
-        // Crear una referencia a la colección
+        // Crear una referencia a la colección con ordenamiento
         const seriesVistasRef = collection(db, "SeriesVistas");
+        const q = query(seriesVistasRef, orderBy("added_at", "desc"));
 
-        // Obtener todos los documentos de la colección
-        const querySnapshot = await getDocs(seriesVistasRef);
+        // Obtener todos los documentos de la colección ordenados
+        const querySnapshot = await getDocs(q);
 
         // Procesar los resultados
         const result: SeriesVistas[] = [];
@@ -382,7 +392,7 @@ export const getSeriesVistas = async (): Promise<SeriesVistas[]> => {
             } as SeriesVistas);
         });
 
-        console.log("Resultado de la consulta:", result);
+        console.log("Resultado de la consulta ordenado:", result);
 
         if (result.length === 0) {
             console.warn("No se encontraron series vistas.");
@@ -397,16 +407,17 @@ export const getSeriesVistas = async (): Promise<SeriesVistas[]> => {
     }
 };
 
-// Función para obtener series siguiendo
+// Función para obtener series siguiendo ordenadas por fecha de añadido (más reciente primero)
 export const getSeriesSiguiendo = async (): Promise<SeriesSiguiendo[]> => {
     try {
         console.log("Intentando obtener series siguiendo...");
 
-        // Crear una referencia a la colección
+        // Crear una referencia a la colección con ordenamiento
         const seriesSiguiendoRef = collection(db, "SeriesSiguiendo");
+        const q = query(seriesSiguiendoRef, orderBy("added_at", "desc"));
 
-        // Obtener todos los documentos de la colección
-        const querySnapshot = await getDocs(seriesSiguiendoRef);
+        // Obtener todos los documentos de la colección ordenados
+        const querySnapshot = await getDocs(q);
 
         // Procesar los resultados
         const result: SeriesSiguiendo[] = [];
@@ -418,7 +429,7 @@ export const getSeriesSiguiendo = async (): Promise<SeriesSiguiendo[]> => {
             } as SeriesSiguiendo);
         });
 
-        console.log("Resultado de la consulta:", result);
+        console.log("Resultado de la consulta ordenado:", result);
 
         if (result.length === 0) {
             console.warn("No se encontraron series siguiendo.");
@@ -433,16 +444,17 @@ export const getSeriesSiguiendo = async (): Promise<SeriesSiguiendo[]> => {
     }
 };
 
-// Función para obtener series que te han gustado
+// Función para obtener series que te han gustado ordenadas por fecha de añadido (más reciente primero)
 export const getLikedSeries = async (): Promise<LikedSeries[]> => {
     try {
         console.log("Intentando obtener series que te gustan...");
 
-        // Crear una referencia a la colección
+        // Crear una referencia a la colección con ordenamiento
         const likedSeriesRef = collection(db, "LikedSeries");
+        const q = query(likedSeriesRef, orderBy("added_at", "desc"));
 
-        // Obtener todos los documentos de la colección
-        const querySnapshot = await getDocs(likedSeriesRef);
+        // Obtener todos los documentos de la colección ordenados
+        const querySnapshot = await getDocs(q);
 
         // Procesar los resultados
         const result: LikedSeries[] = [];
@@ -454,7 +466,7 @@ export const getLikedSeries = async (): Promise<LikedSeries[]> => {
             } as LikedSeries);
         });
 
-        console.log("Resultado de la consulta:", result);
+        console.log("Resultado de la consulta ordenado:", result);
 
         if (result.length === 0) {
             console.warn("No se encontraron series que te gustan.");
@@ -463,7 +475,7 @@ export const getLikedSeries = async (): Promise<LikedSeries[]> => {
 
         return result;
     } catch (error) {
-        console.error("Error al obtener las series siguiendo:", error);
+        console.error("Error al obtener las series que te gustan:", error);
         console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         return [];
     }
@@ -825,13 +837,26 @@ export const getSeriesByCategory = async (category: string, page: string = "1"):
     }
 };
 
-export const getSeriesCast = async (tvId: string): Promise<string[]> => {
+// Interfaz para el tipo de datos del reparto
+interface CastMember {
+    name: string;
+    character: string;
+    id: number;
+}
+
+// Función modificada para obtener el reparto con información del personaje
+export const getSeriesCast = async (tvId: string): Promise<CastMember[]> => {
     const url = `https://api.themoviedb.org/3/tv/${tvId}/credits?api_key=${API_KEY}&language=es-ES`;
     const response = await fetch(url);
     const data = await response.json();
 
-    return data.cast.map((actor: any) => actor.name);
+    return data.cast.map((actor: any) => ({
+        name: actor.name,
+        character: actor.character,
+        id: actor.id
+    }));
 };
+
 
 export const getSeriesDirectorsAndRoles = async (tvId: string): Promise<{ name: string, job: string }[]> => {
     const url = `https://api.themoviedb.org/3/tv/${tvId}/credits?api_key=${API_KEY}&language=es-ES`;
@@ -1086,4 +1111,3 @@ export const fetchAllSeriesPosters = async (
         return [];
     }
 };
-
