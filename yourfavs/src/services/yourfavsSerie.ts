@@ -846,15 +846,31 @@ interface CastMember {
 
 // Función modificada para obtener el reparto con información del personaje
 export const getSeriesCast = async (tvId: string): Promise<CastMember[]> => {
-    const url = `https://api.themoviedb.org/3/tv/${tvId}/credits?api_key=${API_KEY}&language=es-ES`;
-    const response = await fetch(url);
-    const data = await response.json();
+    // Primero obtener info de la serie para saber cuántas temporadas tiene
+    const seriesUrl = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&language=es-ES`;
+    const seriesResponse = await fetch(seriesUrl);
+    const seriesData = await seriesResponse.json();
 
-    return data.cast.map((actor: any) => ({
-        name: actor.name,
-        character: actor.character,
-        id: actor.id
-    }));
+    const seasonsToCheck = Math.min(3, seriesData.number_of_seasons); // Primeras 3 temporadas
+    const allCast = new Map();
+
+    for (let season = 1; season <= seasonsToCheck; season++) {
+        const url = `https://api.themoviedb.org/3/tv/${tvId}/season/${season}/credits?api_key=${API_KEY}&language=es-ES`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        data.cast?.forEach((actor: any) => {
+            if (!allCast.has(actor.id)) {
+                allCast.set(actor.id, {
+                    name: actor.name,
+                    character: actor.character,
+                    id: actor.id
+                });
+            }
+        });
+    }
+
+    return Array.from(allCast.values());
 };
 
 
