@@ -844,17 +844,16 @@ interface CastMember {
     id: number;
 }
 
-// Función modificada para obtener el reparto con información del personaje
+// Función para obtener el reparto completo de todas las temporadas
 export const getSeriesCast = async (tvId: string): Promise<CastMember[]> => {
-    // Primero obtener info de la serie para saber cuántas temporadas tiene
     const seriesUrl = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&language=es-ES`;
     const seriesResponse = await fetch(seriesUrl);
     const seriesData = await seriesResponse.json();
 
-    const seasonsToCheck = Math.min(3, seriesData.number_of_seasons); // Primeras 3 temporadas
-    const allCast = new Map();
+    const totalSeasons = seriesData.number_of_seasons;
+    const allCast = new Map<number, CastMember>();
 
-    for (let season = 1; season <= seasonsToCheck; season++) {
+    for (let season = 1; season <= totalSeasons; season++) {
         const url = `https://api.themoviedb.org/3/tv/${tvId}/season/${season}/credits?api_key=${API_KEY}&language=es-ES`;
         const response = await fetch(url);
         const data = await response.json();
