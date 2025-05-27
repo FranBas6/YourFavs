@@ -1,7 +1,7 @@
 import {type APIMovie, type Movie} from "../types/ApiMovie.ts";
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore";
 
 interface MovieFavs {
     id: string,
@@ -26,6 +26,17 @@ interface MoviesPendientes {
 }
 
 interface MoviesVistas {
+    id: string,
+    title: string;
+    release_date: string;
+    overview: string;
+    poster_path: string;
+    vote_average: number;
+    added_at: string;
+    genres: string[];
+}
+
+interface MoviesVerPronto {
     id: string,
     title: string;
     release_date: string;
@@ -163,6 +174,66 @@ export const getMoviesVistas = async (): Promise<MoviesVistas[]> => {
         return [];
     }
 };
+
+// Obtener películas para ver pronto ordenadas por fecha de añadido (más reciente primero)
+export const getMoviesVerPronto = async (): Promise<MoviesVerPronto[]> => {
+    try {
+        console.log("Intentando obtener películas para ver pronto...");
+
+        // Referencia a la colección de películas pendientes con ordenamiento
+        const moviesVerProntoRef = collection(db, "MoviesVerPronto");
+        const q = query(moviesVerProntoRef, orderBy("added_at", "desc"));
+
+        // Obtener documentos ordenados
+        const querySnapshot = await getDocs(q);
+
+        console.log("Resultado de la consulta ordenado:", querySnapshot);
+
+        if (querySnapshot.empty) {
+            console.warn("No se encontraron películas para ver pronto.");
+            return [];
+        }
+
+        // Convertir los documentos a un array de datos con el tipo MoviesPendientes
+        const result: MoviesVerPronto[] = querySnapshot.docs.map(doc => {
+            return { id: doc.id, ...doc.data() } as MoviesVerPronto;
+        });
+
+        return result;
+    } catch (error) {
+        console.error("Error al obtener las películas para ver pronto:", error);
+        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        return [];
+    }
+};
+
+export async function clearAllMoviesVerPronto() {
+    try {
+        const peliculasVerProntoRef = collection(db, 'MoviesVerPronto');
+        const querySnapshot = await getDocs(peliculasVerProntoRef);
+
+        const deletePromises: Promise<void>[] = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deletePromises.push(deleteDoc(doc(db, 'MoviesVerPronto', docSnapshot.id)));
+        });
+
+        await Promise.all(deletePromises);
+
+        return {
+            success: true,
+            deletedCount: deletePromises.length,
+            message: `Se borraron ${deletePromises.length} películas exitosamente`
+        };
+
+    } catch (error) {
+        console.error('Error al borrar todas las películas:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            message: 'Error al borrar las películas'
+        };
+    }
+}
 
 import axios from 'axios';
 

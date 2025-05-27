@@ -1,7 +1,7 @@
 import {type APISerie, type Serie} from "../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
 
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy, updateDoc, doc } from "firebase/firestore";
+import { getFirestore, collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
 
 interface SeriesFavs {
     id: string;
@@ -198,6 +198,54 @@ interface SeriesSiguiendo {
 }
 
 interface LikedSeries {
+    id: string;
+    name: string;
+    poster_path: string;
+    vote_average: number;
+    overview: string;
+    added_at: Date | string;
+    first_air_date?: string;
+    seasons?: {
+        air_date: string,
+        episode_count: number,
+        id: number,
+        name: string,
+        overview: string,
+        poster_path: string,
+        season_number: number
+    }[];
+    last_episode_to_air?: {
+        air_date: string,
+        episode_number: number,
+        id: number,
+        name: string,
+        overview: string,
+        production_code: string,
+        season_number: number,
+        still_path: string,
+        vote_average: number,
+        vote_count: number
+    };
+    next_episode_to_air?: {
+        air_date: string,
+        episode_number: number,
+        id: number,
+        name: string,
+        overview: string,
+        production_code: string,
+        season_number: number,
+        still_path: string,
+        vote_average: number,
+        vote_count: number
+    };
+    genres?: {
+        id: number,
+        name: string
+    }[];
+    status?: string;
+}
+
+interface SeriesVerPronto {
     id: string;
     name: string;
     poster_path: string;
@@ -480,6 +528,71 @@ export const getLikedSeries = async (): Promise<LikedSeries[]> => {
         return [];
     }
 };
+
+// Función para obtener series pendientes ordenadas por fecha de añadido (más reciente primero)
+export const getSeriesVerPronto = async (): Promise<SeriesVerPronto[]> => {
+    try {
+        console.log("Intentando obtener series para ver pronto...");
+
+        // Crear una referencia a la colección con ordenamiento
+        const seriesVerProntoRef = collection(db, "SeriesVerPronto");
+        const q = query(seriesVerProntoRef, orderBy("added_at", "desc"));
+
+        // Obtener todos los documentos de la colección ordenados
+        const querySnapshot = await getDocs(q);
+
+        // Procesar los resultados
+        const result: SeriesVerPronto[] = [];
+        querySnapshot.forEach((doc) => {
+            // Añadir el ID del documento y todos los datos
+            result.push({
+                id: doc.id,
+                ...doc.data()
+            } as SeriesVerPronto);
+        });
+
+        console.log("Resultado de la consulta ordenado:", result);
+
+        if (result.length === 0) {
+            console.warn("No se encontraron series para ver pronto.");
+            return [];
+        }
+
+        return result;
+    } catch (error) {
+        console.error("Error al obtener las series para ver pronto:", error);
+        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        return [];
+    }
+};
+
+export async function clearAllSeriesVerPronto() {
+    try {
+        const seriesVerProntoRef = collection(db, 'SeriesVerPronto');
+        const querySnapshot = await getDocs(seriesVerProntoRef);
+
+        const deletePromises: Promise<void>[] = [];
+        querySnapshot.forEach((docSnapshot) => {
+            deletePromises.push(deleteDoc(doc(db, 'SeriesVerPronto', docSnapshot.id)));
+        });
+
+        await Promise.all(deletePromises);
+
+        return {
+            success: true,
+            deletedCount: deletePromises.length,
+            message: `Se borraron ${deletePromises.length} series exitosamente`
+        };
+
+    } catch (error) {
+        console.error('Error al borrar todas las series:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            message: 'Error al borrar las series'
+        };
+    }
+}
 
 import axios from 'axios';
 
