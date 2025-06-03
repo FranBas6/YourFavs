@@ -252,7 +252,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
 
         // 2. Extraer los IDs únicos de todas las películas
         const allMovieIds = new Set<string>();
-        [...favoritas, ...vistas].forEach(movie => {
+        [...favoritas].forEach(movie => {
             allMovieIds.add(movie.id);
         });
 
@@ -272,13 +272,6 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
             recommendationPromises.push(fetchRecommendationsForMovie(movie.id, 2.0)); // Mayor peso
         }
 
-        // Luego las vistas (peso normal)
-        for (const movie of vistas) {
-            // Evitamos duplicados que ya estén en favoritas
-            if (!favoritas.some(fav => fav.id === movie.id)) {
-                recommendationPromises.push(fetchRecommendationsForMovie(movie.id, 1.0));
-            }
-        }
 
         // 4. Obtener y procesar todas las recomendaciones
         const allRecommendationsArrays = await Promise.all(recommendationPromises);

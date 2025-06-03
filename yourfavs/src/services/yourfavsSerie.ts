@@ -603,15 +603,14 @@ export const getRecommendedSeries = async (limit: number = 20): Promise<Recommen
         console.log("Obteniendo series recomendadas...");
 
         // 1. Obtener todas tus series actuales
-        const [favoritas, vistas, gustadas] = await Promise.all([
+        const [favoritas, gustadas] = await Promise.all([
             getSerieFav(),
-            getSeriesVistas(),
             getLikedSeries()
         ]);
 
         // 2. Extraer los IDs únicos de todas las series
         const allSeriesIds = new Set<string>();
-        [...favoritas, ...vistas, ...gustadas].forEach(serie => {
+        [...favoritas, ...gustadas].forEach(serie => {
             allSeriesIds.add(serie.id);
         });
 
@@ -636,15 +635,6 @@ export const getRecommendedSeries = async (limit: number = 20): Promise<Recommen
             // Evitamos duplicados que ya estén en favoritas
             if (!favoritas.some(fav => fav.id === serie.id)) {
                 recommendationPromises.push(fetchRecommendationsForSeries(serie.id, 1.5));
-            }
-        }
-
-        // Finalmente las vistas (peso normal)
-        for (const serie of vistas) {
-            // Evitamos duplicados
-            if (!favoritas.some(fav => fav.id === serie.id) &&
-                !gustadas.some(liked => liked.id === serie.id)) {
-                recommendationPromises.push(fetchRecommendationsForSeries(serie.id, 1.0));
             }
         }
 
