@@ -105,9 +105,14 @@ export const getActorsByName = async ({ name, page }: { name: string, page?: str
         const data = await res.json();
         const results = Array.isArray(data.results) ? data.results : [];
 
+        // Filtrar solo personas cuyo departamento conocido sea "Acting"
+        const actors = results.filter((person: any) =>
+            person.known_for_department === "Acting"
+        );
+
         // Obtener detalles para cada actor encontrado
         const actorDetailsList: Actor[] = await Promise.all(
-            results.map(async (actor: any) => {
+            actors.map(async (actor: any) => {
                 const detailsUrl = `https://api.themoviedb.org/3/person/${actor.id}?api_key=${API_KEY}&language=es-ES`;
                 const detailsRes = await fetch(detailsUrl);
                 if (!detailsRes.ok) throw new Error(`Error al obtener detalles del actor ${actor.id}`);
