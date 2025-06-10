@@ -3,33 +3,21 @@ import {type APIMovie, type Movie} from "../types/ApiMovie.ts";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
 
-/// Obtener series en las que participa un actor o actriz
-export const getSeriesByActorName = async ({ name }: { name: string }): Promise<Serie[]> => {
+/// Obtener series en las que participa un actor o actriz por ID
+export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[]> => {
     try {
-        // 1. Buscar el ID de la persona
-        const searchUrl = `https://api.themoviedb.org/3/search/person?query=${encodeURIComponent(name)}&api_key=${API_KEY}&language=es-ES`;
-        const searchRes = await fetch(searchUrl);
-        if (!searchRes.ok) throw new Error(`Error en la búsqueda: ${searchRes.statusText}`);
-        const searchData = await searchRes.json();
-
-        const person = searchData.results[0];
-        if (!person) throw new Error("No se encontró la persona");
-
-        const personId = person.id;
-
-        // 2. Obtener créditos combinados
-        const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/combined_credits?api_key=${API_KEY}&language=es-ES`;
+        // Obtener créditos combinados directamente con el ID
+        const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
         const creditsRes = await fetch(creditsUrl);
         if (!creditsRes.ok) throw new Error(`Error al obtener créditos: ${creditsRes.statusText}`);
         const creditsData = await creditsRes.json();
 
         const series: Serie[] = creditsData.cast.filter((item: any) => item.media_type === "tv");
 
-        // 3. Ordenar primero por popularidad (de mayor a menor) y luego por valoración
+        // Ordenar primero por popularidad (de mayor a menor) y luego por valoración
         return series.sort((a, b) => {
             const popularityDiff = (b as any).popularity - (a as any).popularity;
             if (popularityDiff !== 0) return popularityDiff;
-            // Si tienen la misma popularidad, ordenar por valoración
             return (b as any).vote_average - (a as any).vote_average;
         });
 
@@ -39,34 +27,21 @@ export const getSeriesByActorName = async ({ name }: { name: string }): Promise<
     }
 };
 
-
-// Obtener películas en las que participa un actor o actriz
-export const getMoviesByActorName = async ({ name }: { name: string }): Promise<Movie[]> => {
+// Obtener películas en las que participa un actor o actriz por ID
+export const getMoviesByActorId = async ({ id }: { id: string }): Promise<Movie[]> => {
     try {
-        // 1. Buscar el ID de la persona
-        const searchUrl = `https://api.themoviedb.org/3/search/person?query=${encodeURIComponent(name)}&api_key=${API_KEY}&language=es-ES`;
-        const searchRes = await fetch(searchUrl);
-        if (!searchRes.ok) throw new Error(`Error en la búsqueda: ${searchRes.statusText}`);
-        const searchData = await searchRes.json();
-
-        const person = searchData.results[0];
-        if (!person) throw new Error("No se encontró la persona");
-
-        const personId = person.id;
-
-        // 2. Obtener créditos combinados
-        const creditsUrl = `https://api.themoviedb.org/3/person/${personId}/combined_credits?api_key=${API_KEY}&language=es-ES`;
+        // Obtener créditos combinados directamente con el ID
+        const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
         const creditsRes = await fetch(creditsUrl);
         if (!creditsRes.ok) throw new Error(`Error al obtener créditos: ${creditsRes.statusText}`);
         const creditsData = await creditsRes.json();
 
         const movies: Movie[] = creditsData.cast.filter((item: any) => item.media_type === "movie");
 
-        // 3. Ordenar primero por popularidad (de mayor a menor) y luego por valoración
+        // Ordenar primero por popularidad (de mayor a menor) y luego por valoración
         return movies.sort((a, b) => {
             const popularityDiff = (b as any).popularity - (a as any).popularity;
             if (popularityDiff !== 0) return popularityDiff;
-            // Si tienen la misma popularidad, ordenar por valoración
             return (b as any).vote_average - (a as any).vote_average;
         });
 
@@ -76,28 +51,11 @@ export const getMoviesByActorName = async ({ name }: { name: string }): Promise<
     }
 };
 
-// Obtener detalles de un actor o actriz por nombre
-export const getActorDetails = async ({ name }: { name: string }) => {
+// Obtener detalles de un actor o actriz por ID
+export const getActorDetailsById = async ({ id }: { id: string }) => {
     try {
-        // 1. Buscar TODOS los resultados posibles
-        const searchUrl = `https://api.themoviedb.org/3/search/person?query=${encodeURIComponent(name)}&api_key=${API_KEY}&language=es-ES`;
-        const searchRes = await fetch(searchUrl);
-        if (!searchRes.ok) throw new Error(`Error en la búsqueda: ${searchRes.statusText}`);
-        const searchData = await searchRes.json();
-
-        const persons = searchData.results;
-        if (!persons || persons.length === 0) throw new Error("No se encontró ninguna persona");
-
-        // 2. Ordenar los resultados por popularidad
-        const sortedPersons = persons.sort((a: any, b: any) => b.popularity - a.popularity);
-
-        // 3. Elegir el más popular
-        const mostPopularPerson = sortedPersons[0];
-
-        const personId = mostPopularPerson.id;
-
-        // 4. Obtener detalles de esa persona
-        const detailsUrl = `https://api.themoviedb.org/3/person/${personId}?api_key=${API_KEY}&language=es-ES`;
+        // Obtener detalles directamente con el ID
+        const detailsUrl = `https://api.themoviedb.org/3/person/${id}?api_key=${API_KEY}&language=es-ES`;
         const detailsRes = await fetch(detailsUrl);
         if (!detailsRes.ok) throw new Error(`Error al obtener los detalles: ${detailsRes.statusText}`);
         const actorDetails = await detailsRes.json();
@@ -108,7 +66,7 @@ export const getActorDetails = async ({ name }: { name: string }) => {
             biografia: actorDetails.biography,
             lugarNacimiento: actorDetails.place_of_birth,
             fechaNacimiento: actorDetails.birthday,
-            imagen: actorDetails.profile_path, // Solo devuelve la ruta, no la URL completa
+            imagen: actorDetails.profile_path,
             popularidad: actorDetails.popularity,
             conocidoPor: actorDetails.known_for_department
         };

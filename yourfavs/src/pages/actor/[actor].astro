@@ -1,6 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import {getSeriesByActorName, getMoviesByActorName, getActorDetails} from "../../services/yourfavsActor";
+import {getSeriesByActorId, getMoviesByActorId, getActorDetailsById} from "../../services/yourfavsActor";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 
@@ -10,11 +10,11 @@ if (!actor) {
     throw new Error("ID de la película no encontrado en la URL");
 }
 
-const series = await getSeriesByActorName({name: actor});
-const movies = await getMoviesByActorName({name: actor});
+const series = await getSeriesByActorId({id: actor});
+const movies = await getMoviesByActorId({id: actor});
 
 // Obtener detalles del actor
-const actorDetails = await getActorDetails({name: actor});
+const actorDetails = await getActorDetailsById({id: actor});
 
 // Si no se pueden obtener los detalles, usar un placeholder
 const actorInfo = actorDetails || {
@@ -82,7 +82,7 @@ const topGenres = Object.entries(movieGenres)
     .slice(0, 3)
     .map(([genreId, count]) => genresMap[genreId]);
 ---
-<Layout title={`${actor}`}>
+<Layout title={`${actorInfo.nombre}`}>
     <div class="actor-profile-bg"></div>
     <section class="container mx-auto px-4 py-8 relative">
         <!-- Perfil del Actor -->
