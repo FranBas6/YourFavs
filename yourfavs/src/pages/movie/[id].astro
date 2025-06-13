@@ -19,7 +19,7 @@ import {
 } from "firebase/firestore";
 
 // Configuración de Firebase
-import { firebaseConfig } from '../../utils/firebaseConfig';
+import {firebaseConfig} from '../../utils/firebaseConfig';
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -107,7 +107,7 @@ let trailerUrl: string | null = null;
 let title = "Película no encontrada";
 
 if (id) {
-    item = await getMovieById({ id });
+    item = await getMovieById({id});
     cast = await getMovieCast(id); // Ahora retorna MovieCastMember[]
     directors = await getMovieDirectorsAndRoles(id);
     trailerUrl = await getMovieTrailer(id);
@@ -160,23 +160,6 @@ const formatDate = (dateString: string) => {
     }).format(date);
 };
 
-// Lenguajes mapeados para mostrar nombres en español
-const languageMap = {
-    en: "Inglés",
-    es: "Español",
-    fr: "Francés",
-    de: "Alemán",
-    it: "Italiano",
-    pt: "Portugués",
-    ru: "Ruso",
-    ja: "Japonés",
-    ko: "Coreano",
-    zh: "Chino",
-    ar: "Árabe",
-    hi: "Hindi",
-    // Añade más mapeos según necesites
-};
-
 const providerLinks = {
     'Netflix': 'https://www.netflix.com/',
     'Disney Plus': 'https://www.disneyplus.com/',
@@ -206,9 +189,15 @@ const providerLinks = {
     // Agrega más proveedores según sea necesario
 };
 
-const providerElements = item?.providers?.map((provider) => {
+type Provider = {
+    provider_name: keyof typeof providerLinks;
+    logo_path?: string;
+};
+
+const providerElements = item?.providers?.map((provider: Provider) => {
     const link = providerLinks[provider.provider_name];
     const hasLogo = !!provider.logo_path;
+
     return {
         name: provider.provider_name,
         logo: hasLogo ? `https://image.tmdb.org/t/p/w200${provider.logo_path}` : null,
@@ -226,22 +215,19 @@ const getRatingStars = (rating: number) => {
     return "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(emptyStars);
 };
 
-function formatTrailerUrl(url) {
+function formatTrailerUrl(url: string): string {
     // Si ya es una URL de embed, devolverla tal cual
     if (url.includes('youtube.com/embed/')) {
         return url;
     }
 
-    // Convertir URL normal de YouTube a URL de embed
     let videoId = '';
 
-    // Manejar youtube.com/watch?v=ID
     if (url.includes('youtube.com/watch')) {
         const urlObj = new URL(url);
-        videoId = urlObj.searchParams.get('v');
-    }
-    // Manejar youtu.be/ID
-    else if (url.includes('youtu.be/')) {
+        const id = urlObj.searchParams.get('v');
+        if (id) videoId = id;
+    } else if (url.includes('youtu.be/')) {
         videoId = url.split('youtu.be/')[1].split('?')[0];
     }
 
@@ -249,7 +235,6 @@ function formatTrailerUrl(url) {
         return `https://www.youtube.com/embed/${videoId}`;
     }
 
-    // Si no es una URL de YouTube o no se puede extraer el ID, devolver la URL original
     return url;
 }
 
@@ -277,6 +262,27 @@ if (item?.belongs_to_collection) {
         console.error('Error al obtener información de la colección:', error);
     }
 }
+
+// Lenguajes mapeados para mostrar nombres en español
+const languageMap = {
+    en: "Inglés",
+    es: "Español",
+    fr: "Francés",
+    de: "Alemán",
+    it: "Italiano",
+    pt: "Portugués",
+    ru: "Ruso",
+    ja: "Japonés",
+    ko: "Coreano",
+    zh: "Chino",
+    ar: "Árabe",
+    hi: "Hindi",
+    // Añade más mapeos según necesites
+};
+
+function getLanguageName(code: string): string {
+    return languageMap[code as keyof typeof languageMap] || code;
+}
 ---
 
 <Layout title={`${title}`}>
@@ -298,11 +304,12 @@ if (item?.belongs_to_collection) {
                 </div>
                 {item?.genres && (
                         <div class="flex flex-wrap justify-center gap-2 mb-6">
-                            {item.genres.map((genre) => (
+                            {item.genres.map((genre: { id: number; name: string }) => (
                                     <span class="bg-gray-800 bg-opacity-80 px-3 py-1 rounded-full text-xs text-white">
-                                {genre.name}
-                            </span>
+                                        {genre.name}
+                                    </span>
                             ))}
+
                         </div>
                 )}
             </div>
@@ -548,6 +555,51 @@ if (item?.belongs_to_collection) {
                                 </div>
                         )}
                     </div>
+                    <!-- Info Cards -->
+                    <div class="mt-8 w-full space-y-4">
+                        <div class="bg-white p-4 rounded-lg shadow-md">
+                            <h3 class="text-lg font-bold text-blue-600 mb-2">Información</h3>
+                            <ul class="space-y-2">
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Estreno:</span>
+                                    <span class="font-medium text-gray-600">{formatDate(item?.release_date)}</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Valoración:</span>
+                                    <span class="font-medium text-gray-600">{item?.vote_average?.toFixed(1)}
+                                        ({item?.vote_count} votos)</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Adulto:</span>
+                                    <span class="font-medium text-gray-600">{item?.adult ? "Sí" : "No"}</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Popularidad:</span>
+                                    <span class="font-medium text-gray-600">{item?.popularity?.toFixed(1)}</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Idioma original:</span>
+                                    <span class="font-medium text-gray-600">
+                                        {getLanguageName(item?.original_language)}
+                                    </span>
+                                </li>
+                                {item?.original_title && item?.original_title !== item?.title && (
+                                        <li class="flex justify-between">
+                                            <span class="text-gray-600">Título original:</span>
+                                            <span class="font-medium text-gray-600">{item?.original_title}</span>
+                                        </li>
+                                )}
+                                {item?.runtime && (
+                                        <li class="flex justify-between">
+                                            <span class="text-gray-600">Duración:</span>
+                                            <span class="font-medium text-gray-600">
+                                            {Math.floor(item.runtime / 60)} h {item.runtime % 60} min
+                                            </span>
+                                        </li>
+                                )}
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Columna Derecha: Detalles -->
@@ -566,9 +618,9 @@ if (item?.belongs_to_collection) {
                                     <iframe
                                             class="w-full h-full rounded"
                                             src={formatTrailerUrl(trailerUrl)}
-                                            frameBorder="0"
+                                            frameborder="0"
                                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowFullScreen
+                                            allowfullscreen
                                     ></iframe>
                                 </div>
                             </div>
@@ -661,7 +713,8 @@ if (item?.belongs_to_collection) {
                                                     {/* Modal de imagen */}
                                                     <div id={`poster-${index}`} class="modal">
                                                         <a href="#" class="modal-close">&times;</a>
-                                                        <img src={poster.file_path} alt={`Póster ${poster.vote_average.toFixed(1)}/10`} />
+                                                        <img src={poster.file_path}
+                                                             alt={`Póster ${poster.vote_average.toFixed(1)}/10`}/>
                                                     </div>
                                                 </>
                                         ))}
@@ -731,7 +784,7 @@ if (item?.belongs_to_collection) {
                                 <div class="bg-white p-6 rounded-lg shadow-md">
                                     <h2 class="text-2xl font-bold text-blue-600 mb-4">Disponible en</h2>
                                     <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                        {providerElements.map((provider) => (
+                                        {providerElements.map((provider: { name: string; logo: string | null; link?: string }) => (
                                                 <div class="flex flex-col items-center">
                                                     {provider.logo ? (
                                                         provider.link ? (
@@ -768,7 +821,7 @@ if (item?.belongs_to_collection) {
                                 <div class="bg-white p-6 rounded-lg shadow-md">
                                     <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
                                     <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                        {item.production_companies.map((company) => (
+                                        {item.production_companies.map((company: { logo_path?: string; name: string }) => (
                                                 <div class="flex flex-col items-center">
                                                     {company?.logo_path ? (
                                                             <img
