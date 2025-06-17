@@ -15,7 +15,7 @@ const latestSeries = await getLatestSeries({page: page.toString()});
 const totalPages = 190; // Suponiendo 10 páginas de resultados disponibles, ajusta según tu API
 
 // Definir los géneros comunes
-const genresMap = {
+const genresMap: Record<number, string> = {
     // Géneros de películas y series
     28: "Acción",
     12: "Aventura",
@@ -169,7 +169,6 @@ function getGenreName(id: number): string {
                                     last_episode_to_air={item.last_episode_to_air}
                                     next_episode_to_air={item.next_episode_to_air}
                                     genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                    status={item.status}
                             />
                         </div>
                 ))

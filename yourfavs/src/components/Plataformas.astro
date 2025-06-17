@@ -65,17 +65,12 @@ let movies: Movie[] = [];
 let series: Serie[] = [];
 
 // Función para eliminar duplicados en arrays de películas o series por ID
-function removeDuplicates<T extends {id: number}>(items: T[]): T[] {
-    const uniqueMap = new Map<number, T>();
-
-    items.forEach(item => {
-        if (!uniqueMap.has(item.id)) {
-            uniqueMap.set(item.id, item);
-        }
-    });
-
-    return Array.from(uniqueMap.values());
+function removeDuplicates<T extends { id: number }>(items: T[]): T[] {
+    return items.filter((item, index, self) =>
+        index === self.findIndex((t) => t.id === item.id)
+    );
 }
+
 
 // Cargar todo el contenido si no hay filtro o filtrar por plataforma
 if (platformParam === 'all') {
@@ -413,7 +408,6 @@ const totalPages = 190;
                                             last_episode_to_air={item.last_episode_to_air}
                                             next_episode_to_air={item.next_episode_to_air}
                                             genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                            status={item.status}
                                     />
                                 </div>
                         ))

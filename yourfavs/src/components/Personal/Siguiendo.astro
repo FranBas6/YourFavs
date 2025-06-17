@@ -1,11 +1,15 @@
 ---
-import CardMovie from "../Cards/CardMovie.astro";
 import CardSerie from "../Cards/CardSerie.astro";
 import {
     getSeriesSiguiendo,
 } from "../../services/yourfavsSerie";
+import { fetchSerieDetails } from "../../services/tmdb"; // Las creamos ahora
 
-const seriesSiguiendo = await getSeriesSiguiendo()
+// 🔹 Obtener IDs desde Firebase
+const seriesSiguiendoIds = (await getSeriesSiguiendo()).map(s => s.id);
+
+// 🔹 Obtener detalles desde TMDB
+const seriesSiguiendo = await Promise.all(seriesSiguiendoIds.map(id => fetchSerieDetails(id)));
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
@@ -16,7 +20,7 @@ const showMovies = filter === "peliculas" || filter === "todos";
 const showAll = filter === "todos";
 
 // Definir los géneros comunes
-const genresMap = {
+const genresMap: Record<number, string> = {
     // Géneros de películas y series
     28: "Acción",
     12: "Aventura",
@@ -65,8 +69,7 @@ function filterContent(items: any[], type: 'movie' | 'serie') {
             (title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 overview.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        const genreMatch =
-            !genreFilter || genreList.some(g => g.id.toString() === genreFilter);
+        const genreMatch = !genreFilter || genreList.some((g: { id: number; name: string }) => g.id.toString() === genreFilter);
 
         return searchMatch && genreMatch;
     });
@@ -398,7 +401,7 @@ function buildUrl(params: Record<string, string>) {
                                                     seasons={item.seasons}
                                                     last_episode_to_air={item.last_episode_to_air}
                                                     next_episode_to_air={item.next_episode_to_air}
-                                                    genres={item.genre_ids?.map(id => ({
+                                                    genres={item.genre_ids?.map((id: number) => ({
                                                         id,
                                                         name: getGenreName(id)
                                                     }))}

@@ -5,9 +5,15 @@ import {
     getSerieFav,
 } from "../../services/yourfavsSerie";
 import {getMovieFav} from "../../services/yourfavsMovie";
+import { fetchMovieDetails, fetchSerieDetails } from "../../services/tmdb"; // Las creamos ahora
 
-const seriesFavoritas = await getSerieFav();
-const peliculasFavoritas = await getMovieFav();
+// 🔹 Obtener IDs desde Firebase
+const seriesFavortiasIds = (await getSerieFav()).map(s => s.id);
+const peliculasFavoritasIds = (await getMovieFav()).map(p => p.id);
+
+// 🔹 Obtener detalles desde TMDB
+const seriesFavoritas = await Promise.all(seriesFavortiasIds.map(id => fetchSerieDetails(id)));
+const peliculasFavoritas = await Promise.all(peliculasFavoritasIds.map(id => fetchMovieDetails(id)));
 
 // Obtener parámetros de URL
 const filter = Astro.url.searchParams.get("filter") || "todos";
@@ -19,7 +25,7 @@ const showMovies = filter === "peliculas" || filter === "todos";
 const showAll = filter === "todos";
 
 // Definir los géneros comunes
-const genresMap = {
+const genresMap: Record<number, string> = {
     // Géneros de películas y series
     28: "Acción",
     12: "Aventura",
@@ -68,8 +74,7 @@ function filterContent(items: any[], type: 'movie' | 'serie') {
             (title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 overview.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        const genreMatch =
-            !genreFilter || genreList.some(g => g.id.toString() === genreFilter);
+        const genreMatch = !genreFilter || genreList.some((g: { id: number; name: string }) => g.id.toString() === genreFilter);
 
         return searchMatch && genreMatch;
     });
@@ -83,24 +88,38 @@ const peliculasFiltradas = filterContent(peliculasFavoritas, 'movie');
 function getUniqueGenres() {
     const genreMap = new Map<number, string>();
 
-    if (showSeries || showAll) {
-        seriesFavoritas.forEach(serie => {
-            (serie.genres || []).forEach(g => {
-                if (g?.id && g?.name) {
-                    genreMap.set(g.id, g.name);
+    const processGenres = (items: any[]) => {
+        items.forEach(item => {
+            const genres = item.genre_ids || item.genres || [];
+            genres.forEach((genre: any) => {
+                // Si es un objeto con id y name
+                if (typeof genre === 'object' && genre?.id && genre?.name) {
+                    genreMap.set(genre.id, genre.name);
+                }
+                // Si es solo un ID numérico
+                else if (typeof genre === 'number') {
+                    const genreName = getGenreName(genre);
+                    genreMap.set(genre, genreName);
+                }
+                // Si es un string, buscar el ID correspondiente
+                else if (typeof genre === 'string') {
+                    // Buscar ID por nombre en el mapa inverso
+                    const genreId = Object.entries(genresMap)
+                        .find(([_, name]) => name === genre)?.[0];
+                    if (genreId) {
+                        genreMap.set(parseInt(genreId), genre);
+                    }
                 }
             });
         });
+    };
+
+    if (showSeries || showAll) {
+        processGenres(seriesFavoritas);
     }
 
     if (showMovies || showAll) {
-        peliculasFavoritas.forEach(pelicula => {
-            (pelicula.genres || []).forEach(g => {
-                if (g?.id && g?.name) {
-                    genreMap.set(g.id, g.name);
-                }
-            });
-        });
+        processGenres(peliculasFavoritas);
     }
 
     return Array.from(genreMap.entries())
@@ -416,7 +435,7 @@ function buildUrl(params: Record<string, string>) {
                                                     seasons={item.seasons}
                                                     last_episode_to_air={item.last_episode_to_air}
                                                     next_episode_to_air={item.next_episode_to_air}
-                                                    genres={item.genre_ids?.map(id => ({
+                                                    genres={item.genre_ids?.map((id: number) => ({
                                                         id,
                                                         name: getGenreName(id)
                                                     }))}
@@ -467,7 +486,7 @@ function buildUrl(params: Record<string, string>) {
                                                     vote_average={item.vote_average}
                                                     overview={item.overview}
                                                     release_date={item.release_date}
-                                                    genres={item.genre_ids?.map(id => ({
+                                                    genres={item.genre_ids?.map((id: number) => ({
                                                         id,
                                                         name: getGenreName(id)
                                                     }))}

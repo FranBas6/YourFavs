@@ -44,54 +44,23 @@ const showSeries = filter === "series" || filter === "todos";
 const showMovies = filter === "peliculas" || filter === "todos";
 const showAll = filter === "todos";
 
-// Función para construir URLs manteniendo los parámetros actuales
-function buildUrl({ filter, search = searchQuery, genre = genreFilter }) {
-    const params = new URLSearchParams();
-    if (filter) params.set('filter', filter);
-    if (search) params.set('search', search);
-    if (genre) params.set('genre', genre);
-
-    const queryString = params.toString();
-    return `/personal/verpronto${queryString ? '?' + queryString : ''}`;
-}
-
-// Definir los géneros comunes
-const genresMap = {
-    // Géneros de películas y series
-    28: "Acción",
-    12: "Aventura",
-    16: "Animación",
-    35: "Comedia",
-    80: "Crimen",
-    99: "Documental",
-    18: "Drama",
-    10751: "Familia",
-    14: "Fantasía",
-    36: "Historia",
-    27: "Terror",
-    10402: "Música",
-    9648: "Misterio",
-    10749: "Romance",
-    878: "Ciencia ficción",
-    10770: "Película de TV",
-    53: "Thriller",
-    10752: "Bélica",
-    37: "Western",
-    // Géneros exclusivos de series
-    10759: "Acción y Aventura",
-    10762: "Infantil",
-    10763: "Noticias",
-    10764: "Reality",
-    10765: "Sci-Fi y Fantasía",
-    10766: "Soap",
-    10767: "Talk",
-    10768: "Guerra y Política"
+type UrlParams = {
+    filter?: string;
+    search?: string;
+    genre?: string;
 };
 
-// Función para obtener el nombre del género según su ID
-function getGenreName(id: number): string {
-    return genresMap[id] || "Otro";
+// Función para construir URLs manteniendo los parámetros actuales
+function buildUrl({ filter, search = searchQuery, genre = genreFilter }: UrlParams): string {
+    const params = new URLSearchParams();
+    if (filter) params.set("filter", filter);
+    if (search) params.set("search", search);
+    if (genre) params.set("genre", genre);
+
+    const queryString = params.toString();
+    return `/personal/verpronto${queryString ? "?" + queryString : ""}`;
 }
+
 
 // Mensaje de confirmación si se borró algo
 const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
@@ -351,10 +320,6 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                                                     seasons={item.seasons}
                                                     last_episode_to_air={item.last_episode_to_air}
                                                     next_episode_to_air={item.next_episode_to_air}
-                                                    genres={item.genre_ids?.map(id => ({
-                                                        id,
-                                                        name: getGenreName(id)
-                                                    }))}
                                                     status={item.status}
                                             />
                                     ))}
@@ -398,11 +363,6 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                                                     vote_average={item.vote_average}
                                                     overview={item.overview}
                                                     release_date={item.release_date}
-                                                    genres={item.genre_ids?.map(id => ({
-                                                        id,
-                                                        name: getGenreName(id)
-                                                    }))}
-                                                    providers={item.providers}
                                             />
                                     ))}
                                 </div>

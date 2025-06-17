@@ -12,7 +12,7 @@ const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
 const title = queryParams.get('query') || '';
 
 // Definir los géneros comunes
-const genresMap = {
+const genresMap: Record<number, string> = {
     // Géneros de películas y series
     28: "Acción",
     12: "Aventura",
@@ -83,9 +83,23 @@ async function loadAllPages<T>(
 }
 
 // Then call them like:
-const allMovies = await loadAllPages(getMoviesByTitle, title, "title");
-const allSeries = await loadAllPages(getSeriesByTitle, title, "title");
-const allActors = await loadAllPages(getActorsByName, title, "name");
+const allMovies = await loadAllPages(
+    ({ title, page }) => getMoviesByTitle({ title, page }),
+    title,
+    "title"
+);
+
+const allSeries = await loadAllPages(
+    ({ title, page }) => getSeriesByTitle({ title, page }),
+    title,
+    "title"
+);
+
+const allActors = await loadAllPages(
+    ({ name, page }) => getActorsByName({ name, page }),
+    title,
+    "name"
+);
 
 // Limitar a 65 elementos por categoría
 const limitedMovies = allMovies.slice(0, 65);
@@ -216,7 +230,10 @@ const hasResults = totalResults > 0;
                                                     vote_average={item.vote_average}
                                                     overview={item.overview}
                                                     release_date={item.release_date}
-                                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                                    genres={item.genre_ids?.map((id: number) => ({
+                                                        id,
+                                                        name: getGenreName(id)
+                                                    }))}
                                                     providers={item.providers}
                                             />
                                         </div>
@@ -251,7 +268,6 @@ const hasResults = totalResults > 0;
                                                     overview={item.overview}
                                                     first_air_date={item.first_air_date}
                                                     genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                                    providers={item.providers}
                                                     last_episode_to_air={item.last_episode_to_air}
                                                     next_episode_to_air={item.next_episode_to_air}
                                             />

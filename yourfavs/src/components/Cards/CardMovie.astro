@@ -24,17 +24,17 @@ const {
 } = Astro.props;
 
 // Formatear la fecha en formato legible
-const formatDate = (dateString) => {
+const formatDate = (dateString: string | undefined): string => {
     if (!dateString) return "";
     const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+    return date.toLocaleDateString("es-ES", { year: "numeric", month: "short", day: "numeric" });
 };
 
 // Obtener año de estreno
 const releaseYear = release_date ? new Date(release_date).getFullYear() : null;
 
 // Formatear duración de la película
-const formatRuntime = (minutes) => {
+const formatRuntime = (minutes: number | undefined): string => {
     if (!minutes) return "";
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -56,7 +56,7 @@ const isRecent = release_date ?
 const isTrending = vote_average >= 8.0;
 
 // Color de fondo basado en la calificación
-const getRatingColor = (rating) => {
+const getRatingColor = (rating: number): string => {
     if (rating >= 8) return "bg-emerald-500 text-white";
     if (rating >= 7) return "bg-green-500 text-white";
     if (rating >= 6) return "bg-yellow-500 text-gray-900";

@@ -29,7 +29,7 @@ const actorInfo = actorDetails || {
 };
 
 // Definir los géneros comunes
-const genresMap = {
+const genresMap: Record<number, string> = {
     // Géneros de películas y series
     28: "Acción",
     12: "Aventura",
@@ -70,8 +70,8 @@ function getGenreName(id: number): string {
 const totalMovies = movies.length;
 const totalSeries = series.length;
 const totalProductions = totalMovies + totalSeries;
-const movieGenres = movies.flatMap(m => m.genre_ids || [])
-    .reduce((acc, genreId) => {
+const movieGenres: Record<number, number> = movies.flatMap(m => m.genre_ids || [])
+    .reduce((acc: Record<number, number>, genreId: number) => {
         acc[genreId] = (acc[genreId] || 0) + 1;
         return acc;
     }, {});
@@ -80,7 +80,7 @@ const movieGenres = movies.flatMap(m => m.genre_ids || [])
 const topGenres = Object.entries(movieGenres)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
-    .map(([genreId, count]) => genresMap[genreId]);
+    .map(([genreId, _count]) => genresMap[parseInt(genreId)]);
 ---
 <Layout title={`${actorInfo.nombre}`}>
     <div class="actor-profile-bg"></div>
@@ -302,7 +302,6 @@ const topGenres = Object.entries(movieGenres)
                                                 last_episode_to_air={item.last_episode_to_air}
                                                 next_episode_to_air={item.next_episode_to_air}
                                                 genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                                status={item.status}
                                         />
                                     </div>
                             ))
@@ -884,7 +883,7 @@ const topGenres = Object.entries(movieGenres)
             grid-template-columns: 1fr;
         }
 
-        .metadata-item.col-span-1.md\\:col-span-2 {
+        .metadata-item.col-span-1.md {
             grid-column: 1;
         }
 

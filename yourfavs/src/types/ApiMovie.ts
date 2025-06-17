@@ -15,7 +15,7 @@ export type APIMovie = {
 export type Movie = {
     adult: boolean;
     backdrop_path: string;
-    genres: { id: number, name: string }[];  // Ahora 'genres' es un array de objetos
+    genre_ids: number[];  // Ahora 'genres' es un array de objetos
     id: string;
     original_language: string;
     overview: string;

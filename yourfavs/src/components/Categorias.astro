@@ -23,7 +23,7 @@ const formattedCategory = category.replace(/_/g, ' ');
 
 console.log("Categoría seleccionada:", category);
 // Definir los géneros comunes
-const genresMap = {
+const genresMap: Record<number, string> = {
     // Géneros de películas y series
     28: "Acción",
     12: "Aventura",
@@ -280,7 +280,6 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
                             last_episode_to_air={item.last_episode_to_air}
                             next_episode_to_air={item.next_episode_to_air}
                             genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            status={item.status}
                     />
             ))
         }
