@@ -1,5 +1,5 @@
-import {type APISerie, type Serie} from "../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
-import {type APIMovie, type Movie} from "../types/ApiMovie.ts";
+import {type APISerie, type Serie} from "../../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
+import {type APIMovie, type Movie} from "../../types/ApiMovie.ts";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
 
