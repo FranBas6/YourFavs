@@ -1,11 +1,11 @@
 ---
-import CardMovie from "./Cards/CardMovie.astro";
-import CardSerie from "./Cards/CardSerie.astro";
-import CardActor from "./Cards/CardActor.astro";
-import CategoriasButton from "./CategoriasButton.astro";
-import {getMoviesByTitle} from "../services/API/tmdbMovies";
-import {getSeriesByTitle} from "../services/API/tmdbSeries";
-import {getActorsByName} from "../services/API/tmdbActor";
+import CardMovie from "../Cards/CardMovie.astro";
+import CardSerie from "../Cards/CardSerie.astro";
+import CardActor from "../Cards/CardActor.astro";
+import CategoriasButton from "../CategoriasButton.astro";
+import {getMoviesByTitle} from "../../services/API/Movies/tmdbMovies";
+import {getSeriesByTitle} from "../../services/API/Series/tmdbSeries";
+import {getActorsByName} from "../../services/API/Actors/tmdbActor";
 
 // Obtener el parámetro de query desde la URL
 const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
@@ -194,7 +194,7 @@ const hasResults = totalResults > 0;
                     <p class="no-results-description text-slate-700 mb-8 max-w-lg mx-auto leading-relaxed">
                         Intenta con otro término de búsqueda o revisa la ortografía. También puedes explorar nuestras categorías principales.
                     </p>
-                    <a href="/" class="back-button inline-flex items-center gap-2 px-6 py-3 bg-navy-blue text-white rounded-xl hover:bg-blue-800 transition-all duration-300 font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                    <a href="/yourfavs/public" class="back-button inline-flex items-center gap-2 px-6 py-3 bg-navy-blue text-white rounded-xl hover:bg-blue-800 transition-all duration-300 font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd"/>
                         </svg>

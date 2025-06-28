@@ -211,25 +211,21 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
     try {
         console.log("Obteniendo películas recomendadas...");
 
-        // 1. Obtener todas tus películas actuales
-        const [favoritas, vistas] = await Promise.all([
-            getMovieFav(),
-            getMoviesVistas()
-        ]);
+        // Solo favoritas como base
+        const favoritas = await getMovieFav();
+        const vistas = await getMoviesVistas();
 
-        // 2. Extraer los IDs únicos de todas las películas
-        const allMovieIds = new Set<string>();
-        [...favoritas].forEach(movie => {
-            allMovieIds.add(movie.id);
-        });
-
-        console.log(`Se encontraron ${allMovieIds.size} películas únicas para generar recomendaciones`);
-
-        // Si no hay películas, no podemos hacer recomendaciones
-        if (allMovieIds.size === 0) {
-            console.warn("No hay películas para generar recomendaciones.");
+        // Si no hay favoritas, no generamos recomendaciones
+        if (favoritas.length === 0) {
+            console.warn("No hay películas favoritas para generar recomendaciones.");
             return [];
         }
+
+        // IDs que debemos excluir (favoritas + vistas)
+        const excludeMovieIds = new Set<string>([
+            ...favoritas.map(m => m.id),
+            ...vistas.map(m => m.id)
+        ]);
 
         // 3. Obtener recomendaciones para cada película (con prioridad para favoritas)
         const recommendationPromises = [];
@@ -238,7 +234,6 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
         for (const movie of favoritas) {
             recommendationPromises.push(fetchRecommendationsForMovie(movie.id, 2.0)); // Mayor peso
         }
-
 
         // 4. Obtener y procesar todas las recomendaciones
         const allRecommendationsArrays = await Promise.all(recommendationPromises);
@@ -251,7 +246,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
 
         // 6. Filtrar películas que ya existen en tus colecciones
         const filteredRecommendations = allRecommendations.filter(rec =>
-            !allMovieIds.has(rec.id)
+            !excludeMovieIds.has(rec.id)
         );
 
         // 7. Eliminar duplicados y agregar puntuaciones

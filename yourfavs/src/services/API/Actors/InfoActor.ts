@@ -1,7 +1,7 @@
-import {type APISerie, type Serie} from "../../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
-import {type APIMovie, type Movie} from "../../types/ApiMovie.ts";
+import {type APISerie, type Serie} from "../../../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
+import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
 
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
+const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 
 /// Obtener series en las que participa un actor o actriz por ID
 export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[]> => {
@@ -54,11 +54,16 @@ export const getMoviesByActorId = async ({ id }: { id: string }): Promise<Movie[
 // Obtener detalles de un actor o actriz por ID
 export const getActorDetailsById = async ({ id }: { id: string }) => {
     try {
-        // Obtener detalles directamente con el ID
-        const detailsUrl = `https://api.themoviedb.org/3/person/${id}?api_key=${API_KEY}&language=es-ES`;
-        const detailsRes = await fetch(detailsUrl);
+        const [detailsRes, socialsRes] = await Promise.all([
+            fetch(`https://api.themoviedb.org/3/person/${id}?api_key=${API_KEY}&language=es-ES`),
+            fetch(`https://api.themoviedb.org/3/person/${id}/external_ids?api_key=${API_KEY}`)
+        ]);
+
         if (!detailsRes.ok) throw new Error(`Error al obtener los detalles: ${detailsRes.statusText}`);
+        if (!socialsRes.ok) throw new Error(`Error al obtener redes sociales: ${socialsRes.statusText}`);
+
         const actorDetails = await detailsRes.json();
+        const socialLinks = await socialsRes.json();
 
         return {
             id: actorDetails.id,
@@ -68,7 +73,15 @@ export const getActorDetailsById = async ({ id }: { id: string }) => {
             fechaNacimiento: actorDetails.birthday,
             imagen: actorDetails.profile_path,
             popularidad: actorDetails.popularity,
-            conocidoPor: actorDetails.known_for_department
+            conocidoPor: actorDetails.known_for_department,
+            redes: {
+                imdb: socialLinks.imdb_id ? `https://www.imdb.com/name/${socialLinks.imdb_id}` : null,
+                twitter: socialLinks.twitter_id ? `https://twitter.com/${socialLinks.twitter_id}` : null,
+                instagram: socialLinks.instagram_id ? `https://instagram.com/${socialLinks.instagram_id}` : null,
+                facebook: socialLinks.facebook_id ? `https://facebook.com/${socialLinks.facebook_id}` : null,
+                tiktok: socialLinks.tiktok_id ? `https://www.tiktok.com/@${socialLinks.tiktok_id}` : null,
+                youtube: socialLinks.youtube_id ? `https://www.youtube.com/${socialLinks.youtube_id}` : null,
+            }
         };
 
     } catch (error) {
@@ -78,64 +91,23 @@ export const getActorDetailsById = async ({ id }: { id: string }) => {
 };
 
 
-// Tipo detallado para Actor
-export interface Actor {
-    id: number;
-    nombre: string;
-    biografia: string;
-    lugarNacimiento: string | null;
-    fechaNacimiento: string | null;
-    imagen: string | null; // Esta es solo la ruta, no la URL completa
-    popularidad: number;
-    conocidoPor: string;
-}
-
-// Obtener actores/actrices por nombre y devolver datos detallados
-export const getActorsByName = async ({ name, page }: { name: string, page?: string }): Promise<Actor[]> => {
-    const pageNumber = page || "1";
-
-    const searchUrl = `https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&query=${encodeURIComponent(name)}&language=es-ES&page=${pageNumber}`;
-
+/* export const getActorSocialLinksById = async ({ id }: { id: string }) => {
     try {
-        const res = await fetch(searchUrl);
-        if (!res.ok) {
-            throw new Error(`Error en la solicitud: ${res.statusText}`);
-        }
-
+        const url = `https://api.themoviedb.org/3/person/${id}/external_ids?api_key=${API_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Error al obtener redes sociales: ${res.statusText}`);
         const data = await res.json();
-        const results = Array.isArray(data.results) ? data.results : [];
 
-        // Filtrar solo personas cuyo departamento conocido sea "Acting"
-        const actors = results.filter((person: any) =>
-            person.known_for_department === "Acting"
-        );
-
-        // Obtener detalles para cada actor encontrado
-        const actorDetailsList: Actor[] = await Promise.all(
-            actors.map(async (actor: any) => {
-                const detailsUrl = `https://api.themoviedb.org/3/person/${actor.id}?api_key=${API_KEY}&language=es-ES`;
-                const detailsRes = await fetch(detailsUrl);
-                if (!detailsRes.ok) throw new Error(`Error al obtener detalles del actor ${actor.id}`);
-                const actorDetails = await detailsRes.json();
-
-                return {
-                    id: actorDetails.id,
-                    nombre: actorDetails.name,
-                    biografia: actorDetails.biography,
-                    lugarNacimiento: actorDetails.place_of_birth,
-                    fechaNacimiento: actorDetails.birthday,
-                    imagen: actorDetails.profile_path,
-                    popularidad: actorDetails.popularity,
-                    conocidoPor: actorDetails.known_for_department
-                };
-            })
-        );
-
-        // Ordenar por popularidad descendente
-        return actorDetailsList.sort((a, b) => b.popularidad - a.popularidad);
+        return {
+            imdb: data.imdb_id ? `https://www.imdb.com/name/${data.imdb_id}` : null,
+            twitter: data.twitter_id ? `https://twitter.com/${data.twitter_id}` : null,
+            instagram: data.instagram_id ? `https://instagram.com/${data.instagram_id}` : null,
+            facebook: data.facebook_id ? `https://facebook.com/${data.facebook_id}` : null,
+            tiktok: data.tiktok_id ? `https://www.tiktok.com/@${data.tiktok_id}` : null,
+            youtube: data.youtube_id ? `https://www.youtube.com/${data.youtube_id}` : null,
+        };
     } catch (error) {
-        console.error("Hubo un error al obtener los actores:", error);
-        return [];
+        console.error("Hubo un error al obtener las redes sociales del actor:", error);
+        return null;
     }
-};
-
+}; */

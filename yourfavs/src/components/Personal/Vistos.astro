@@ -3,10 +3,10 @@ import CardMovie from "../Cards/CardMovie.astro";
 import CardSerie from "../Cards/CardSerie.astro";
 import {
     getSeriesVistas,
-} from "../../services/yourfavsSerie";
-import {getMoviesVistas} from "../../services/yourfavsMovie";
-import { fetchMovieDetails } from "../../services/API/tmdbMovies";
-import { fetchSerieDetails } from "../../services/API/tmdbSeries";
+} from "../../services/BD/yourfavsSerie";
+import {getMoviesVistas} from "../../services/BD/yourfavsMovie";
+import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
+import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
 
 // 🔹 Obtener IDs desde Firebase
 const seriesVsitasIds = (await getSeriesVistas()).map(s => s.id);
@@ -62,12 +62,15 @@ function getGenreName(id: number): string {
     return genresMap[id] || "Otro";
 }
 
+const minRating = parseFloat(new URLSearchParams(Astro.request.url).get('minRating') || '0');
+
 // Función para filtrar contenido
 function filterContent(items: any[], type: 'movie' | 'serie') {
     return items.filter(item => {
         const title = type === 'movie' ? item.title : item.name;
         const overview = item.overview || '';
-        const genreList = item.genres || []; // array de objetos {id, name}
+        const genreList = item.genres || [];
+        const rating = item.vote_average || 0;
 
         const searchMatch =
             !searchQuery ||
@@ -76,7 +79,9 @@ function filterContent(items: any[], type: 'movie' | 'serie') {
 
         const genreMatch = !genreFilter || genreList.some((g: { id: number; name: string }) => g.id.toString() === genreFilter);
 
-        return searchMatch && genreMatch;
+        const ratingMatch = !minRating || item.vote_average >= minRating;
+
+        return searchMatch && genreMatch && ratingMatch;
     });
 }
 
@@ -185,81 +190,106 @@ function buildUrl(params: Record<string, string>) {
         </div>
     </nav>
 
-    <!-- Panel de búsqueda y filtros (inicialmente oculto) -->
-    <div class="search-panel bg-white rounded-xl shadow-lg border border-gray-200 mb-4 overflow-hidden">
-        <div class="search-content p-6">
-            <form method="GET" class="space-y-4">
-                <!-- Mantener filtros actuales en inputs ocultos -->
+    <!-- Panel de búsqueda -->
+    <div class="search-panel bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-3xl shadow-2xl border border-blue-100 mb-8 overflow-hidden">
+        <div class="search-content p-6 sm:p-8 space-y-8">
+            <form method="GET" class="space-y-8">
                 <input type="hidden" name="filter" value={filter}/>
 
-                <div class="flex flex-col md:flex-row gap-4">
-                    <!-- Barra de búsqueda -->
-                    <div class="flex-1">
-                        <label for="search" class="block text-sm font-medium text-gray-700 mb-2">
-                            Buscar por título o descripción
-                        </label>
-                        <div class="relative">
-                            <input
-                                    type="text"
-                                    id="search"
-                                    name="search"
-                                    value={searchQuery}
-                                    placeholder="Escribe el nombre de una serie o película..."
-                                    class="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900"
-                            />
-                            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
-                                 xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                 stroke="currentColor">
+                <!-- Grupo de filtros en tarjetas -->
+                <div class="flex flex-col gap-6 md:flex-row md:gap-8 justify-center">
+                    <!-- Búsqueda -->
+                    <div class="flex-1 bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-col gap-2 transition-transform hover:scale-105">
+                        <label for="search" class="flex items-center gap-2 text-base font-semibold text-blue-800 mb-1">
+                            <svg class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                       d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                             </svg>
+                            Buscar
+                        </label>
+                        <input
+                                type="text"
+                                id="search"
+                                name="search"
+                                value={searchQuery}
+                                placeholder="Título o descripción..."
+                                class="w-full px-4 py-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-900 placeholder-gray-400 bg-blue-50 transition"
+                        />
+                    </div>
+
+                    <!-- Nota mínima -->
+                    <div class="flex-1 bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-col gap-2 transition-transform hover:scale-105">
+                        <label for="minRating"
+                               class="flex items-center gap-2 text-base font-semibold text-indigo-800 mb-1">
+                            <svg class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"/>
+                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
+                            </svg>
+                            Nota mínima
+                        </label>
+                        <div class="relative flex items-center gap-4">
+                            <input
+                                    type="range"
+                                    id="minRating"
+                                    name="minRating"
+                                    min="0"
+                                    max="10"
+                                    step="0.1"
+                                    value={minRating || 0}
+                                    class="rating-slider w-full"
+                                    oninput="document.getElementById('ratingValue').textContent = this.value"
+                            />
+                            <span id="ratingValue" class="text-base font-bold text-indigo-700 w-12 text-right">
+                        {minRating || 0}
+                    </span>
                         </div>
                     </div>
 
-                    <!-- Filtro por género -->
-                    <div class="md:w-64">
-                        <label for="genre" class="block text-sm font-medium text-gray-700 mb-2">
-                            Filtrar por género
+                    <!-- Género -->
+                    <div class="flex-1 bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-col gap-2 transition-transform hover:scale-105">
+                        <label for="genre" class="flex items-center gap-2 text-base font-semibold text-pink-800 mb-1">
+                            <svg class="h-5 w-5 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M4 6h16M4 12h16M4 18h16"/>
+                            </svg>
+                            Género
                         </label>
                         <select
                                 id="genre"
                                 name="genre"
-                                class="w-full py-3 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white text-gray-900"
+                                class="w-full py-3 px-4 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:border-transparent bg-pink-50 text-gray-900 transition"
                         >
-                            <option value="">Todos los géneros</option>
+                            <option value="">Todos</option>
                             {availableGenres.map(genre => (
-                                    <option
-                                            value={genre.id.toString()}
-                                            selected={genreFilter === genre.id.toString()}
-                                    >
+                                    <option value={genre.id.toString()} selected={genreFilter === genre.id.toString()}>
                                         {genre.name}
                                     </option>
                             ))}
                         </select>
                     </div>
+                </div>
 
-                    <!-- Botón de búsqueda -->
-                    <div class="flex items-end">
-                        <button
-                                type="submit"
-                                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                                 stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
-                            Buscar
-                        </button>
-                    </div>
+                <!-- Botón Buscar -->
+                <div class="flex justify-center">
+                    <button
+                            type="submit"
+                            class="w-full md:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-colors font-semibold flex justify-center items-center gap-2 shadow-lg"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+                             stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        Buscar
+                    </button>
                 </div>
 
                 <!-- Limpiar filtros -->
-                {(searchQuery || genreFilter) && (
+                {(searchQuery || genreFilter || minRating) && (
                         <div class="flex justify-center">
                             <a
-                                    href={buildUrl({filter: filter, search: '', genre: ''})}
-                                    class="text-sm text-gray-600 hover:text-gray-800 underline flex items-center gap-1"
+                                    href={buildUrl({filter: filter, search: '', genre: '', minRating: ''})}
+                                    class="text-sm text-blue-600 hover:text-blue-800 underline flex items-center gap-1 font-medium"
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
                                      stroke="currentColor">
@@ -270,17 +300,28 @@ function buildUrl(params: Record<string, string>) {
                             </a>
                         </div>
                 )}
+
+                <!-- Filtros activos -->
+                {(searchQuery || genreFilter || minRating) && (
+                        <div class="flex flex-wrap gap-2 justify-center text-sm text-gray-800">
+                            <span class="font-semibold text-blue-800">Filtros activos:</span>
+                            {searchQuery && (
+                                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">{`"${searchQuery}"`}</span>
+                            )}
+                            {genreFilter && (
+                                    <span class="bg-pink-100 text-pink-800 px-3 py-1 rounded-full">{getGenreName(parseInt(genreFilter))}</span>
+                            )}
+                            {minRating && (
+                                    <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full">{`≥ ${minRating}`}</span>
+                            )}
+                        </div>
+                )}
             </form>
 
-            <!-- Indicador de resultados -->
+            <!-- Resultados -->
             {(searchQuery || genreFilter) && (
-                    <div class="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                        <p class="text-sm text-blue-800">
-                            <strong>Filtros activos:</strong>
-                            {searchQuery && <span class="mr-3">Búsqueda: "{searchQuery}"</span>}
-                            {genreFilter && <span>Género: {getGenreName(parseInt(genreFilter))}</span>}
-                        </p>
-                        <p class="text-sm text-blue-600 mt-1">
+                    <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 text-center">
+                        <p class="text-sm text-blue-800 font-medium">
                             Mostrando {seriesFiltradas.length + peliculasFiltradas.length} resultados
                         </p>
                     </div>
@@ -523,16 +564,33 @@ function buildUrl(params: Record<string, string>) {
     .search-panel {
         max-height: 0;
         opacity: 0;
-        transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        overflow: hidden; /* para que no se vea contenido al ocultar */
+        transition: opacity 0.4s ease, max-height 0.4s ease;
         pointer-events: none;
     }
 
     /* Cuando el checkbox está marcado, mostrar el panel */
     .search-toggle:checked ~ nav + .search-panel {
-        max-height: 500px;
+        max-height: 2000px; /* un valor muy alto para que no se corte */
         opacity: 1;
         pointer-events: all;
+        overflow: visible;
     }
+
+    @media (max-width: 640px) {
+        .search-panel {
+            margin: 0 1rem; /* un margen pequeño para no pegarse a los bordes */
+        }
+
+        .search-content {
+            padding: 1rem !important; /* menos padding para que entre bien */
+        }
+
+        form > div.flex {
+            flex-direction: column; /* que las tarjetas estén una debajo de otra */
+        }
+    }
+
 
     /* Rotar la flecha cuando está abierto */
     .search-toggle:checked ~ nav .search-toggle-btn .chevron {
@@ -593,5 +651,68 @@ function buildUrl(params: Record<string, string>) {
     /* Transición suave para el chevron */
     .chevron {
         transition: transform 0.3s ease;
+    }
+
+    .rating-slider {
+        -webkit-appearance: none;
+        width: 100%;
+        height: 8px;
+        background: linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%);
+        border-radius: 4px;
+        outline: none;
+        transition: background 0.3s;
+    }
+    .rating-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        border: 3px solid #6366f1;
+        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        cursor: pointer;
+        transition: border 0.2s, box-shadow 0.2s;
+    }
+    .rating-slider:focus::-webkit-slider-thumb {
+        border: 3px solid #a5b4fc;
+        box-shadow: 0 0 0 4px #6366f133;
+    }
+    .rating-slider::-moz-range-thumb {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        border: 3px solid #6366f1;
+        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        cursor: pointer;
+        transition: border 0.2s, box-shadow 0.2s;
+    }
+    .rating-slider:focus::-moz-range-thumb {
+        border: 3px solid #a5b4fc;
+        box-shadow: 0 0 0 4px #6366f133;
+    }
+    .rating-slider::-ms-thumb {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: #fff;
+        border: 3px solid #6366f1;
+        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        cursor: pointer;
+        transition: border 0.2s, box-shadow 0.2s;
+    }
+    .rating-slider:focus::-ms-thumb {
+        border: 3px solid #a5b4fc;
+        box-shadow: 0 0 0 4px #6366f133;
+    }
+    .rating-slider::-ms-fill-lower {
+        background: #6366f1;
+    }
+    .rating-slider::-ms-fill-upper {
+        background: #a5b4fc;
+    }
+    .rating-slider:focus {
+        outline: none;
     }
 </style>

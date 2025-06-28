@@ -8,10 +8,10 @@ import {
     getSeriesTrailer,
     getSeriesStatus,
     getEpisodesBySeasonNumber,
-    fetchAllSeriesPosters
-} from "../../services/API/tmdbSeries";
-import type {SeriesFavs} from "../../services/yourfavsSerie";
-
+    fetchAllSeriesPosters,
+    getSerieRecommendationsOrSimilar
+} from "../../services/API/Series/InfoSeries";
+import type {SeriesFavs} from "../../services/BD/yourfavsSerie";
 import {initializeApp} from "firebase/app";
 import {
     getFirestore,
@@ -472,7 +472,7 @@ function formatTrailerUrl(url: string): string {
     return url;
 }
 
-import type {PosterImage} from '../../services/API/tmdbSeries'; // Asegúrate de exportar este tipo desde tu archivo api.ts
+import type {PosterImage} from '../../services/API/Series/tmdbSeries'; // Asegúrate de exportar este tipo desde tu archivo api.ts
 
 let posters: PosterImage[] = [];
 
@@ -492,6 +492,11 @@ interface GuestStar {
     name: string;
     character: string;
 }
+
+// Donde obtienes los otros datos
+const recommendationsData = await getSerieRecommendationsOrSimilar(item.id);
+const recommendations = recommendationsData.success ? recommendationsData.recommendations : [];
+const recommendationType = recommendationsData.type || 'recommendations';
 ---
 
 <Layout title={`${title}`}>
@@ -950,19 +955,6 @@ interface GuestStar {
                                 </li>
                             </ul>
                         </div>
-
-                        {item?.languages && item.languages.length > 0 && (
-                                <div class="bg-white p-4 rounded-lg shadow-md">
-                                    <h3 class="text-lg font-bold text-blue-600 mb-2">Idiomas disponibles</h3>
-                                    <div class="flex flex-wrap gap-2">
-                                        {item.languages.map((language) => (
-                                                <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                        {languageMap[language] || language}
-                    </span>
-                                        ))}
-                                    </div>
-                                </div>
-                        )}
                     </div>
                 </div>
 
@@ -989,49 +981,6 @@ interface GuestStar {
                                 </div>
                             </div>
                     )}
-
-                    <!-- Episodios recientes y próximos -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        {item?.last_episode_to_air && (
-                                <div class="bg-white p-6 rounded-lg shadow-md">
-                                    <h3 class="text-xl font-bold text-blue-600 mb-2">Último episodio</h3>
-                                    <div class="space-y-2">
-                                        <p class="font-medium text-gray-600">{item.last_episode_to_air.name}</p>
-                                        <p class="text-sm text-gray-600">T{item.last_episode_to_air.season_number}
-                                            E{item.last_episode_to_air.episode_number}</p>
-                                        <p class="text-sm text-gray-600">{formatDate(item.last_episode_to_air.air_date)}</p>
-                                        {item.last_episode_to_air.still_path && (
-                                                <img
-                                                        src={`https://image.tmdb.org/t/p/w300${item.last_episode_to_air.still_path}`}
-                                                        alt={item.last_episode_to_air.name}
-                                                        loading="lazy"
-                                                        class="w-full h-auto rounded mt-2"
-                                                />
-                                        )}
-                                    </div>
-                                </div>
-                        )}
-
-                        {item?.next_episode_to_air && (
-                                <div class="bg-white p-6 rounded-lg shadow-md">
-                                    <h3 class="text-xl font-bold text-blue-600 mb-2">Próximo episodio</h3>
-                                    <div class="space-y-2 text-gray-600">
-                                        <p class="font-medium">{item.next_episode_to_air.name}</p>
-                                        <p class="text-sm">T{item.next_episode_to_air.season_number}
-                                            E{item.next_episode_to_air.episode_number}</p>
-                                        <p class="text-sm text-gray-600">{formatDate(item.next_episode_to_air.air_date)}</p>
-                                        {item.next_episode_to_air.still_path && (
-                                                <img
-                                                        src={`https://image.tmdb.org/t/p/w300${item.next_episode_to_air.still_path}`}
-                                                        alt={item.next_episode_to_air.name}
-                                                        loading="lazy"
-                                                        class="w-full h-auto rounded mt-2"
-                                                />
-                                        )}
-                                    </div>
-                                </div>
-                        )}
-                    </div>
 
                     <!-- Temporadas con acordeón para episodios -->
                     <div class="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -1103,9 +1052,9 @@ interface GuestStar {
                                                             <summary
                                                                     class={`cursor-pointer py-2 flex items-center justify-between rounded-lg px-3 transition-colors ${season.season_number === 0 ? 'hover:bg-purple-50' : 'hover:bg-blue-50'}`}>
                                                                 <div class="flex items-center gap-3 w-full">
-                                        <span class={`font-bold px-2 py-1 rounded text-sm text-center flex-shrink-0 ${season.season_number === 0 ? 'bg-purple-100 text-purple-800 min-w-[40px]' : 'bg-blue-100 text-blue-800 w-8'}`}>
-                                            {season.season_number === 0 ? `E${episode.episode_number}` : episode.episode_number}
-                                        </span>
+                                                            <span class={`font-bold px-2 py-1 rounded text-sm text-center flex-shrink-0 ${season.season_number === 0 ? 'bg-purple-100 text-purple-800 min-w-[40px]' : 'bg-blue-100 text-blue-800 w-8'}`}>
+                                                                {season.season_number === 0 ? `E${episode.episode_number}` : episode.episode_number}
+                                                            </span>
                                                                     <div class="flex-grow">
                                                                         <h5 class="font-medium text-gray-800 text-base">{episode.name}</h5>
                                                                         <div class="text-xs text-gray-500 flex items-center gap-2 mt-1">
@@ -1256,8 +1205,23 @@ interface GuestStar {
                             <div class="text-gray-600">
                                 {cast?.length > 0 ? (
                                         <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                            {cast.map((actor) => (
-                                                    <li class="border-b border-gray-100 pb-3 last:border-0">
+                                        {cast.map((actor) => (
+                                                <li class="border-b border-gray-100 pb-3 last:border-0">
+                                                    <div class="flex gap-4 items-start">
+                                                        {actor.profile_path ? (
+                                                                <a href={`/actor/${actor.id}`} class="shrink-0">
+                                                                    <img
+                                                                            src={`https://image.tmdb.org/t/p/w92${actor.profile_path}`}
+                                                                            alt={actor.name}
+                                                                            class="w-16 h-16 rounded-full object-cover border border-gray-300 shadow-sm hover:brightness-110 transition"
+                                                                    />
+                                                                </a>
+                                                        ) : (
+                                                                <div class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs border border-gray-300">
+                                                                    ?
+                                                                </div>
+                                                        )}
+
                                                         <div class="flex flex-col">
                                                             <a
                                                                     href={`/actor/${actor.id}`}
@@ -1266,13 +1230,12 @@ interface GuestStar {
                                                                 {actor.name}
                                                             </a>
                                                             {actor.character && (
-                                                                    <span class="text-sm text-gray-500 mt-1">
-                                                            {actor.character}
-                                                        </span>
+                                                                    <span class="text-sm text-gray-500 mt-1">{actor.character}</span>
                                                             )}
                                                         </div>
-                                                    </li>
-                                            ))}
+                                                    </div>
+                                                </li>
+                                        ))}
                                         </ul>
                                 ) : (
                                         <p class="text-gray-500">Información no disponible</p>
@@ -1362,6 +1325,92 @@ interface GuestStar {
                                                     <p class="text-xs text-center text-gray-500">{company.name}</p>
                                                 </div>
                                         ))}
+                                    </div>
+                                </div>
+                        )}
+
+                        <!-- Recomendaciones -->
+                        {recommendations && recommendations.length > 0 && (
+                                <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                                    <div class="flex items-center justify-between mb-6">
+                                        <h2 class="text-2xl font-bold text-blue-600">
+                                            {recommendationType === 'similar' ? 'Series Similares' : 'Recomendaciones'}
+                                        </h2>
+                                    </div>
+
+                                    <!-- Carousel de recomendaciones con scroll horizontal -->
+                                    <div class="recommendations-carousel relative overflow-hidden">
+                                        <!-- Contenedor de series -->
+                                        <div class="recommendations-container flex gap-4 overflow-x-auto pb-4 px-2 scroll-smooth">
+                                            {recommendations.map((serie, index) => (
+                                                    <div class={`recommendation-card flex-shrink-0 w-48 group animate-fade-in-up`} style={`animation-delay: ${(index % 6 + 1) * 0.1}s`}>
+                                                        <a href={`/serie/${serie.id}`} class="block">
+                                                            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-300 group-hover:-translate-y-2">
+                                                                <!-- Imagen de la serie -->
+                                                                <div class="relative aspect-[2/3] overflow-hidden">
+                                                                    <img
+                                                                            src={serie.poster_path}
+                                                                            alt={serie.name}
+                                                                            loading="lazy"
+                                                                            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                                    />
+
+                                                                    <!-- Overlay con gradiente -->
+                                                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                                                                    <!-- Rating badge -->
+                                                                    <div class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+                                                                        ⭐ {serie.vote_average.toFixed(1)}
+                                                                    </div>
+
+                                                                    <!-- Botón de play overlay -->
+                                                                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                                        <div class="bg-white/90 rounded-full p-3 shadow-lg transform scale-0 group-hover:scale-100 transition-transform duration-300">
+                                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                                                                                <path d="M8 5v14l11-7z"/>
+                                                                            </svg>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                <!-- Información de la serie -->
+                                                                <div class="p-4 bg-white h-32 flex flex-col justify-between">
+                                                                    <div>
+                                                                        <h3 class="font-semibold text-gray-800 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors duration-300">
+                                                                            {serie.name}
+                                                                        </h3>
+                                                                    </div>
+
+                                                                    <div class="mt-auto">
+                                                                        <div class="flex items-center justify-between">
+                                                                            <span class="text-xs text-gray-500">
+                                                                                {serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : 'Próximamente'}
+                                                                                </span>
+                                                                            <div class="flex items-center gap-1">
+                                                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                                                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                                                                </svg>
+                                                                                <span class="text-xs text-gray-600 font-medium">
+                                                                                    {serie.vote_average.toFixed(1)}
+                                                                                </span>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        <!-- Sinopsis corta - ahora siempre visible pero con altura fija -->
+                                                                        <div class="mt-2 h-9 overflow-hidden">
+                                                                            {serie.overview && (
+                                                                                    <p class="text-xs text-gray-600 line-clamp-3 opacity-70 group-hover:opacity-100 transition-opacity duration-300">
+                                                                                        {serie.overview.slice(0, 100)}...
+                                                                                    </p>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </a>
+                                                    </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
                         )}
@@ -1479,5 +1528,123 @@ interface GuestStar {
         font-size: 2rem;
         text-decoration: none;
         font-weight: bold;
+    }
+
+    /* Estilos CSS para el componente */
+    .recommendations-carousel {
+        position: relative;
+    }
+
+    /* Gradientes laterales para indicar scroll */
+    .recommendations-carousel::before,
+    .recommendations-carousel::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 30px;
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    /* Animación de aparición de las cards */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease forwards;
+        opacity: 0;
+    }
+
+    /* Clases para truncar texto */
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Hover effects mejorados */
+    .recommendation-card {
+        transition: transform 0.3s ease;
+    }
+
+    .recommendation-card:hover {
+        transform: translateY(-8px);
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .recommendation-card {
+            width: 140px;
+        }
+
+        .recommendations-carousel::before,
+        .recommendations-carousel::after {
+            width: 20px;
+        }
+
+        .recommendations-container {
+            padding-left: 4px;
+            padding-right: 4px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .recommendation-card {
+            width: 120px;
+        }
+
+        .recommendations-carousel {
+            padding: 0;
+        }
+    }
+
+    /* Mejora de accesibilidad */
+    @media (prefers-reduced-motion: reduce) {
+        .animate-fade-in-up {
+            animation: none;
+            opacity: 1;
+        }
+
+        .recommendation-card,
+        .recommendation-card img,
+        .recommendation-card > a > div,
+        .recommendation-card .bg-white\/90 {
+            transition: none;
+        }
+    }
+
+    /* Indicador visual de que se puede hacer scroll */
+    .recommendations-container {
+        scroll-snap-type: x mandatory;
+    }
+
+    .recommendation-card {
+        scroll-snap-align: start;
+    }
+
+    /* Estilos adicionales para mejor UX */
+    .recommendations-container:hover {
+        cursor: grab;
+    }
+
+    .recommendations-container:active {
+        cursor: grabbing;
     }
 </style>

@@ -1,6 +1,6 @@
 ---
-import CardMovie from "./Cards/CardMovie.astro";
-import CardSerie from "./Cards/CardSerie.astro";
+import CardMovie from "../Cards/CardMovie.astro";
+import CardSerie from "../Cards/CardSerie.astro";
 import {
     getNetflixSeries,
     getAmazonPrimeSeries,
@@ -9,7 +9,7 @@ import {
     getAppleTVSeries,
     getMovistarPlusSeries,
     getFilminSeries
-} from "../services/API/tmdbSeries";
+} from "../../services/API/Series/tmdbSeries";
 
 import {
     getNetflixMovies,
@@ -19,11 +19,11 @@ import {
     getAppleTVMovies,
     getMovistarPlusMovies,
     getFilminMovies
-} from "../services/API/tmdbMovies";
+} from "../../services/API/Movies/tmdbMovies";
 
 // Import the types from your type definition files
-import type {Movie} from "../types/ApiMovie";
-import type {Serie} from "../types/ApiSerie";
+import type {Movie} from "../../types/ApiMovie";
+import type {Serie} from "../../types/ApiSerie";
 
 // Define type for sort options
 type SortOptionS = 'popularity' | 'vote_average' | 'first_air_date' | 'name';
@@ -44,13 +44,13 @@ const sortOrder: SortOrder = 'desc';
 
 // Definir plataformas disponibles
 const platforms = [
-    {id: 'netflix', name: 'Netflix', logo: '/logos/netflix.svg'},
-    {id: 'amazon', name: 'Amazon Prime', logo: '/logos/amazon.svg'},
-    {id: 'disney', name: 'Disney+', logo: '/logos/disney.svg'},
-    {id: 'hbo', name: 'HBO Max', logo: '/logos/hbo.svg'},
-    {id: 'apple', name: 'Apple TV+', logo: '/logos/apple.svg'},
-    {id: 'movistar', name: 'Movistar+', logo: '/logos/movistar.svg'},
-    {id: 'filmin', name: 'Filmin', logo: '/logos/filmin.svg'}
+    {id: 'netflix', name: 'Netflix', logo: '/logos/plataformas/netflix.svg'},
+    {id: 'amazon', name: 'Amazon Prime', logo: '/logos/plataformas/amazon.svg'},
+    {id: 'disney', name: 'Disney+', logo: '/logos/plataformas/disney.svg'},
+    {id: 'hbo', name: 'HBO Max', logo: '/logos/plataformas/hbo.svg'},
+    {id: 'apple', name: 'Apple TV+', logo: '/logos/plataformas/apple.svg'},
+    {id: 'movistar', name: 'Movistar+', logo: '/logos/plataformas/movistar.svg'},
+    {id: 'filmin', name: 'Filmin', logo: '/logos/plataformas/filmin.svg'}
 ];
 
 // Opciones de ordenación
@@ -217,55 +217,54 @@ function getGenreName(id: number) {
 // Total de páginas
 const totalPages = 190;
 ---
-
 <section class="container mx-auto px-4 py-4">
-    <header class="mb-8">
-        <h1 class="text-coral-red font-bold text-4xl md:text-5xl lg:text-6xl text-center mb-2">
-            PLATAFORMAS
+    <header class="mb-10 text-center">
+        <h1 class="text-5xl md:text-6xl font-extrabold text-coral-red tracking-tight drop-shadow-lg">
+            Plataformas
         </h1>
-        <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
-        <p class="text-gray-600 text-center max-w-2xl mx-auto">
-            Descubre las películas y series disponibles en tus plataformas favoritas
+        <div class="w-24 h-1 bg-coral-red mx-auto mt-3 rounded-full"></div>
+        <p class="mt-4 text-gray-600 text-lg max-w-2xl mx-auto">
+            Explora las películas y series disponibles según tu plataforma preferida
         </p>
     </header>
 
     <!-- Filtro de Plataformas -->
-    <div class="mb-6">
-        <h3 class="text-lg font-medium mb-3 text-gray-700">Selecciona una plataforma:</h3>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-            <a href={createUrlWithParams({platform: 'all'})}
-               class={`flex flex-col items-center p-3 rounded-lg border ${platformParam === 'all' ? 'border-ice-blue bg-ice-blue text-white' : 'border-gray-300 hover:bg-gray-50 text-gray-700'} transition-all`}>
-                <span class="font-medium">Todas</span>
+    <section class="mb-8">
+        <h3 class="text-xl font-semibold text-gray-700 mb-4">Filtrar por plataforma</h3>
+        <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-4">
+            <a href={createUrlWithParams({ platform: 'all' })}
+               class={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all shadow-sm hover:shadow-md hover:scale-105 ${
+                   platformParam === 'all'
+                       ? 'bg-ice-blue text-white border-ice-blue'
+                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+               }`}>
+                <span class="text-sm font-medium">Todas</span>
             </a>
+
             {platforms.map((platform) => (
-                    <a href={createUrlWithParams({platform: platform.id})}
-                       class={`flex flex-col items-center p-3 rounded-lg border ${platformParam === platform.id ? 'border-ice-blue bg-ice-blue text-white' : 'border-gray-300 hover:bg-gray-50 text-gray-700'} transition-all`}>
-                        <div class="w-8 h-8 mb-2">
-                            <img
-                                    src={platform.logo}
-                                    alt={platform.name}
-                                    class="w-full h-full object-contain"
-                            />
-                        </div>
-                        <span class="font-medium text-sm text-center">{platform.name}</span>
+                    <a href={createUrlWithParams({ platform: platform.id })}
+                       class={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all shadow-sm hover:shadow-md hover:scale-105 ${
+                           platformParam === platform.id
+                               ? 'bg-ice-blue text-white border-ice-blue'
+                               : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                       }`}>
+                        <img src={platform.logo} alt={platform.name} class="w-10 h-10 mb-2 object-contain" />
+                        <span class="text-xs font-medium text-center">{platform.name}</span>
                     </a>
             ))}
         </div>
-    </div>
+    </section>
 
     <!-- Opciones de ordenación con botones -->
-    <div class="mb-6 bg-white p-4 rounded-lg shadow-md">
-        <h3 class="text-lg font-medium mb-3 text-gray-700">Ordenar por:</h3>
-
-        <!-- Criterios de ordenación -->
-        <div class="mb-4">
-            <p class="block text-sm font-medium text-gray-700 mb-2">Criterio:</p>
-            <div class="flex flex-wrap gap-2">
+    <section class="mb-10">
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <h3 class="text-lg font-semibold text-gray-800 mb-3">Ordenar contenido</h3>
+            <div class="flex flex-wrap gap-3">
                 {sortOptions.map((option) => (
-                        <a href={createUrlWithParams({sortBy: option.id})}
-                           class={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        <a href={createUrlWithParams({ sortBy: option.id })}
+                           class={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                                sortBy === option.id
-                                   ? 'bg-coral-red text-white'
+                                   ? 'bg-coral-red text-white shadow-md'
                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                            }`}>
                             {option.name}
@@ -273,6 +272,17 @@ const totalPages = 190;
                 ))}
             </div>
         </div>
+    </section>
+
+    <div class="flex justify-center gap-4 mt-6 mb-6 sticky top-5 z-40 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
+        <a href="#peliculas"
+           class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
+            Ir a Películas
+        </a>
+        <a href="#series"
+           class="button-bounce px-5 py-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300 text-sm font-semibold tracking-wide">
+            Ir a Series
+        </a>
     </div>
 
     <!-- Paginación Mejorada para Móviles -->
@@ -323,34 +333,23 @@ const totalPages = 190;
     </nav>
 
     <!-- Título de plataforma seleccionada y criterio de ordenación -->
-    <div class="mb-6">
-        {platformParam !== 'all' && (
-                <h2 class="text-2xl font-bold text-center text-gray-700 mb-2">
-                    Contenido de {platforms.find(p => p.id === platformParam)?.name || ''}
-                </h2>
-        )}
-        {platformParam === 'all' && (
-                <h2 class="text-2xl font-bold text-center text-gray-700 mb-2">
-                    Contenido de todas las plataformas
-                </h2>
-        )}
-        <p class="text-center text-gray-600">
-            Ordenado por <span
-                class="font-medium">{sortOptions.find(o => o.id === sortBy)?.name || 'Popularidad'}</span>
-            en orden descendente
+    <section class="mb-6 text-center">
+        <h2 class="text-2xl font-bold text-gray-800">
+            {platformParam === 'all' ? 'Contenido de todas las plataformas' : `Contenido de ${platforms.find(p => p.id === platformParam)?.name || ''}`}
+        </h2>
+        <p class="text-gray-600">
+            Ordenado por <span class="font-semibold">{sortOptions.find(o => o.id === sortBy)?.name || 'Popularidad'}</span> en orden descendente
         </p>
         {platformParam === 'all' && (
-                <p class="text-center text-gray-600 mt-2">
-                    <span class="font-medium">Contenido duplicado:</span> Cada película o serie aparece solo una vez
-                </p>
+                <p class="text-gray-500 text-sm mt-1">Evita duplicados mostrando una sola vez cada título</p>
         )}
-    </div>
+    </section>
 
     <!-- Sección de Películas -->
     {movies.length > 0 && (
-            <section class="mb-10">
-                <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
-                    <span class="mr-2">
+            <section id="peliculas" class="mb-14">
+            <h2 class="text-coral-red text-3xl font-bold mb-5 flex items-center">
+                    <span class="w-8 h-8 mr-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
                              stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -359,7 +358,7 @@ const totalPages = 190;
                     </span>
                     PELÍCULAS
                 </h2>
-                <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 transition-all duration-300">
                     {
                         movies.map((item) => (
                                 <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
@@ -382,9 +381,9 @@ const totalPages = 190;
 
     <!-- Sección de Series -->
     {series.length > 0 && (
-            <section class="mb-10">
-                <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
-                    <span class="mr-2">
+            <section id="series" class="mb-14">
+                <h2 class="text-coral-red text-3xl font-bold mb-5 flex items-center">
+                    <span class="w-8 h-8 mr-2">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
                              stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -393,7 +392,7 @@ const totalPages = 190;
                     </span>
                     SERIES
                 </h2>
-                <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 transition-all duration-300">
                     {
                         series.map((item) => (
                                 <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
@@ -476,6 +475,10 @@ const totalPages = 190;
 </section>
 
 <style is:global>
+    html {
+        scroll-behavior: smooth;
+    }
+
     .text-coral-red {
         color: #E63946;
     }
@@ -557,4 +560,21 @@ const totalPages = 190;
             color: #E5E5E5;
         }
     }
+
+    @keyframes click-bounce {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(0.93);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .button-bounce:active {
+        animation: click-bounce 0.25s ease-in-out;
+    }
+
 </style>
