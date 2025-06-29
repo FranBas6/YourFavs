@@ -11,6 +11,7 @@ interface Props {
     next_episode_to_air?: { air_date: string, episode_number: number, id: number, name: string, overview: string, production_code: string, season_number: number, still_path: string, vote_average: number, vote_count: number };
     genres?: { id: number, name: string }[];
     status?: string; // Estado de la serie (En emisión, Finalizada, etc.)
+    character?: string; // Papel del actor en la serie
 }
 
 const {
@@ -25,6 +26,7 @@ const {
     next_episode_to_air,
     genres,
     status,
+    character
 } = Astro.props;
 
 // Calculate number of seasons
@@ -138,6 +140,12 @@ const getRatingColor = (rating: number): string => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-coral-plat leading-tight mb-2 line-clamp-2">
                 {name}
             </h2>
+
+            {character && (
+                    <p class="text-sm text-gray-500 dark:text-gray-400 italic mt-1">
+                        <span class="font-medium text-gray-700 dark:text-white">{character}</span>
+                    </p>
+            )}
 
             {/* Metadata: Temporadas y Periodo */}
             <div class="flex flex-wrap items-center gap-3 mb-3">

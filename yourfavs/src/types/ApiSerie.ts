@@ -41,4 +41,5 @@ export type Serie = {
         provider_name: string;
         logo_path: string;
     }[];
+    character?: string;  // Añadido 'character' para series de tipo "cast"
 };

@@ -3,7 +3,7 @@ import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 
-/// Obtener series en las que participa un actor o actriz por ID
+// Obtener series en las que participa un actor o actriz por ID
 export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[]> => {
     try {
         // Obtener créditos combinados directamente con el ID

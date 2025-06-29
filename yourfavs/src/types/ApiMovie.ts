@@ -34,6 +34,7 @@ export type Movie = {
         provider_name: string;
         logo_path: string;
     }[];  // Array de plataformas de visualización
+    character?: string;  // Añadido 'character' para películas de tipo "cast"
 };
 
 

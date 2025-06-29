@@ -9,6 +9,7 @@ interface Props {
     genres?: { id: number, name: string }[];
     runtime?: number;
     providers?: { provider_id: number, provider_name: string, logo_path: string }[];
+    character?: string; // Opcional, para actores
 }
 
 const {
@@ -20,7 +21,8 @@ const {
     release_date,
     genres,
     runtime,
-    providers
+    providers,
+    character
 } = Astro.props;
 
 // Formatear la fecha en formato legible
@@ -116,6 +118,12 @@ const getRatingColor = (rating: number): string => {
             <h2 class="text-lg sm:text-xl font-bold tracking-tight text-coral-plat leading-tight mb-2 line-clamp-2">
                 {title}
             </h2>
+
+            {character && (
+                    <p class="text-sm text-gray-500 dark:text-gray-400 italic mt-1">
+                        <span class="font-medium text-gray-700 dark:text-white">{character}</span>
+                    </p>
+            )}
 
             <!-- Genres -->
             {displayGenres.length > 0 && (
