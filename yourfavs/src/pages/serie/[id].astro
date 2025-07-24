@@ -925,6 +925,20 @@ const recommendationType = recommendationsData.type || 'recommendations';
                                     <span class="font-medium text-gray-600">{formatDate(item?.first_air_date)}</span>
                                 </li>
                                 <li class="flex justify-between">
+                                    <span class="text-gray-600">Finalización:</span>
+                                    <span class="font-medium text-gray-600">
+                                        {item?.last_episode_to_air ? formatDate(item.last_episode_to_air.air_date) : "No disponible"}
+                                    </span>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Valoración:</span>
+                                    <span class="font-medium text-gray-600">{item?.vote_average?.toFixed(1)}
+                                        ({item?.vote_count} votos)</span>
+                                </li>
+                                <li class="flex justify-between">
+                                    <span class="text-gray-600">Popularidad:</span>
+                                    <span class="font-medium text-gray-600">{item?.popularity?.toFixed(1)}</span>
+                                </li>
+                                <li class="flex justify-between">
                                     <span class="text-gray-600">Temporadas:</span>
                                     <span class="font-medium text-gray-600">
                                         {regularSeasonsCount}
@@ -1213,6 +1227,7 @@ const recommendationType = recommendationsData.type || 'recommendations';
                                                                     <img
                                                                             src={`https://image.tmdb.org/t/p/w92${actor.profile_path}`}
                                                                             alt={actor.name}
+                                                                            loading="lazy"
                                                                             class="w-16 h-16 rounded-full object-cover border border-gray-300 shadow-sm hover:brightness-110 transition"
                                                                     />
                                                                 </a>
