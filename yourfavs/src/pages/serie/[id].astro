@@ -491,6 +491,7 @@ interface GuestStar {
     id: number;
     name: string;
     character: string;
+    profile_path?: string;
 }
 
 // Donde obtienes los otros datos
@@ -1140,16 +1141,28 @@ const recommendationType = recommendationsData.type || 'recommendations';
                                                                         {episode.guest_stars && episode.guest_stars.length > 0 && (
                                                                                 <div class="mt-2">
                                                                                     <h6 class={`text-sm font-semibold mb-1 ${season.season_number === 0 ? 'text-purple-700' : 'text-blue-700'}`}>
-                                                                                        Estrellas invitadas:</h6>
-                                                                                    <ul class="text-xs text-gray-600 list-disc list-inside">
+                                                                                        Estrellas invitadas:
+                                                                                    </h6>
+                                                                                    <ul class="space-y-1">
                                                                                         {episode.guest_stars.map((star: GuestStar) => (
-                                                                                                <li><a
-                                                                                                        href={`/actor/${star.id}`}
-                                                                                                        class={`text-gray-800 font-semibold hover:underline transition duration-300 ${season.season_number === 0 ? 'hover:text-purple-600' : 'hover:text-blue-600'}`}
-                                                                                                >
-                                                                                                    {star.name}
-                                                                                                </a>
-                                                                                                    como {star.character}
+                                                                                                <li class="flex items-center text-xs text-gray-600">
+                                                                                                    {star.profile_path && (
+                                                                                                            <a href={`/actor/${star.id}`} class="shrink-0">
+                                                                                                                <img
+                                                                                                                    src={`https://image.tmdb.org/t/p/w45${star.profile_path}`}
+                                                                                                                    alt={star.name}
+                                                                                                                    class="w-12 h-12 rounded-full mr-2 object-cover border border-gray-200"
+                                                                                                                    loading="lazy"
+                                                                                                                />
+                                                                                                            </a>
+                                                                                                    )}
+                                                                                                    <a
+                                                                                                            href={`/actor/${star.id}`}
+                                                                                                            class={`text-gray-800 font-semibold hover:underline transition duration-300 ${season.season_number === 0 ? 'hover:text-purple-600' : 'hover:text-blue-600'}`}
+                                                                                                    >
+                                                                                                        {star.name}
+                                                                                                    </a>
+                                                                                                    <span class="ml-1 text-gray-500">como {star.character}</span>
                                                                                                 </li>
                                                                                         ))}
                                                                                     </ul>
