@@ -69,6 +69,11 @@ if (Astro.request.method === 'POST') {
         collectionName = 'MoviesVistas';
     } else if (listType === 'verPronto') {
         collectionName = 'MoviesVerPronto';
+    } else if (listType === 'liked') {
+        collectionName = 'LikedMovies';
+    } else {
+        console.error("Tipo de lista no reconocido:", listType);
+        return Astro.redirect(`/movie/${id}`); // Redirigir si el tipo de lista no es válido
     }
 
     if (collectionName) {
@@ -130,24 +135,28 @@ const docRefFavs = doc(db, "MovieFavs", clientData.id);
 const docRefPendientes = doc(db, "MoviesPendientes", clientData.id);
 const docRefVistas = doc(db, "MoviesVistas", clientData.id);
 const docRefVerPronto = doc(db, "MoviesVerPronto", clientData.id);
+const docRefLiked = doc(db, "LikedMovies", clientData.id);
 
-const [docSnapFavs, docSnapPendientes, docSnapVistas, docSnapVerPronto] = await Promise.all([
+const [docSnapFavs, docSnapPendientes, docSnapVistas, docSnapVerPronto, docSnapLiked] = await Promise.all([
     getDoc(docRefFavs),
     getDoc(docRefPendientes),
     getDoc(docRefVistas),
-    getDoc(docRefVerPronto)
+    getDoc(docRefVerPronto),
+    getDoc(docRefLiked)
 ]);
 
 const existingFavs = docSnapFavs.exists();
 const existingPendientes = docSnapPendientes.exists();
 const existingVistas = docSnapVistas.exists();
 const existingVerPronto = docSnapVerPronto.exists();
+const existingLiked = docSnapLiked.exists();
 
 // Verificar si la película ya está en cada una de las listas
 const isInFavorites = existingFavs;
 const isInPendientes = existingPendientes;
 const isInVistas = existingVistas;
 const isInVerPronto = existingVerPronto;
+const isInLiked = existingLiked;
 
 // Formatear la fecha para mejor visualización
 const formatDate = (dateString: string) => {
@@ -238,7 +247,7 @@ function formatTrailerUrl(url: string): string {
     return url;
 }
 
-import type {PosterImage} from '../../services/API/Movies/tmdbMovies'; // Asegúrate de exportar este tipo desde tu archivo api.ts
+import type {PosterImage} from '../../services/API/Movies/InfoMovies'; // Asegúrate de exportar este tipo desde tu archivo api.ts
 
 let posters: PosterImage[] = [];
 
@@ -316,6 +325,46 @@ const recommendationType = recommendationsData.type || 'recommendations';
 
                         </div>
                 )}
+                <!-- Botón de Me gusta - Colocar después de la sección de géneros -->
+                <form method="POST" class="mt-4">
+                    <input type="hidden" name="id" value={item?.id}/>
+                    <input type="hidden" name="poster_path" value={item?.poster_path || ''}/>
+                    <input type="hidden" name="title" value={item?.title || 'Sin nombre'}/>
+                    <input type="hidden" name="vote_average" value={item?.vote_average || 0}/>
+                    <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
+                    <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
+                    <input type="hidden" name="release_date" value={item?.release_date || ''}/>
+                    <input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/>
+                    <input type="hidden" name="list_type" value="liked"/>
+
+                    <button
+                            type="submit"
+                            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all flex items-center gap-2 mx-auto"
+                            aria-live="polite"
+                    >
+                        {isInLiked ? (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                         fill="currentColor">
+                                        <path fill-rule="evenodd"
+                                              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                              clip-rule="evenodd"/>
+                                    </svg>
+                                    Ya me gusta
+                                </>
+                        ) : (
+                                <>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
+                                         fill="none" stroke="currentColor">
+                                        <path fill-rule="evenodd"
+                                              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                              clip-rule="evenodd"/>
+                                    </svg>
+                                    Me gusta
+                                </>
+                        )}
+                    </button>
+                </form>
             </div>
         </div>
 

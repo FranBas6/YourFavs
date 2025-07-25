@@ -142,6 +142,38 @@ export const getMoviesVistas = async (): Promise<MovieInterface[]> => {
     }
 };
 
+// Obtener películas vistas ordenadas por fecha de añadido (más reciente primero)
+export const getLikedMovies = async (): Promise<MovieInterface[]> => {
+    try {
+        console.log("Intentando obtener películas vistas...");
+
+        // Referencia a la colección de películas vistas con ordenamiento
+        const likedMoviesRef = collection(db, "LikedMovies");
+        const q = query(likedMoviesRef, orderBy("added_at", "desc"));
+
+        // Obtener documentos ordenados
+        const querySnapshot = await getDocs(q);
+
+        console.log("Resultado de la consulta ordenado:", querySnapshot);
+
+        if (querySnapshot.empty) {
+            console.warn("No se encontraron películas que te gustan.");
+            return [];
+        }
+
+        // Convertir los documentos a un array de datos con el tipo MoviesVistas
+        const result: MovieInterface[] = querySnapshot.docs.map(doc => {
+            return { id: doc.id, ...doc.data() } as MovieInterface;
+        });
+
+        return result;
+    } catch (error) {
+        console.error("Error al obtener las películas vistas:", error);
+        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        return [];
+    }
+};
+
 // Obtener películas para ver pronto ordenadas por fecha de añadido (más reciente primero)
 export const getMoviesVerPronto = async (): Promise<MovieInterface[]> => {
     try {

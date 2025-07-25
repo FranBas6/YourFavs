@@ -1,15 +1,22 @@
 ---
 import CardSerie from "../Cards/CardSerie.astro";
+import CardMovie from "../Cards/CardMovie.astro";
 import {
     getLikedSeries,
 } from "../../services/BD/yourfavsSerie";
+import {
+    getLikedMovies,
+} from "../../services/BD/yourfavsMovie";
 import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
+import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
 
 // 🔹 Obtener IDs desde Firebase
 const seriesMeGustanIds = (await getLikedSeries()).map(s => s.id);
+const moviesMeGustanIds = (await getLikedMovies()).map(m => m.id);
 
 // 🔹 Obtener detalles desde TMDB
 const likedSeries = await Promise.all(seriesMeGustanIds.map(id => fetchSerieDetails(id)));
+const likedMovies = await Promise.all(moviesMeGustanIds.map(id => fetchMovieDetails(id)));
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
@@ -82,6 +89,7 @@ function filterContent(items: any[], type: 'movie' | 'serie') {
 
 // Aplicar filtros
 const seriesFiltradas = filterContent(likedSeries, 'serie');
+const peliculasFiltradas = filterContent(likedMovies, 'movie');
 
 // Obtener géneros únicos del contenido actual
 function getUniqueGenres() {
@@ -159,6 +167,12 @@ function buildUrl(params: Record<string, string>) {
                  ${showSeries && !showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
                    "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
                 Series
+            </a>
+            <a href={buildUrl({filter: 'peliculas', search: searchQuery, genre: genreFilter})}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                 ${showMovies && !showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                   "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Películas
             </a>
 
             <!-- Botón para mostrar/ocultar búsqueda -->
@@ -477,6 +491,57 @@ function buildUrl(params: Record<string, string>) {
                                                         name: getGenreName(id)
                                                     }))}
                                                     status={item.status}
+                                            />
+                                    ))}
+                                </div>
+                        )}
+                    </section>
+            )}
+
+            {/* Películas Favoritas */}
+            {(showMovies || showAll) && (
+                    <section class="mb-8">
+                        <h3 class="text-xl font-semibold text-red-700 mb-4 pl-4 border-l-4 border-red-500 flex justify-between items-center">
+                            <span>Películas Pendientes</span>
+                            <span class="ml-4 text-base text-red-700 bg-red-100 rounded-full px-3 py-1 font-bold">
+                                {peliculasFiltradas.length}
+                                {searchQuery || genreFilter ? ` de ${likedMovies.length}` : ''}
+                            </span>
+                        </h3>
+
+                        {peliculasFiltradas.length === 0 ? (
+                                <div class="empty-state bg-red-50 border border-red-200 rounded-xl p-6 text-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                         class="h-12 w-12 mx-auto text-red-400 mb-3" fill="none"
+                                         viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                              d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                                    </svg>
+                                    <h3 class="text-lg font-semibold text-red-700 mb-1">
+                                        {searchQuery || genreFilter ? 'No se encontraron películas' : 'Aún no tienes películas favoritas'}
+                                    </h3>
+                                    <p class="text-red-600 text-sm">
+                                        {searchQuery || genreFilter ?
+                                            'Intenta ajustar los filtros o términos de búsqueda.' :
+                                            'Explora el catálogo y guarda las películas que más te gusten.'
+                                        }
+                                    </p>
+                                </div>
+                        ) : (
+                                <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full">
+                                    {peliculasFiltradas.map((item) => (
+                                            <CardMovie
+                                                    id={item.id.toString()}
+                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                    title={item.title}
+                                                    vote_average={item.vote_average}
+                                                    overview={item.overview}
+                                                    release_date={item.release_date}
+                                                    genres={item.genre_ids?.map((id: number) => ({
+                                                        id,
+                                                        name: getGenreName(id)
+                                                    }))}
+                                                    providers={item.providers}
                                             />
                                     ))}
                                 </div>

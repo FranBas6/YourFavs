@@ -11,6 +11,17 @@ const seriesSiguiendoIds = (await getSeriesSiguiendo()).map(s => s.id);
 // 🔹 Obtener detalles desde TMDB
 const seriesSiguiendo = await Promise.all(seriesSiguiendoIds.map(id => fetchSerieDetails(id)));
 
+seriesSiguiendo.sort((a, b) => {
+    const dateA = a.last_episode_to_air?.air_date;
+    const dateB = b.last_episode_to_air?.air_date;
+
+    if (!dateA) return 1;
+    if (!dateB) return -1;
+
+    return new Date(dateB).getTime() - new Date(dateA).getTime();
+});
+
+
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
 const genreFilter = Astro.url.searchParams.get("genre") || "";
