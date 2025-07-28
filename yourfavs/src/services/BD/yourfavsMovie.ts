@@ -245,7 +245,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
 
         // Solo favoritas como base
         const favoritas = await getMovieFav();
-        const vistas = await getMoviesVistas();
+        const vistas = await getLikedMovies();
 
         // Si no hay favoritas, no generamos recomendaciones
         if (favoritas.length === 0) {
