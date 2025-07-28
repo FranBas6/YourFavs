@@ -245,7 +245,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
 
         // Solo favoritas como base
         const favoritas = await getMovieFav();
-        const vistas = await getLikedMovies();
+        const liked = await getLikedMovies();
 
         // Si no hay favoritas, no generamos recomendaciones
         if (favoritas.length === 0) {
@@ -256,7 +256,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
         // IDs que debemos excluir (favoritas + vistas)
         const excludeMovieIds = new Set<string>([
             ...favoritas.map(m => m.id),
-            ...vistas.map(m => m.id)
+            ...liked.map(m => m.id)
         ]);
 
         // 3. Obtener recomendaciones para cada película (con prioridad para favoritas)
