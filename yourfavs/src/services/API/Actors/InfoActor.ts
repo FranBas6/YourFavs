@@ -89,3 +89,54 @@ export const getActorDetailsById = async ({ id }: { id: string }) => {
         return null;
     }
 };
+
+interface TMDBProfileImage {
+    aspect_ratio: number;
+    height: number;
+    iso_639_1: string | null;
+    file_path: string;
+    vote_average: number;
+    vote_count: number;
+    width: number;
+}
+
+export interface ActorImage {
+    aspect_ratio: number;
+    height: number;
+    iso_639_1: string | null;
+    file_path: string; // ruta completa
+    vote_average: number;
+    vote_count: number;
+    width: number;
+}
+
+export const fetchActorImages = async (
+    actorId: number | string,
+    language: string = "es-ES"
+): Promise<ActorImage[]> => {
+    const numericId = typeof actorId === 'string' ? parseInt(actorId, 10) : actorId;
+    const baseUrl = `https://api.themoviedb.org/3`;
+    const fullImagePath = (path: string) => `https://image.tmdb.org/t/p/original${path}`;
+
+    try {
+        const res = await fetch(`${baseUrl}/person/${numericId}/images?api_key=${API_KEY}`);
+        const data = await res.json();
+
+        let images: TMDBProfileImage[] = data.profiles || [];
+
+        // Filtrar por idioma si aplica (aunque los perfiles suelen ser sin idioma)
+        if (language !== "" && language !== "all") {
+            images = images.filter(img => img.iso_639_1 === language.split('-')[0] || img.iso_639_1 === null);
+        }
+
+        // Formatear imágenes con ruta completa
+        return images.map(img => ({
+            ...img,
+            file_path: fullImagePath(img.file_path)
+        }));
+
+    } catch (error) {
+        console.error(`Error al obtener imágenes del actor ${numericId}:`, error);
+        return [];
+    }
+};
