@@ -35,6 +35,7 @@ export type Movie = {
         logo_path: string;
     }[];  // Array de plataformas de visualización
     character?: string;  // Añadido 'character' para películas de tipo "cast"
+    imdb_id?: string;
 };
 
 

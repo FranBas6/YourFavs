@@ -1,8 +1,6 @@
 ---
 import CardSerie from "../Cards/CardSerie.astro";
-import {
-    getSeriesSiguiendo,
-} from "../../services/BD/yourfavsSerie";
+import { getSeriesSiguiendo } from "../../services/BD/yourfavsSerie";
 import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
 
 // 🔹 Obtener IDs desde Firebase
@@ -20,7 +18,6 @@ seriesSiguiendo.sort((a, b) => {
 
     return new Date(dateB).getTime() - new Date(dateA).getTime();
 });
-
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";

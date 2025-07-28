@@ -32,9 +32,6 @@ const formatDate = (dateString: string | undefined): string => {
     return date.toLocaleDateString("es-ES", { year: "numeric", month: "short", day: "numeric" });
 };
 
-// Obtener año de estreno
-const releaseYear = release_date ? new Date(release_date).getFullYear() : null;
-
 // Formatear duración de la película
 const formatRuntime = (minutes: number | undefined): string => {
     if (!minutes) return "";
@@ -66,7 +63,6 @@ const getRatingColor = (rating: number): string => {
     return "bg-red-500 text-white";
 };
 ---
-
 <div class="media-card group">
     <a
             href={`/movie/${id}`}
@@ -119,6 +115,7 @@ const getRatingColor = (rating: number): string => {
                 {title}
             </h2>
 
+            <!-- Character (if applicable) -->
             {character && (
                     <p class="text-sm text-gray-500 dark:text-gray-400 italic mt-1">
                         <span class="font-medium text-gray-700 dark:text-white">{character}</span>

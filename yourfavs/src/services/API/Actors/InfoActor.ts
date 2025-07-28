@@ -89,25 +89,3 @@ export const getActorDetailsById = async ({ id }: { id: string }) => {
         return null;
     }
 };
-
-
-/* export const getActorSocialLinksById = async ({ id }: { id: string }) => {
-    try {
-        const url = `https://api.themoviedb.org/3/person/${id}/external_ids?api_key=${API_KEY}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error(`Error al obtener redes sociales: ${res.statusText}`);
-        const data = await res.json();
-
-        return {
-            imdb: data.imdb_id ? `https://www.imdb.com/name/${data.imdb_id}` : null,
-            twitter: data.twitter_id ? `https://twitter.com/${data.twitter_id}` : null,
-            instagram: data.instagram_id ? `https://instagram.com/${data.instagram_id}` : null,
-            facebook: data.facebook_id ? `https://facebook.com/${data.facebook_id}` : null,
-            tiktok: data.tiktok_id ? `https://www.tiktok.com/@${data.tiktok_id}` : null,
-            youtube: data.youtube_id ? `https://www.youtube.com/${data.youtube_id}` : null,
-        };
-    } catch (error) {
-        console.error("Hubo un error al obtener las redes sociales del actor:", error);
-        return null;
-    }
-}; */
