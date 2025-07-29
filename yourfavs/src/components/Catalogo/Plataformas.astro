@@ -24,39 +24,21 @@ import {
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 
-// Define type for sort options
-type SortOptionS = 'popularity' | 'vote_average' | 'first_air_date' | 'name';
-type SortOptionM = 'popularity' | 'vote_average' | 'release_date' | 'title';
-type SortOrder = 'desc';
-
 // Obtener parámetros desde la URL
 const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const page = Number(urlParams.get('page')) || 1;
 const pageStr = page.toString();
 const platformParam = urlParams.get('platform') || 'all';
 
-// Nuevos parámetros para ordenación
-const sortBy = urlParams.get('sortBy') || 'popularity';
-const sortByS = sortBy as SortOptionS;
-const sortByM = sortBy as SortOptionM;
-const sortOrder: SortOrder = 'desc';
-
 // Definir plataformas disponibles
 const platforms = [
-    {id: 'netflix', name: 'Netflix', logo: '/logos/plataformas/netflix.svg'},
-    {id: 'amazon', name: 'Amazon Prime', logo: '/logos/plataformas/amazon.svg'},
-    {id: 'disney', name: 'Disney+', logo: '/logos/plataformas/disney.svg'},
-    {id: 'hbo', name: 'HBO Max', logo: '/logos/plataformas/hbo.svg'},
-    {id: 'apple', name: 'Apple TV+', logo: '/logos/plataformas/apple.svg'},
-    {id: 'movistar', name: 'Movistar+', logo: '/logos/plataformas/movistar.svg'},
-    {id: 'filmin', name: 'Filmin', logo: '/logos/plataformas/filmin.svg'}
-];
-
-// Opciones de ordenación
-const sortOptions = [
-    {id: 'popularity' as const, name: 'Popularidad'},
-    {id: 'vote_average' as const, name: 'Puntuación'},
-    {id: 'first_air_date' as const, name: 'Fecha de estreno'}
+    {id: 'netflix', name: 'NETFLIX', logo: '/logos/plataformas/netflix.svg'},
+    {id: 'amazon', name: 'AMAZON PRIME', logo: '/logos/plataformas/amazon.svg'},
+    {id: 'disney', name: 'DISNEY+', logo: '/logos/plataformas/disney.svg'},
+    {id: 'hbo', name: 'HBO MAX', logo: '/logos/plataformas/hbo.svg'},
+    {id: 'apple', name: 'APPLE TV+', logo: '/logos/plataformas/apple.svg'},
+    {id: 'movistar', name: 'MOVISTAR+', logo: '/logos/plataformas/movistar.svg'},
+    {id: 'filmin', name: 'FILMIN', logo: '/logos/plataformas/filmin.svg'}
 ];
 
 // Cargar las películas y series para la página actual basado en la plataforma seleccionada
@@ -73,20 +55,20 @@ function removeDuplicates<T extends { id: number }>(items: T[]): T[] {
 // Cargar todo el contenido si no hay filtro o filtrar por plataforma
 if (platformParam === 'all') {
     // Cargar todas las plataformas con los parámetros de ordenación
-    const netflixSeries = await getNetflixSeries(pageStr, sortByS, sortOrder);
-    const netflixMovies = await getNetflixMovies(pageStr, sortByM, sortOrder);
-    const amazonPrimeSeries = await getAmazonPrimeSeries(pageStr, sortByS, sortOrder);
-    const amazonPrimeMovies = await getAmazonPrimeMovies(pageStr, sortByM, sortOrder);
-    const disneyPlusSeries = await getDisneyPlusSeries(pageStr, sortByS, sortOrder);
-    const disneyPlusMovies = await getDisneyPlusMovies(pageStr, sortByM, sortOrder);
-    const hboMaxSeries = await getHBOMaxSeries(pageStr, sortByS, sortOrder);
-    const hboMaxMovies = await getHBOMaxMovies(pageStr, sortByM, sortOrder);
-    const appleTVSeries = await getAppleTVSeries(pageStr, sortByS, sortOrder);
-    const appleTVMovies = await getAppleTVMovies(pageStr, sortByM, sortOrder);
-    const movistarPlusSeries = await getMovistarPlusSeries(pageStr, sortByS, sortOrder);
-    const movistarPlusMovies = await getMovistarPlusMovies(pageStr, sortByM, sortOrder);
-    const filminSeries = await getFilminSeries(pageStr, sortByS, sortOrder);
-    const filminMovies = await getFilminMovies(pageStr, sortByM, sortOrder);
+    const netflixSeries = await getNetflixSeries(pageStr);
+    const netflixMovies = await getNetflixMovies(pageStr);
+    const amazonPrimeSeries = await getAmazonPrimeSeries(pageStr);
+    const amazonPrimeMovies = await getAmazonPrimeMovies(pageStr);
+    const disneyPlusSeries = await getDisneyPlusSeries(pageStr);
+    const disneyPlusMovies = await getDisneyPlusMovies(pageStr);
+    const hboMaxSeries = await getHBOMaxSeries(pageStr);
+    const hboMaxMovies = await getHBOMaxMovies(pageStr);
+    const appleTVSeries = await getAppleTVSeries(pageStr);
+    const appleTVMovies = await getAppleTVMovies(pageStr);
+    const movistarPlusSeries = await getMovistarPlusSeries(pageStr);
+    const movistarPlusMovies = await getMovistarPlusMovies(pageStr);
+    const filminSeries = await getFilminSeries(pageStr);
+    const filminMovies = await getFilminMovies(pageStr);
 
     // Combinar todos los resultados
     const allMovies = [
@@ -113,57 +95,36 @@ if (platformParam === 'all') {
     movies = removeDuplicates(allMovies);
     series = removeDuplicates(allSeries);
 
-    // Re-ordenar después de eliminar duplicados
-    if (sortByM === 'popularity') {
-        movies.sort((a, b) => b.popularity - a.popularity);
-    } else if (sortByM === 'vote_average') {
-        movies.sort((a, b) => b.vote_average - a.vote_average);
-    } else if (sortByM === 'release_date') {
-        movies.sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
-    } else if (sortByM === 'title') {
-        movies.sort((a, b) => a.title.localeCompare(b.title));
-    }
-
-    if (sortByS === 'popularity') {
-        series.sort((a, b) => b.popularity - a.popularity);
-    } else if (sortByS === 'vote_average') {
-        series.sort((a, b) => b.vote_average - a.vote_average);
-    } else if (sortByS === 'first_air_date') {
-        series.sort((a, b) => new Date(b.first_air_date).getTime() - new Date(a.first_air_date).getTime());
-    } else if (sortByS === 'name') {
-        series.sort((a, b) => a.name.localeCompare(b.name));
-    }
-
 } else {
     // Filtrar por plataforma seleccionada con parámetros de ordenación
     switch (platformParam) {
         case 'netflix':
-            movies = await getNetflixMovies(pageStr, sortByM, sortOrder);
-            series = await getNetflixSeries(pageStr, sortByS, sortOrder);
+            movies = await getNetflixMovies(pageStr);
+            series = await getNetflixSeries(pageStr);
             break;
         case 'amazon':
-            movies = await getAmazonPrimeMovies(pageStr, sortByM, sortOrder);
-            series = await getAmazonPrimeSeries(pageStr, sortByS, sortOrder);
+            movies = await getAmazonPrimeMovies(pageStr);
+            series = await getAmazonPrimeSeries(pageStr);
             break;
         case 'disney':
-            movies = await getDisneyPlusMovies(pageStr, sortByM, sortOrder);
-            series = await getDisneyPlusSeries(pageStr, sortByS, sortOrder);
+            movies = await getDisneyPlusMovies(pageStr);
+            series = await getDisneyPlusSeries(pageStr);
             break;
         case 'hbo':
-            movies = await getHBOMaxMovies(pageStr, sortByM, sortOrder);
-            series = await getHBOMaxSeries(pageStr, sortByS, sortOrder);
+            movies = await getHBOMaxMovies(pageStr);
+            series = await getHBOMaxSeries(pageStr);
             break;
         case 'apple':
-            movies = await getAppleTVMovies(pageStr, sortByM, sortOrder);
-            series = await getAppleTVSeries(pageStr, sortByS, sortOrder);
+            movies = await getAppleTVMovies(pageStr);
+            series = await getAppleTVSeries(pageStr);
             break;
         case 'movistar':
-            movies = await getMovistarPlusMovies(pageStr, sortByM, sortOrder);
-            series = await getMovistarPlusSeries(pageStr, sortByS, sortOrder);
+            movies = await getMovistarPlusMovies(pageStr);
+            series = await getMovistarPlusSeries(pageStr);
             break;
         case 'filmin':
-            movies = await getFilminMovies(pageStr, sortByM, sortOrder);
-            series = await getFilminSeries(pageStr, sortByS, sortOrder);
+            movies = await getFilminMovies(pageStr);
+            series = await getFilminSeries(pageStr);
             break;
     }
 }
@@ -253,25 +214,6 @@ const totalPages = 190;
         </div>
     </section>
 
-    <!-- Opciones de ordenación con botones -->
-    <section class="mb-10">
-        <div class="bg-white p-6 rounded-2xl shadow-lg">
-            <h3 class="text-lg font-semibold text-gray-800 mb-3">Ordenar contenido</h3>
-            <div class="flex flex-wrap gap-3">
-                {sortOptions.map((option) => (
-                        <a href={createUrlWithParams({sortBy: option.id})}
-                           class={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                               sortBy === option.id
-                                   ? 'bg-coral-red text-white shadow-md'
-                                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                           }`}>
-                            {option.name}
-                        </a>
-                ))}
-            </div>
-        </div>
-    </section>
-
     <div class="flex justify-center gap-4 mt-6 mb-6 sticky top-5 z-40 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
         <a href="#peliculas"
            class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
@@ -333,16 +275,15 @@ const totalPages = 190;
     <!-- Título de plataforma seleccionada y criterio de ordenación -->
     <section class="mb-6 text-center">
         <h2 class="text-2xl font-bold text-gray-800">
-            {platformParam === 'all' ? 'Contenido de todas las plataformas' : `Contenido de ${platforms.find(p => p.id === platformParam)?.name || ''}`}
+            {platformParam === 'all'
+                ? 'Contenido de todas las plataformas'
+                : (
+                            <>Contenido de <span
+                                    class="underline-custom">{platforms.find(p => p.id === platformParam)?.name || ''}</span>
+                            </>
+                )
+            }
         </h2>
-        <p class="text-gray-600">
-            Ordenado por <span
-                class="font-semibold">{sortOptions.find(o => o.id === sortBy)?.name || 'Popularidad'}</span> en orden
-            descendente
-        </p>
-        {platformParam === 'all' && (
-                <p class="text-gray-500 text-sm mt-1">Evita duplicados mostrando una sola vez cada título</p>
-        )}
     </section>
 
     <!-- Sección de Películas -->
@@ -489,6 +430,11 @@ const totalPages = 190;
 
     .border-coral-red {
         border-color: #E63946;
+    }
+
+    .underline-custom {
+        text-decoration: underline;
+        text-decoration-color: #E63946; /* el color coral */
     }
 
     #toggleSidebar:checked ~ #sidebar {

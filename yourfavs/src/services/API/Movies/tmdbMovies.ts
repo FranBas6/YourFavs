@@ -243,26 +243,12 @@ export const getMoviesByTitle = async ({title, page}: { title: string, page?: st
 
 // -- Obtener películas por proveedor de streaming --
 
-// Tipos para mejor organización
-type SortOption = 'popularity' | 'vote_average' | 'release_date' | 'title';
-type SortOrder = 'asc' | 'desc';
-
-// Función mejorada para obtener y ordenar películas
+// Función para obtener las películas más populares (orden fijo por popularidad descendente)
 const fetchMoviesByProvider = async (
     providerId: number,
-    page: string = "1",
-    sortBy: SortOption = 'popularity',
-    sortOrder: SortOrder = 'desc'
+    page: string = "1"
 ): Promise<Movie[]> => {
-    // Mapeo para parámetros de ordenación de TMDb
-    const sortMapping = {
-        popularity: 'popularity',
-        vote_average: 'vote_average',
-        release_date: 'release_date',
-        title: 'original_title'
-    };
-
-    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=es-ES&page=${page}&with_watch_providers=${providerId}&watch_region=ES&sort_by=${sortMapping[sortBy]}.${sortOrder}`;
+    const url = `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=es-ES&page=${page}&with_watch_providers=${providerId}&watch_region=ES&sort_by=popularity.desc`;
 
     try {
         const res = await fetch(url);
@@ -289,24 +275,24 @@ const PROVIDERS = {
     FILMIN: 63
 };
 
-// Funciones mejoradas que permiten ordenación
-export const getNetflixMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.NETFLIX, page, sortBy, sortOrder);
+// Funciones que siempre devuelven las películas más populares
+export const getNetflixMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.NETFLIX, page);
 
-export const getAmazonPrimeMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.AMAZON, page, sortBy, sortOrder);
+export const getAmazonPrimeMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.AMAZON, page);
 
-export const getDisneyPlusMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.DISNEY, page, sortBy, sortOrder);
+export const getDisneyPlusMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.DISNEY, page);
 
-export const getHBOMaxMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.HBO, page, sortBy, sortOrder);
+export const getHBOMaxMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.HBO, page);
 
-export const getAppleTVMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.APPLE, page, sortBy, sortOrder);
+export const getAppleTVMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.APPLE, page);
 
-export const getMovistarPlusMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.MOVISTAR, page, sortBy, sortOrder);
+export const getMovistarPlusMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.MOVISTAR, page);
 
-export const getFilminMovies = async (page?: string, sortBy?: SortOption, sortOrder?: SortOrder) =>
-    fetchMoviesByProvider(PROVIDERS.FILMIN, page, sortBy, sortOrder);
+export const getFilminMovies = async (page?: string) =>
+    fetchMoviesByProvider(PROVIDERS.FILMIN, page);
