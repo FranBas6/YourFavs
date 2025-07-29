@@ -4,7 +4,7 @@ import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 
 // Obtener series en las que participa un actor o actriz por ID
-export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[]> => {
+export const getSeriesByActorId = async ({id}: { id: string }): Promise<Serie[]> => {
     try {
         // Obtener créditos combinados directamente con el ID
         const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
@@ -28,7 +28,7 @@ export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[
 };
 
 // Obtener películas en las que participa un actor o actriz por ID
-export const getMoviesByActorId = async ({ id }: { id: string }): Promise<Movie[]> => {
+export const getMoviesByActorId = async ({id}: { id: string }): Promise<Movie[]> => {
     try {
         // Obtener créditos combinados directamente con el ID
         const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
@@ -52,7 +52,7 @@ export const getMoviesByActorId = async ({ id }: { id: string }): Promise<Movie[
 };
 
 // Obtener detalles de un actor o actriz por ID
-export const getActorDetailsById = async ({ id }: { id: string }) => {
+export const getActorDetailsById = async ({id}: { id: string }) => {
     try {
         const [detailsRes, socialsRes] = await Promise.all([
             fetch(`https://api.themoviedb.org/3/person/${id}?api_key=${API_KEY}&language=es-ES`),

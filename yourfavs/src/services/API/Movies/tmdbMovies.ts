@@ -26,7 +26,7 @@ export const fetchMovieDetails = async (id: string | number) => {
 };
 
 // Obtener películas en cartelera
-export const getLatestMovies = async ({ page }: { page?: string }): Promise<Movie[]> => {
+export const getLatestMovies = async ({page}: { page?: string }): Promise<Movie[]> => {
     const pageNumber = page || "1";
 
     const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${API_KEY}&language=es-ES&page=${pageNumber}`;
@@ -96,7 +96,7 @@ export const getMostPopularMovies = async ({page}: { page?: string }): Promise<M
 };
 
 // Películas mejor valoradas
-export const getTopRatedMovies = async ({ page }: { page?: string }): Promise<Movie[]> => {
+export const getTopRatedMovies = async ({page}: { page?: string }): Promise<Movie[]> => {
     const pageNumber = page || "1";
 
     const url = `https://api.themoviedb.org/3/movie/top_rated?api_key=${API_KEY}&language=es-ES&page=${pageNumber}`;

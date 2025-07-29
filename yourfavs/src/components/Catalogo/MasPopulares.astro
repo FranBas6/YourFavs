@@ -8,8 +8,8 @@ import {getMostPopularSeries} from "../../services/API/Series/tmdbSeries";
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
 
 // Cargar las películas y series para la página actual
-const popularMovies = await getMostPopularMovies({ page: page.toString() });
-const popularSeries = await getMostPopularSeries({ page: page.toString() });
+const popularMovies = await getMostPopularMovies({page: page.toString()});
+const popularSeries = await getMostPopularSeries({page: page.toString()});
 
 // Total de páginas, puedes obtenerlo del API o mantenerlo como un valor estático
 const totalPages = 190; // Suponiendo 10 páginas de resultados disponibles, ajusta según tu API
@@ -125,8 +125,10 @@ function getGenreName(id: number): string {
     <section class="mb-10" id="peliculas">
         <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
             <span class="mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h18M3 16h18" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
                 </svg>
             </span>
             PELÍCULAS
@@ -142,7 +144,7 @@ function getGenreName(id: number): string {
                                     vote_average={item.vote_average}
                                     overview={item.overview}
                                     release_date={item.release_date}
-                                    genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
+                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
                                     providers={item.providers}
                             />
                         </div>
@@ -155,8 +157,10 @@ function getGenreName(id: number): string {
     <section class="mb-10" id="series">
         <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
             <span class="mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
             </span>
             SERIES

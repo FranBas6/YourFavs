@@ -1,8 +1,8 @@
 ---
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import type { Movie } from "../../types/ApiMovie"
-import type { Serie } from "../../types/ApiSerie";
+import type {Movie} from "../../types/ApiMovie"
+import type {Serie} from "../../types/ApiSerie";
 import {
     getAmazonPrimeMovies, getAppleTVMovies,
     getDisneyPlusMovies, getFilminMovies,
@@ -64,30 +64,30 @@ const filminMovies = await getFilminMovies(pageStr, sortByM, sortOrder);
 
 // Plataformas y categorías disponibles
 const platforms = [
-    { name: "NETFLIX", movies: netflixMovies, series: netflixSeries },
-    { name: "AMAZON PRIME", movies: amazonPrimeMovies, series: amazonPrimeSeries },
-    { name: "DISNEY+", movies: disneyPlusMovies, series: disneyPlusSeries },
-    { name: "HBO MAX", movies: hboMaxMovies, series: hboMaxSeries },
-    { name: "APPLE TV+", movies: appleTVMovies, series: appleTVSeries },
-    { name: "MOVISTAR+", movies: movistarPlusMovies, series: movistarPlusSeries },
-    { name: "FILMIN", movies: filminMovies, series: filminSeries },
+    {name: "NETFLIX", movies: netflixMovies, series: netflixSeries},
+    {name: "AMAZON PRIME", movies: amazonPrimeMovies, series: amazonPrimeSeries},
+    {name: "DISNEY+", movies: disneyPlusMovies, series: disneyPlusSeries},
+    {name: "HBO MAX", movies: hboMaxMovies, series: hboMaxSeries},
+    {name: "APPLE TV+", movies: appleTVMovies, series: appleTVSeries},
+    {name: "MOVISTAR+", movies: movistarPlusMovies, series: movistarPlusSeries},
+    {name: "FILMIN", movies: filminMovies, series: filminSeries},
 ];
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
 
 const allCategories = [
-    { slug: 'accion', name: 'ACCIÓN' },
-    { slug: 'comedia', name: 'COMEDIA' },
-    { slug: 'drama', name: 'DRAMA' },
-    { slug: 'crimen', name: 'CRIMEN' },
-    { slug: 'aventura', name: 'AVENTURA' },
-    { slug: 'fantasia', name: 'FANTASÍA' },
-    { slug: 'ciencia_ficcion', name: 'CIENCIA FICCIÓN' },
-    { slug: 'misterio', name: 'MISTERIO' },
-    { slug: 'terror', name: 'TERROR' },
-    { slug: 'animacion', name: 'ANIMACIÓN' },
-    { slug: 'familia', name: 'FAMILIA' },
-    { slug: 'proximamente', name: 'PRÓXIMAMENTE' },
+    {slug: 'accion', name: 'ACCIÓN'},
+    {slug: 'comedia', name: 'COMEDIA'},
+    {slug: 'drama', name: 'DRAMA'},
+    {slug: 'crimen', name: 'CRIMEN'},
+    {slug: 'aventura', name: 'AVENTURA'},
+    {slug: 'fantasia', name: 'FANTASÍA'},
+    {slug: 'ciencia_ficcion', name: 'CIENCIA FICCIÓN'},
+    {slug: 'misterio', name: 'MISTERIO'},
+    {slug: 'terror', name: 'TERROR'},
+    {slug: 'animacion', name: 'ANIMACIÓN'},
+    {slug: 'familia', name: 'FAMILIA'},
+    {slug: 'proximamente', name: 'PRÓXIMAMENTE'},
 ];
 
 const randomIndex = Math.floor(Math.random() * allCategories.length);
@@ -186,86 +186,94 @@ const sections: {
     <h1 class="text-coral-red text-5xl font-extrabold text-center mb-4">CATÁLOGO PRINCIPAL</h1>
     <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
     <p class="text-gray-600 text-center max-w-2xl mx-auto mb-10">
-        Explora nuestro catálogo completo de películas y series. Encuentra tus favoritos y descubre nuevas historias que te encantarán.
+        Explora nuestro catálogo completo de películas y series. Encuentra tus favoritos y descubre nuevas historias que
+        te encantarán.
     </p>
 
     {sections
         .filter((section) => section.movies.length > 0 || section.series.length > 0)
         .map((section) => (
-            <section class="space-y-6 mb-16">
-                <header class="flex items-center justify-between border-b border-white/10 pb-2">
-                    <h2 class="text-blue-500 font-semibold text-xl sm:text-2xl md:text-3xl leading-tight break-words">
-                        {section.title}
-                    </h2>
-                    <a href={section.link} class="text-blue-400 hover:underline flex items-center gap-1 group text-sm sm:text-base">
-                        Ver más <span class="group-hover:translate-x-1 transition-transform">&rarr;</span>
-                    </a>
-                </header>
+                <section class="space-y-6 mb-16">
+                    <header class="flex items-center justify-between border-b border-white/10 pb-2">
+                        <h2 class="text-blue-500 font-semibold text-xl sm:text-2xl md:text-3xl leading-tight break-words">
+                            {section.title}
+                        </h2>
+                        <a href={section.link}
+                           class="text-blue-400 hover:underline flex items-center gap-1 group text-sm sm:text-base">
+                            Ver más <span class="group-hover:translate-x-1 transition-transform">&rarr;</span>
+                        </a>
+                    </header>
 
 
-                <div class="space-y-4">
-                    {section.movies.length > 0 && (
-                    <div>
-                        <h3 class="text-coral-red py-3 font-bold mb-6 text-2xl md:text-3xl flex items-center">
+                    <div class="space-y-4">
+                        {section.movies.length > 0 && (
+                                <div>
+                                    <h3 class="text-coral-red py-3 font-bold mb-6 text-2xl md:text-3xl flex items-center">
                             <span class="mr-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
+                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                                          d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
                                 </svg>
                             </span>
-                            PELÍCULAS
-                        </h3>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                            {section.movies.slice(0, 10).map((item) => (
-                                    <CardMovie
-                                            id={item.id.toString()}
-                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                            title={item.title}
-                                            vote_average={item.vote_average}
-                                            overview={item.overview}
-                                            release_date={item.release_date}
-                                            genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
-                                            providers={item.providers}
-                                    />
-                            ))}
-                        </div>
-                    </div>
-                    )}
+                                        PELÍCULAS
+                                    </h3>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                        {section.movies.slice(0, 10).map((item) => (
+                                                <CardMovie
+                                                        id={item.id.toString()}
+                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                        title={item.title}
+                                                        vote_average={item.vote_average}
+                                                        overview={item.overview}
+                                                        release_date={item.release_date}
+                                                        genres={item.genre_ids?.map(id => ({
+                                                            id,
+                                                            name: getGenreName(id)
+                                                        }))}
+                                                        providers={item.providers}
+                                                />
+                                        ))}
+                                    </div>
+                                </div>
+                        )}
 
-                    {section.series.length > 0 && (
-                    <div>
-                        <h3 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+                        {section.series.length > 0 && (
+                                <div>
+                                    <h3 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
                             <span class="mr-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                                    stroke="currentColor">
+                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                                 </svg>
                             </span>
-                            SERIES
-                        </h3>
-                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                            {section.series.slice(0, 10).map((item) => (
-                                    <CardSerie
-                                            id={item.id.toString()}
-                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                            name={item.name}
-                                            vote_average={item.vote_average}
-                                            overview={item.overview}
-                                            first_air_date={item.first_air_date}
-                                            seasons={item.seasons}
-                                            last_episode_to_air={item.last_episode_to_air}
-                                            next_episode_to_air={item.next_episode_to_air}
-                                            genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
-                                    />
-                            ))}
-                        </div>
+                                        SERIES
+                                    </h3>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                                        {section.series.slice(0, 10).map((item) => (
+                                                <CardSerie
+                                                        id={item.id.toString()}
+                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                        name={item.name}
+                                                        vote_average={item.vote_average}
+                                                        overview={item.overview}
+                                                        first_air_date={item.first_air_date}
+                                                        seasons={item.seasons}
+                                                        last_episode_to_air={item.last_episode_to_air}
+                                                        next_episode_to_air={item.next_episode_to_air}
+                                                        genres={item.genre_ids?.map(id => ({
+                                                            id,
+                                                            name: getGenreName(id)
+                                                        }))}
+                                                />
+                                        ))}
+                                    </div>
+                                </div>
+                        )}
                     </div>
-                    )}
-                </div>
-            </section>
-    ))}
+                </section>
+        ))}
 </main>
 
 <style is:global>

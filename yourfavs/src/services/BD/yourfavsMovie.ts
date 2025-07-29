@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore";
+import {initializeApp} from "firebase/app";
+import {getFirestore, collection, getDocs, query, orderBy, deleteDoc, doc} from "firebase/firestore";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
 
@@ -67,7 +67,7 @@ export const getMovieFav = async (): Promise<MovieInterface[]> => {
 
         // Convertir los documentos a un array de datos con el tipo MovieFavs
         const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return { id: doc.id, ...doc.data() } as MovieInterface;
+            return {id: doc.id, ...doc.data()} as MovieInterface;
         });
 
         return result;
@@ -99,7 +99,7 @@ export const getMoviesPendientes = async (): Promise<MovieInterface[]> => {
 
         // Convertir los documentos a un array de datos con el tipo MoviesPendientes
         const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return { id: doc.id, ...doc.data() } as MovieInterface;
+            return {id: doc.id, ...doc.data()} as MovieInterface;
         });
 
         return result;
@@ -131,7 +131,7 @@ export const getMoviesVistas = async (): Promise<MovieInterface[]> => {
 
         // Convertir los documentos a un array de datos con el tipo MoviesVistas
         const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return { id: doc.id, ...doc.data() } as MovieInterface;
+            return {id: doc.id, ...doc.data()} as MovieInterface;
         });
 
         return result;
@@ -163,7 +163,7 @@ export const getLikedMovies = async (): Promise<MovieInterface[]> => {
 
         // Convertir los documentos a un array de datos con el tipo MoviesVistas
         const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return { id: doc.id, ...doc.data() } as MovieInterface;
+            return {id: doc.id, ...doc.data()} as MovieInterface;
         });
 
         return result;
@@ -195,7 +195,7 @@ export const getMoviesVerPronto = async (): Promise<MovieInterface[]> => {
 
         // Convertir los documentos a un array de datos con el tipo MoviesPendientes
         const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return { id: doc.id, ...doc.data() } as MovieInterface;
+            return {id: doc.id, ...doc.data()} as MovieInterface;
         });
 
         return result;

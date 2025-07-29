@@ -26,7 +26,7 @@ export const fetchSerieDetails = async (id: string | number) => {
 };
 
 // Obtener series en emisión
-export const getLatestSeries = async ({ page }: { page?: string }): Promise<Serie[]> => {
+export const getLatestSeries = async ({page}: { page?: string }): Promise<Serie[]> => {
     const pageNumber = page || "1";
 
     const url = `https://api.themoviedb.org/3/tv/on_the_air?api_key=${API_KEY}&language=es-ES&page=${pageNumber}`;
@@ -108,7 +108,7 @@ export const getMostPopularSeries = async ({page}: { page?: string }): Promise<S
 };
 
 // Series mejor valoradas
-export const getTopRatedSeries = async ({ page }: { page?: string }): Promise<Serie[]> => {
+export const getTopRatedSeries = async ({page}: { page?: string }): Promise<Serie[]> => {
     const pageNumber = page || "1";
 
     const url = `https://api.themoviedb.org/3/tv/top_rated?api_key=${API_KEY}&language=es-ES&page=${pageNumber}`;

@@ -13,7 +13,7 @@ export interface Actor {
 }
 
 // Obtener actores/actrices por nombre y devolver datos detallados
-export const getActorsByName = async ({ name, page }: { name: string, page?: string }): Promise<Actor[]> => {
+export const getActorsByName = async ({name, page}: { name: string, page?: string }): Promise<Actor[]> => {
     const pageNumber = page || "1";
 
     const searchUrl = `https://api.themoviedb.org/3/search/person?api_key=${API_KEY}&query=${encodeURIComponent(name)}&language=es-ES&page=${pageNumber}`;

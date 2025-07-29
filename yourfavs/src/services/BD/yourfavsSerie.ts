@@ -1,5 +1,5 @@
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import {initializeApp} from "firebase/app";
+import {getFirestore, collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc} from "firebase/firestore";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 
@@ -118,7 +118,7 @@ interface RecommendedSeries {
     status?: string;
 }
 
-export type { SeriesFavs, SeriesInterface };
+export type {SeriesFavs, SeriesInterface};
 
 // Configuración de Firebase
 const firebaseConfig = {
@@ -176,7 +176,7 @@ export const getSerieFav = async (): Promise<SeriesFavs[]> => {
             await Promise.all(
                 seriesWithOrder.map((series, index) => {
                     const serieRef = doc(db, "SeriesFavs", series.id);
-                    return updateDoc(serieRef, { position: index });
+                    return updateDoc(serieRef, {position: index});
                 })
             );
         }
@@ -526,4 +526,4 @@ const removeDuplicatesAndCalculateScores = (recommendations: RecommendedSeries[]
 };
 
 // Exportar db para que pueda ser utilizada por otros módulos si es necesario
-export { db };
+export {db};

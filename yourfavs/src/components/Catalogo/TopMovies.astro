@@ -1,12 +1,12 @@
 ---
 import CardMovie from "../Cards/CardMovie.astro";
-import { getTopRatedMovies} from "../../services/API/Movies/tmdbMovies";
+import {getTopRatedMovies} from "../../services/API/Movies/tmdbMovies";
 
 // Obtener el parámetro de página desde la URL
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
 
 // Cargar las películas y series para la página actual
-const popularMovies = await getTopRatedMovies({ page: page.toString() });
+const popularMovies = await getTopRatedMovies({page: page.toString()});
 
 // Total de páginas, puedes obtenerlo del API o mantenerlo como un valor estático
 const totalPages = 500; // Suponiendo 10 páginas de resultados disponibles, ajusta según tu API
@@ -117,7 +117,7 @@ function getGenreName(id: number): string {
                                 vote_average={item.vote_average}
                                 overview={item.overview}
                                 release_date={item.release_date}
-                                genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
                                 providers={item.providers}
                         />
                     </div>
@@ -128,7 +128,8 @@ function getGenreName(id: number): string {
     <div class="mt-12 flex justify-center">
         <div class="inline-flex rounded-md shadow-sm">
             {page > 2 && (
-                    <a href="?page=1" class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
+                    <a href="?page=1"
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
                         1
                     </a>
             )}
@@ -140,7 +141,8 @@ function getGenreName(id: number): string {
             )}
 
             {page > 1 && (
-                    <a href={`?page=${page - 1}`} class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                    <a href={`?page=${page - 1}`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
                         {page - 1}
                     </a>
             )}
@@ -150,7 +152,8 @@ function getGenreName(id: number): string {
             </a>
 
             {page < totalPages && (
-                    <a href={`?page=${page + 1}`} class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                    <a href={`?page=${page + 1}`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
                         {page + 1}
                     </a>
             )}
@@ -162,7 +165,8 @@ function getGenreName(id: number): string {
             )}
 
             {page < totalPages - 1 && (
-                    <a href={`?page=${totalPages}`} class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
+                    <a href={`?page=${totalPages}`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
                         {totalPages}
                     </a>
             )}
@@ -184,8 +188,12 @@ function getGenreName(id: number): string {
     }
 
     @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
     }
 
     .grid > div {

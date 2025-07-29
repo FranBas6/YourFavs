@@ -1,7 +1,7 @@
 ---
 import CardSerie from "../Cards/CardSerie.astro";
-import { getSeriesSiguiendo } from "../../services/BD/yourfavsSerie";
-import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
+import {getSeriesSiguiendo} from "../../services/BD/yourfavsSerie";
+import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 
 // 🔹 Obtener IDs desde Firebase
 const seriesSiguiendoIds = (await getSeriesSiguiendo()).map(s => s.id);
@@ -80,7 +80,10 @@ function filterContent(items: any[], type: 'movie' | 'serie') {
             (title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 overview.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        const genreMatch = !genreFilter || genreList.some((g: { id: number; name: string }) => g.id.toString() === genreFilter);
+        const genreMatch = !genreFilter || genreList.some((g: {
+            id: number;
+            name: string
+        }) => g.id.toString() === genreFilter);
 
         const ratingMatch = !minRating || item.vote_average >= minRating;
 
@@ -106,7 +109,7 @@ function getUniqueGenres() {
     }
 
     return Array.from(genreMap.entries())
-        .map(([id, name]) => ({ id, name }))
+        .map(([id, name]) => ({id, name}))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -127,18 +130,18 @@ function buildUrl(params: Record<string, string>) {
 ---
 <div class="favorites-container max-w-7xl mx-auto px-4 py-8">
     <!-- Checkbox oculto para controlar el desplegable -->
-    <input type="checkbox" id="search-toggle" class="search-toggle hidden" />
+    <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>
 
     <!-- Primera barra de navegación -->
     <nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 backdrop-blur-lg shadow-xl rounded-2xl px-6 py-4 mb-4">
         <div class="flex flex-wrap justify-center gap-4">
-            <a href={buildUrl({ filter: 'todos', search: searchQuery, genre: genreFilter })}
+            <a href={buildUrl({filter: 'todos', search: searchQuery, genre: genreFilter})}
                class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
                  ${showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
                    "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
                 Todo el contenido
             </a>
-            <a href={buildUrl({ filter: 'series', search: searchQuery, genre: genreFilter })}
+            <a href={buildUrl({filter: 'series', search: searchQuery, genre: genreFilter})}
                class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
                  ${showSeries && !showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
                    "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
@@ -146,13 +149,17 @@ function buildUrl(params: Record<string, string>) {
             </a>
 
             <!-- Botón para mostrar/ocultar búsqueda -->
-            <label for="search-toggle" class="search-toggle-btn px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all bg-green-600 text-white hover:bg-green-700 hover:scale-105 cursor-pointer flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <label for="search-toggle"
+                   class="search-toggle-btn px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all bg-green-600 text-white hover:bg-green-700 hover:scale-105 cursor-pointer flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
                 <span class="toggle-text">Búsqueda</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 chevron transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 chevron transition-transform" fill="none"
+                     viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                 </svg>
             </label>
         </div>
@@ -372,7 +379,8 @@ function buildUrl(params: Record<string, string>) {
                    class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
                     <span class="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-indigo-500" viewBox="0 0 24 24"
-                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                             <line x1="8" y1="21" x2="16" y2="21"/>
                             <line x1="12" y1="17" x2="12" y2="21"/>
@@ -579,6 +587,7 @@ function buildUrl(params: Record<string, string>) {
         outline: none;
         transition: background 0.3s;
     }
+
     .rating-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
@@ -587,48 +596,56 @@ function buildUrl(params: Record<string, string>) {
         border-radius: 50%;
         background: #fff;
         border: 3px solid #6366f1;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         cursor: pointer;
         transition: border 0.2s, box-shadow 0.2s;
     }
+
     .rating-slider:focus::-webkit-slider-thumb {
         border: 3px solid #a5b4fc;
         box-shadow: 0 0 0 4px #6366f133;
     }
+
     .rating-slider::-moz-range-thumb {
         width: 28px;
         height: 28px;
         border-radius: 50%;
         background: #fff;
         border: 3px solid #6366f1;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         cursor: pointer;
         transition: border 0.2s, box-shadow 0.2s;
     }
+
     .rating-slider:focus::-moz-range-thumb {
         border: 3px solid #a5b4fc;
         box-shadow: 0 0 0 4px #6366f133;
     }
+
     .rating-slider::-ms-thumb {
         width: 28px;
         height: 28px;
         border-radius: 50%;
         background: #fff;
         border: 3px solid #6366f1;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         cursor: pointer;
         transition: border 0.2s, box-shadow 0.2s;
     }
+
     .rating-slider:focus::-ms-thumb {
         border: 3px solid #a5b4fc;
         box-shadow: 0 0 0 4px #6366f133;
     }
+
     .rating-slider::-ms-fill-lower {
         background: #6366f1;
     }
+
     .rating-slider::-ms-fill-upper {
         background: #a5b4fc;
     }
+
     .rating-slider:focus {
         outline: none;
     }
