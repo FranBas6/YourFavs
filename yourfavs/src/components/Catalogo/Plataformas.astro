@@ -29,6 +29,7 @@ const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const page = Number(urlParams.get('page')) || 1;
 const pageStr = page.toString();
 const platformParam = urlParams.get('platform') || 'all';
+const type = urlParams.get('type') || 'all'; // 'all', 'movies', 'series'
 
 // Definir plataformas disponibles
 const platforms = [
@@ -214,14 +215,19 @@ const totalPages = 190;
         </div>
     </section>
 
+    <!-- Navegación de filtros - mantener igual -->
     <div class="flex justify-center gap-4 mt-6 mb-6 sticky top-5 z-40 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
-        <a href="#peliculas"
-           class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-            Ir a Películas
+        <a href={`?page=1&type=all&platform=${platformParam}`}
+           class="button-bounce show-all-btn bg-green-600 text-white">
+            Todo
         </a>
-        <a href="#series"
+        <a href={`?page=1&type=movies&platform=${platformParam}`}
+           class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
+            Películas
+        </a>
+        <a href={`?page=1&type=series&platform=${platformParam}`}
            class="button-bounce px-5 py-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-            Ir a Series
+            Series
         </a>
     </div>
 
@@ -236,13 +242,13 @@ const totalPages = 190;
             </div>
 
             <div class="grid grid-cols-2 gap-2">
-                <a href={createUrlWithParams({page: Math.max(1, page - 1).toString()})}
+                <a href={`?page=${Math.max(1, page - 1)}&type=${type}&platform=${platformParam}`}
                    class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                    aria-disabled={page === 1}>
                     <span class="mr-1">←</span> Anterior
                 </a>
 
-                <a href={createUrlWithParams({page: Math.min(totalPages, page + 1).toString()})}
+                <a href={`?page=${Math.min(totalPages, page + 1)}&type=${type}&platform=${platformParam}`}
                    class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                    aria-disabled={page === totalPages}>
                     Siguiente <span class="ml-1">→</span>
@@ -252,7 +258,7 @@ const totalPages = 190;
 
         <!-- En pantallas medianas y grandes - Diseño horizontal -->
         <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
-            <a href={createUrlWithParams({page: Math.max(1, page - 1).toString()})}
+            <a href={`?page=${Math.max(1, page - 1)}&type=${type}&platform=${platformParam}`}
                class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                aria-disabled={page === 1}>
                 <span class="mr-1">←</span> Anterior
@@ -264,7 +270,7 @@ const totalPages = 190;
                 <span class="font-medium text-gray-700">de {totalPages}</span>
             </div>
 
-            <a href={createUrlWithParams({page: Math.min(totalPages, page + 1).toString()})}
+            <a href={`?page=${Math.min(totalPages, page + 1)}&type=${type}&platform=${platformParam}`}
                class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                aria-disabled={page === totalPages}>
                 Siguiente <span class="ml-1">→</span>
@@ -287,7 +293,7 @@ const totalPages = 190;
     </section>
 
     <!-- Sección de Películas -->
-    {movies.length > 0 && (
+    {(type === 'all' || type === 'movies') && movies.length > 0 &&(
             <section id="peliculas" class="mb-14">
                 <h2 class="text-coral-red text-3xl font-bold mb-5 flex items-center">
                     <span class="w-8 h-8 mr-2">
@@ -321,7 +327,7 @@ const totalPages = 190;
     )}
 
     <!-- Sección de Series -->
-    {series.length > 0 && (
+    {(type === 'all' || type === 'series') && series.length > 0 && (
             <section id="series" class="mb-14">
                 <h2 class="text-coral-red text-3xl font-bold mb-5 flex items-center">
                     <span class="w-8 h-8 mr-2">
@@ -364,53 +370,51 @@ const totalPages = 190;
             </div>
     )}
 
-    <!-- Paginación inferior -->
+    <!-- Y también en la paginación de abajo -->
     <div class="mt-12 flex justify-center">
         <div class="inline-flex rounded-md shadow-sm">
+
             {page > 2 && (
-                    <a href={createUrlWithParams({page: '1'})}
+                    <a href={`?page=1&type=${type}&platform=${platformParam}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
                         1
                     </a>
             )}
 
             {page > 3 && (
-                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                            ...
-                        </span>
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">...</span>
             )}
 
             {page > 1 && (
-                    <a href={createUrlWithParams({page: (page - 1).toString()})}
+                    <a href={`?page=${page - 1}&type=${type}&platform=${platformParam}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
                         {page - 1}
                     </a>
             )}
 
-            <a href={createUrlWithParams({page: page.toString()})}
+            <a href={`?page=${page}&type=${type}&platform=${platformParam}#`}
                class="px-3 py-2 bg-coral-red text-white border border-coral-red">
                 {page}
             </a>
 
             {page < totalPages && (
-                    <a href={createUrlWithParams({page: (page + 1).toString()})}
+                    <a href={`?page=${page + 1}&type=${type}&platform=${platformParam}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
                         {page + 1}
                     </a>
             )}
 
             {page < totalPages - 2 && (
-                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                            ...
-                        </span>
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">...</span>
             )}
 
             {page < totalPages - 1 && (
-                    <a href={createUrlWithParams({page: totalPages.toString()})}
+                    <a href={`?page=${totalPages}&type=${type}&platform=${platformParam}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
                         {totalPages}
                     </a>
             )}
+
         </div>
     </div>
 </section>
@@ -521,6 +525,55 @@ const totalPages = 190;
 
     .button-bounce:active {
         animation: click-bounce 0.25s ease-in-out;
+    }
+
+    /* Por defecto, mostrar ambas secciones */
+    #peliculas, #series {
+        display: block;
+    }
+
+    /* Cuando se hace clic en "Ir a Películas" (#peliculas está activo) */
+    #peliculas:target ~ #series {
+        display: none;
+    }
+
+    /* Cuando se hace clic en "Ir a Series" (#series está activo) */
+    #series:target ~ #peliculas {
+        display: none;
+    }
+
+    /* Alternativa más específica si la anterior no funciona debido a la estructura HTML */
+    body:has(#peliculas:target) #series {
+        display: none;
+    }
+
+    body:has(#series:target) #peliculas {
+        display: none;
+    }
+
+    /* Opcional: Agregar un botón para mostrar todo */
+    .show-all-btn {
+        display: inline-block;
+        padding: 0.5rem 1.25rem;
+        background-color: #16a34a;
+        color: white;
+        border-radius: 9999px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+    }
+
+    .show-all-btn:hover {
+        background-color: #15803d;
+        box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Agregar esto a tu CSS para que los enlaces mantengan el fragmento actual */
+    a[href*="?page="][href$="#"] {
+        /* Los enlaces con # al final usarán el fragmento actual de la página */
     }
 
 </style>

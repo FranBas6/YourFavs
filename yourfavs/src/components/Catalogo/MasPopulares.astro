@@ -5,7 +5,9 @@ import {getMostPopularMovies} from "../../services/API/Movies/tmdbMovies";
 import {getMostPopularSeries} from "../../services/API/Series/tmdbSeries";
 
 // Obtener el parámetro de página desde la URL
-const page = Number(Astro.request.url.split('?page=')[1] || 1);
+const urlParams = new URL(Astro.request.url).searchParams;
+const page = Number(urlParams.get('page') || 1);
+const type = urlParams.get('type') || 'all'; // 'all', 'movies', 'series'1);
 
 // Cargar las películas y series para la página actual
 const popularMovies = await getMostPopularMovies({page: page.toString()});
@@ -63,19 +65,24 @@ function getGenreName(id: number): string {
         </p>
     </header>
 
+    <!-- Navegación de filtros - mantener igual -->
     <div class="flex justify-center gap-4 mt-6 mb-6 sticky top-5 z-40 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
-        <a href="#peliculas"
-           class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-            Ir a Películas
+        <a href={`?page=1&type=all`}
+           class="button-bounce show-all-btn bg-green-600 text-white">
+            Todo
         </a>
-        <a href="#series"
+        <a href={`?page=1&type=movies`}
+           class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
+            Películas
+        </a>
+        <a href={`?page=1&type=series`}
            class="button-bounce px-5 py-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-            Ir a Series
+            Series
         </a>
     </div>
 
-    <!-- Paginación Superior Mejorada -->
-    <nav aria-label="Paginación superior" class="flex items-center justify-center mb-8">
+    <!-- Paginación Mejorada para Móviles -->
+    <nav aria-label="Paginación" class="flex items-center justify-center mb-8">
         <!-- En pantallas pequeñas (móviles) - Diseño vertical compacto -->
         <div class="flex flex-col w-full max-w-xs gap-2 p-2 bg-white rounded-lg shadow-md sm:hidden">
             <div class="flex justify-center items-center px-2 py-1">
@@ -85,13 +92,13 @@ function getGenreName(id: number): string {
             </div>
 
             <div class="grid grid-cols-2 gap-2">
-                <a href={`?page=${Math.max(1, page - 1)}`}
+                <a href={`?page=${Math.max(1, page - 1)}&type=${type}`}
                    class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                    aria-disabled={page === 1}>
                     <span class="mr-1">←</span> Anterior
                 </a>
 
-                <a href={`?page=${Math.min(totalPages, page + 1)}`}
+                <a href={`?page=${Math.min(totalPages, page + 1)}&type=${type}`}
                    class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                    aria-disabled={page === totalPages}>
                     Siguiente <span class="ml-1">→</span>
@@ -101,7 +108,7 @@ function getGenreName(id: number): string {
 
         <!-- En pantallas medianas y grandes - Diseño horizontal -->
         <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
-            <a href={`?page=${Math.max(1, page - 1)}`}
+            <a href={`?page=${Math.max(1, page - 1)}&type=${type}`}
                class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                aria-disabled={page === 1}>
                 <span class="mr-1">←</span> Anterior
@@ -113,7 +120,7 @@ function getGenreName(id: number): string {
                 <span class="font-medium text-gray-700">de {totalPages}</span>
             </div>
 
-            <a href={`?page=${Math.min(totalPages, page + 1)}`}
+            <a href={`?page=${Math.min(totalPages, page + 1)}&type=${type}`}
                class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                aria-disabled={page === totalPages}>
                 Siguiente <span class="ml-1">→</span>
@@ -122,116 +129,120 @@ function getGenreName(id: number): string {
     </nav>
 
     <!-- Sección de Películas -->
-    <section class="mb-10" id="peliculas">
-        <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
-            <span class="mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                </svg>
-            </span>
-            PELÍCULAS
-        </h2>
-        <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
-            {
-                popularMovies.map((item) => (
-                        <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
-                            <CardMovie
-                                    id={item.id.toString()}
-                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                    title={item.title}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    release_date={item.release_date}
-                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                    providers={item.providers}
-                            />
-                        </div>
-                ))
-            }
-        </div>
-    </section>
+    {(type === 'all' || type === 'movies') && (
+            <section class="mb-10" id="peliculas">
+                <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+        <span class="mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+            </svg>
+        </span>
+                    PELÍCULAS
+                </h2>
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
+                    {
+                        popularMovies.map((item) => (
+                                <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                    <CardMovie
+                                            id={item.id.toString()}
+                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                            title={item.title}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            release_date={item.release_date}
+                                            genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                            providers={item.providers}
+                                    />
+                                </div>
+                        ))
+                    }
+                </div>
+            </section>
+    )}
 
-    <!-- Sección de Series -->
-    <section class="mb-10" id="series">
-        <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
-            <span class="mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                </svg>
-            </span>
-            SERIES
-        </h2>
-        <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
-            {
-                popularSeries.map((item) => (
-                        <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
-                            <CardSerie
-                                    id={item.id.toString()}
-                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                    name={item.name}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    first_air_date={item.first_air_date}
-                                    seasons={item.seasons}
-                                    last_episode_to_air={item.last_episode_to_air}
-                                    next_episode_to_air={item.next_episode_to_air}
-                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            />
-                        </div>
-                ))
-            }
-        </div>
-    </section>
+    {(type === 'all' || type === 'series') && (
+        <!-- Sección de Series -->
+            <section class="mb-10" id="series">
+                <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+        <span class="mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+        </span>
+                    SERIES
+                </h2>
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
+                    {
+                        popularSeries.map((item) => (
+                                <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                    <CardSerie
+                                            id={item.id.toString()}
+                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                            name={item.name}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            first_air_date={item.first_air_date}
+                                            seasons={item.seasons}
+                                            last_episode_to_air={item.last_episode_to_air}
+                                            next_episode_to_air={item.next_episode_to_air}
+                                            genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                    />
+                                </div>
+                        ))
+                    }
+                </div>
+            </section>
+    )}
 
+    <!-- Y también en la paginación de abajo -->
     <div class="mt-12 flex justify-center">
         <div class="inline-flex rounded-md shadow-sm">
+
             {page > 2 && (
-                    <a href="?page=1"
+                    <a href={`?page=1&type=${type}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
                         1
                     </a>
             )}
 
             {page > 3 && (
-                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                    ...
-                </span>
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">...</span>
             )}
 
             {page > 1 && (
-                    <a href={`?page=${page - 1}`}
+                    <a href={`?page=${page - 1}&type=${type}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
                         {page - 1}
                     </a>
             )}
 
-            <a href={`?page=${page}`} class="px-3 py-2 bg-coral-red text-white border border-coral-red">
+            <a href={`?page=${page}&type=${type}#`}
+               class="px-3 py-2 bg-coral-red text-white border border-coral-red">
                 {page}
             </a>
 
             {page < totalPages && (
-                    <a href={`?page=${page + 1}`}
+                    <a href={`?page=${page + 1}&type=${type}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
                         {page + 1}
                     </a>
             )}
 
             {page < totalPages - 2 && (
-                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                    ...
-                </span>
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">...</span>
             )}
 
             {page < totalPages - 1 && (
-                    <a href={`?page=${totalPages}`}
+                    <a href={`?page=${totalPages}&type=${type}#`}
                        class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
                         {totalPages}
                     </a>
             )}
+
         </div>
     </div>
 </div>
@@ -329,5 +340,54 @@ function getGenreName(id: number): string {
 
     html {
         scroll-behavior: smooth;
+    }
+
+    /* Por defecto, mostrar ambas secciones */
+    #peliculas, #series {
+        display: block;
+    }
+
+    /* Cuando se hace clic en "Ir a Películas" (#peliculas está activo) */
+    #peliculas:target ~ #series {
+        display: none;
+    }
+
+    /* Cuando se hace clic en "Ir a Series" (#series está activo) */
+    #series:target ~ #peliculas {
+        display: none;
+    }
+
+    /* Alternativa más específica si la anterior no funciona debido a la estructura HTML */
+    body:has(#peliculas:target) #series {
+        display: none;
+    }
+
+    body:has(#series:target) #peliculas {
+        display: none;
+    }
+
+    /* Opcional: Agregar un botón para mostrar todo */
+    .show-all-btn {
+        display: inline-block;
+        padding: 0.5rem 1.25rem;
+        background-color: #16a34a;
+        color: white;
+        border-radius: 9999px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+    }
+
+    .show-all-btn:hover {
+        background-color: #15803d;
+        box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Agregar esto a tu CSS para que los enlaces mantengan el fragmento actual */
+    a[href*="?page="][href$="#"] {
+        /* Los enlaces con # al final usarán el fragmento actual de la página */
     }
 </style>

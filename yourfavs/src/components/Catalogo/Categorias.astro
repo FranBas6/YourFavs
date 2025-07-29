@@ -9,6 +9,7 @@ const url = new URL(Astro.request.url);
 const page = Number(url.searchParams.get('page') || 1);
 // Obtener la categoría de los parámetros de búsqueda, con valor predeterminado "proximamente"
 const category = url.searchParams.get('categoria') || 'proximamente';
+const type = url.searchParams.get('type') || 'all';
 
 // Cargar las películas y series para la página y categoría actual
 const latestMovies = await getMoviesByCategory(category, page.toString());
@@ -59,10 +60,13 @@ function getGenreName(id: number): string {
 }
 
 // Modifica esta función para que mantenga la categoría al cambiar páginas
-function generateUrl(newCategory?: string, newPage: number = 1): string {
+function generateUrl(newCategory?: string, newPage: number = 1, newType?: string): string {
     const newParams = new URLSearchParams();
-    newParams.set('categoria', newCategory || category);
-    newParams.set('page', newPage.toString());
+
+    newParams.set('categoria', newCategory || category); // mantiene o cambia categoría
+    newParams.set('page', newPage.toString());           // cambia o reinicia página
+    newParams.set('type', newType || type);              // mantiene o cambia tipo
+
     return `?${newParams.toString()}`;
 }
 ---
@@ -79,84 +83,84 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
      id="nav-menuu">
     <!-- Grid compacto para móviles, flex normal para desktop -->
     <div class="grid grid-cols-3 gap-1 w-full p-2 md:hidden">
-        <a href={generateUrl('accion')}
+        <a href={generateUrl('accion', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'accion'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Acción
         </a>
-        <a href={generateUrl('comedia')}
+        <a href={generateUrl('comedia', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'comedia'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Comedia
         </a>
-        <a href={generateUrl('drama')}
+        <a href={generateUrl('drama', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'drama'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Drama
         </a>
-        <a href={generateUrl('crimen')}
+        <a href={generateUrl('crimen', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'crimen'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Crimen
         </a>
-        <a href={generateUrl('aventura')}
+        <a href={generateUrl('aventura', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'aventura'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Aventura
         </a>
-        <a href={generateUrl('fantasia')}
+        <a href={generateUrl('fantasia', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'fantasia'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Fantasía
         </a>
-        <a href={generateUrl('ciencia_ficcion')}
+        <a href={generateUrl('ciencia_ficcion', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'ciencia_ficcion'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Ciencia Ficción
         </a>
-        <a href={generateUrl('misterio')}
+        <a href={generateUrl('misterio', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'misterio'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Misterio
         </a>
-        <a href={generateUrl('terror')}
+        <a href={generateUrl('terror', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'terror'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Terror
         </a>
-        <a href={generateUrl('animacion')}
+        <a href={generateUrl('animacion', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'animacion'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Animación
         </a>
-        <a href={generateUrl('familia')}
+        <a href={generateUrl('familia', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'familia'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Familia
         </a>
-        <a href={generateUrl('proximamente')}
+        <a href={generateUrl('proximamente', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'proximamente'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
@@ -167,84 +171,84 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
 
     <!-- Navegación normal para desktop (oculta en móviles) -->
     <div class="hidden md:flex md:flex-wrap md:justify-center md:items-center md:gap-2 md:p-4">
-        <a href={generateUrl('accion')}
+        <a href={generateUrl('accion', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'accion'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Acción
         </a>
-        <a href={generateUrl('comedia')}
+        <a href={generateUrl('comedia', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'comedia'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Comedia
         </a>
-        <a href={generateUrl('drama')}
+        <a href={generateUrl('drama', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'drama'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Drama
         </a>
-        <a href={generateUrl('crimen')}
+        <a href={generateUrl('crimen', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'crimen'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Crimen
         </a>
-        <a href={generateUrl('aventura')}
+        <a href={generateUrl('aventura', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'aventura'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Aventura
         </a>
-        <a href={generateUrl('fantasia')}
+        <a href={generateUrl('fantasia', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'fantasia'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Fantasía
         </a>
-        <a href={generateUrl('ciencia_ficcion')}
+        <a href={generateUrl('ciencia_ficcion', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'ciencia_ficcion'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Ciencia Ficción
         </a>
-        <a href={generateUrl('misterio')}
+        <a href={generateUrl('misterio', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'misterio'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Misterio
         </a>
-        <a href={generateUrl('terror')}
+        <a href={generateUrl('terror', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'terror'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Terror
         </a>
-        <a href={generateUrl('animacion')}
+        <a href={generateUrl('animacion', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'animacion'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Animación
         </a>
-        <a href={generateUrl('familia')}
+        <a href={generateUrl('familia', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'familia'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
                : 'bg-dark-blue hover:bg-blue-700 hover:scale-105 shadow-sm'}`}>
             Familia
         </a>
-        <a href={generateUrl('proximamente')}
+        <a href={generateUrl('proximamente', 1, 'all')}
            class={`px-6 py-3 flex items-center gap-2 text-white rounded-full transition-all duration-300
            ${category === 'proximamente'
                ? 'bg-gradient-to-r from-red-500 to-orange-500 shadow-lg scale-105 font-semibold'
@@ -263,14 +267,19 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
     <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-coral-red rounded-full"></div>
 </div>
 
+<!-- Navegación de filtros - mantener igual -->
 <div class="flex justify-center gap-4 mt-6 mb-6 sticky top-5 z-40 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
-    <a href="#peliculas"
-       class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-        Ir a Películas
+    <a href={generateUrl(category, 1, 'all')}
+       class="button-bounce show-all-btn bg-green-600 text-white">
+        Todo
     </a>
-    <a href="#series"
+    <a href={generateUrl(category, 1, 'movies')}
+       class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
+        Películas
+    </a>
+    <a href={generateUrl(category, 1, 'series')}
        class="button-bounce px-5 py-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-        Ir a Series
+        Series
     </a>
 </div>
 
@@ -322,6 +331,7 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
 </nav>
 
 <!-- Sección de Películas con mejor diseño -->
+{(type === 'all' || type === 'movies') && (
 <div class="mb-12" id="peliculas">
     <h2 class="text-coral-red py-3 px-4 font-bold mb-1 text-3xl">PELICULAS</h2>
 
@@ -342,8 +352,10 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
         }
     </div>
 </div>
+    )}
 
-<!-- Sección de Series con mejor diseño -->
+{(type === 'all' || type === 'series') && (
+    <!-- Sección de Series con mejor diseño -->
 <div class="mb-12" id="series">
     <h2 class="text-coral-red py-3 px-4 font-bold mb-1 text-3xl">SERIES</h2>
 
@@ -366,6 +378,7 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
         }
     </div>
 </div>
+    )}
 
 <!-- Paginación inferior mejorada -->
 <div class="mt-12 flex justify-center">
@@ -597,4 +610,49 @@ function generateUrl(newCategory?: string, newPage: number = 1): string {
     html {
         scroll-behavior: smooth;
     }
+
+    /* Por defecto, mostrar ambas secciones */
+    #peliculas, #series {
+        display: block;
+    }
+
+    /* Cuando se hace clic en "Ir a Películas" (#peliculas está activo) */
+    #peliculas:target ~ #series {
+        display: none;
+    }
+
+    /* Cuando se hace clic en "Ir a Series" (#series está activo) */
+    #series:target ~ #peliculas {
+        display: none;
+    }
+
+    /* Alternativa más específica si la anterior no funciona debido a la estructura HTML */
+    body:has(#peliculas:target) #series {
+        display: none;
+    }
+
+    body:has(#series:target) #peliculas {
+        display: none;
+    }
+
+    /* Opcional: Agregar un botón para mostrar todo */
+    .show-all-btn {
+        display: inline-block;
+        padding: 0.5rem 1.25rem;
+        background-color: #16a34a;
+        color: white;
+        border-radius: 9999px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s;
+        text-decoration: none;
+        font-size: 0.875rem;
+        font-weight: 600;
+        letter-spacing: 0.025em;
+    }
+
+    .show-all-btn:hover {
+        background-color: #15803d;
+        box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+    }
+
 </style>
