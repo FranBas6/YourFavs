@@ -5,8 +5,8 @@ import {
     getSeriesPendientes,
 } from "../../services/BD/yourfavsSerie";
 import {getMoviesPendientes} from "../../services/BD/yourfavsMovie";
-import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
-import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
+import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
+import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 
 // 🔹 Obtener IDs desde Firebase
 const seriesPendientesIds = (await getSeriesPendientes()).map(s => s.id);
@@ -77,7 +77,10 @@ function filterContent(items: any[], type: 'movie' | 'serie') {
             (title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                 overview.toLowerCase().includes(searchQuery.toLowerCase()));
 
-        const genreMatch = !genreFilter || genreList.some((g: { id: number; name: string }) => g.id.toString() === genreFilter);
+        const genreMatch = !genreFilter || genreList.some((g: {
+            id: number;
+            name: string
+        }) => g.id.toString() === genreFilter);
 
         const ratingMatch = !minRating || item.vote_average >= minRating;
 
@@ -128,7 +131,7 @@ function getUniqueGenres() {
     }
 
     return Array.from(genreMap.entries())
-        .map(([id, name]) => ({ id, name }))
+        .map(([id, name]) => ({id, name}))
         .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -372,10 +375,8 @@ function buildUrl(params: Record<string, string>) {
                         </a>
                 ) : null}
 
-                {/* Mostrar "Me gustan" solo si NO está en modo de películas */}
-                {!showMovies || showAll ? (
-                        <a href="/personal/megusta"
-                           class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
+                <a href="/personal/megusta"
+                   class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
                 <span class="flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-pink-500" viewBox="0 0 20 20"
                          fill="currentColor">
@@ -385,8 +386,7 @@ function buildUrl(params: Record<string, string>) {
                     </svg>
                     Me gustan
                 </span>
-                        </a>
-                ) : null}
+                </a>
 
                 <a href="/personal/vistos"
                    class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
@@ -404,7 +404,8 @@ function buildUrl(params: Record<string, string>) {
                    class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
                     <span class="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-indigo-500" viewBox="0 0 24 24"
-                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                             <line x1="8" y1="21" x2="16" y2="21"/>
                             <line x1="12" y1="17" x2="12" y2="21"/>
@@ -662,6 +663,7 @@ function buildUrl(params: Record<string, string>) {
         outline: none;
         transition: background 0.3s;
     }
+
     .rating-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
@@ -670,48 +672,56 @@ function buildUrl(params: Record<string, string>) {
         border-radius: 50%;
         background: #fff;
         border: 3px solid #6366f1;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         cursor: pointer;
         transition: border 0.2s, box-shadow 0.2s;
     }
+
     .rating-slider:focus::-webkit-slider-thumb {
         border: 3px solid #a5b4fc;
         box-shadow: 0 0 0 4px #6366f133;
     }
+
     .rating-slider::-moz-range-thumb {
         width: 28px;
         height: 28px;
         border-radius: 50%;
         background: #fff;
         border: 3px solid #6366f1;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         cursor: pointer;
         transition: border 0.2s, box-shadow 0.2s;
     }
+
     .rating-slider:focus::-moz-range-thumb {
         border: 3px solid #a5b4fc;
         box-shadow: 0 0 0 4px #6366f133;
     }
+
     .rating-slider::-ms-thumb {
         width: 28px;
         height: 28px;
         border-radius: 50%;
         background: #fff;
         border: 3px solid #6366f1;
-        box-shadow: 0 2px 8px rgba(99,102,241,0.2);
+        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.2);
         cursor: pointer;
         transition: border 0.2s, box-shadow 0.2s;
     }
+
     .rating-slider:focus::-ms-thumb {
         border: 3px solid #a5b4fc;
         box-shadow: 0 0 0 4px #6366f133;
     }
+
     .rating-slider::-ms-fill-lower {
         background: #6366f1;
     }
+
     .rating-slider::-ms-fill-upper {
         background: #a5b4fc;
     }
+
     .rating-slider:focus {
         outline: none;
     }

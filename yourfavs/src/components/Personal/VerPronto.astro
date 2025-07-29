@@ -51,7 +51,7 @@ type UrlParams = {
 };
 
 // Función para construir URLs manteniendo los parámetros actuales
-function buildUrl({ filter, search = searchQuery, genre = genreFilter }: UrlParams): string {
+function buildUrl({filter, search = searchQuery, genre = genreFilter}: UrlParams): string {
     const params = new URLSearchParams();
     if (filter) params.set("filter", filter);
     if (search) params.set("search", search);
@@ -96,14 +96,17 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                 {/* Botón borrar todo (solo si hay contenido) */}
                 {(seriesVerPronto.length > 0 || peliculasVerPronto.length > 0) && showAll && (
                         <form method="POST" class="inline">
-                            <input type="hidden" name="filter" value={filter} />
+                            <input type="hidden" name="filter" value={filter}/>
                             <button
                                     type="submit"
                                     name="clear"
                                     value="todos"
                                     class="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center gap-1 text-xs font-medium">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                                 Borrar todo
                             </button>
@@ -113,14 +116,17 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                 {/* Botón borrar series */}
                 {seriesVerPronto.length > 0 && (showSeries || showAll) && (
                         <form method="POST" class="inline">
-                            <input type="hidden" name="filter" value={filter} />
+                            <input type="hidden" name="filter" value={filter}/>
                             <button
                                     type="submit"
                                     name="clear"
                                     value="series"
                                     class="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1 text-xs font-medium">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                                 Borrar series
                             </button>
@@ -130,14 +136,17 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                 {/* Botón borrar películas */}
                 {peliculasVerPronto.length > 0 && (showMovies || showAll) && (
                         <form method="POST" class="inline">
-                            <input type="hidden" name="filter" value={filter} />
+                            <input type="hidden" name="filter" value={filter}/>
                             <button
                                     type="submit"
                                     name="clear"
                                     value="peliculas"
                                     class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-1 text-xs font-medium">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                                 Borrar películas
                             </button>
@@ -179,8 +188,10 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                         <a href="/personal/siguiendo"
                            class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
                         <span class="flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-purple-500" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" width="24"
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-purple-500"
+                                 viewBox="0 0 24 24"
+                                 fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                 width="24"
                                  height="24" stroke-width="2">
                                 <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"></path>
                                 <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"></path>
@@ -190,12 +201,11 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                         </a>
                 ) : null}
 
-                {/* Mostrar "Me gustan" solo si NO está en modo de películas */}
-                {!showMovies || showAll ? (
-                        <a href="/personal/megusta"
-                           class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
+                <a href="/personal/megusta"
+                   class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
                         <span class="flex items-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-pink-500" viewBox="0 0 20 20"
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-pink-500"
+                                 viewBox="0 0 20 20"
                                  fill="currentColor">
                                 <path fill-rule="evenodd"
                                       d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
@@ -203,8 +213,7 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                             </svg>
                             Me gustan
                         </span>
-                        </a>
-                ) : null}
+                </a>
 
                 <a href="/personal/vistos"
                    class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-200 hover:bg-gray-300">
@@ -223,7 +232,8 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                    class="px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-white shadow-md transform scale-105">
                     <span class="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-indigo-500" viewBox="0 0 24 24"
-                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round">
                             <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                             <line x1="8" y1="21" x2="16" y2="21"/>
                             <line x1="12" y1="17" x2="12" y2="21"/>
@@ -253,7 +263,9 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
             <div class="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
                 <div class="flex items-center">
                     <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                        <path fill-rule="evenodd"
+                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                              clip-rule="evenodd"/>
                     </svg>
                     {clearedMessage === 'series' ? 'Series borradas exitosamente' :
                         clearedMessage === 'peliculas' ? 'Películas borradas exitosamente' :
@@ -270,7 +282,8 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                 <div class="flex-grow h-0.5 bg-gradient-to-r "></div>
                 <h2 class="text-2xl font-bold text-gray-800 flex items-center">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-indigo-500" viewBox="0 0 24 24"
-                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                         stroke-linejoin="round">
                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                         <line x1="8" y1="21" x2="16" y2="21"/>
                         <line x1="12" y1="17" x2="12" y2="21"/>

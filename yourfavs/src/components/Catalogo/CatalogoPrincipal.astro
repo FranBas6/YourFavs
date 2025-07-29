@@ -1,0 +1,382 @@
+---
+import CardMovie from "../../components/Cards/CardMovie.astro";
+import CardSerie from "../../components/Cards/CardSerie.astro";
+import type { Movie } from "../../types/ApiMovie"
+import type { Serie } from "../../types/ApiSerie";
+import {
+    getAmazonPrimeMovies, getAppleTVMovies,
+    getDisneyPlusMovies, getFilminMovies,
+    getHBOMaxMovies,
+    getLatestMovies, getMovistarPlusMovies
+} from "../../services/API/Movies/tmdbMovies";
+import {
+    getAmazonPrimeSeries, getAppleTVSeries,
+    getDisneyPlusSeries, getFilminSeries,
+    getHBOMaxSeries,
+    getLatestSeries, getMovistarPlusSeries
+} from "../../services/API/Series/tmdbSeries";
+import {getMostPopularMovies} from "../../services/API/Movies/tmdbMovies";
+import {getMostPopularSeries} from "../../services/API/Series/tmdbSeries";
+import {getTopRatedMovies} from "../../services/API/Movies/tmdbMovies";
+import {getTopRatedSeries} from "../../services/API/Series/tmdbSeries";
+import {getNetflixSeries} from "../../services/API/Series/tmdbSeries";
+import {getNetflixMovies} from "../../services/API/Movies/tmdbMovies";
+import {getMoviesByCategory} from "../../services/API/Movies/tmdbMovies";
+import {getSeriesByCategory} from "../../services/API/Series/tmdbSeries";
+
+const page = Number(Astro.request.url.split('?page=')[1] || 1);
+
+const latestMovies = await getLatestMovies({page: page.toString()});
+const latestSeries = await getLatestSeries({page: page.toString()});
+const popularMovies = await getMostPopularMovies({page: page.toString()});
+const popularSeries = await getMostPopularSeries({page: page.toString()});
+const topRatedMovies = await getTopRatedMovies({page: page.toString()});
+const topRatedSeries = await getTopRatedSeries({page: page.toString()});
+
+// Define type for sort options
+type SortOptionS = 'popularity' | 'vote_average' | 'first_air_date' | 'name';
+type SortOptionM = 'popularity' | 'vote_average' | 'release_date' | 'title';
+type SortOrder = 'desc';
+
+const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
+const pageStr = page.toString();
+
+// Nuevos parámetros para ordenación
+const sortBy = urlParams.get('sortBy') || 'popularity';
+const sortByS = sortBy as SortOptionS;
+const sortByM = sortBy as SortOptionM;
+const sortOrder: SortOrder = 'desc';
+
+const netflixMovies = await getNetflixMovies(pageStr, sortByM, sortOrder);
+const netflixSeries = await getNetflixSeries(pageStr, sortByS, sortOrder);
+const amazonPrimeSeries = await getAmazonPrimeSeries(pageStr, sortByS, sortOrder);
+const amazonPrimeMovies = await getAmazonPrimeMovies(pageStr, sortByM, sortOrder);
+const disneyPlusSeries = await getDisneyPlusSeries(pageStr, sortByS, sortOrder);
+const disneyPlusMovies = await getDisneyPlusMovies(pageStr, sortByM, sortOrder);
+const hboMaxSeries = await getHBOMaxSeries(pageStr, sortByS, sortOrder);
+const hboMaxMovies = await getHBOMaxMovies(pageStr, sortByM, sortOrder);
+const appleTVSeries = await getAppleTVSeries(pageStr, sortByS, sortOrder);
+const appleTVMovies = await getAppleTVMovies(pageStr, sortByM, sortOrder);
+const movistarPlusSeries = await getMovistarPlusSeries(pageStr, sortByS, sortOrder);
+const movistarPlusMovies = await getMovistarPlusMovies(pageStr, sortByM, sortOrder);
+const filminSeries = await getFilminSeries(pageStr, sortByS, sortOrder);
+const filminMovies = await getFilminMovies(pageStr, sortByM, sortOrder);
+
+// Plataformas y categorías disponibles
+const platforms = [
+    { name: "NETFLIX", movies: netflixMovies, series: netflixSeries },
+    { name: "AMAZON PRIME", movies: amazonPrimeMovies, series: amazonPrimeSeries },
+    { name: "DISNEY+", movies: disneyPlusMovies, series: disneyPlusSeries },
+    { name: "HBO MAX", movies: hboMaxMovies, series: hboMaxSeries },
+    { name: "APPLE TV+", movies: appleTVMovies, series: appleTVSeries },
+    { name: "MOVISTAR+", movies: movistarPlusMovies, series: movistarPlusSeries },
+    { name: "FILMIN", movies: filminMovies, series: filminSeries },
+];
+
+const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+
+const allCategories = [
+    { slug: 'accion', name: 'ACCIÓN' },
+    { slug: 'comedia', name: 'COMEDIA' },
+    { slug: 'drama', name: 'DRAMA' },
+    { slug: 'crimen', name: 'CRIMEN' },
+    { slug: 'aventura', name: 'AVENTURA' },
+    { slug: 'fantasia', name: 'FANTASÍA' },
+    { slug: 'ciencia_ficcion', name: 'CIENCIA FICCIÓN' },
+    { slug: 'misterio', name: 'MISTERIO' },
+    { slug: 'terror', name: 'TERROR' },
+    { slug: 'animacion', name: 'ANIMACIÓN' },
+    { slug: 'familia', name: 'FAMILIA' },
+    { slug: 'proximamente', name: 'PRÓXIMAMENTE' },
+];
+
+const randomIndex = Math.floor(Math.random() * allCategories.length);
+const randomCategorySlug = allCategories[randomIndex].slug;
+const randomCategoryName = allCategories[randomIndex].name;
+
+const categoriesMovies = await getMoviesByCategory(randomCategorySlug, page.toString());
+const categoriesSeries = await getSeriesByCategory(randomCategorySlug, page.toString());
+
+const randomCategory = {
+    name: randomCategoryName,
+    movies: categoriesMovies,
+    series: categoriesSeries,
+};
+
+// Definir los géneros comunes
+const genresMap: Record<number, string> = {
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+
+const sections: {
+    title: string;
+    movies: Movie[];
+    series: Serie[];
+    link: string;
+}[] = [
+    {
+        title: "ÚLTIMOS LANZAMIENTOS",
+        movies: latestMovies,
+        series: latestSeries,
+        link: "/catalogo/ultimoslanzamientos"
+    },
+    {
+        title: "MÁS POPULARES",
+        movies: popularMovies,
+        series: popularSeries,
+        link: "/catalogo/maspopulares"
+    },
+    {
+        title: "TOP PELÍCULAS",
+        movies: topRatedMovies,
+        series: [],
+        link: "/catalogo/topmovies"
+    },
+    {
+        title: "TOP SERIES",
+        movies: [],
+        series: topRatedSeries,
+        link: "/catalogo/topseries"
+    },
+    {
+        title: `PLATAFORMA DESTACADA: ${randomPlatform.name}`,
+        movies: randomPlatform.movies as Movie[],
+        series: randomPlatform.series as Serie[],
+        link: "/catalogo/plataformas"
+    },
+    {
+        title: `CATEGORIA DESTACADA: ${randomCategory.name}`,
+        movies: randomCategory.movies as Movie[],
+        series: randomCategory.series as Serie[],
+        link: "/catalogo/categorias"
+    }
+];
+---
+<main class="container mx-auto px-4 py-4">
+    <h1 class="text-coral-red text-5xl font-extrabold text-center mb-4">CATÁLOGO PRINCIPAL</h1>
+    <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
+    <p class="text-gray-600 text-center max-w-2xl mx-auto mb-10">
+        Explora nuestro catálogo completo de películas y series. Encuentra tus favoritos y descubre nuevas historias que te encantarán.
+    </p>
+
+    {sections
+        .filter((section) => section.movies.length > 0 || section.series.length > 0)
+        .map((section) => (
+            <section class="space-y-6 mb-16">
+                <header class="flex items-center justify-between border-b border-white/10 pb-2">
+                    <h2 class="text-blue-500 font-semibold text-xl sm:text-2xl md:text-3xl leading-tight break-words">
+                        {section.title}
+                    </h2>
+                    <a href={section.link} class="text-blue-400 hover:underline flex items-center gap-1 group text-sm sm:text-base">
+                        Ver más <span class="group-hover:translate-x-1 transition-transform">&rarr;</span>
+                    </a>
+                </header>
+
+
+                <div class="space-y-4">
+                    {section.movies.length > 0 && (
+                    <div>
+                        <h3 class="text-coral-red py-3 font-bold mb-6 text-2xl md:text-3xl flex items-center">
+                            <span class="mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                                </svg>
+                            </span>
+                            PELÍCULAS
+                        </h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {section.movies.slice(0, 10).map((item) => (
+                                    <CardMovie
+                                            id={item.id.toString()}
+                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                            title={item.title}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            release_date={item.release_date}
+                                            genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
+                                            providers={item.providers}
+                                    />
+                            ))}
+                        </div>
+                    </div>
+                    )}
+
+                    {section.series.length > 0 && (
+                    <div>
+                        <h3 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+                            <span class="mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                </svg>
+                            </span>
+                            SERIES
+                        </h3>
+                        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                            {section.series.slice(0, 10).map((item) => (
+                                    <CardSerie
+                                            id={item.id.toString()}
+                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                            name={item.name}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            first_air_date={item.first_air_date}
+                                            seasons={item.seasons}
+                                            last_episode_to_air={item.last_episode_to_air}
+                                            next_episode_to_air={item.next_episode_to_air}
+                                            genres={item.genre_ids?.map(id => ({ id, name: getGenreName(id) }))}
+                                    />
+                            ))}
+                        </div>
+                    </div>
+                    )}
+                </div>
+            </section>
+    ))}
+</main>
+
+<style is:global>
+    .text-coral-red {
+        color: #E63946;
+    }
+
+    .bg-coral-red {
+        background-color: #E63946;
+    }
+
+    #toggleSidebar:checked ~ #sidebar {
+        transform: translateX(0);
+    }
+
+    .bg-ice-blue {
+        background-color: #3B82F6;
+    }
+
+    /* Nuevos estilos para mejorar la apariencia */
+    body {
+        background-color: #F8F9FA;
+    }
+
+    /* Estilos para asegurar cards del mismo tamaño */
+    .card-wrapper {
+        display: flex;
+        height: 100%;
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Asegurar que todas las imágenes tengan el mismo tamaño */
+    .card-wrapper img {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+    }
+
+    /* Asegurar que los títulos tengan una altura fija */
+    .card-wrapper h3,
+    .card-wrapper h4 {
+        height: 3em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Para el contenido de la tarjeta */
+    .card-wrapper > div {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        background-color: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        height: 100%;
+    }
+
+    /* Para descripciones/overview */
+    .card-wrapper p {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        flex-grow: 1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        body {
+            background-color: #121212;
+        }
+
+        .card-wrapper > div {
+            background-color: #1E1E1E;
+            color: #E5E5E5;
+        }
+    }
+
+    @keyframes click-bounce {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(0.93);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    @media (max-width: 640px) {
+        h2 {
+            font-size: 1.125rem; /* 18px */
+            line-height: 1.3;
+            word-break: break-word;
+        }
+    }
+
+    .button-bounce:active {
+        animation: click-bounce 0.25s ease-in-out;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+</style>
