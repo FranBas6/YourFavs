@@ -494,10 +494,10 @@ interface GuestStar {
     profile_path?: string;
 }
 
-// Donde obtienes los otros datos
-const recommendationsData = await getSerieRecommendationsOrSimilar(item.id);
-const recommendations = recommendationsData.success ? recommendationsData.recommendations : [];
-const recommendationType = recommendationsData.type || 'recommendations';
+// Recomendaciones o similares// Series
+const seriesRecommendationsData = await getSerieRecommendationsOrSimilar(item.id);
+const seriesRecommendations = seriesRecommendationsData.success ? seriesRecommendationsData.recommendations : [];
+const seriesRecommendationType = seriesRecommendationsData.type || 'recommendations';
 
 const apiKey = import.meta.env.PUBLIC_TMDB_API_KEY;
 
@@ -1437,12 +1437,12 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                 </div>
                         )}
 
-                        <!-- Recomendaciones -->
-                        {recommendations && recommendations.length > 0 && (
+                        <!-- SERIES Recomendaciones -->
+                        {seriesRecommendations && seriesRecommendations.length > 0 && (
                                 <div class="bg-white p-6 rounded-lg shadow-md mb-8">
                                     <div class="flex items-center justify-between mb-6">
                                         <h2 class="text-2xl font-bold text-blue-600">
-                                            {recommendationType === 'similar' ? 'Series Similares' : 'Recomendaciones'}
+                                            {seriesRecommendationType === 'similar' ? 'Series Similares' : 'Series Recomendadas'}
                                         </h2>
                                     </div>
 
@@ -1450,7 +1450,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <div class="recommendations-carousel relative overflow-hidden">
                                         <!-- Contenedor de series -->
                                         <div class="recommendations-container flex gap-4 overflow-x-auto pb-4 px-2 scroll-smooth">
-                                            {recommendations.map((serie, index) => (
+                                            {seriesRecommendations.map((serie, index) => (
                                                     <div class={`recommendation-card flex-shrink-0 w-48 group animate-fade-in-up`}
                                                          style={`animation-delay: ${(index % 6 + 1) * 0.1}s`}>
                                                         <a href={`/serie/${serie.id}`} class="block">
@@ -1485,7 +1485,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                                                     </div>
                                                                 </div>
 
-                                                                <!-- Información de la serie -->
+                                                                <!-- Información de la película -->
                                                                 <div class="p-4 bg-white h-32 flex flex-col justify-between">
                                                                     <div>
                                                                         <h3 class="font-semibold text-gray-800 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors duration-300">

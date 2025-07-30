@@ -130,6 +130,34 @@ export const getTopRatedMovies = async ({page}: { page?: string }): Promise<Movi
     }
 };
 
+// Obtener películas en cartelera
+export const getNowPlayingMoviesInSpain = async ({ page }: { page?: string }): Promise<Movie[]> => {
+    const pageNumber = page || "1";
+    const url = `https://api.themoviedb.org/3/movie/now_playing?api_key=${API_KEY}&language=es-ES&region=ES&page=${pageNumber}`;
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error(`Error en la solicitud: ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        const movies: Movie[] = Array.isArray(data.results) ? data.results : [];
+
+        // Puedes mantener el orden personalizado si lo deseas
+        return movies.sort((a, b) => {
+            if (b.vote_average !== a.vote_average) return b.vote_average - a.vote_average;
+            if (b.popularity !== a.popularity) return b.popularity - a.popularity;
+            const dateA = new Date(a.release_date || "");
+            const dateB = new Date(b.release_date || "");
+            return dateB.getTime() - dateA.getTime();
+        });
+    } catch (error) {
+        console.error("Hubo un error al obtener las películas en cartelera en España:", error);
+        return [];
+    }
+};
+
 // -- Obtener películas por género--
 
 // Obtener películas por categoría

@@ -293,14 +293,16 @@ function getLanguageName(code: string): string {
     return languageMap[code as keyof typeof languageMap] || code;
 }
 
-// Donde obtienes los otros datos
-const recommendationsData = await getMovieRecommendationsOrSimilar(item.id);
-const recommendations = recommendationsData.success ? recommendationsData.recommendations : [];
-const recommendationType = recommendationsData.type || 'recommendations';
+// Recomendaciones o similares
+// Movies
+const moviesRecommendationsData = await getMovieRecommendationsOrSimilar(item.id);
+const moviesRecommendations = moviesRecommendationsData.success ? moviesRecommendationsData.recommendations : [];
+const moviesRecommendationType = moviesRecommendationsData.type || 'recommendations';
 
+// Enlace a Críticas de IMDB
 const apiKey = import.meta.env.PUBLIC_TMDB_API_KEY;
 
-// Si tienes el ID de TMDB de la serie
+// Si tienes el ID de TMDB de la movie
 const tmdbId = item.id; // tu ID de TMDB
 
 // Hacer petición para obtener external_ids
@@ -992,12 +994,12 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                 </div>
                         )}
 
-                        <!-- Recomendaciones -->
-                        {recommendations && recommendations.length > 0 && (
+                        <!-- MOVIES Recomendaciones -->
+                        {moviesRecommendations && moviesRecommendations.length > 0 && (
                                 <div class="bg-white p-6 rounded-lg shadow-md mb-8">
                                     <div class="flex items-center justify-between mb-6">
                                         <h2 class="text-2xl font-bold text-blue-600">
-                                            {recommendationType === 'similar' ? 'Películas Similares' : 'Recomendaciones'}
+                                            {moviesRecommendationType === 'similar' ? 'Películas Similares' : 'Películas Recomendadas'}
                                         </h2>
                                     </div>
 
@@ -1005,7 +1007,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <div class="recommendations-carousel relative overflow-hidden">
                                         <!-- Contenedor de películas -->
                                         <div class="recommendations-container flex gap-4 overflow-x-auto pb-4 px-2 scroll-smooth">
-                                            {recommendations.map((movie, index) => (
+                                            {moviesRecommendations.map((movie, index) => (
                                                     <div class={`recommendation-card flex-shrink-0 w-48 group animate-fade-in-up`}
                                                          style={`animation-delay: ${(index % 6 + 1) * 0.1}s`}>
                                                         <a href={`/movie/${movie.id}`} class="block">

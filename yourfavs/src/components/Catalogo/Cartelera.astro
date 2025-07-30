@@ -1,0 +1,300 @@
+---
+import CardMovie from "../Cards/CardMovie.astro";
+import {getNowPlayingMoviesInSpain} from "../../services/API/Movies/tmdbMovies";
+
+// Obtener el parámetro de página desde la URL
+const urlParams = new URL(Astro.request.url).searchParams;
+const page = Number(urlParams.get('page') || 1);
+const type = urlParams.get('type') || 'all'; // 'all', 'movies', 'series'
+
+// Cargar las películas y series para la página actual
+const onAirMovies = await getNowPlayingMoviesInSpain({page: page.toString()});
+
+// Total de páginas, puedes obtenerlo del API o mantenerlo como un valor estático
+const totalPages = 3; // Suponiendo 10 páginas de resultados disponibles, ajusta según tu API
+
+// Definir los géneros comunes
+const genresMap: Record<number, string> = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+---
+<section class="container mx-auto px-4 py-4">
+    <header class="mb-10 text-center">
+        <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 tracking-tight leading-tight mb-4">
+            <span class="text-coral-red">🎬 Cartelera</span> en <span
+                class="underline decoration-coral-red decoration-4 underline-offset-4">España</span>
+        </h1>
+
+        <p class="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-4">
+            Descubre qué películas están actualmente en los cines de tu pais.
+        </p>
+
+        <div class="h-1 w-16 bg-coral-red rounded-full mx-auto mt-4 animate-pulse"></div>
+    </header>
+
+    <!-- Paginación Mejorada para Móviles -->
+    <nav aria-label="Paginación" class="flex items-center justify-center mb-8">
+        <!-- En pantallas pequeñas (móviles) - Diseño vertical compacto -->
+        <div class="flex flex-col w-full max-w-xs gap-2 p-2 bg-white rounded-lg shadow-md sm:hidden">
+            <div class="flex justify-center items-center px-2 py-1">
+                <span class="font-medium text-gray-700 text-sm">Página</span>
+                <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold text-sm">{page}</span>
+                <span class="font-medium text-gray-700 text-sm">de {totalPages}</span>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <a href={`?page=${Math.max(1, page - 1)}`}
+                   class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+                   aria-disabled={page === 1}>
+                    <span class="mr-1">←</span> Anterior
+                </a>
+
+                <a href={`?page=${Math.min(totalPages, page + 1)}`}
+                   class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+                   aria-disabled={page === totalPages}>
+                    Siguiente <span class="ml-1">→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- En pantallas medianas y grandes - Diseño horizontal -->
+        <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
+            <a href={`?page=${Math.max(1, page - 1)}`}
+               class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+               aria-disabled={page === 1}>
+                <span class="mr-1">←</span> Anterior
+            </a>
+
+            <div class="flex items-center px-4">
+                <span class="font-medium text-gray-700">Página</span>
+                <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold">{page}</span>
+                <span class="font-medium text-gray-700">de {totalPages}</span>
+            </div>
+
+            <a href={`?page=${Math.min(totalPages, page + 1)}`}
+               class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
+               aria-disabled={page === totalPages}>
+                Siguiente <span class="ml-1">→</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Sección de Películas -->
+
+    <section class="mb-10" id="peliculas">
+        <h2 class="text-coral-red py-3 font-bold mb-4 text-2xl md:text-3xl flex items-center">
+        <span class="mr-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+            </svg>
+        </span>
+            PELÍCULAS
+        </h2>
+        <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 w-full transition-all duration-300">
+            {
+                onAirMovies.map((item) => (
+                        <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
+                            <CardMovie
+                                    id={item.id.toString()}
+                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                    title={item.title}
+                                    vote_average={item.vote_average}
+                                    overview={item.overview}
+                                    release_date={item.release_date}
+                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                    providers={item.providers}
+                            />
+                        </div>
+                ))
+            }
+        </div>
+    </section>
+
+    <!-- Y también en la paginación de abajo -->
+    <div class="mt-12 flex justify-center">
+        <div class="inline-flex rounded-md shadow-sm">
+
+            {page > 2 && (
+                    <a href={`?page=1`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
+                        1
+                    </a>
+            )}
+
+            {page > 3 && (
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">...</span>
+            )}
+
+            {page > 1 && (
+                    <a href={`?page=${page - 1}`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                        {page - 1}
+                    </a>
+            )}
+
+            <a href={`?page=${page}`}
+               class="px-3 py-2 bg-coral-red text-white border border-coral-red">
+                {page}
+            </a>
+
+            {page < totalPages && (
+                    <a href={`?page=${page + 1}`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
+                        {page + 1}
+                    </a>
+            )}
+
+            {page < totalPages - 2 && (
+                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">...</span>
+            )}
+
+            {page < totalPages - 1 && (
+                    <a href={`?page=${totalPages}`}
+                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
+                        {totalPages}
+                    </a>
+            )}
+
+        </div>
+    </div>
+</section>
+
+<style is:global>
+    .text-coral-red {
+        color: #E63946;
+    }
+
+    .bg-coral-red {
+        background-color: #E63946;
+    }
+
+    #toggleSidebar:checked ~ #sidebar {
+        transform: translateX(0);
+    }
+
+    .bg-ice-blue {
+        background-color: #3B82F6;
+    }
+
+    /* Nuevos estilos para mejorar la apariencia */
+    body {
+        background-color: #F8F9FA;
+    }
+
+    /* Estilos para asegurar cards del mismo tamaño */
+    .card-wrapper {
+        display: flex;
+        height: 100%;
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Asegurar que todas las imágenes tengan el mismo tamaño */
+    .card-wrapper img {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+    }
+
+    /* Asegurar que los títulos tengan una altura fija */
+    .card-wrapper h3,
+    .card-wrapper h4 {
+        height: 3em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Para el contenido de la tarjeta */
+    .card-wrapper > div {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        background-color: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        height: 100%;
+    }
+
+    /* Para descripciones/overview */
+    .card-wrapper p {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        flex-grow: 1;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        body {
+            background-color: #121212;
+        }
+
+        .card-wrapper > div {
+            background-color: #1E1E1E;
+            color: #E5E5E5;
+        }
+    }
+
+    @keyframes click-bounce {
+        0% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(0.93);
+        }
+        100% {
+            transform: scale(1);
+        }
+    }
+
+    .button-bounce:active {
+        animation: click-bounce 0.25s ease-in-out;
+    }
+
+    html {
+        scroll-behavior: smooth;
+    }
+</style>
