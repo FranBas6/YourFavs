@@ -7,9 +7,7 @@ interface Props {
     overview: string;
     release_date?: string;
     genres?: { id: number, name: string }[];
-    runtime?: number;
-    providers?: { provider_id: number, provider_name: string, logo_path: string }[];
-    character?: string; // Opcional, para actores
+    character?: string
 }
 
 const {
@@ -20,8 +18,6 @@ const {
     overview,
     release_date,
     genres,
-    runtime,
-    providers,
     character
 } = Astro.props;
 
@@ -30,14 +26,6 @@ const formatDate = (dateString: string | undefined): string => {
     if (!dateString) return "";
     const date = new Date(dateString);
     return date.toLocaleDateString("es-ES", {year: "numeric", month: "short", day: "numeric"});
-};
-
-// Formatear duración de la película
-const formatRuntime = (minutes: number | undefined): string => {
-    if (!minutes) return "";
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
 };
 
 // Limitar géneros a mostrar
@@ -62,6 +50,7 @@ const getRatingColor = (rating: number): string => {
     if (rating >= 5) return "bg-orange-500 text-white";
     return "bg-red-500 text-white";
 };
+
 ---
 <div class="media-card group">
     <a
@@ -141,19 +130,8 @@ const getRatingColor = (rating: number): string => {
                 {overview || "Sin descripción disponible."}
             </p>
 
-            <!-- Runtime & Release Date -->
+            <!-- Release Date -->
             <div class="mt-auto mb-2 text-xs">
-                {runtime && (
-                        <div class="info-pill">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24"
-                                 stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            <span class="font-semibold">Duración:</span>
-                            <span>{formatRuntime(runtime)}</span>
-                        </div>
-                )}
                 {release_date && (
                         <div class="info-pill text-pastel-yellow">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24"
@@ -167,16 +145,16 @@ const getRatingColor = (rating: number): string => {
                 )}
             </div>
 
-            <!-- View Details Button -->
-            <div class="mt-auto pt-3">
-                <span class="view-details-btn">
-                    Ver detalles
-                    <svg xmlns="http://www.w3.org/2000/svg"
-                         class="h-4 w-4 ml-1 transition-transform duration-300 group-hover:translate-x-1" fill="none"
-                         viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </span>
+            <!-- Botón de detalles -->
+            <div class="pt-2">
+        <span class="view-details-btn">
+            Ver detalles
+            <svg xmlns="http://www.w3.org/2000/svg"
+                 class="h-4 w-4 ml-1 transition-transform duration-300 group-hover:translate-x-1"
+                 fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </span>
             </div>
         </div>
     </a>
@@ -243,15 +221,6 @@ const getRatingColor = (rating: number): string => {
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
         overflow: hidden;
-    }
-
-    .provider-logo {
-        transition: transform 0.2s ease;
-    }
-
-    .provider-logo:hover {
-        transform: scale(1.5);
-        z-index: 2;
     }
 
     .badge {

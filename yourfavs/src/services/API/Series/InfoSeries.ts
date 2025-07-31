@@ -1,5 +1,4 @@
 import {type APISerie, type Serie} from "../../../types/ApiSerie.ts";
-import type {Movie} from "../../../types/ApiMovie.ts"; // Asegúrate de tener este tipo definido
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 

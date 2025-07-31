@@ -146,8 +146,8 @@ export const getNowPlayingMoviesInSpain = async ({ page }: { page?: string }): P
 
         // Puedes mantener el orden personalizado si lo deseas
         return movies.sort((a, b) => {
-            if (b.vote_average !== a.vote_average) return b.vote_average - a.vote_average;
             if (b.popularity !== a.popularity) return b.popularity - a.popularity;
+            if (b.vote_average !== a.vote_average) return b.vote_average - a.vote_average;
             const dateA = new Date(a.release_date || "");
             const dateB = new Date(b.release_date || "");
             return dateB.getTime() - dateA.getTime();

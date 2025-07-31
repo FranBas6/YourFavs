@@ -24,10 +24,7 @@ interface RecommendedMovie {
     release_date: string;
     popularity?: number;
     score?: number; // Puntuación personalizada para ordenar recomendaciones
-    genres?: Array<{
-        id: number,
-        name: string
-    }>;
+    genres: number[];
 }
 
 // Configuración de Firebase
