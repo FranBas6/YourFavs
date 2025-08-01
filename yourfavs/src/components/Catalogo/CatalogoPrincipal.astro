@@ -33,16 +33,7 @@ const popularSeries = await getMostPopularSeries({page: page.toString()});
 const topRatedMovies = await getTopRatedMovies({page: page.toString()});
 const topRatedSeries = await getTopRatedSeries({page: page.toString()});
 
-// Define type for sort options
-type SortOptionS = 'popularity' | 'vote_average' | 'first_air_date' | 'name';
-type SortOptionM = 'popularity' | 'vote_average' | 'release_date' | 'title';
-type SortOrder = 'desc';
-
-const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const pageStr = page.toString();
-
-// Nuevos parámetros para ordenación
-const sortBy = urlParams.get('sortBy') || 'popularity';
 
 const netflixMovies = await getNetflixMovies(pageStr);
 const netflixSeries = await getNetflixSeries(pageStr);
