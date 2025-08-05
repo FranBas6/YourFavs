@@ -177,7 +177,7 @@ function getGenreName(id: number) {
 // Total de páginas
 const totalPages = 190;
 ---
-<section class="container mx-auto px-4 py-4">
+<section class="px-1 sm:py-8">
     <!-- Header mejorado -->
     <header class="text-center mb-6">
         <div class="inline-flex items-center gap-3 mb-4">
@@ -312,7 +312,7 @@ const totalPages = 190;
 
     <!-- Sección de Películas -->
     {(type === 'all' || type === 'movies') && movies.length > 0 && (
-            <section id="peliculas" class="mb-14">
+            <div class="mb-12" id="peliculas">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="w-10 h-10 bg-gradient-to-br bg-coral-red rounded-xl flex items-center justify-center shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
@@ -324,10 +324,11 @@ const totalPages = 190;
                     <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Películas</h2>
                     <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
                 </div>
+
                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                     {
                         movies.map((item) => (
-                                <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                <div class="card-wrapper group">
                                     <CardMovie
                                             id={item.id.toString()}
                                             img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -341,12 +342,12 @@ const totalPages = 190;
                         ))
                     }
                 </div>
-            </section>
+            </div>
     )}
 
     <!-- Sección de Series -->
     {(type === 'all' || type === 'series') && series.length > 0 && (
-            <section id="series" class="mb-14">
+            <div class="mb-12" id="series">
                 <div class="flex items-center gap-3 mb-6">
                     <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
@@ -361,7 +362,7 @@ const totalPages = 190;
                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                     {
                         series.map((item) => (
-                                <div class="card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                <div class="card-wrapper group">
                                     <CardSerie
                                             id={item.id.toString()}
                                             img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -378,7 +379,7 @@ const totalPages = 190;
                         ))
                     }
                 </div>
-            </section>
+            </div>
     )}
 
     <!-- Mensaje cuando no hay resultados -->
@@ -611,26 +612,6 @@ const totalPages = 190;
 
     body:has(#series:target) #peliculas {
         display: none;
-    }
-
-    /* Opcional: Agregar un botón para mostrar todo */
-    .show-all-btn {
-        display: inline-block;
-        padding: 0.5rem 1.25rem;
-        background-color: #16a34a;
-        color: white;
-        border-radius: 9999px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        transition: all 0.3s;
-        text-decoration: none;
-        font-size: 0.875rem;
-        font-weight: 600;
-        letter-spacing: 0.025em;
-    }
-
-    .show-all-btn:hover {
-        background-color: #15803d;
-        box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
     }
 
     /* Filtros mejorados */
