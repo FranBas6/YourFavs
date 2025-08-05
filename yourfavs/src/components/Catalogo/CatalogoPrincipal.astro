@@ -33,16 +33,7 @@ const popularSeries = await getMostPopularSeries({page: page.toString()});
 const topRatedMovies = await getTopRatedMovies({page: page.toString()});
 const topRatedSeries = await getTopRatedSeries({page: page.toString()});
 
-// Define type for sort options
-type SortOptionS = 'popularity' | 'vote_average' | 'first_air_date' | 'name';
-type SortOptionM = 'popularity' | 'vote_average' | 'release_date' | 'title';
-type SortOrder = 'desc';
-
-const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const pageStr = page.toString();
-
-// Nuevos parámetros para ordenación
-const sortBy = urlParams.get('sortBy') || 'popularity';
 
 const netflixMovies = await getNetflixMovies(pageStr);
 const netflixSeries = await getNetflixSeries(pageStr);
@@ -61,13 +52,13 @@ const filminMovies = await getFilminMovies(pageStr);
 
 // Plataformas y categorías disponibles
 const platforms = [
-    { name: "NETFLIX", slug: "netflix", movies: netflixMovies, series: netflixSeries },
-    { name: "AMAZON PRIME", slug: "amazon", movies: amazonPrimeMovies, series: amazonPrimeSeries },
-    { name: "DISNEY+", slug: "disney", movies: disneyPlusMovies, series: disneyPlusSeries },
-    { name: "HBO MAX", slug: "hbo", movies: hboMaxMovies, series: hboMaxSeries },
-    { name: "APPLE TV+", slug: "apple", movies: appleTVMovies, series: appleTVSeries },
-    { name: "MOVISTAR+", slug: "movistar", movies: movistarPlusMovies, series: movistarPlusSeries },
-    { name: "FILMIN", slug: "filmin", movies: filminMovies, series: filminSeries },
+    {name: "NETFLIX", slug: "netflix", movies: netflixMovies, series: netflixSeries},
+    {name: "AMAZON PRIME", slug: "amazon", movies: amazonPrimeMovies, series: amazonPrimeSeries},
+    {name: "DISNEY+", slug: "disney", movies: disneyPlusMovies, series: disneyPlusSeries},
+    {name: "HBO MAX", slug: "hbo", movies: hboMaxMovies, series: hboMaxSeries},
+    {name: "APPLE TV+", slug: "apple", movies: appleTVMovies, series: appleTVSeries},
+    {name: "MOVISTAR+", slug: "movistar", movies: movistarPlusMovies, series: movistarPlusSeries},
+    {name: "FILMIN", slug: "filmin", movies: filminMovies, series: filminSeries},
 ];
 
 
@@ -222,7 +213,9 @@ const sections = [
                             <a href={section.link} class="view-more-btn">
                                 <span>Ver más</span>
                                 <svg class="arrow-icon" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                                    <path fill-rule="evenodd"
+                                          d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                                          clip-rule="evenodd"/>
                                 </svg>
                             </a>
                         </header>
@@ -231,7 +224,8 @@ const sections = [
                             {section.movies.length > 0 && (
                                     <div class="content-category">
                                         <h3 class="category-title">
-                                            <svg class="category-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <svg class="category-icon" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor">
                                                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                                                 <line x1="8" y1="21" x2="16" y2="21"/>
                                                 <line x1="12" y1="17" x2="12" y2="21"/>
@@ -263,7 +257,8 @@ const sections = [
                             {section.series.length > 0 && (
                                     <div class="content-category">
                                         <h3 class="category-title">
-                                            <svg class="category-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                            <svg class="category-icon" viewBox="0 0 24 24" fill="none"
+                                                 stroke="currentColor">
                                                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                                                 <line x1="8" y1="21" x2="16" y2="21"/>
                                                 <line x1="12" y1="17" x2="12" y2="21"/>
@@ -395,39 +390,6 @@ const sections = [
         line-height: 1.7;
     }
 
-    /* Breadcrumb */
-    .breadcrumb {
-        margin-top: var(--spacing-xl);
-    }
-
-    .breadcrumb-list {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: var(--spacing-sm);
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        font-size: 0.875rem;
-    }
-
-    .breadcrumb-list li:not(:last-child)::after {
-        content: '→';
-        margin-left: var(--spacing-sm);
-        color: var(--text-muted);
-    }
-
-
-    .breadcrumb-link:hover {
-        color: var(--primary-red);
-        text-decoration: underline;
-    }
-
-    .breadcrumb-current {
-        color: var(--text-muted);
-        font-weight: 500;
-    }
-
     /* Content wrapper */
     .content-wrapper {
         display: flex;
@@ -482,7 +444,7 @@ const sections = [
 
     .section-icon {
         font-size: 1.5rem;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
     }
 
     .section-title {
@@ -579,38 +541,8 @@ const sections = [
         }
     }
 
-    /* Animations */
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-    }
-
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    @keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
-    }
-
-    /* Loading states */
-    .loading-shimmer {
-        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-        background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
-    }
-
     /* Focus states for accessibility */
     .view-more-btn:focus,
-    .breadcrumb-link:focus,
     .show-more-link:focus {
         outline: 2px solid var(--primary-blue);
         outline-offset: 2px;
@@ -685,27 +617,6 @@ const sections = [
         }
     }
 
-    /* Reduced motion */
-    @media (prefers-reduced-motion: reduce) {
-        * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-        }
-
-        .hero-icon {
-            animation: none;
-        }
-
-        .card-wrapper:hover {
-            transform: none;
-        }
-
-        .section-card:hover {
-            transform: none;
-        }
-    }
-
     /* Scroll behavior */
     html {
         scroll-behavior: smooth;
@@ -730,27 +641,6 @@ const sections = [
     ::-webkit-scrollbar-thumb {
         background: var(--border-medium);
         border-radius: 4px;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-        background: var(--primary-blue);
-    }
-
-    /* Utilities */
-    .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-    }
-
-    .text-balance {
-        text-wrap: balance;
     }
 
     /* Performance optimizations */

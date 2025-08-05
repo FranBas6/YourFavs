@@ -48,68 +48,75 @@ const genresMap: Record<number, string> = {
 function getGenreName(id: number): string {
     return genresMap[id] || "Otro";
 }
+
+// Calcular estadísticas de la página actual
+const totalMoviesShown = page * 20; // Asumiendo 20 películas por página
+const startIndex = (page - 1) * 20 + 1;
+const endIndex = Math.min(page * 20, totalPages * 20);
 ---
-<section class="container mx-auto px-4 py-4">
-    <header class="mb-8">
-        <h1 class="text-coral-red font-bold text-4xl md:text-5xl lg:text-6xl text-center mb-2">
-            TOP PELÍCULAS
-        </h1>
-        <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
-        <p class="text-gray-600 text-center max-w-2xl mx-auto">
-            Descubre las películas mejor valoradas por la crítica y el público
+<section class="px-1 sm:py-8">
+    <!-- Header mejorado -->
+    <header class="text-center mb-8">
+        <div class="inline-flex items-center gap-3 mb-6">
+            <div class="text-left mb-4">
+                <h1 class="text-coral-red font-bold text-3xl md:text-4xl lg:text-5xl leading-tight mb-2">
+                    TOP PELÍCULAS
+                </h1>
+                <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
+            </div>
+        </div>
+
+        <p class="text-gray-700 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6">
+            Descubre las películas mejor valoradas por la crítica y el público mundial.
+            <span class="text-coral-red font-medium">Solo lo mejor del cine</span>
         </p>
     </header>
 
-    <nav aria-label="Paginación" class="flex items-center justify-center mb-8">
-        <!-- En pantallas pequeñas (móviles) - Diseño vertical compacto -->
-        <div class="flex flex-col w-full max-w-xs gap-2 p-2 bg-white rounded-lg shadow-md sm:hidden">
-            <div class="flex justify-center items-center px-2 py-1">
-                <span class="font-medium text-gray-700 text-sm">Página</span>
-                <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold text-sm">{page}</span>
-                <span class="font-medium text-gray-700 text-sm">de {totalPages}</span>
+    <!-- Información de paginación superior mejorada -->
+    <div class="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 md:p-6 mb-8 shadow-sm border border-gray-100">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <!-- Info de página -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center justify-center w-10 h-10 bg-coral-red/10 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-coral-red" fill="none"
+                         viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">
+                        Página <span class="text-coral-red">{page}</span> de <span
+                            class="text-coral-red">{totalPages}</span>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        Mostrando {startIndex}-{endIndex} de {totalPages * 20} películas
+                    </div>
+                </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2">
-                <a href={`?page=${Math.max(1, page - 1)}`}
-                   class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-                   aria-disabled={page === 1}>
-                    <span class="mr-1">←</span> Anterior
-                </a>
-
-                <a href={`?page=${Math.min(totalPages, page + 1)}`}
-                   class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-                   aria-disabled={page === totalPages}>
-                    Siguiente <span class="ml-1">→</span>
-                </a>
+            <!-- Stats adicionales -->
+            <div class="flex items-center gap-4 text-sm">
+                <div class="flex items-center gap-2 text-gray-600">
+                    <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    <span>Actualizado hoy</span>
+                </div>
+                <div class="flex items-center gap-2 text-gray-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    <span>Mejor valoradas</span>
+                </div>
             </div>
         </div>
+    </div>
 
-        <!-- En pantallas medianas y grandes - Diseño horizontal -->
-        <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
-            <a href={`?page=${Math.max(1, page - 1)}`}
-               class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-               aria-disabled={page === 1}>
-                <span class="mr-1">←</span> Anterior
-            </a>
-
-            <div class="flex items-center px-4">
-                <span class="font-medium text-gray-700">Página</span>
-                <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold">{page}</span>
-                <span class="font-medium text-gray-700">de {totalPages}</span>
-            </div>
-
-            <a href={`?page=${Math.min(totalPages, page + 1)}`}
-               class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-               aria-disabled={page === totalPages}>
-                Siguiente <span class="ml-1">→</span>
-            </a>
-        </div>
-    </nav>
-
-    <div class="grid gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-5">
+    <!-- Grid mejorado con loading states visuales -->
+    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
         {
             popularMovies.map((item) => (
-                    <div class="card-wrapper transform transition-transform duration-300 hover:scale-105">
+                    <div class="card-wrapper group">
                         <CardMovie
                                 id={item.id.toString()}
                                 img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -124,53 +131,93 @@ function getGenreName(id: number): string {
         }
     </div>
 
-    <div class="mt-12 flex justify-center">
-        <div class="inline-flex rounded-md shadow-sm">
-            {page > 2 && (
-                    <a href="?page=1"
-                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
-                        1
-                    </a>
-            )}
-
-            {page > 3 && (
-                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                    ...
-                </span>
-            )}
-
-            {page > 1 && (
-                    <a href={`?page=${page - 1}`}
-                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
-                        {page - 1}
-                    </a>
-            )}
-
-            <a href={`?page=${page}`} class="px-3 py-2 bg-coral-red text-white border border-coral-red">
-                {page}
+    <!-- Paginación mejorada -->
+    <nav aria-label="Paginación" class="mt-12">
+        <!-- Navegación móvil -->
+        <div class="flex sm:hidden items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+            <a href={`?page=${Math.max(1, page - 1)}`}
+               class={`pagination-btn-mobile ${page === 1 ? 'disabled' : ''}`}
+               aria-disabled={page === 1}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Anterior
             </a>
 
-            {page < totalPages && (
-                    <a href={`?page=${page + 1}`}
-                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
-                        {page + 1}
-                    </a>
-            )}
+            <div class="flex items-center gap-2 px-4">
+                <span class="text-sm text-gray-600">Página</span>
+                <span class="px-3 py-1 bg-coral-red text-white rounded-lg font-semibold text-sm">{page}</span>
+                <span class="text-sm text-gray-600">/{totalPages}</span>
+            </div>
 
-            {page < totalPages - 2 && (
-                    <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                    ...
-                </span>
-            )}
-
-            {page < totalPages - 1 && (
-                    <a href={`?page=${totalPages}`}
-                       class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
-                        {totalPages}
-                    </a>
-            )}
+            <a href={`?page=${Math.min(totalPages, page + 1)}`}
+               class={`pagination-btn-mobile ${page === totalPages ? 'disabled' : ''}`}
+               aria-disabled={page === totalPages}>
+                Siguiente
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
         </div>
-    </div>
+
+        <!-- Navegación escritorio -->
+        <div class="hidden sm:flex justify-center">
+            <div class="inline-flex items-center bg-white rounded-xl p-2 shadow-sm border border-gray-100">
+                <!-- Botón anterior -->
+                <a href={`?page=${Math.max(1, page - 1)}`}
+                   class={`pagination-btn ${page === 1 ? 'disabled' : ''}`}
+                   aria-disabled={page === 1}>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    Anterior
+                </a>
+
+                <!-- Primera página -->
+                {page > 2 && (
+                        <>
+                            <a href={`?page=1`} class="pagination-number">1</a>
+                            {page > 3 && <span class="px-2 text-gray-400">...</span>}
+                        </>
+                )}
+
+                <!-- Página anterior -->
+                {page > 1 && (
+                        <a href={`?page=${page - 1}`} class="pagination-number">{page - 1}</a>
+                )}
+
+                <!-- Página actual -->
+                <span class="pagination-number active">{page}</span>
+
+                <!-- Página siguiente -->
+                {page < totalPages && (
+                        <a href={`?page=${page + 1}`} class="pagination-number">{page + 1}</a>
+                )}
+
+                <!-- Última página -->
+                {page < totalPages - 1 && (
+                        <>
+                            {page < totalPages - 2 && <span class="px-2 text-gray-400">...</span>}
+                            <a href={`?page=${totalPages}`} class="pagination-number">{totalPages}</a>
+                        </>
+                )}
+
+                <!-- Botón siguiente -->
+                <a href={`?page=${Math.min(totalPages, page + 1)}`}
+                   class={`pagination-btn ${page === totalPages ? 'disabled' : ''}`}
+                   aria-disabled={page === totalPages}>
+                    Siguiente
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                         stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </nav>
 </section>
 
 <style is:global>
@@ -200,63 +247,125 @@ function getGenreName(id: number): string {
     }
 
     /* Estilos para asegurar que todas las cards tengan el mismo tamaño */
+    /* Cards mejoradas */
     .card-wrapper {
-        height: 100%;
         display: flex;
+        height: 100%;
+        transition: all 0.3s ease-in-out;
     }
 
-    .card-wrapper > :global(*) {
+    .card-wrapper:hover {
+        transform: translateY(-4px);
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
         width: 100%;
         height: 100%;
-        display: flex;
-        flex-direction: column;
+        background-color: white;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        transition: all 0.3s ease-in-out;
     }
 
-    /* Si el componente CardMovie tiene su propia estructura interna,
-       estas reglas asegurarán que mantenga proporciones consistentes */
-    .card-wrapper :global(.card),
-    .card-wrapper :global(article),
-    .card-wrapper :global(div) {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
+    .card-wrapper:hover > * {
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
 
-    /* Aseguramos que la imagen mantenga proporciones consistentes */
-    .card-wrapper :global(img) {
+    .card-wrapper img {
+        width: 100%;
         aspect-ratio: 2/3;
         object-fit: cover;
-        width: 100%;
+        transition: transform 0.3s ease-in-out;
     }
 
-    /* Si hay áreas de contenido, les permitimos expandirse según necesidad */
-    .card-wrapper :global(.content),
-    .card-wrapper :global(.card-body) {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
+    .card-wrapper:hover img {
+        transform: scale(1.05);
     }
 
-    /* Aseguramos que los títulos tengan altura consistente y manejen overflow */
-    .card-wrapper :global(h2),
-    .card-wrapper :global(h3),
-    .card-wrapper :global(.title) {
+    /* Paginación mejorada */
+    .pagination-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #374151;
+        background-color: #F9FAFB;
+        border: 1px solid #E5E7EB;
+    }
+
+    .pagination-btn:hover:not(.disabled) {
+        background-color: #E63946;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .pagination-btn-mobile {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #374151;
+        background-color: #F9FAFB;
+        border: 1px solid #E5E7EB;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    .pagination-btn-mobile:hover:not(.disabled) {
+        background-color: #E63946;
+        color: white;
+        transform: translateY(-1px);
+    }
+
+    .pagination-btn-mobile.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .pagination-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
         height: 2.5rem;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #6B7280;
+        background-color: transparent;
     }
 
-    /* Para descripciones u overviews, también controlamos la altura */
-    .card-wrapper :global(p),
-    .card-wrapper :global(.overview),
-    .card-wrapper :global(.description) {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
+    .pagination-number:hover {
+        background-color: #F3F4F6;
+        color: #374151;
+    }
+
+    .pagination-number.active {
+        background-color: #E63946;
+        color: white;
+        box-shadow: 0 2px 8px rgba(230, 57, 70, 0.3);
     }
 </style>
