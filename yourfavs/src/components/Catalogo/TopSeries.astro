@@ -49,7 +49,6 @@ function getGenreName(id: number): string {
     return genresMap[id] || "Otro";
 }
 
-
 // Calcular estadísticas de la página actual
 const totalMoviesShown = page * 20; // Asumiendo 20 películas por página
 const startIndex = (page - 1) * 20 + 1;
@@ -71,7 +70,6 @@ const endIndex = Math.min(page * 20, totalPages * 20);
             Descubre las series mejor valoradas por la crítica y el público mundial.
             <span class="text-coral-red font-medium">Solo lo mejor de las series</span>
         </p>
-
     </header>
 
     <!-- Información de paginación superior mejorada -->
@@ -114,6 +112,7 @@ const endIndex = Math.min(page * 20, totalPages * 20);
         </div>
     </div>
 
+    <!-- Grid mejorado con loading states visuales -->
     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
         {
             popularSeries.map((item) => (
@@ -152,7 +151,7 @@ const endIndex = Math.min(page * 20, totalPages * 20);
             <div class="flex items-center gap-2 px-4">
                 <span class="text-sm text-gray-600">Página</span>
                 <span class="px-3 py-1 bg-coral-red text-white rounded-lg font-semibold text-sm">{page}</span>
-                <span class="text-sm text-gray-600">de {totalPages}</span>
+                <span class="text-sm text-gray-600">/{totalPages}</span>
             </div>
 
             <a href={`?page=${Math.min(totalPages, page + 1)}`}
@@ -251,112 +250,42 @@ const endIndex = Math.min(page * 20, totalPages * 20);
     }
 
     /* Estilos para asegurar que todas las cards tengan el mismo tamaño */
-    .serie-card-wrapper {
-        height: 100%;
+    /* Cards mejoradas */
+    .card-wrapper {
         display: flex;
+        height: 100%;
+        transition: all 0.3s ease-in-out;
     }
 
-    .serie-card-wrapper > :global(*) {
+    .card-wrapper:hover {
+        transform: translateY(-4px);
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
         width: 100%;
         height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    /* Estilos específicos para los componentes de serie */
-    .serie-card-wrapper :global(.card),
-    .serie-card-wrapper :global(article),
-    .serie-card-wrapper :global(.serie-card) {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        border-radius: 0.5rem;
+        background-color: white;
+        border-radius: 1rem;
         overflow: hidden;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        background-color: white;
-        transition: transform 0.2s, box-shadow 0.2s;
+        transition: all 0.3s ease-in-out;
     }
 
-    .serie-card-wrapper:hover :global(.card),
-    .serie-card-wrapper:hover :global(article),
-    .serie-card-wrapper:hover :global(.serie-card) {
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    .card-wrapper:hover > * {
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     }
 
-    /* Aseguramos que la imagen mantenga proporciones consistentes */
-    .serie-card-wrapper :global(img) {
+    .card-wrapper img {
+        width: 100%;
         aspect-ratio: 2/3;
         object-fit: cover;
-        width: 100%;
+        transition: transform 0.3s ease-in-out;
     }
 
-    /* Áreas de contenido */
-    .serie-card-wrapper :global(.content),
-    .serie-card-wrapper :global(.card-body) {
-        flex-grow: 1;
-        display: flex;
-        flex-direction: column;
-        padding: 0.75rem;
-    }
-
-    /* Títulos de las series */
-    .serie-card-wrapper :global(h2),
-    .serie-card-wrapper :global(h3),
-    .serie-card-wrapper :global(.title) {
-        height: 2.5rem;
-        font-weight: 600;
-        font-size: 1rem;
-        margin-bottom: 0.5rem;
-        color: #1F2937;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-    }
-
-    /* Descripciones */
-    .serie-card-wrapper :global(p),
-    .serie-card-wrapper :global(.overview),
-    .serie-card-wrapper :global(.description) {
-        font-size: 0.875rem;
-        color: #4B5563;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        margin-bottom: 0.5rem;
-    }
-
-    /* Estilos para información de episodios */
-    .serie-card-wrapper :global(.episode-info) {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-        border-radius: 0.25rem;
-        margin-top: auto;
-        background-color: #F3F4F6;
-    }
-
-    .serie-card-wrapper :global(.next-episode) {
-        color: #0D9488;
-        font-weight: 500;
-    }
-
-    /* Badge para puntuación */
-    .serie-card-wrapper :global(.rating) {
-        position: absolute;
-        top: 0.5rem;
-        right: 0.5rem;
-        background-color: rgba(13, 148, 136, 0.9);
-        color: white;
-        border-radius: 9999px;
-        padding: 0.25rem 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    .card-wrapper:hover img {
+        transform: scale(1.05);
     }
 
     /* Paginación mejorada */
