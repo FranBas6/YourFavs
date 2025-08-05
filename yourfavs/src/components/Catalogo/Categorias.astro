@@ -267,73 +267,91 @@ function generateUrl(newCategory?: string, newPage: number = 1, newType?: string
     <div class="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-coral-red rounded-full"></div>
 </div>
 
-<!-- Navegación de filtros - mantener igual -->
-<div class="flex justify-center gap-4 mt-6 mb-6 sticky top-5 z-40 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 shadow-lg">
-    <a href={generateUrl(category, 1, 'all')}
-       class="button-bounce show-all-btn bg-green-600 text-white">
-        Todo
-    </a>
-    <a href={generateUrl(category, 1, 'movies')}
-       class="button-bounce px-5 py-2 bg-coral-red text-white rounded-full shadow-lg hover:bg-red-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-        Películas
-    </a>
-    <a href={generateUrl(category, 1, 'series')}
-       class="button-bounce px-5 py-2 bg-blue-500 text-white rounded-full shadow-lg hover:bg-blue-600 transition-all duration-300 text-sm font-semibold tracking-wide">
-        Series
-    </a>
+<!-- Navegación de filtros mejorada -->
+<div class="flex justify-center sticky top-5 z-40 mb-8">
+    <div class="inline-flex bg-white/95 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-gray-200">
+        <a href={generateUrl(category, 1, 'all')}
+           class={`filter-btn ${type === 'all' ? 'active' : ''}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M19 11H5m14-4H3m16 8H7m10 4H5"/>
+            </svg>
+            Todo
+        </a>
+        <a href={generateUrl(category, 1, 'movies')}
+           class={`filter-btn ${type === 'movies' ? 'active' : ''}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+            </svg>
+            Películas
+        </a>
+        <a href={generateUrl(category, 1, 'series')}
+           class={`filter-btn ${type === 'series' ? 'active' : ''}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+            Series
+        </a>
+    </div>
 </div>
 
-<!-- Paginación Mejorada para Móviles -->
-<nav aria-label="Paginación" class="relative z-10 flex items-center justify-center mb-8">
-    <!-- En pantallas pequeñas (móviles) - Diseño vertical compacto -->
-    <div class="flex flex-col w-full max-w-xs gap-2 p-2 bg-white rounded-lg shadow-md sm:hidden">
-        <div class="flex justify-center items-center px-2 py-1">
-            <span class="font-medium text-gray-700 text-sm">Página</span>
-            <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold text-sm">{page}</span>
-            <span class="font-medium text-gray-700 text-sm">de {totalPages}</span>
+<!-- Información de paginación superior mejorada y más responsive -->
+<div class="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 md:p-6 mb-8 shadow-sm border border-gray-100">
+    <div class="flex flex-col gap-6 md:gap-4 md:flex-row md:items-center md:justify-between">
+
+        <!-- Info de página -->
+        <div class="flex items-center gap-3">
+            <div class="flex items-center justify-center w-10 h-10 bg-coral-red/10 rounded-xl shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-coral-red" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+            </div>
+            <div class="text-sm">
+                <div class="font-semibold text-gray-900">
+                    Página <span class="text-coral-red">{page}</span> de <span class="text-coral-red">{totalPages}</span>
+                </div>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm text-gray-500">
+                    <span>Mostrando contenido {type === 'all' ? 'completo' : type === 'movies' ? 'de películas' : 'de series'} de {category}</span>
+                </div>
+            </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2">
-            <a href={generateUrl(category, Math.max(1, page - 1))}
-               class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-               aria-disabled={page === 1}>
-                <span class="mr-1">←</span> Anterior
-            </a>
+        <!-- Stats adicionales -->
+        <div class="flex flex-wrap justify-start md:justify-end items-center gap-x-4 gap-y-2 text-sm">
+            <div class="flex items-center gap-2 text-gray-600">
+                <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span>Actualizado hoy</span>
+            </div>
 
-            <a href={generateUrl(category, Math.min(totalPages, page + 1))}
-               class={`px-3 py-2 rounded-lg transition-all duration-300 flex items-center justify-center text-sm ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-               aria-disabled={page === totalPages}>
-                Siguiente <span class="ml-1">→</span>
-            </a>
+            <div class="flex items-center gap-2 text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                <span>Categorías</span>
+            </div>
         </div>
     </div>
-
-    <!-- En pantallas medianas y grandes - Diseño horizontal -->
-    <div class="hidden sm:flex items-center space-x-2 bg-white p-2 rounded-lg shadow-md">
-        <a href={generateUrl(category, Math.max(1, page - 1))}
-           class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === 1 ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-           aria-disabled={page === 1}>
-            <span class="mr-1">←</span> Anterior
-        </a>
-
-        <div class="flex items-center px-4">
-            <span class="font-medium text-gray-700">Página</span>
-            <span class="mx-2 px-3 py-1 bg-coral-red text-white rounded-md font-bold">{page}</span>
-            <span class="font-medium text-gray-700">de {totalPages}</span>
-        </div>
-
-        <a href={generateUrl(category, Math.min(totalPages, page + 1))}
-           class={`px-4 py-2 rounded-lg transition-all duration-300 flex items-center ${page === totalPages ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-blue-500 text-white hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
-           aria-disabled={page === totalPages}>
-            Siguiente <span class="ml-1">→</span>
-        </a>
-    </div>
-</nav>
+</div>
 
 <!-- Sección de Películas con mejor diseño -->
 {(type === 'all' || type === 'movies') && (
 <div class="mb-12" id="peliculas">
-    <h2 class="text-coral-red py-3 px-4 font-bold mb-1 text-3xl">PELICULAS</h2>
+    <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 bg-gradient-to-br bg-coral-red rounded-xl flex items-center justify-center shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+            </svg>
+        </div>
+        <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Películas</h2>
+        <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
+    </div>
 
     <div class="grid gap-8 grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 w-full px-4">
         {
@@ -356,8 +374,17 @@ function generateUrl(newCategory?: string, newPage: number = 1, newType?: string
 {(type === 'all' || type === 'series') && (
     <!-- Sección de Series con mejor diseño -->
 <div class="mb-12" id="series">
-    <h2 class="text-coral-red py-3 px-4 font-bold mb-1 text-3xl">SERIES</h2>
-
+    <div class="flex items-center gap-3 mb-6">
+        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                 viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+            </svg>
+        </div>
+        <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Series</h2>
+        <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
+    </div>
     <div class="grid gap-8 grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 w-full px-4">
         {
             latestSeries.map((item) => (
@@ -379,54 +406,93 @@ function generateUrl(newCategory?: string, newPage: number = 1, newType?: string
 </div>
     )}
 
-<!-- Paginación inferior mejorada -->
-<div class="mt-12 flex justify-center">
-    <div class="inline-flex rounded-md shadow-sm">
-        {page > 2 && (
-                <a href={generateUrl(category, 1)}
-                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-l-lg">
-                    1
-                </a>
-        )}
-
-        {page > 3 && (
-                <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                    ...
-                </span>
-        )}
-
-        {page > 1 && (
-                <a href={generateUrl(category, page - 1)}
-                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
-                    {page - 1}
-                </a>
-        )}
-
-        <a href={generateUrl(category, page)} class="px-3 py-2 bg-coral-red text-white border border-coral-red">
-            {page}
+<!-- Paginación mejorada -->
+<nav aria-label="Paginación" class="mt-12">
+    <!-- Navegación móvil -->
+    <div class="flex sm:hidden items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <a href={generateUrl(category, Math.max(1, page - 1), type)}
+           class={`pagination-btn-mobile ${page === 1 ? 'disabled' : ''}`}
+           aria-disabled={page === 1}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Anterior
         </a>
 
-        {page < totalPages && (
-                <a href={generateUrl(category, page + 1)}
-                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300">
-                    {page + 1}
-                </a>
-        )}
+        <div class="flex items-center gap-2 px-4">
+            <span class="text-sm text-gray-600">Página</span>
+            <span class="px-3 py-1 bg-coral-red text-white rounded-lg font-semibold text-sm">{page}</span>
+            <span class="text-sm text-gray-600">de {totalPages}</span>
+        </div>
 
-        {page < totalPages - 2 && (
-                <span class="px-3 py-2 bg-white text-gray-700 border-t border-b border-gray-300">
-                    ...
-                </span>
-        )}
-
-        {page < totalPages - 1 && (
-                <a href={generateUrl(category, totalPages)}
-                   class="px-3 py-2 bg-white text-gray-700 hover:bg-gray-50 border border-gray-300 rounded-r-lg">
-                    {totalPages}
-                </a>
-        )}
+        <a href={generateUrl(category, Math.min(totalPages, page + 1), type)}
+           class={`pagination-btn-mobile ${page === totalPages ? 'disabled' : ''}`}
+           aria-disabled={page === totalPages}>
+            Siguiente
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                 stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
     </div>
-</div>
+
+    <!-- Navegación escritorio -->
+    <div class="hidden sm:flex justify-center">
+        <div class="inline-flex items-center bg-white rounded-xl p-2 shadow-sm border border-gray-100">
+            <!-- Botón anterior -->
+            <a href={generateUrl(category, Math.max(1, page - 1), type)}
+               class={`pagination-btn ${page === 1 ? 'disabled' : ''}`}
+               aria-disabled={page === 1}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Anterior
+            </a>
+
+            <!-- Primera página -->
+            {page > 2 && (
+                    <>
+                        <a href={generateUrl(category, 1, type)} class="pagination-number">1</a>
+                        {page > 3 && <span class="px-2 text-gray-400">...</span>}
+                    </>
+            )}
+
+            <!-- Página anterior -->
+            {page > 1 && (
+                    <a href={generateUrl(category, page - 1, type)} class="pagination-number">{page - 1}</a>
+            )}
+
+            <!-- Página actual -->
+            <span class="pagination-number active">{page}</span>
+
+            <!-- Página siguiente -->
+            {page < totalPages && (
+                    <a href={generateUrl(category, page + 1, type)} class="pagination-number">{page + 1}</a>
+            )}
+
+            <!-- Última página -->
+            {page < totalPages - 1 && (
+                    <>
+                        {page < totalPages - 2 && <span class="px-2 text-gray-400">...</span>}
+                        <a href={generateUrl(category, totalPages, type)} class="pagination-number">{totalPages}</a>
+                    </>
+            )}
+
+            <!-- Botón siguiente -->
+            <a href={generateUrl(category, Math.min(totalPages, page + 1), type)}
+               class={`pagination-btn ${page === totalPages ? 'disabled' : ''}`}
+               aria-disabled={page === totalPages}>
+                Siguiente
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+                     stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+</nav>
 
 <style is:global>
     .text-coral-red {
@@ -454,7 +520,6 @@ function generateUrl(newCategory?: string, newPage: number = 1, newType?: string
         border-radius: 1rem;
         box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
         transform-origin: top center;
-        transition: all 0.4s ease;
     }
 
     /* En móviles, el menú está oculto por defecto */
@@ -470,19 +535,8 @@ function generateUrl(newCategory?: string, newPage: number = 1, newType?: string
         display: flex !important;
         transform: translateY(0);
         opacity: 1;
-        animation: slideDown 0.4s ease-out;
     }
 
-    @keyframes slideDown {
-        from {
-            transform: translateY(-20px);
-            opacity: 0;
-        }
-        to {
-            transform: translateY(0);
-            opacity: 1;
-        }
-    }
 
     /* Mejorar el botón de toggle */
     label[for="nav-togglee"] {
@@ -652,6 +706,117 @@ function generateUrl(newCategory?: string, newPage: number = 1, newType?: string
     .show-all-btn:hover {
         background-color: #15803d;
         box-shadow: 0 6px 8px -1px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Filtros mejorados */
+    .filter-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: 1rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #6B7280;
+        background-color: transparent;
+    }
+
+    .filter-btn:hover {
+        background-color: #F3F4F6;
+        color: #374151;
+        transform: translateY(-1px);
+    }
+
+    .filter-btn.active {
+        background-color: #E63946;
+        color: white;
+        box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
+    }
+
+    /* Paginación mejorada */
+    .pagination-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #374151;
+        background-color: #F9FAFB;
+        border: 1px solid #E5E7EB;
+    }
+
+    .pagination-btn:hover:not(.disabled) {
+        background-color: #E63946;
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
+    }
+
+    .pagination-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .pagination-btn-mobile {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #374151;
+        background-color: #F9FAFB;
+        border: 1px solid #E5E7EB;
+        min-width: 100px;
+        justify-content: center;
+    }
+
+    .pagination-btn-mobile:hover:not(.disabled) {
+        background-color: #E63946;
+        color: white;
+        transform: translateY(-1px);
+    }
+
+    .pagination-btn-mobile.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    .pagination-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.75rem;
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.2s ease-in-out;
+        color: #6B7280;
+        background-color: transparent;
+    }
+
+    .pagination-number:hover {
+        background-color: #F3F4F6;
+        color: #374151;
+    }
+
+    .pagination-number.active {
+        background-color: #E63946;
+        color: white;
+        box-shadow: 0 2px 8px rgba(230, 57, 70, 0.3);
     }
 
 </style>
