@@ -8,16 +8,26 @@ import HeaderButton from "./HeaderButton.astro";
         </a>
     </div>
 
-    <!-- Checkbox oculto para controlar la visibilidad del menú en móviles -->
-    <input type="checkbox" id="nav-toggle" class="hidden">
+    <!-- Toggle oculto -->
+    <input type="checkbox" id="nav-toggle" class="hidden peer" />
 
-    <!-- Botón de menú flotante solo en móvil -->
+    <!-- Botón hamburguesa (solo visible cuando NO está activo) -->
     <label for="nav-toggle"
-           class="md:hidden fixed top-4 right-4 z-[9999] bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-full shadow-lg transition">
+           class="md:hidden fixed top-4 right-4 z-[9999] bg-white text-indigo-600 hover:text-white hover:bg-indigo-700 p-3 rounded-full shadow-xl border border-indigo-600 transition-all duration-300 ease-in-out peer-checked:hidden">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
              stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </label>
+
+    <!-- Botón X (solo visible cuando SÍ está activo) -->
+    <label for="nav-toggle"
+           class="md:hidden fixed top-4 right-4 z-[9999] text-white bg-red-600 hover:bg-red-700 p-3 rounded-full shadow-xl transition-all duration-300 ease-in-out hidden peer-checked:flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+             stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"/>
         </svg>
     </label>
 
@@ -208,7 +218,6 @@ import HeaderButton from "./HeaderButton.astro";
         }
     }
 
-
     /* Mostrar el menú cuando el checkbox está marcado */
     #nav-toggle:checked ~ #nav-menu {
         display: flex;
@@ -237,10 +246,25 @@ import HeaderButton from "./HeaderButton.astro";
         }
     }
 
+    @keyframes fadeInScale {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    #nav-toggle:checked ~ #nav-menu {
+        animation: fadeInScale 0.3s ease-out forwards;
+    }
+
+
     #nav-menu {
         animation: fadeInUp 0.3s ease-out;
     }
-
 
     /* Contenedor flexible para el título */
     .title-container {
@@ -285,7 +309,6 @@ import HeaderButton from "./HeaderButton.astro";
             padding: 0.75rem;
             background: rgba(59, 130, 246, 0.95);
             backdrop-filter: blur(8px);
-            border-radius: 0.75rem;
             margin-top: 0.5rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
@@ -294,8 +317,7 @@ import HeaderButton from "./HeaderButton.astro";
     @media (max-width: 768px) {
         #nav-menu {
             position: fixed;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100vw;
             height: 100vh;
             flex-direction: column;
@@ -303,28 +325,61 @@ import HeaderButton from "./HeaderButton.astro";
             align-items: center;
             gap: 1.5rem;
             padding: 2rem;
-            background: rgba(30, 41, 59, 0.95); /* dark navy */
-            backdrop-filter: blur(10px);
-            z-index: 40;
+            background: rgba(30, 58, 138, 0.8); /* más transparente */
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(20px);
+            z-index: 9998;
             display: none;
+            overflow-y: auto;
         }
 
-        /* Mostrar el menú solo cuando el checkbox está marcado */
         #nav-toggle:checked ~ #nav-menu {
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            position: fixed;
-            left: 0;
-            right: 0;
-            z-index: 9998;
-            background: rgba(30, 41, 59, 0.95); /* dark navy */
-            backdrop-filter: blur(8px);
-            padding: 1.5rem;
-            border-radius: 0.75rem;
             animation: slideDown 0.3s ease-out forwards;
         }
 
+        #nav-menu a,
+        #nav-menu form {
+            width: 100%;
+            max-width: 320px;
+            text-align: center;
+        }
+    }
+
+    #nav-menu a {
+        font-size: 1rem;
+        font-weight: 500;
+        padding: 1rem;
+        border-radius: 9999px;
+        color: #fff;
+        transition: background-color 0.2s ease;
+    }
+
+    #nav-menu a:hover {
+        background-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Por defecto: solo se muestra el botón hamburguesa */
+    .menu-toggle-open {
+        display: block;
+    }
+    .menu-toggle-close {
+        display: none;
+    }
+
+    /* Si el checkbox está marcado, se oculta hamburguesa y aparece la X */
+    #nav-toggle:checked ~ .menu-toggle-open {
+        display: none;
+    }
+    #nav-toggle:checked ~ .menu-toggle-close {
+        display: block;
+    }
+
+    @media (min-width: 768px) {
+        /* Forzar ocultar los botones toggle en escritorio */
+        label[for="nav-toggle"] {
+            display: none !important;
+        }
     }
 
     .yourfavs-title-sm {
