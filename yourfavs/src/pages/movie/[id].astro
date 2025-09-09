@@ -172,7 +172,7 @@ const formatDate = (dateString: string) => {
 const providerLinks = {
     'Netflix': 'https://www.netflix.com/',
     'Disney Plus': 'https://www.disneyplus.com/',
-    'Max': 'https://www.max.com/',
+    'HBO Max': 'https://www.hbomax.com/',
     'Amazon Prime Video': 'https://www.primevideo.com/',
     'Apple TV+': 'https://tv.apple.com/',
     'Filmin': 'https://www.filmin.es/',
@@ -316,30 +316,57 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
     <article class="bg-gray-50">
         <!-- Hero Section con backdrop -->
         <div
-                class="relative w-full h-96 bg-cover bg-center bg-no-repeat"
-                style={`background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(https://image.tmdb.org/t/p/original${item?.backdrop_path})`}
+            class="relative w-full h-auto bg-cover bg-center bg-no-repeat"
+            style={`background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(https://image.tmdb.org/t/p/original${item?.backdrop_path})`}
         >
-            <div class="absolute inset-0 flex items-center justify-center flex-col px-4 text-center">
+            <div class="absolute inset-0"></div>
+            <div class="relative flex flex-col items-center justify-center px-4 py-12 text-center max-w-4xl mx-auto">
+                
+                <!-- 🎬 Título -->
                 <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
                     {item?.title}
                 </h1>
-                <div class="flex items-center gap-4 text-white mb-4">
+
+                <!-- ⭐ Info básica -->
+                <div class="flex flex-wrap items-center justify-center gap-4 text-white mb-4">
                     <span class="text-yellow-400 text-xl font-bold">
                         {item?.vote_average?.toFixed(1)} {getRatingStars(item?.vote_average)}
                     </span>
                     <span>{formatDate(item?.release_date)}</span>
                 </div>
-                {item?.genres && (
-                        <div class="flex flex-wrap justify-center gap-2 mb-6">
-                            {item.genres.map((genre: { id: number; name: string }) => (
-                                    <span class="bg-gray-800 bg-opacity-80 px-3 py-1 rounded-full text-xs text-white">
-                                        {genre.name}
-                                    </span>
-                            ))}
 
-                        </div>
+                <!-- 🎭 Géneros -->
+                {item?.genres && (
+                    <div class="flex flex-wrap justify-center gap-2 mb-6">
+                        {item.genres.map((genre: { id: number; name: string }) => (
+                            <span class="bg-gray-800 bg-opacity-80 px-3 py-1 rounded-full text-xs text-white">
+                                {genre.name}
+                            </span>
+                        ))}
+                    </div>
                 )}
-                <!-- Botón de Me gusta - Colocar después de la sección de géneros -->
+
+                <!-- 📖 Sinopsis con truncado -->
+                <div class="bg-black bg-opacity-50 rounded-xl p-4 mb-6 max-w-2xl">
+                    <h2 class="text-lg font-semibold text-white mb-2">Sinopsis</h2>
+                    <p
+                        id="overview-text"
+                        class="text-gray-200 text-sm md:text-base leading-relaxed line-clamp-4 transition-all"
+                    >
+                        {item?.overview || "No hay sinopsis disponible."}
+                    </p>
+                    {item?.overview && item.overview.length > 300 && (
+                        <button
+                            type="button"
+                            class="mt-2 text-blue-400 hover:text-blue-300 font-medium text-sm"
+                            onclick="const p=document.getElementById('overview-text'); p.classList.toggle('line-clamp-4'); this.textContent = p.classList.contains('line-clamp-4') ? 'Mostrar más' : 'Mostrar menos';"
+                        >
+                            Mostrar más
+                        </button>
+                    )}
+                </div>
+
+                <!-- ❤️ Botón de Me gusta -->
                 <form method="POST" class="mt-4">
                     <input type="hidden" name="id" value={item?.id}/>
                     <input type="hidden" name="poster_path" value={item?.poster_path || ''}/>
@@ -352,30 +379,28 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                     <input type="hidden" name="list_type" value="liked"/>
 
                     <button
-                            type="submit"
-                            class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all flex items-center gap-2 mx-auto"
-                            aria-live="polite"
+                        type="submit"
+                        class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all flex items-center gap-2 mx-auto"
+                        aria-live="polite"
                     >
                         {isInLiked ? (
-                                <>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
-                                         fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                                              clip-rule="evenodd"/>
-                                    </svg>
-                                    Ya me gusta
-                                </>
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                        d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                        clip-rule="evenodd"/>
+                                </svg>
+                                Ya me gusta
+                            </>
                         ) : (
-                                <>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
-                                         fill="none" stroke="currentColor">
-                                        <path fill-rule="evenodd"
-                                              d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                                              clip-rule="evenodd"/>
-                                    </svg>
-                                    Me gusta
-                                </>
+                            <>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                                    <path fill-rule="evenodd"
+                                        d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
+                                        clip-rule="evenodd"/>
+                                </svg>
+                                Me gusta
+                            </>
                         )}
                     </button>
                 </form>
@@ -733,12 +758,6 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
 
                 <!-- Columna Derecha: Detalles -->
                 <div class="md:w-2/3">
-                    <!-- Sinopsis -->
-                    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                        <h2 class="text-2xl font-bold text-blue-600 mb-4">Sinopsis</h2>
-                        <p class="text-gray-700 leading-relaxed">{item?.overview || "No hay sinopsis disponible."}</p>
-                    </div>
-
                     <!-- Trailer -->
                     {trailerUrl && (
                             <div class="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -906,16 +925,21 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                             <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo</h2>
                             <div class="text-gray-600">
                                 {directors?.length > 0 ? (
-                                        <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-                                            {directors.map((director) => (
-                                                    <li class="border-b border-gray-100 py-1 last:border-0">
-                                                        <span class="font-medium">{director.job}: </span>
-                                                        <span>{director.name}</span>
-                                                    </li>
-                                            ))}
-                                        </ul>
+                                <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                    {directors.map((member) => (
+                                    <li class="p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:shadow-sm transition">
+                                        <a
+                                        href={`/team/${member.name}`}
+                                        class="block text-gray-900 font-semibold hover:text-blue-600 transition"
+                                        >
+                                        {member.name}
+                                        </a>
+                                        <p class="text-sm text-gray-500">{member.job}</p>
+                                    </li>
+                                    ))}
+                                </ul>
                                 ) : (
-                                        <p class="text-gray-500">Información no disponible</p>
+                                <p class="text-gray-500">Información no disponible</p>
                                 )}
                             </div>
                         </div>
@@ -967,31 +991,34 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
 
                         <!-- Productoras -->
                         {item?.production_companies && item.production_companies.length > 0 && (
-                                <div class="bg-white p-6 rounded-lg shadow-md">
-                                    <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
-                                    <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                        {item.production_companies.map((company: {
-                                            logo_path?: string;
-                                            name: string
-                                        }) => (
-                                                <div class="flex flex-col items-center">
-                                                    {company?.logo_path ? (
-                                                            <img
-                                                                    src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
-                                                                    alt={company.name}
-                                                                    loading="lazy"
-                                                                    class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
-                                                            />
-                                                    ) : (
-                                                            <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
-                                                                <span class="text-xs text-gray-500">Sin logo</span>
-                                                            </div>
-                                                    )}
-                                                    <p class="text-xs text-center text-gray-500">{company.name}</p>
-                                                </div>
-                                        ))}
+                        <div class="bg-white p-6 rounded-lg shadow-md">
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
+
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                            {item.production_companies.map((company: { logo_path?: string; name: string }) => (
+                                <a
+                                href={`/productora/${company.name}`}
+                                class="flex flex-col items-center group"
+                                >
+                                {company?.logo_path ? (
+                                    <img
+                                    src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
+                                    alt={company.name}
+                                    loading="lazy"
+                                    class="w-20 h-20 object-contain rounded-md mb-2 transition-transform duration-200 group-hover:scale-110"
+                                    />
+                                ) : (
+                                    <div class="w-20 h-20 bg-gray-200 rounded-md flex items-center justify-center mb-2 group-hover:bg-gray-300 transition-colors">
+                                    <span class="text-xs text-gray-500">Sin logo</span>
                                     </div>
-                                </div>
+                                )}
+                                <p class="text-sm text-center text-gray-600 group-hover:text-blue-600 font-medium transition-colors">
+                                    {company.name}
+                                </p>
+                                </a>
+                            ))}
+                            </div>
+                        </div>
                         )}
 
                         <!-- MOVIES Recomendaciones -->

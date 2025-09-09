@@ -1,0 +1,1072 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getMoviesAndSeriesByMemberName } from "../../services/API/Team/InfoMember";
+import CardMovie from "../../components/Cards/CardMovie.astro";
+import CardSerie from "../../components/Cards/CardSerie.astro";
+
+const { name } = Astro.params;
+const { searchParams } = Astro.url;
+const sortBy = searchParams.get('sort') || 'quality'; // 'quality', 'popularity', 'date'
+
+if (!name) {
+    throw new Error("Nombre del miembro del equipo no encontrado en la URL");
+}
+
+// Obtener datos del miembro y sus trabajos
+const { 
+    success, 
+    memberInfo, 
+    movies, 
+    series, 
+    error 
+} = await getMoviesAndSeriesByMemberName(name, sortBy);
+
+if (!success) {
+    throw new Error(error || "Error al obtener información del miembro");
+}
+
+// Función para obtener el texto del rol principal
+function getMainRole(department: string, jobs: string[] = []): string {
+    // Mapeo de departamentos principales de TMDB a un rol más claro
+    const departmentMap: Record<string, string> = {
+        "Directing": "Director",
+        "Production": "Productor",
+        "Writing": "Guionista",
+        "Acting": "Actor/Actriz",
+        "Crew": "Equipo Técnico",
+        "Editing": "Editor",
+        "Sound": "Sonido",
+        "Art": "Diseño de Arte",
+        "Camera": "Cinematógrafo",
+        "Visual Effects": "Efectos Visuales"
+    };
+
+    // Mapeo de jobs concretos a traducciones
+    const jobMap: Record<string, string> = {
+        "Director": "Director",
+        "Executive Producer": "Productor Ejecutivo",
+        "Producer": "Productor",
+        "Writer": "Guionista",
+        "Screenplay": "Guionista",
+        "Actor": "Actor/Actriz",
+        "Actress": "Actor/Actriz"
+    };
+
+    // 1. Si hay un job específico que coincide en prioridad, lo usamos
+    for (const [key, value] of Object.entries(jobMap)) {
+        if (jobs.includes(key)) return value;
+    }
+
+    // 2. Si no, usamos el departamento principal
+    if (departmentMap[department]) {
+        return departmentMap[department];
+    }
+
+    // 3. Fallback
+    return "Profesional del cine";
+}
+
+const mainRole = memberInfo ? getMainRole(memberInfo.known_for_department, memberInfo.known_for) : "";
+const totalWorks = movies.length + series.length;
+
+// Definir los géneros comunes
+const genresMap: Record<number, string> = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+---
+
+<Layout title={`${name}`}>
+    <div class="container mx-auto px-4 py-8">
+        <nav class="floating-nav">
+            <!-- Botón flecha para móviles -->
+            <input type="checkbox" id="nav-toggle2" class="nav-toggle2" />
+            <label for="nav-toggle2" class="nav-arrow-btn">
+                <svg class="arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path class="arrow-path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                <span class="nav-count total-count">{totalWorks}</span>
+            </label>
+            
+            <!-- Menú desplegable horizontal -->
+            <div class="nav-menu">
+                <a href="#peliculas" class="nav-btn nav-btn-movies">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                    </svg>
+                    <span class="nav-text">Películas</span>
+                    <span class="nav-count">{movies.length}</span>
+                </a>
+                <a href="#series" class="nav-btn nav-btn-series">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    <span class="nav-text">Series</span>
+                    <span class="nav-count">{series.length}</span>
+                </a>
+            </div>
+        </nav>
+
+        <!-- Header del miembro -->
+        <div class="bg-gradient-to-r from-blue-900 to-purple-900 rounded-xl p-8 mb-10 text-white shadow-lg">
+            <div class="flex flex-col md:flex-row items-center gap-6">
+                {memberInfo?.profile_path && (
+                <img 
+                    src={`https://image.tmdb.org/t/p/w300${memberInfo.profile_path}`} 
+                    alt={name}
+                    class="w-36 h-36 rounded-full object-cover border-4 border-white/30 shadow-md"
+                />
+                )}
+                <div class="text-center md:text-left">
+                <h1 class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-pink-400 mb-3">
+                    {name}
+                </h1>
+                <p class="text-lg md:text-xl font-medium text-blue-200">{mainRole}</p>
+                {memberInfo?.birthday && (
+                    <p class="mt-2 text-blue-100 text-sm md:text-base">
+                    <span class="font-semibold">Nacimiento:</span> 
+                    {new Date(memberInfo.birthday).toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    })}
+                    {memberInfo.place_of_birth && ` • ${memberInfo.place_of_birth}`}
+                    </p>
+                )}
+                <p class="mt-1 text-blue-100 text-sm md:text-base">
+                    <span class="font-semibold">Trabajos encontrados:</span> {totalWorks}
+                    ({movies.length} películas, {series.length} series)
+                </p>
+                </div>
+            </div>
+
+                {memberInfo?.biography && (
+                    <div class="mt-8 bg-white/10 backdrop-blur-sm p-4 rounded-lg">
+                        <h3 class="text-lg font-semibold mb-2">Biografía</h3>
+
+                        <input type="checkbox" id="toggleBio" class="peer hidden" />
+
+                        <p class="text-blue-50 leading-relaxed line-clamp-5 peer-checked:line-clamp-none transition-all">
+                        {memberInfo.biography}
+                        </p>
+
+                        <label 
+                        for="toggleBio" 
+                        class="mt-3 inline-block text-sm font-medium text-blue-300 hover:text-blue-200 cursor-pointer"
+                        >
+                        Mostrar
+                        </label>
+                    </div>
+                )}
+            </div>
+
+        <!-- Controles de ordenación -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <!-- Título -->
+            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 text-center sm:text-left">
+                FILMOGRAFÍA ({totalWorks})
+            </h2>
+
+            <!-- Botones -->
+            <div class="flex flex-wrap justify-center sm:justify-end gap-3">
+                <a 
+                    href="?sort=quality"
+                    class={`px-4 py-2 rounded-full font-medium transition-all ${
+                    sortBy === 'quality'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                >
+                    Mejor Valoradas
+                </a>
+                <a 
+                    href="?sort=popularity"
+                    class={`px-4 py-2 rounded-full font-medium transition-all ${
+                    sortBy === 'popularity'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                >
+                    Más Populares
+                </a>
+                <a 
+                    href="?sort=date"
+                    class={`px-4 py-2 rounded-full font-medium transition-all ${
+                    sortBy === 'date'
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                >
+                    Más Recientes
+                </a>
+            </div>
+        </div>
+
+        <!-- Sección de Películas -->
+        <section id="peliculas" class="mb-16 content-section scroll-mt-24">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="p-3 rounded-full bg-coral-red-alpha text-coral-red">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">
+                    PELÍCULAS <span class="text-gray-500">({movies.length})</span>
+                </h2>
+                <div class="flex-grow h-0.5 bg-gradient-to-r from-coral-red/80 to-transparent"></div>
+            </div>
+
+            {movies.length === 0 ? (
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                            </svg>
+                        </div>
+                        <h3 class="empty-state-title">No se encontraron películas</h3>
+                        <p class="empty-state-description">{name} no tiene películas registradas en nuestra base de
+                            datos.</p>
+                    </div>
+            ) : (
+                    <div class="content-grid">
+                        {
+                            movies.map((item) => (
+                                    <div class="card-wrapper">
+                                        <CardMovie
+                                                id={item.id.toString()}
+                                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                title={item.title}
+                                                vote_average={item.vote_average}
+                                                overview={item.overview}
+                                                release_date={item.release_date}
+                                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                                character={item.character}
+                                        />
+                                    </div>
+                            ))
+                        }
+                    </div>
+            )}
+        </section>
+
+        <!-- Sección de Series -->
+        <section id="series" class="mb-16 content-section scroll-mt-24">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="p-3 rounded-full bg-coral-red-alpha text-coral-red">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
+                             stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-bold text-gray-800">
+                    SERIES <span class="text-gray-500">({series.length})</span>
+                </h2>
+                <div class="flex-grow h-0.5 bg-gradient-to-r from-coral-red/80 to-transparent"></div>
+            </div>
+
+            {series.length === 0 ? (
+                    <div class="empty-state">
+                        <div class="empty-state-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24"
+                                 stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
+                                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <h3 class="empty-state-title">No se encontraron series</h3>
+                        <p class="empty-state-description">{name} no tiene series registradas en nuestra base de
+                            datos.</p>
+                    </div>
+            ) : (
+                    <div class="content-grid">
+                        {
+                            series.map((item) => (
+                                    <div class="card-wrapper">
+                                        <CardSerie
+                                                id={item.id.toString()}
+                                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                name={item.name}
+                                                vote_average={item.vote_average}
+                                                overview={item.overview}
+                                                first_air_date={item.first_air_date}
+                                                seasons={item.seasons}
+                                                last_episode_to_air={item.last_episode_to_air}
+                                                next_episode_to_air={item.next_episode_to_air}
+                                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                                character={item.character}
+                                        />
+                                    </div>
+                            ))
+                        }
+                    </div>
+            )}
+        </section>
+    </div>
+</Layout>
+
+<style is:global>
+    /* Variables y colores base */
+    :root {
+        --coral-red: #E63946;
+        --coral-red-light: #f8656f;
+        --coral-red-dark: #c41e2b;
+        --coral-red-alpha: rgba(230, 57, 70, 0.1);
+        --shadow-light: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --shadow-medium: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        --shadow-large: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        --border-radius: 12px;
+    }
+
+    /* Scroll suave */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Estilos generales */
+    body {
+        background-color: #F3F4F6;
+        transition: background 0.3s ease;
+    }
+
+    .text-coral-red {
+        color: var(--coral-red);
+    }
+
+    .bg-coral-red {
+        background-color: var(--coral-red);
+    }
+
+    .line-clamp-4 {
+        display: -webkit-box;
+        -webkit-line-clamp: 4;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Secciones de contenido mejoradas */
+    .content-section {
+        animation: fadeInUp 0.8s ease-out;
+        scroll-margin-top: 6rem;
+    }
+
+    .section-header-container {
+        display: flex;
+        align-items: center;
+        margin-bottom: 2rem;
+        gap: 1rem;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        color: var(--coral-red);
+        font-weight: 800;
+        font-size: 2rem;
+        letter-spacing: -0.025em;
+        white-space: nowrap;
+        gap: 0.75rem;
+    }
+
+    .section-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 48px;
+        height: 48px;
+        background: var(--coral-red-alpha);
+        border-radius: 12px;
+        color: var(--coral-red);
+    }
+
+    .section-count {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #6c757d;
+        margin-left: 0.5rem;
+    }
+
+    .section-header-line {
+        flex-grow: 1;
+        height: 3px;
+        background: linear-gradient(90deg, var(--coral-red) 0%, rgba(230, 57, 70, 0.3) 50%, rgba(230, 57, 70, 0) 100%);
+        border-radius: 2px;
+    }
+
+    /* Cuadrícula de contenido */
+    .content-grid {
+        display: grid;
+        gap: 1.5rem;
+        grid-template-columns: repeat(1, minmax(0, 1fr));
+    }
+
+    @media (min-width: 480px) {
+        .content-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 640px) {
+        .content-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 768px) {
+        .content-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .content-grid {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+    }
+
+    /* Tarjetas mejoradas */
+    .card-wrapper {
+        transform: translateY(0);
+        transition: var(--transition-smooth);
+        height: 100%;
+        position: relative;
+    }
+
+    .card-wrapper:hover {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: var(--shadow-large);
+        z-index: 10;
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        box-shadow: var(--shadow-medium);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        transition: var(--transition-smooth);
+    }
+
+    .card-wrapper img {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+        transition: transform 0.5s ease;
+    }
+
+    .card-wrapper:hover img {
+        transform: scale(1.05);
+    }
+
+    .card-wrapper h3,
+    .card-wrapper h4 {
+        height: auto;
+        min-height: 3em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        font-weight: 600;
+        padding: 1rem 1rem 0.5rem;
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.4;
+    }
+
+    .card-wrapper p {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        flex-grow: 1;
+        line-height: 1.5;
+        padding: 0.5rem 1rem 1rem;
+        margin: 0;
+        font-size: 0.9rem;
+        color: #6c757d;
+    }
+
+    /* Estado vacío mejorado */
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        background: linear-gradient(135deg, rgba(230, 57, 70, 0.03) 0%, rgba(230, 57, 70, 0.01) 100%);
+        border-radius: var(--border-radius);
+        border: 2px dashed rgba(230, 57, 70, 0.2);
+        margin: 2rem 0;
+    }
+
+    .empty-state-icon {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 1.5rem;
+        color: rgba(230, 57, 70, 0.4);
+    }
+
+    .empty-state-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--coral-red);
+        margin-bottom: 0.75rem;
+    }
+
+    .empty-state-description {
+        color: #6c757d;
+        font-size: 1rem;
+        line-height: 1.6;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    /* Animaciones */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Mejoras responsivas */
+    @media (max-width: 768px) {
+        .section-title {
+            font-size: 1.5rem;
+            white-space: normal; /* Cambiar de nowrap a normal */
+            flex-wrap: wrap; /* Permitir que se envuelva */
+            justify-content: center; /* Centrar en móviles */
+        }
+
+        .section-header-container {
+            flex-direction: column; /* Cambiar a columna en móviles */
+            align-items: center;
+            text-align: center;
+            gap: 0.5rem;
+        }
+
+        .quick-nav {
+            justify-content: center;
+        }
+
+        .nav-pill {
+            font-size: 0.85rem;
+            padding: 0.625rem 1rem;
+        }
+
+        .section-header-line {
+            width: 100%;
+            max-width: 200px; /* Limitar el ancho de la línea */
+        }
+    }
+
+    @media (max-width: 640px) {
+        .content-grid {
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem; /* Reducir de 1rem */
+            padding: 0 0.5rem; /* Añadir padding lateral pequeño */
+        }
+
+        .card-wrapper {
+            min-width: 0; /* Permitir que se compriman */
+            width: 100%;
+        }
+    }
+
+    /* Modo oscuro mejorado */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --coral-red: #ff6b7a;
+            --coral-red-light: #ff8f9c;
+            --coral-red-dark: #e8495a;
+            --coral-red-alpha: rgba(255, 107, 122, 0.15);
+        }
+
+        body {
+            background-color: #1a202c;
+            color: #e2e8f0;
+        }
+
+        .card-wrapper > * {
+            background: rgba(26, 32, 44, 0.95);
+            color: #e2e8f0;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .card-wrapper p {
+            color: #a0aec0;
+        }
+
+        .card-wrapper:hover {
+            box-shadow: 0 20px 40px -10px rgba(255, 107, 122, 0.2);
+        }
+
+        .empty-state {
+            background: linear-gradient(135deg, rgba(255, 107, 122, 0.05) 0%, rgba(255, 107, 122, 0.02) 100%);
+            border: 2px dashed rgba(255, 107, 122, 0.3);
+        }
+
+        .empty-state-icon {
+            color: rgba(255, 107, 122, 0.5);
+        }
+
+        .empty-state-description {
+            color: #a0aec0;
+        }
+    }
+
+    /* Accesibilidad mejorada */
+    .nav-pill:focus-visible,
+    .read-more-btn:focus-visible {
+        outline: 2px solid var(--coral-red);
+        outline-offset: 2px;
+    }
+
+    /* Reducir movimiento para usuarios que lo prefieran */
+    @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+        }
+
+        html {
+            scroll-behavior: auto;
+        }
+    }
+
+    /* Cambiar el texto dinámicamente */
+    #toggleBio:checked + p + label::after {
+        content: " menos";
+    }
+    #toggleBio:not(:checked) + p + label::after {
+        content: " más";
+    }
+ 
+    /* ===== NAVEGACIÓN FLOTANTE CON FLECHA LATERAL ===== */
+    .floating-nav {
+        position: fixed;
+        right: 1.5rem;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 50;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        opacity: 0;
+        visibility: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        animation: slideInFromRight 0.6s ease-out 1s forwards;
+    }
+
+    /* Ocultar el checkbox */
+    .nav-toggle2 {
+        display: none;
+    }
+
+    /* Ocultar el botón flecha en desktop */
+    .nav-arrow-btn {
+        display: none;
+    }
+
+    /* Menú desktop (vertical) */
+    .nav-menu {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    /* Botones desktop */
+    .nav-btn {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(230, 57, 70, 0.2);
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        color: #374151;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.875rem;
+        gap: 0.5rem;
+        min-width: 140px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateX(0);
+    }
+
+    .nav-btn:hover {
+        background: var(--coral-red);
+        color: white;
+        border-color: var(--coral-red);
+        box-shadow: 0 8px 25px rgba(230, 57, 70, 0.3);
+        transform: translateX(-5px) scale(1.05);
+    }
+
+    .nav-icon {
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+    }
+
+    .nav-text {
+        flex-grow: 1;
+        text-align: left;
+    }
+
+    .nav-count {
+        background: rgba(230, 57, 70, 0.1);
+        color: var(--coral-red);
+        padding: 0.25rem 0.5rem;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        min-width: 28px;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+
+    .nav-btn:hover .nav-count {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+
+    /* Efectos especiales para cada botón */
+    .nav-btn-movies {
+        border-left: 4px solid #3B82F6;
+    }
+
+    .nav-btn-series {
+        border-left: 4px solid #10B981;
+    }
+
+    .nav-btn-movies:hover {
+        background: linear-gradient(135deg, var(--coral-red), #3B82F6);
+    }
+
+    .nav-btn-series:hover {
+        background: linear-gradient(135deg, var(--coral-red), #10B981);
+    }
+
+    /* Responsivo para tablets */
+    @media (max-width: 1024px) {
+        .floating-nav {
+            right: 1rem;
+        }
+        
+        .nav-btn {
+            min-width: 120px;
+            padding: 0.625rem 0.875rem;
+            font-size: 0.8rem;
+        }
+        
+        .nav-icon {
+            width: 18px;
+            height: 18px;
+        }
+    }
+
+    /* ===== MÓVILES: FLECHA LATERAL CON DESPLIEGUE HORIZONTAL ===== */
+    @media (max-width: 768px) {
+        .floating-nav {
+            position: fixed;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            flex-direction: row;
+            align-items: center;
+            gap: 0;
+        }
+        
+        /* Mostrar botón flecha */
+        .nav-arrow-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            width: 48px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(230, 57, 70, 0.2);
+            border-right: none;
+            border-radius: 12px 0 0 12px;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            color: #374151;
+            z-index: 51;
+        }
+        
+        .nav-arrow-btn:hover {
+            background: var(--coral-red);
+            color: white;
+            border-color: var(--coral-red);
+            box-shadow: -6px 0 25px rgba(230, 57, 70, 0.3);
+        }
+        
+        .arrow-icon {
+            width: 24px;
+            height: 24px;
+            transition: all 0.3s ease;
+        }
+        
+        /* Contador total en el botón flecha */
+        .total-count {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            min-width: 20px;
+            height: 20px;
+            padding: 0;
+            border-radius: 50%;
+            font-size: 0.65rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            background: var(--coral-red);
+            color: white;
+            border: 2px solid white;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-arrow-btn:hover .total-count {
+            background: white;
+            color: var(--coral-red);
+        }
+        
+        /* Animación de la flecha */
+        .nav-toggle2:checked + .nav-arrow-btn .arrow-icon {
+            transform: rotate(180deg);
+        }
+        
+        .nav-toggle2:checked + .nav-arrow-btn {
+            border-radius: 0 12px 12px 0;
+            border-right: 1px solid rgba(230, 57, 70, 0.2);
+            border-left: none;
+        }
+        
+        .nav-toggle2:checked + .nav-arrow-btn:hover {
+            border-color: var(--coral-red);
+        }
+        
+        /* Menú desplegable horizontal */
+        .nav-menu {
+            flex-direction: row;
+            gap: 0;
+            height: 80px;
+            max-width: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            pointer-events: none;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(230, 57, 70, 0.2);
+            border-right: none;
+            border-radius: 12px 0 0 12px;
+            box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .nav-toggle2:checked ~ .nav-menu {
+            max-width: 300px;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        /* Botones en el menú móvil horizontal */
+        .nav-btn {
+            min-width: 140px;
+            height: 78px;
+            padding: 0.75rem 1rem;
+            justify-content: flex-start;
+            border-radius: 0;
+            border: none;
+            border-right: 1px solid rgba(230, 57, 70, 0.1);
+            background: transparent;
+            transform: translateX(20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            flex-direction: column;
+            text-align: center;
+            gap: 0.25rem;
+        }
+        
+        .nav-btn:last-child {
+            border-right: none;
+        }
+        
+        .nav-toggle2:checked ~ .nav-menu .nav-btn {
+            transform: translateX(0);
+        }
+        
+        .nav-toggle2:checked ~ .nav-menu .nav-btn:nth-child(1) {
+            transition-delay: 0.1s;
+        }
+        
+        .nav-toggle2:checked ~ .nav-menu .nav-btn:nth-child(2) {
+            transition-delay: 0.2s;
+        }
+        
+        .nav-btn:hover {
+            background: rgba(230, 57, 70, 0.1);
+            transform: translateX(0) scale(1.02);
+        }
+        
+        .nav-btn .nav-icon {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .nav-btn .nav-text {
+            font-size: 0.75rem;
+            text-align: center;
+            flex-grow: 0;
+        }
+        
+        .nav-btn .nav-count {
+            margin-top: 0.125rem;
+            font-size: 0.7rem;
+            min-width: 24px;
+            height: 18px;
+            padding: 0;
+        }
+        
+        /* Efectos hover para móvil */
+        .nav-btn-movies:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3B82F6;
+        }
+        
+        .nav-btn-series:hover {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10B981;
+        }
+    }
+
+    /* Para móviles pequeños */
+    @media (max-width: 380px) {
+        .nav-arrow-btn {
+            width: 42px;
+            height: 70px;
+        }
+        
+        .arrow-icon {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .total-count {
+            min-width: 18px;
+            height: 18px;
+            font-size: 0.6rem;
+            top: 6px;
+            left: 6px;
+        }
+        
+        .nav-menu {
+            height: 70px;
+        }
+        
+        .nav-btn {
+            min-width: 120px;
+            height: 68px;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.7rem;
+        }
+        
+        .nav-toggle2:checked ~ .nav-menu {
+            max-width: 250px;
+        }
+    }
+
+    /* Accesibilidad */
+    .nav-arrow-btn:focus-visible,
+    .nav-btn:focus-visible {
+        outline: 2px solid var(--coral-red);
+        outline-offset: 2px;
+    }
+
+    /* Reducir movimiento para usuarios sensibles */
+    @media (prefers-reduced-motion: reduce) {
+        .floating-nav,
+        .nav-btn,
+        .nav-arrow-btn,
+        .nav-menu,
+        .arrow-icon {
+            transition: none;
+            animation: none;
+        }
+        
+        .nav-btn:hover,
+        .nav-arrow-btn:hover {
+            transform: none;
+        }
+        
+        .nav-toggle2:checked + .nav-arrow-btn .arrow-path {
+            transform: none;
+        }
+    }
+
+    /* Animación original para desktop */
+    @keyframes slideInFromRight {
+        from {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-50%) translateX(100px);
+        }
+        to {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(-50%) translateX(0);
+        }
+    }
+</style>
