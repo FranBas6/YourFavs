@@ -25,7 +25,7 @@ export const fetchMovieDetails = async (id: string | number) => {
     }
 };
 
-// Obtener películas en cartelera
+// Obtener últimas películas lanzadas
 export const getLatestMovies = async ({page}: { page?: string }): Promise<Movie[]> => {
     const pageNumber = page || "1";
 

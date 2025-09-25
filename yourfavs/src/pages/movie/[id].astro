@@ -346,24 +346,24 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                     </div>
                 )}
 
-                <!-- 📖 Sinopsis con truncado -->
+                <!-- 🚀 Sinopsis integrada con truncado sin JS -->
                 <div class="bg-black bg-opacity-50 rounded-xl p-4 mb-6 max-w-2xl">
-                    <h2 class="text-lg font-semibold text-white mb-2">Sinopsis</h2>
-                    <p
-                        id="overview-text"
-                        class="text-gray-200 text-sm md:text-base leading-relaxed line-clamp-4 transition-all"
-                    >
-                        {item?.overview || "No hay sinopsis disponible."}
-                    </p>
-                    {item?.overview && item.overview.length > 300 && (
-                        <button
-                            type="button"
-                            class="mt-2 text-blue-400 hover:text-blue-300 font-medium text-sm"
-                            onclick="const p=document.getElementById('overview-text'); p.classList.toggle('line-clamp-4'); this.textContent = p.classList.contains('line-clamp-4') ? 'Mostrar más' : 'Mostrar menos';"
-                        >
-                            Mostrar más
-                        </button>
-                    )}
+                <h2 class="text-lg font-semibold text-white mb-2">Sinopsis</h2>
+
+                <!-- Contenedor con checkbox oculto -->
+                <input type="checkbox" id="toggle-sinopsis" class="peer hidden" />
+
+                <!-- Párrafo truncado si no está activado -->
+                <p class="text-gray-200 text-sm md:text-base leading-relaxed max-h-24 overflow-hidden peer-checked:max-h-[1000px] transition-all">
+                    {item?.overview || "No hay sinopsis disponible."}
+                </p>
+
+                {item?.overview && item.overview.length > 250 && (
+                    <label
+                    for="toggle-sinopsis"
+                    class="mt-2 inline-block cursor-pointer text-blue-400 hover:text-blue-300 font-medium text-sm peer-checked:before:content-['Mostrar_menos'] before:content-['Mostrar_más']"
+                    ></label>
+                )}
                 </div>
 
                 <!-- ❤️ Botón de Me gusta -->

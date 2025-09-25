@@ -60,7 +60,13 @@ const {
 } = Astro.props;
 
 // Calculate number of seasons
-const numberOfSeasons = seasons?.filter(season => season.season_number !== 0).length || 0;
+// Extraer la temporada válida (excluyendo especiales con season_number === 0)
+const validSeasons = seasons?.filter(season => season.season_number !== 0) || [];
+const numberOfSeasons = validSeasons.length;
+
+// Si solo hay 1 temporada, coger la primera
+const singleSeason = numberOfSeasons === 1 ? validSeasons[0] : null;
+
 
 // Determine if the show is still running
 const isRunning = next_episode_to_air ? true : false;
@@ -189,18 +195,20 @@ const getRatingColor = (rating: number): string => {
                     <span class="text-xs">{getAirPeriod()}</span>
                 </div>
 
-                {/* Número de temporadas - si está disponible */}
+                {/* Número de temporadas o episodios si solo hay 1 temporada */}
                 {numberOfSeasons > 0 && (
-                        <div class="info-pill text-coral-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
-                                 stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                            </svg>
-                            <span class="text-xs">
-                {numberOfSeasons} {numberOfSeasons === 1 ? "Temporada" : "Temporadas"}
-            </span>
-                        </div>
+                <div class="info-pill text-coral-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    <span class="text-xs">
+                    {singleSeason
+                        ? `${singleSeason.episode_count} Episodios`
+                        : `${numberOfSeasons} ${numberOfSeasons === 1 ? "Temporada" : "Temporadas"}`}
+                    </span>
+                </div>
                 )}
             </div>
 
@@ -260,11 +268,6 @@ const getRatingColor = (rating: number): string => {
         @apply text-xs px-2 py-0.5 rounded-full bg-dark-blue text-coral-white;
         border: 1px solid rgba(255, 255, 255, 0.2);
         transition: background-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .genre-tag:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        transform: translateY(-1px);
     }
 
     .info-pill {

@@ -30,6 +30,11 @@ const formatDate = (dateString: string | undefined): string => {
 
 // Limitar géneros a mostrar
 const displayGenres = genres?.slice(0, 2) || [];
+// Función para formatear el nombre de la categoría para la URL
+const formatCategoryForUrl = (name: string): string => {
+    // Reemplaza espacios por guiones bajos y elimina tildes
+    return name.normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/ /g, "_");
+};
 
 // Placeholder para imagen no disponible
 const placeholderImg = "/placeholder.jpg";
@@ -185,11 +190,6 @@ const getRatingColor = (rating: number): string => {
         @apply text-xs px-2 py-0.5 rounded-full bg-dark-blue text-coral-white;
         border: 1px solid rgba(255, 255, 255, 0.2);
         transition: background-color 0.2s ease, transform 0.2s ease;
-    }
-
-    .genre-tag:hover {
-        background-color: rgba(255, 255, 255, 0.1);
-        transform: translateY(-1px);
     }
 
     .info-pill {
