@@ -62,86 +62,27 @@ function getGenreName(id: number): string {
     return genresMap[id] || "Otro";
 }
 
-const minRating = parseFloat(new URLSearchParams(Astro.request.url).get('minRating') || '0');
+// Paginación - obtener parámetros
+const seriesPage = parseInt(Astro.url.searchParams.get("seriesPage") || "1");
+const moviesPage = parseInt(Astro.url.searchParams.get("moviesPage") || "1");
 
-// Función para filtrar contenido
-function filterContent(items: any[], type: 'movie' | 'serie') {
-    return items.filter(item => {
-        const title = type === 'movie' ? item.title : item.name;
-        const overview = item.overview || '';
-        const genreList = item.genres || [];
-        const rating = item.vote_average || 0;
+const ITEMS_PER_PAGE = 20;
 
-        const searchMatch =
-            !searchQuery ||
-            (title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                overview.toLowerCase().includes(searchQuery.toLowerCase()));
+// Calcular elementos a mostrar
+const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
+const moviesItemsToShow = moviesPage * ITEMS_PER_PAGE;
 
-        const genreMatch = !genreFilter || genreList.some((g: {
-            id: number;
-            name: string
-        }) => g.id.toString() === genreFilter);
+const seriesPaginadas = seriesPendientes.slice(0, seriesItemsToShow);
+const peliculasPaginadas = peliculasPendientes.slice(0, moviesItemsToShow);
 
-        const ratingMatch = !minRating || item.vote_average >= minRating;
-
-        return searchMatch && genreMatch && ratingMatch;
-    });
-}
-
-// Aplicar filtros
-const seriesFiltradas = filterContent(seriesPendientes, 'serie');
-const peliculasFiltradas = filterContent(peliculasPendientes, 'movie');
-
-// Obtener géneros únicos del contenido actual
-function getUniqueGenres() {
-    const genreMap = new Map<number, string>();
-
-    const processGenres = (items: any[]) => {
-        items.forEach(item => {
-            const genres = item.genre_ids || item.genres || [];
-            genres.forEach((genre: any) => {
-                // Si es un objeto con id y name
-                if (typeof genre === 'object' && genre?.id && genre?.name) {
-                    genreMap.set(genre.id, genre.name);
-                }
-                // Si es solo un ID numérico
-                else if (typeof genre === 'number') {
-                    const genreName = getGenreName(genre);
-                    genreMap.set(genre, genreName);
-                }
-                // Si es un string, buscar el ID correspondiente
-                else if (typeof genre === 'string') {
-                    // Buscar ID por nombre en el mapa inverso
-                    const genreId = Object.entries(genresMap)
-                        .find(([_, name]) => name === genre)?.[0];
-                    if (genreId) {
-                        genreMap.set(parseInt(genreId), genre);
-                    }
-                }
-            });
-        });
-    };
-
-    if (showSeries || showAll) {
-        processGenres(seriesPendientes);
-    }
-
-    if (showMovies || showAll) {
-        processGenres(peliculasPendientes);
-    }
-
-    return Array.from(genreMap.entries())
-        .map(([id, name]) => ({id, name}))
-        .sort((a, b) => a.name.localeCompare(b.name));
-}
-
-const availableGenres = getUniqueGenres();
+const hasMoreSeries = seriesPendientes.length > seriesItemsToShow;
+const hasMoreMovies = peliculasPendientes.length > moviesItemsToShow;
 
 // Función para construir URL con parámetros
 function buildUrl(params: Record<string, string>) {
     const url = new URL(Astro.url);
     Object.entries(params).forEach(([key, value]) => {
-        if (value && value !== 'todos' && value !== '') {
+        if (value && value !== 'todos' && value !== '' && value !== '1') {
             url.searchParams.set(key, value);
         } else {
             url.searchParams.delete(key);
@@ -250,163 +191,8 @@ const stats = calculateStats();
                    "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
                 Películas
             </a>
-
-            <!-- Botón para mostrar/ocultar búsqueda -->
-            <label for="search-toggle"
-                   class="search-toggle-btn px-4 py-2 rounded-full text-sm font-semibold tracking-wide transition-all bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 hover:scale-105 cursor-pointer flex items-center gap-2 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                <span class="toggle-text">Filtros y Búsqueda</span>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 chevron transition-transform" fill="none"
-                     viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                </svg>
-            </label>
         </div>
     </nav>
-
-    <!-- Panel de búsqueda -->
-    <div class="search-panel bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-3xl shadow-2xl border border-blue-100 mb-8 overflow-hidden">
-        <div class="search-content p-6 sm:p-8 space-y-8">
-            <form method="GET" class="space-y-8">
-                <input type="hidden" name="filter" value={filter}/>
-
-                <!-- Grupo de filtros en tarjetas -->
-                <div class="flex flex-col gap-4 lg:flex-row lg:gap-6 justify-center">
-                    <!-- Búsqueda -->
-                    <div class="flex-1 bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-col gap-2 transition-transform hover:scale-105">
-                        <label for="search" class="flex items-center gap-2 text-base font-semibold text-blue-800 mb-1">
-                            <svg class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                            </svg>
-                            Buscar
-                        </label>
-                        <input
-                                type="text"
-                                id="search"
-                                name="search"
-                                value={searchQuery}
-                                placeholder="Título o descripción..."
-                                class="w-full px-4 py-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-transparent text-gray-900 placeholder-gray-400 bg-blue-50 transition"
-                        />
-                    </div>
-
-                    <!-- Nota mínima -->
-                    <div class="flex-1 bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-col gap-2 transition-transform hover:scale-105">
-                        <label for="minRating"
-                               class="flex items-center gap-2 text-base font-semibold text-indigo-800 mb-1">
-                            <svg class="h-5 w-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3"/>
-                                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none"/>
-                            </svg>
-                            Nota mínima
-                        </label>
-                        <div class="relative flex items-center gap-4">
-                            <input
-                                    type="range"
-                                    id="minRating"
-                                    name="minRating"
-                                    min="0"
-                                    max="10"
-                                    step="0.1"
-                                    value={minRating || 0}
-                                    class="rating-slider w-full"
-                                    oninput="document.getElementById('ratingValue').textContent = this.value"
-                            />
-                            <span id="ratingValue" class="text-base font-bold text-indigo-700 w-12 text-right">
-                        {minRating || 0}
-                    </span>
-                        </div>
-                    </div>
-
-                    <!-- Género -->
-                    <div class="flex-1 bg-white rounded-2xl shadow-md border border-gray-100 p-5 flex flex-col gap-2 transition-transform hover:scale-105">
-                        <label for="genre" class="flex items-center gap-2 text-base font-semibold text-pink-800 mb-1">
-                            <svg class="h-5 w-5 text-pink-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                      d="M4 6h16M4 12h16M4 18h16"/>
-                            </svg>
-                            Género
-                        </label>
-                        <select
-                                id="genre"
-                                name="genre"
-                                class="w-full py-3 px-4 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:border-transparent bg-pink-50 text-gray-900 transition"
-                        >
-                            <option value="">Todos</option>
-                            {availableGenres.map(genre => (
-                                    <option value={genre.id.toString()} selected={genreFilter === genre.id.toString()}>
-                                        {genre.name}
-                                    </option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Botón Buscar -->
-                <div class="flex justify-center">
-                    <button
-                            type="submit"
-                            class="w-full md:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-colors font-semibold flex justify-center items-center gap-2 shadow-lg"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                        Buscar
-                    </button>
-                </div>
-
-                <!-- Limpiar filtros -->
-                {(searchQuery || genreFilter || minRating) && (
-                        <div class="flex justify-center">
-                            <a
-                                    href={buildUrl({filter: filter, search: '', genre: '', minRating: ''})}
-                                    class="text-sm text-blue-600 hover:text-blue-800 underline flex items-center gap-1 font-medium"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                                     stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                          d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                                Limpiar filtros
-                            </a>
-                        </div>
-                )}
-
-                <!-- Filtros activos -->
-                {(searchQuery || genreFilter || minRating) && (
-                        <div class="flex flex-wrap gap-2 justify-center text-sm text-gray-800">
-                            <span class="font-semibold text-blue-800">Filtros activos:</span>
-                            {searchQuery && (
-                                    <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full">{`"${searchQuery}"`}</span>
-                            )}
-                            {genreFilter && (
-                                    <span class="bg-pink-100 text-pink-800 px-3 py-1 rounded-full">{getGenreName(parseInt(genreFilter))}</span>
-                            )}
-                            {minRating && (
-                                    <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full">{`≥ ${minRating}`}</span>
-                            )}
-                        </div>
-                )}
-            </form>
-
-            <!-- Resultados -->
-            {(searchQuery || genreFilter || minRating > 0) && (
-                    <div class="p-4 bg-blue-50 rounded-xl border border-blue-200 text-center">
-                        <p class="text-sm text-blue-800 font-medium">
-                            Mostrando {seriesFiltradas.length + peliculasFiltradas.length} resultados
-                            {searchQuery || genreFilter || minRating > 0 ? ' con los filtros aplicados' : ''}
-                        </p>
-                    </div>
-            )}
-        </div>
-    </div>
 
     <!-- Barra de navegación secundaria (Categorías) -->
     <nav class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
@@ -435,21 +221,18 @@ const stats = calculateStats();
                     </span>
                 </a>
 
-                {/* Mostrar "Siguiendo" solo si NO está en modo de películas */}
-                {!showMovies || showAll ? (
-                        <a href="/personal/siguiendo"
-                           class="flex-shrink-0 px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 hover:scale-105">
-                    <span class="flex items-center whitespace-nowrap">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-purple-500" viewBox="0 0 24 24"
-                             fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" width="24"
-                             height="24" stroke-width="2">
-                            <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"></path>
-                            <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"></path>
-                        </svg>
+                <a href="/personal/siguiendo"
+                    class="flex-shrink-0 px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 hover:scale-105">
+                        <span class="flex items-center whitespace-nowrap">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1 text-purple-500" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" width="24"
+                                height="24" stroke-width="2">
+                                <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"></path>
+                                <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"></path>
+                            </svg>
                         Siguiendo
-                    </span>
-                        </a>
-                ) : null}
+                        </span>
+                </a>
 
                 <a href="/personal/megusta"
                    class="flex-shrink-0 px-4 py-2 rounded-lg transition-all duration-300 font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 hover:scale-105">
@@ -709,7 +492,7 @@ const stats = calculateStats();
 
             {/* Series Pendientes */}
             {(showSeries || showAll) && (
-                    <section class="mb-8">
+                    <section id="series-section" class="mb-8 scroll-mt-24">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-blue-50 rounded-lg px-4 py-3 border-l-4 border-blue-500">
                             <span class="flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none"
@@ -721,12 +504,12 @@ const stats = calculateStats();
                             Series Pendientes
                             </span>
                             <span class="text-sm text-blue-600 bg-blue-100 rounded-full px-3 py-1 font-bold">
-                                {seriesFiltradas.length}
-                                {searchQuery || genreFilter ? ` de ${seriesPendientes.length}` : ''}
+                                {seriesPaginadas.length}
+                                {searchQuery || genreFilter ? ` de ${seriesPendientes.length}` : ` de ${seriesPendientes.length}`}
                             </span>
                         </h3>
 
-                        {seriesFiltradas.length === 0 ? (
+                        {seriesPaginadas.length === 0 ? (
                                 <div class="empty-state bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-xl p-8 text-center">
                                     <div class="max-w-sm mx-auto">
                                         <svg xmlns="http://www.w3.org/2000/svg"
@@ -748,7 +531,7 @@ const stats = calculateStats();
                                 </div>
                         ) : (
                                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                    {seriesFiltradas.map((item) => (
+                                    {seriesPaginadas.map((item) => (
                                             <CardSerie
                                                     id={item.id.toString()}
                                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -768,12 +551,31 @@ const stats = calculateStats();
                                     ))}
                                 </div>
                         )}
+                        {hasMoreSeries && (
+                            <div class="flex justify-center mt-8">
+                                <a 
+                                    href={buildUrl({
+                                        filter: filter,
+                                        search: searchQuery,
+                                        genre: genreFilter,
+                                        seriesPage: (seriesPage + 1).toString(),
+                                        moviesPage: moviesPage.toString()
+                                    }) + '#series-section'}
+                                    class="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                    Mostrar más series ({Math.min(ITEMS_PER_PAGE, seriesPendientes.length - seriesItemsToShow)} más)
+                                </a>
+                            </div>
+                        )}
                     </section>
             )}
 
             {/* Películas Favoritas */}
             {(showMovies || showAll) && (
-                    <section class="mb-8">
+                    <section id="movies-section" class="mb-8 scroll-mt-24">
                         <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-red-50 rounded-lg px-4 py-3 border-l-4 border-red-500">
                             <span class="flex items-center gap-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none"
@@ -785,12 +587,12 @@ const stats = calculateStats();
                                 Películas Pendientes
                             </span>
                             <span class="text-sm text-red-600 bg-red-100 rounded-full px-3 py-1 font-bold">
-                                {peliculasFiltradas.length}
-                                {searchQuery || genreFilter ? ` de ${peliculasPendientes.length}` : ''}
-                                </span>
+                                {peliculasPaginadas.length}
+                                {searchQuery || genreFilter ? ` de ${peliculasPendientes.length}` : ` de ${peliculasPendientes.length}`}
+                            </span>
                         </h3>
 
-                        {peliculasFiltradas.length === 0 ? (
+                        {peliculasPaginadas.length === 0 ? (
                                 <div class="empty-state bg-gradient-to-br from-red-50 to-indigo-50 border-2 border-dashed border-red-200 rounded-xl p-8 text-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-red-400 mb-4"
                                          fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -809,7 +611,7 @@ const stats = calculateStats();
                                 </div>
                         ) : (
                                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                    {peliculasFiltradas.map((item) => (
+                                    {peliculasPaginadas.map((item) => (
                                             <CardMovie
                                                     id={item.id.toString()}
                                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -825,6 +627,25 @@ const stats = calculateStats();
                                     ))}
                                 </div>
                         )}
+                        {hasMoreMovies && (
+                            <div class="flex justify-center mt-8">
+                                <a 
+                                    href={buildUrl({
+                                        filter: filter,
+                                        search: searchQuery,
+                                        genre: genreFilter,
+                                        seriesPage: seriesPage.toString(),
+                                        moviesPage: (moviesPage + 1).toString()
+                                    }) + '#movies-section'}
+                                    class="px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:from-red-700 hover:to-pink-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                    Mostrar más películas ({Math.min(ITEMS_PER_PAGE, peliculasPendientes.length - moviesItemsToShow)} más)
+                                </a>
+                            </div>
+                        )}
                     </section>
             )}
         </div>
@@ -832,64 +653,6 @@ const stats = calculateStats();
 </div>
 
 <style>
-    /* Ocultar el checkbox */
-    .search-toggle {
-        display: none;
-    }
-
-    /* Panel inicialmente oculto */
-    .search-panel {
-        max-height: 0;
-        opacity: 0;
-        overflow: hidden; /* para que no se vea contenido al ocultar */
-        transition: opacity 0.4s ease, max-height 0.4s ease;
-        pointer-events: none;
-    }
-
-    /* Cuando el checkbox está marcado, mostrar el panel */
-    .search-toggle:checked ~ nav + .search-panel {
-        max-height: 2000px; /* un valor muy alto para que no se corte */
-        opacity: 1;
-        pointer-events: all;
-        overflow: visible;
-    }
-
-    @media (max-width: 640px) {
-        .search-panel {
-            margin: 0 1rem; /* un margen pequeño para no pegarse a los bordes */
-        }
-
-        .search-content {
-            padding: 1rem !important; /* menos padding para que entre bien */
-        }
-
-        form > div.flex {
-            flex-direction: column; /* que las tarjetas estén una debajo de otra */
-        }
-    }
-
-
-    /* Rotar la flecha cuando está abierto */
-    .search-toggle:checked ~ nav .search-toggle-btn .chevron {
-        transform: rotate(180deg);
-    }
-
-    /* Cambiar color del botón cuando está activo */
-    .search-toggle:checked ~ nav .search-toggle-btn {
-        background-color: rgb(34 197 94); /* green-500 */
-        box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.3);
-    }
-
-    /* Estilo del contenido del panel */
-    .search-content {
-        transform: translateY(-10px);
-        transition: transform 0.3s ease-out 0.1s;
-    }
-
-    .search-toggle:checked ~ nav + .search-panel .search-content {
-        transform: translateY(0);
-    }
-
     /* Animaciones */
     .animate-fadeIn {
         animation: fadeIn 0.5s ease-in-out;
@@ -918,11 +681,6 @@ const stats = calculateStats();
 
     .section-title {
         @apply text-xl font-semibold mb-4 pl-4 border-l-4;
-    }
-
-    /* Efecto hover del botón de búsqueda */
-    .search-toggle-btn:hover {
-        transform: scale(1.05);
     }
 
     /* Transición suave para el chevron */
@@ -1012,16 +770,6 @@ const stats = calculateStats();
         display: none;
     }
 
-    /* Mejora visual para filtros activos */
-    .search-panel {
-        border: 1px solid #e5e7eb;
-    }
-
-    /* Estados hover mejorados */
-    .search-toggle-btn:hover .toggle-text {
-        letter-spacing: 0.02em;
-    }
-
     /* Transiciones más suaves */
     .content-sections > div {
         transition: all 0.3s ease-out;
@@ -1036,12 +784,6 @@ const stats = calculateStats();
         .grid {
             gap: 1.5rem;
         }
-    }
-
-    /* Botón de búsqueda mejorado */
-    .search-toggle:checked ~ nav .search-toggle-btn {
-        background: linear-gradient(135deg, #10b981, #059669);
-        transform: scale(1.02);
     }
 
     /* Ocultar el checkbox de estadísticas */
