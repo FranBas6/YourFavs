@@ -9,7 +9,8 @@ import {
     getSeriesStatus,
     getEpisodesBySeasonNumber,
     fetchAllSeriesPosters,
-    getSerieRecommendationsOrSimilar
+    getSerieRecommendationsOrSimilar,
+    getSeriesAdditionalInfo
 } from "../../services/API/Series/InfoSeries";
 import type {SeriesFavs} from "../../services/BD/yourfavsSerie";
 import {initializeApp} from "firebase/app";
@@ -202,6 +203,35 @@ function formatRuntime(minutes: number): string {
     return hours > 0 ? `${hours} hr ${remainingMinutes} min` : `${minutes} min`;
 }
 
+// Función para obtener estadísticas de temporada
+function getSeasonStats(seasonNumber: number, seasonEpisodes: any[]) {
+    if (!seasonEpisodes || seasonEpisodes.length === 0) {
+        return {
+            totalEpisodes: 0,
+            averageRating: "0.0",
+            averageRuntime: "No disponible"
+        };
+    }
+
+    const totalEpisodes = seasonEpisodes.length;
+    
+    // Calcular rating promedio
+    const ratingsSum = seasonEpisodes.reduce((sum, ep) => sum + (ep.vote_average || 0), 0);
+    const averageRating = totalEpisodes > 0 ? (ratingsSum / totalEpisodes).toFixed(1) : "0.0";
+    
+    // Calcular duración promedio
+    const runtimesSum = seasonEpisodes.reduce((sum, ep) => sum + (ep.runtime || 0), 0);
+    const episodesWithRuntime = seasonEpisodes.filter(ep => ep.runtime && ep.runtime > 0);
+    const averageRuntimeMinutes = episodesWithRuntime.length > 0 ? Math.round(runtimesSum / episodesWithRuntime.length) : 0;
+    const averageRuntime = averageRuntimeMinutes > 0 ? formatRuntime(averageRuntimeMinutes) : "No disponible";
+
+    return {
+        totalEpisodes,
+        averageRating,
+        averageRuntime
+    };
+}
+
 let item = await getSeriesById({id});
 let cast = await getSeriesCast(id);
 let directors = await getSeriesDirectorsAndRoles(id);
@@ -217,7 +247,7 @@ const clientData = {
     vote_average: item?.vote_average ? Number(item.vote_average) : 0,
     overview: item?.overview || 'Sin descripción',
     first_air_date: item?.first_air_date || '',
-    status: item?.status || '',
+    status: status || '',
     genres: item?.genres || [],
     seasons: item?.seasons || [],
     last_episode_to_air: item?.last_episode_to_air || null,
@@ -382,7 +412,9 @@ const providerLinks: Record<string, string> = {
     'Disney Plus': 'https://www.disneyplus.com/',
     'HBO Max': 'https://www.hbomax.com/',
     'Amazon Prime Video': 'https://www.primevideo.com/',
+    'Amazon Video': 'https://www.amazon.com/dp/B08J4Q4Z5D',
     'Apple TV+': 'https://tv.apple.com/',
+    'Apple TV': 'https://tv.apple.com/',
     'Filmin': 'https://www.filmin.es/',
     'Movistar Plus+': 'https://www.movistarplus.es/',
     'Rakuten TV': 'https://rakuten.tv/',
@@ -403,6 +435,15 @@ const providerLinks: Record<string, string> = {
     'DOCSVILLE': 'https://www.docsville.com/',
     'WOW Presents Plus': 'https://www.wowpresentsplus.com/',
     'Mitele': 'https://www.mitele.es/',
+    'StarzPlay': 'https://www.starzplay.com/',
+    'Paramount+': 'https://www.paramountplus.com/',
+    'Peacock': 'https://www.peacocktv.com/',
+    'Tubi': 'https://tubitv.com/',
+    'Pluto TV': 'https://pluto.tv/',
+    'Crunchyroll': 'https://www.crunchyroll.com/',
+    'Funimation': 'https://www.funimation.com/',
+    'Vix': 'https://vix.com/',
+    'Cinepolis Klic': 'https://www.cinepolisklic.com/'
     // Agrega más proveedores según sea necesario
 };
 
@@ -413,8 +454,17 @@ const providerElements = item?.providers?.map((provider) => {
         name: provider.provider_name,
         logo: hasLogo ? `https://image.tmdb.org/t/p/w200${provider.logo_path}` : null,
         link,
+        type: provider.type || 'flatrate'
     };
 }) || [];
+
+// Agrupar por tipo
+const providersByType = providerElements.reduce((acc: Record<string, any[]>, p) => {
+    const key = p.type || 'flatrate';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(p);
+    return acc;
+}, {} as Record<string, any[]>);
 
 const statusMap = {
     "Returning Series": "Serie en emisión",
@@ -510,19 +560,43 @@ const externalIds = await response.json();
 
 // El IMDB ID estará en externalIds.imdb_id
 const imdbId = externalIds.imdb_id; // formato: "tt1234567"
+
+// Obtener información adicional de la serie
+const additionalInfo = await getSeriesAdditionalInfo(id);
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
-        <!-- Hero Section con backdrop -->
-        <div
-            class="relative w-full h-auto bg-cover bg-center bg-no-repeat"
-            style={`background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(https://image.tmdb.org/t/p/original${item?.backdrop_path})`}
-        >
-            <div class="absolute inset-0"></div>
+        <!-- Hero Mejorado -->
+        <div class="relative w-full h-auto bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : '/assets/background.svg'})`}>
+            <!-- Overlay adaptativo -->
+            <div class="absolute inset-0" style={`background: ${item?.backdrop_path ? 'linear-gradient(180deg, rgba(0,0,0,0.7) 100%, rgba(30,30,30,0.5) 100%)' : 'linear-gradient(180deg, #1e293b 0%, #334155 100%)'}`}></div>
+            
+            <!-- Breadcrumbs - Posicionado arriba a la izquierda -->
+            <nav class="relative z-10 pt-6 px-4 max-w-7xl mx-auto hero-breadcrumbs" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2 text-sm">
+                    <li>
+                        <a href="/" class="text-white/80 hover:text-white transition-colors flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            Inicio
+                        </a>
+                    </li>
+                    <li class="text-white/60">/</li>
+                    <li>
+                        <a href="/catalogo/topseries" class="text-white/80 hover:text-white transition-colors">Series</a>
+                    </li>
+                    <li class="text-white/60">/</li>
+                    <li class="text-white font-medium truncate max-w-xs" title={item?.name}>
+                        {item?.name}
+                    </li>
+                </ol>
+            </nav>
+
             <div class="relative flex flex-col items-center justify-center px-4 py-12 text-center max-w-4xl mx-auto">
-                
+
                 <!-- Título -->
-                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-lg">
                     {item?.name}
                 </h1>
 
@@ -533,14 +607,30 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                     </div>
                 )}
 
-                <!-- Info básica -->
+                <!-- Info básica + Rating circular + Ver tráiler -->
                 <div class="flex flex-wrap items-center justify-center gap-4 text-white mb-4">
                     <span class="bg-blue-600 px-3 py-1 rounded-full text-sm font-medium">
-                        {statusMap[status] || status}
+                        {status ? ((statusMap as any)[status] || status) : ''}
                     </span>
-                    <span class="text-yellow-400 text-xl font-bold">
-                        {item?.vote_average?.toFixed(1)} {getRatingStars(item?.vote_average)}
-                    </span>
+                    <!-- Chip de rating circular con tooltip -->
+                    {item?.vote_average && (
+                        <div class="relative flex items-center justify-center group" tabindex="0">
+                            <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+                                <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"/>
+                                <path class="text-yellow-400" stroke="currentColor" stroke-width="3" fill="none"
+                                      stroke-linecap="round"
+                                      stroke-dasharray={`${Math.min(100, Math.round((item.vote_average || 0) * 10))}, 100`}
+                                      d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"/>
+                            </svg>
+                            <span class="absolute text-sm font-semibold">{item.vote_average.toFixed(1)}</span>
+                            <!-- Tooltip votos -->
+                            {item.vote_count && (
+                                <span class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded px-2 py-1 shadow-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 z-10">
+                                    {item.vote_count} votos
+                                </span>
+                            )}
+                        </div>
+                    )}
                     <span>{yearsActive}</span>
                 </div>
 
@@ -557,26 +647,18 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
 
                 <!-- 🚀 Sinopsis integrada con truncado sin JS -->
                 <div class="bg-black bg-opacity-50 rounded-xl p-4 mb-6 max-w-2xl">
-                <h2 class="text-lg font-semibold text-white mb-2">Sinopsis</h2>
-
-                <!-- Contenedor con checkbox oculto -->
-                <input type="checkbox" id="toggle-sinopsis" class="peer hidden" />
-
-                <!-- Párrafo truncado si no está activado -->
-                <p class="text-gray-200 text-sm md:text-base leading-relaxed max-h-24 overflow-hidden peer-checked:max-h-[1000px] transition-all">
-                    {item?.overview || "No hay sinopsis disponible."}
-                </p>
-
-                {item?.overview && item.overview.length > 250 && (
-                    <label
-                    for="toggle-sinopsis"
-                    class="mt-2 inline-block cursor-pointer text-blue-400 hover:text-blue-300 font-medium text-sm peer-checked:before:content-['Mostrar_menos'] before:content-['Mostrar_más']"
-                    ></label>
-                )}
+                    <h2 class="text-lg font-semibold text-white mb-2">Sinopsis</h2>
+                    <input type="checkbox" id="toggle-sinopsis" class="peer hidden" />
+                    <p class="text-gray-200 text-sm md:text-base leading-relaxed max-h-24 overflow-hidden peer-checked:max-h-[1000px] transition-all">
+                        {item?.overview || "No hay sinopsis disponible."}
+                    </p>
+                    {item?.overview && item.overview.length > 250 && (
+                        <label for="toggle-sinopsis" class="mt-2 inline-block cursor-pointer text-blue-400 hover:text-blue-300 font-medium text-sm peer-checked:before:content-['Mostrar_menos'] before:content-['Mostrar_más']"></label>
+                    )}
                 </div>
 
                 <!-- Botón de Me gusta -->
-                <form method="POST" class="mt-4">
+                <form method="POST" class="mt-2">
                     <input type="hidden" name="id" value={item?.id}/>
                     <input type="hidden" name="poster_path" value={item?.poster_path || ''}/>
                     <input type="hidden" name="name" value={item?.name || 'Sin nombre'}/>
@@ -584,37 +666,24 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                     <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
                     <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
                     <input type="hidden" name="first_air_date" value={item?.first_air_date || ''}/>
-                    <input type="hidden" name="status" value={item?.status || ''}/>
+                    <input type="hidden" name="status" value={status || ''}/>
                     <input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/>
                     <input type="hidden" name="actionType" value="liked"/>
                     <input type="hidden" name="seasons" value={JSON.stringify(item?.seasons || [])}/>
-                    <input type="hidden" name="last_episode_to_air"
-                        value={JSON.stringify(item?.last_episode_to_air || null)}/>
-                    <input type="hidden" name="next_episode_to_air"
-                        value={JSON.stringify(item?.next_episode_to_air || null)}/>
-
-                    <button
-                        type="submit"
-                        class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all flex items-center gap-2 mx-auto"
-                        aria-live="polite"
-                    >
+                    <input type="hidden" name="last_episode_to_air" value={JSON.stringify(item?.last_episode_to_air || null)}/>
+                    <input type="hidden" name="next_episode_to_air" value={JSON.stringify(item?.next_episode_to_air || null)}/>
+                    <button type="submit" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all flex items-center gap-2 mx-auto" aria-live="polite">
                         {isInLiked ? (
                             <>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
-                                    fill="currentColor">
-                                    <path fill-rule="evenodd"
-                                        d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                                        clip-rule="evenodd"/>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
                                 </svg>
                                 Ya me gusta
                             </>
                         ) : (
                             <>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20"
-                                    fill="none" stroke="currentColor">
-                                    <path fill-rule="evenodd"
-                                        d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                                        clip-rule="evenodd"/>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
+                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
                                 </svg>
                                 Me gusta
                             </>
@@ -654,7 +723,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
                                     <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
                                     <input type="hidden" name="first_air_date" value={item?.first_air_date || ''}/>
-                                    <input type="hidden" name="status" value={item?.status || ''}/>
+                                    <input type="hidden" name="status" value={status || ''}/>
                                     <input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/>
                                     <input type="hidden" name="actionType" value="favs"/>
                                     <input type="hidden" name="seasons" value={JSON.stringify(item?.seasons || [])}/>
@@ -708,7 +777,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
                                     <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
                                     <input type="hidden" name="first_air_date" value={item?.first_air_date || ''}/>
-                                    <input type="hidden" name="status" value={item?.status || ''}/>
+                                    <input type="hidden" name="status" value={status || ''}/>
                                     <input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/>
                                     <input type="hidden" name="actionType" value="verpronto"/>
                                     <input type="hidden" name="seasons" value={JSON.stringify(item?.seasons || [])}/>
@@ -768,7 +837,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
                                     <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
                                     <input type="hidden" name="first_air_date" value={item?.first_air_date || ''}/>
-                                    <input type="hidden" name="status" value={item?.status || ''}/>
+                                    <input type="hidden" name="status" value={status || ''}/>
                                     <input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/>
                                     <input type="hidden" name="actionType" value="pendientes"/>
                                     <input type="hidden" name="seasons" value={JSON.stringify(item?.seasons || [])}/>
@@ -805,7 +874,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
                                     <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
                                     <input type="hidden" name="first_air_date" value={item?.first_air_date || ''}/>
-                                    <input type="hidden" name="status" value={item?.status || ''}/>
+                                    <input type="hidden" name="status" value={status || ''}/>
                                     <input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/>
                                     <input type="hidden" name="actionType" value="siguiendo"/>
                                     <input type="hidden" name="seasons" value={JSON.stringify(item?.seasons || [])}/>
@@ -852,7 +921,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <input type="hidden" name="overview" value={item?.overview || 'Sin descripción'}/>
                                     <input type="hidden" name="genres" value={JSON.stringify(item?.genres || [])}/>
                                     <input type="hidden" name="first_air_date" value={item?.first_air_date || ''}/>
-                                    <input type="hidden" name="status" value={item?.status || ''}/>
+                                    <input type="hidden" name="status" value={status || ''}/>
                                     <input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/>
                                     <input type="hidden" name="actionType" value="vistas"/>
                                     <input type="hidden" name="seasons" value={JSON.stringify(item?.seasons || [])}/>
@@ -1026,7 +1095,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                             <ul class="space-y-2">
                                 <li class="flex justify-between">
                                     <span class="text-gray-600">Estado:</span>
-                                    <span class="font-medium text-gray-600">{statusMap[status] || status}</span>
+                                    <span class="font-medium text-gray-600">{status ? ((statusMap as any)[status] || status) : 'No disponible'}</span>
                                 </li>
                                 <li class="flex justify-between">
                                     <span class="text-gray-600">Estreno:</span>
@@ -1037,6 +1106,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                     <span class="font-medium text-gray-600">
                                         {item?.last_episode_to_air ? formatDate(item.last_episode_to_air.air_date) : "No disponible"}
                                     </span>
+                                </li>
                                 <li class="flex justify-between">
                                     <span class="text-gray-600">Valoración:</span>
                                     <span class="font-medium text-gray-600">{item?.vote_average?.toFixed(1)}
@@ -1059,7 +1129,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                 <li class="flex justify-between">
                                     <span class="text-gray-600">Episodios:</span>
                                     <span class="font-medium text-gray-600">
-                    {totalRegularEpisodes}
+                                        {totalRegularEpisodes}
                                         {hasSpecialSeasons &&
                                                 <span class="text-blue-600 text-sm ml-1">
                                                     (+ {totalSpecialEpisodes} especiales)
@@ -1077,6 +1147,41 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                 </li>
                             </ul>
                         </div>
+
+                        <!-- Redes de Transmisión -->
+                        {additionalInfo.networks && additionalInfo.networks.length > 0 && (
+                            <div class="bg-white p-4 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold text-blue-600 mb-3">Redes de Transmisión</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {additionalInfo.networks.map((network: any) => (
+                                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                            {network.logo_path && (
+                                                <img
+                                                    src={`https://image.tmdb.org/t/p/w92${network.logo_path}`}
+                                                    alt={network.name}
+                                                    class="w-12 h-8 object-contain flex-shrink-0"
+                                                    loading="lazy"
+                                                />
+                                            )}
+                                            <div class="min-w-0 flex-1">
+                                                <p class="font-medium text-gray-800 truncate">{network.name}</p>
+                                                {network.origin_country && (
+                                                    <p class="text-sm text-gray-500">{network.origin_country}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <!-- Eslogan/Tagline -->
+                        {additionalInfo.tagline && (
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+                                <h3 class="text-lg font-bold text-blue-600 mb-2">Eslogan</h3>
+                                <p class="text-gray-700 italic text-lg">"{additionalInfo.tagline}"</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -1098,62 +1203,93 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                             </div>
                     )}
 
-                    <!-- Temporadas con acordeón para episodios -->
+                    <!-- Temporadas con acordeón mejorado para episodios -->
                     <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                        <h2 class="text-2xl font-bold text-blue-600 mb-4">Temporadas</h2>
+                        <div class="flex items-center justify-between mb-6">
+                            <h2 class="text-2xl font-bold text-blue-600">Temporadas y Episodios</h2>
+                            <div class="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+                                {regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios
+                                {hasSpecialSeasons && ` • ${specialSeasonsCount} especiales`}
+                            </div>
+                        </div>
+                        
                         <div class="space-y-6">
-                            {sortedSeasons.map((season) => (
+                            {sortedSeasons.map((season) => {
+                                const seasonEpisodes = allSeasonEpisodes[season.season_number] || [];
+                                const stats = getSeasonStats(season.season_number, seasonEpisodes);
+                                
+                                return (
                                     <details
-                                            class={`border rounded-lg overflow-hidden ${season.season_number === 0 ? 'border-purple-100 bg-gradient-to-r from-purple-50 to-pink-50' : 'border-blue-100'}`}>
+                                            class={`border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-md ${season.season_number === 0 ? 'border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50' : 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50'}`}>
                                         <summary
-                                                class={`cursor-pointer transition-colors p-4 ${season.season_number === 0 ? 'bg-purple-50 hover:bg-purple-100' : 'bg-blue-50 hover:bg-blue-100'}`}>
-                                            <div class="flex flex-col md:flex-row gap-4 items-center">
-                                                <div class="md:w-1/4 w-full max-w-[200px]">
+                                                class={`cursor-pointer transition-all duration-300 p-6 ${season.season_number === 0 ? 'bg-purple-50 hover:bg-purple-100' : 'bg-blue-50 hover:bg-blue-100'}`}>
+                                            <div class="flex flex-col lg:flex-row gap-6 items-start">
+                                                <div class="lg:w-1/4 w-full max-w-[250px] mx-auto lg:mx-0 season-poster">
                                                     <img
-                                                            src={`https://image.tmdb.org/t/p/w300${season.poster_path || item?.poster_path}`}
+                                                            src={`https://image.tmdb.org/t/p/w400${season.poster_path || item?.poster_path}`}
                                                             alt={season.season_number === 0 ? "Episodios Especiales" : `Temporada ${season.season_number}`}
                                                             loading="lazy"
-                                                            class="w-full h-auto rounded-lg shadow-md transform hover:scale-105 transition-transform"
+                                                            class="w-full h-auto rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-300"
                                                     />
                                                 </div>
-                                                <div class="md:w-3/4 w-full">
-                                                    <h3 class={`text-xl font-bold mb-2 ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
-                                                        {season.season_number === 0 ? (
-                                                                <span class="flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor"
-                                             viewBox="0 0 24 24">
-                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                        </svg>
-                                        Episodios Especiales
-                                    </span>
-                                                        ) : (
-                                                            `Temporada ${season.season_number}`
-                                                        )}
-                                                    </h3>
-                                                    <div class="flex items-center gap-3 text-sm text-gray-600 mb-2">
-                                <span class="flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                    </svg>
-                                    {season.episode_count} {season.season_number === 0 ? 'episodios especiales' : 'episodios'}
-                                </span>
+                                                <div class="lg:w-3/4 w-full">
+                                                    <div class="flex items-center justify-between mb-3">
+                                                        <h3 class={`text-2xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
+                                                            {season.season_number === 0 ? (
+                                                                    <span class="flex items-center gap-2">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
+                                                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                                                        </svg>
+                                                                        Episodios Especiales
+                                                                    </span>
+                                                            ) : (
+                                                                `Temporada ${season.season_number}`
+                                                            )}
+                                                        </h3>
+                                                        <svg xmlns="http://www.w3.org/2000/svg" 
+                                                             class={`h-6 w-6 transition-transform duration-300 ${season.season_number === 0 ? 'text-purple-600' : 'text-blue-600'}`} 
+                                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                        </svg>
+                                                    </div>
+                                                    
+                                                    <!-- Estadísticas mejoradas de la temporada -->
+                                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 season-stats">
+                                                        <div class={`text-center p-3 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
+                                                                {stats.totalEpisodes}
+                                                            </div>
+                                                            <div class="text-xs text-gray-600">Episodios</div>
+                                                        </div>
+                                                        
+                                                        <div class={`text-center p-3 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
+                                                                {stats.averageRating !== "0.0" ? `⭐${stats.averageRating}` : "N/A"}
+                                                            </div>
+                                                            <div class="text-xs text-gray-600">Rating</div>
+                                                        </div>
+                                                        
+                                                        <div class={`text-center p-3 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                                                            <div class={`text-sm font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
+                                                                {stats.averageRuntime !== "No disponible" ? stats.averageRuntime : "N/A"}
+                                                            </div>
+                                                            <div class="text-xs text-gray-600">Duración</div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="flex items-center gap-4 text-sm text-gray-600 mb-3">
                                                         {season.air_date && (
                                                                 <span class="flex items-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4"
-                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round"
-                                                  stroke-width="2"
-                                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                        </svg>
-                                                                    {formatDate(season.air_date)}
-                                    </span>
+                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                                                    </svg>
+                                                                    Estreno: {formatDate(season.air_date)}
+                                                                </span>
                                                         )}
                                                     </div>
-                                                    <p class="text-sm text-gray-700 season-overview">
-                                                        {season.overview || (season.season_number === 0 ? "Episodios especiales, documentales, detrás de cámaras y contenido adicional." : "No hay descripción disponible para esta temporada.")}
+                                                    
+                                                    <p class="text-sm text-gray-700 season-overview leading-relaxed">
+                                                        {season.overview || (season.season_number === 0 ? "Episodios especiales, documentales, detrás de cámaras y contenido adicional de la serie." : "No hay descripción disponible para esta temporada.")}
                                                     </p>
                                                 </div>
                                             </div>
@@ -1289,7 +1425,8 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                             </div>
                                         </div>
                                     </details>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
 
@@ -1332,7 +1469,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         {/* Reparto */}
                         <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto</h2>
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto Principal</h2>
                             <div class="text-gray-600">
                                 {cast?.length > 0 ? (
                                         <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1377,7 +1514,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
 
                         <!-- Equipo -->
                         <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo</h2>
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo de Producción</h2>
                             <div class="text-gray-600">
                                 {directors?.length > 0 ? (
                                 <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -1406,36 +1543,82 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                         {providerElements.length > 0 && (
                                 <div class="bg-white p-6 rounded-lg shadow-md">
                                     <h2 class="text-2xl font-bold text-blue-600 mb-4">Disponible en</h2>
-                                    <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                        {providerElements.map((provider) => (
-                                                <div class="flex flex-col items-center">
-                                                    {provider.logo ? (
-                                                        provider.link ? (
-                                                                <a href={provider.link} target="_blank"
-                                                                   rel="noopener noreferrer">
-                                                                    <img
-                                                                            src={provider.logo}
-                                                                            alt={provider.name}
-                                                                            loading="lazy"
-                                                                            class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
-                                                                    />
-                                                                </a>
-                                                        ) : (
-                                                                <img
-                                                                        src={provider.logo}
-                                                                        alt={provider.name}
-                                                                        loading="lazy"
-                                                                        class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
-                                                                />
-                                                        )
-                                                    ) : (
-                                                            <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
-                                                                <span class="text-xs text-gray-500">Sin logo</span>
-                                                            </div>
-                                                    )}
-                                                    <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                    <div class="space-y-4">
+                                        {providersByType.flatrate && providersByType.flatrate.length > 0 && (
+                                            <div>
+                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Incluido con suscripción</h3>
+                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                                    {providersByType.flatrate.map((provider) => (
+                                                        <div class="flex flex-col items-center">
+                                                            {provider.logo ? (
+                                                                provider.link ? (
+                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                )
+                                                            ) : (
+                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                                </div>
+                                                            )}
+                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                        ))}
+                                            </div>
+                                        )}
+                                        {providersByType.rent && providersByType.rent.length > 0 && (
+                                            <div>
+                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Alquiler</h3>
+                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                                    {providersByType.rent.map((provider) => (
+                                                        <div class="flex flex-col items-center">
+                                                            {provider.logo ? (
+                                                                provider.link ? (
+                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                )
+                                                            ) : (
+                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                                </div>
+                                                            )}
+                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {providersByType.buy && providersByType.buy.length > 0 && (
+                                            <div>
+                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Compra</h3>
+                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                                    {providersByType.buy.map((provider) => (
+                                                        <div class="flex flex-col items-center">
+                                                            {provider.logo ? (
+                                                                provider.link ? (
+                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                )
+                                                            ) : (
+                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                                </div>
+                                                            )}
+                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                         )}
@@ -1472,15 +1655,16 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                             </div>
                         </div>
                         )}
+                    </div>
 
-                        <!-- SERIES Recomendaciones -->
-                        {seriesRecommendations && seriesRecommendations.length > 0 && (
-                                <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                                    <div class="flex items-center justify-between mb-6">
-                                        <h2 class="text-2xl font-bold text-blue-600">
-                                            {seriesRecommendationType === 'similar' ? 'Series Similares' : 'Series Recomendadas'}
-                                        </h2>
-                                    </div>
+                    <!-- SERIES Recomendaciones -->
+                    {seriesRecommendations && seriesRecommendations.length > 0 && (
+                            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                                <div class="flex items-center justify-between mb-6">
+                                    <h2 class="text-2xl font-bold text-blue-600">
+                                        {seriesRecommendationType === 'similar' ? 'Series Similares' : 'Series Recomendadas'}
+                                    </h2>
+                                </div>
 
                                     <!-- Carousel de recomendaciones con scroll horizontal -->
                                     <div class="recommendations-carousel relative overflow-hidden">

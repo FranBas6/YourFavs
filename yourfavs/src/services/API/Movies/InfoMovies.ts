@@ -8,23 +8,50 @@ if (!API_KEY) {
 
 const BASE_URL = "https://api.themoviedb.org/3";
 
-// Obtener película por ID
-export const getMovieById = async ({id}: { id: string }) => {
+// Obtener película por ID y sus plataformas de visualización
+export const getMovieById = async ({ id }: { id: string }) => {
     // Obtener los detalles de la película
     const movieRes = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${API_KEY}&language=es-ES`);
     const movie = await movieRes.json();
 
     // Obtener las plataformas de visualización de la película
-    const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${API_KEY}&language=es-ES`);
+    const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${API_KEY}`);
     const providers = await providersRes.json();
 
-    // Añadir las plataformas al objeto de la película
-    const availablePlatforms = providers?.results?.ES?.flatrate || [];  // Ajustar el país según sea necesario (ES = España)
+    // Extraer las plataformas disponibles en España (puedes cambiar "ES" por otro país si quieres)
+    const esProviders = providers.results?.ES || {};
 
-    return {
-        ...movie,
-        providers: availablePlatforms
-    };
+    // Función para mapear plataformas con su tipo (suscripción, alquiler, compra)
+    const mapProviders = (list: any[] | undefined, type: 'flatrate' | 'rent' | 'buy') =>
+        (list || []).map((provider: any) => ({
+            provider_id: provider.provider_id,
+            provider_name: provider.provider_name,
+            logo_path: provider.logo_path,
+            type
+        }));
+
+    const flatrate = mapProviders(esProviders.flatrate, 'flatrate');
+    const rent = mapProviders(esProviders.rent, 'rent');
+    const buy = mapProviders(esProviders.buy, 'buy');
+
+    // Combinar y deduplicar (priorizando flatrate > rent > buy)
+    const combined = [...flatrate, ...rent, ...buy];
+    const uniqueById = new Map<number, { provider_id: number; provider_name: string; logo_path: string; type: 'flatrate' | 'rent' | 'buy' }>();
+
+    for (const p of combined) {
+        const existing = uniqueById.get(p.provider_id);
+        if (!existing) {
+            uniqueById.set(p.provider_id, p);
+        } else {
+            const priority = { flatrate: 3, rent: 2, buy: 1 } as const;
+            if (priority[p.type] > priority[existing.type]) uniqueById.set(p.provider_id, p);
+        }
+    }
+
+    // Añadir las plataformas a la película
+    movie.providers = Array.from(uniqueById.values());
+
+    return movie;
 };
 
 // Interfaz para el tipo de datos del reparto de películas
@@ -390,3 +417,35 @@ export async function getMovieRecommendationsOrSimilar(movieId: number): Promise
         type: 'recommendations'
     };
 }
+
+// Función para obtener información adicional de la movie (redes, palabras clave, etc.)
+export const getMoviesAdditionalInfo = async (movieId: string) => {
+    try {
+        // Obtener keywords
+        const keywordsRes = await fetch(`${BASE_URL}/movie/${movieId}/keywords?api_key=${API_KEY}`);
+        const keywordsData = await keywordsRes.json();
+
+        // Obtener información detallada de la película que incluye networks
+        const detailRes = await fetch(`${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=es-ES&append_to_response=content_ratings`);
+        const detailData = await detailRes.json();
+        
+        return {
+            keywords: keywordsData.results || [],
+            networks: detailData.networks || [],
+            content_ratings: detailData.content_ratings?.results || [],
+            episode_run_time: detailData.episode_run_time || [],
+            languages: detailData.spoken_languages || [],
+            tagline: detailData.tagline || null
+        };
+    } catch (error) {
+        console.error('Error al obtener información adicional de la serie:', error);
+        return {
+            keywords: [],
+            networks: [],
+            content_ratings: [],
+            episode_run_time: [],
+            languages: [],
+            tagline: null
+        };
+    }
+};

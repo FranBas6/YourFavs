@@ -16,12 +16,35 @@ export const getSeriesById = async ({id}: { id: string }) => {
     const serie = await movieRes.json() as Serie;
     const providers = await providersRes.json();
 
-    // Añadir la información de las plataformas de visualización a la serie
-    serie.providers = providers.results?.ES?.flatrate?.map((provider: any) => ({
-        provider_id: provider.provider_id,
-        provider_name: provider.provider_name,
-        logo_path: provider.logo_path,
-    })) || [];
+    // Añadir la información de las plataformas de visualización a la serie, incluyendo tipos (incluido, alquiler, compra)
+    const esProviders = providers.results?.ES || {};
+    const mapProviders = (list: any[] | undefined, type: 'flatrate' | 'rent' | 'buy') =>
+        (list || []).map((provider: any) => ({
+            provider_id: provider.provider_id,
+            provider_name: provider.provider_name,
+            logo_path: provider.logo_path,
+            type
+        }));
+
+    const flatrate = mapProviders(esProviders.flatrate, 'flatrate');
+    const rent = mapProviders(esProviders.rent, 'rent');
+    const buy = mapProviders(esProviders.buy, 'buy');
+
+    // Combinar y deduplicar por provider_id conservando el tipo preferente (flatrate > rent > buy)
+    const combined = [...flatrate, ...rent, ...buy];
+    const uniqueById = new Map<number, { provider_id: number; provider_name: string; logo_path: string; type: 'flatrate' | 'rent' | 'buy' }>();
+    for (const p of combined) {
+        const existing = uniqueById.get(p.provider_id);
+        if (!existing) {
+            uniqueById.set(p.provider_id, p);
+        } else {
+            // Priorizar flatrate sobre rent/buy
+            const priority = { flatrate: 3, rent: 2, buy: 1 } as const;
+            if (priority[p.type] > priority[existing.type]) uniqueById.set(p.provider_id, p);
+        }
+    }
+
+    serie.providers = Array.from(uniqueById.values());
 
     return serie;
 };
@@ -398,3 +421,35 @@ export async function getSerieRecommendationsOrSimilar(serieId: number): Promise
         type: 'recommendations'
     };
 }
+
+// Función para obtener información adicional de la serie (redes, palabras clave, etc.)
+export const getSeriesAdditionalInfo = async (seriesId: string) => {
+    try {
+        // Obtener keywords
+        const keywordsRes = await fetch(`${BASE_URL}/tv/${seriesId}/keywords?api_key=${API_KEY}`);
+        const keywordsData = await keywordsRes.json();
+        
+        // Obtener información detallada de la serie que incluye networks
+        const detailRes = await fetch(`${BASE_URL}/tv/${seriesId}?api_key=${API_KEY}&language=es-ES&append_to_response=content_ratings`);
+        const detailData = await detailRes.json();
+        
+        return {
+            keywords: keywordsData.results || [],
+            networks: detailData.networks || [],
+            content_ratings: detailData.content_ratings?.results || [],
+            episode_run_time: detailData.episode_run_time || [],
+            languages: detailData.spoken_languages || [],
+            tagline: detailData.tagline || null
+        };
+    } catch (error) {
+        console.error('Error al obtener información adicional de la serie:', error);
+        return {
+            keywords: [],
+            networks: [],
+            content_ratings: [],
+            episode_run_time: [],
+            languages: [],
+            tagline: null
+        };
+    }
+};

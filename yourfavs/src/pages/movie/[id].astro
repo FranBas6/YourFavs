@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import type { Movie } from "../../types/ApiMovie";
 import {
     getMovieById,
     getMovieCast,
@@ -7,7 +8,8 @@ import {
     getMovieTrailer,
     fetchAllMoviePosters,
     getMovieCollectionInfo,
-    getMovieRecommendationsOrSimilar
+    getMovieRecommendationsOrSimilar,
+    getMoviesAdditionalInfo
 } from "../../services/API/Movies/InfoMovies";
 import {initializeApp} from "firebase/app";
 import {
@@ -102,6 +104,15 @@ interface MovieCastMember {
     name: string;
     character: string;
     id: number;
+    profile_path?: string; // Añadida la propiedad que faltaba
+}
+
+// Definir la interfaz para los providers
+interface MovieProvider {
+    provider_id: number;
+    provider_name: string;
+    logo_path: string;
+    type?: 'flatrate' | 'rent' | 'buy';
 }
 
 // Obtener datos de la película
@@ -169,12 +180,14 @@ const formatDate = (dateString: string) => {
     }).format(date);
 };
 
-const providerLinks = {
+const providerLinks: Record<string, string> = {
     'Netflix': 'https://www.netflix.com/',
     'Disney Plus': 'https://www.disneyplus.com/',
     'HBO Max': 'https://www.hbomax.com/',
     'Amazon Prime Video': 'https://www.primevideo.com/',
+    'Amazon Video': 'https://www.amazon.com/dp/B08J4Q4Z5D',
     'Apple TV+': 'https://tv.apple.com/',
+    'Apple TV': 'https://tv.apple.com/',
     'Filmin': 'https://www.filmin.es/',
     'Movistar Plus+': 'https://www.movistarplus.es/',
     'Rakuten TV': 'https://rakuten.tv/',
@@ -195,24 +208,36 @@ const providerLinks = {
     'DOCSVILLE': 'https://www.docsville.com/',
     'WOW Presents Plus': 'https://www.wowpresentsplus.com/',
     'Mitele': 'https://www.mitele.es/',
+    'StarzPlay': 'https://www.starzplay.com/',
+    'Paramount+': 'https://www.paramountplus.com/',
+    'Peacock': 'https://www.peacocktv.com/',
+    'Tubi': 'https://tubitv.com/',
+    'Pluto TV': 'https://pluto.tv/',
+    'Crunchyroll': 'https://www.crunchyroll.com/',
+    'Funimation': 'https://www.funimation.com/',
+    'Vix': 'https://vix.com/',
+    'Cinepolis Klic': 'https://www.cinepolisklic.com/'
     // Agrega más proveedores según sea necesario
 };
 
-type Provider = {
-    provider_name: keyof typeof providerLinks;
-    logo_path?: string;
-};
-
-const providerElements = item?.providers?.map((provider: Provider) => {
+const providerElements = item?.providers?.map((provider: MovieProvider) => {
     const link = providerLinks[provider.provider_name];
     const hasLogo = !!provider.logo_path;
-
     return {
         name: provider.provider_name,
         logo: hasLogo ? `https://image.tmdb.org/t/p/w200${provider.logo_path}` : null,
         link,
+        type: provider.type || 'flatrate'
     };
 }) || [];
+
+// Agrupar por tipo
+const providersByType = providerElements.reduce((acc: Record<string, any[]>, p: any) => {
+    const key = p.type || 'flatrate';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(p);
+    return acc;
+}, {} as Record<string, any[]>);
 
 // Función para convertir rating a estrellas
 const getRatingStars = (rating: number) => {
@@ -311,15 +336,39 @@ const externalIds = await response.json();
 
 // El IMDB ID estará en externalIds.imdb_id
 const imdbId = externalIds.imdb_id; // formato: "tt1234567"
+
+// Obtener información adicional de la movie
+const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
-        <!-- Hero Section con backdrop -->
-        <div
-            class="relative w-full h-auto bg-cover bg-center bg-no-repeat"
-            style={`background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7)), url(https://image.tmdb.org/t/p/original${item?.backdrop_path})`}
-        >
-            <div class="absolute inset-0"></div>
+        <!-- Hero Mejorado -->
+        <div class="relative w-full h-auto bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : '/assets/background.svg'})`}>
+            <!-- Overlay adaptativo -->
+            <div class="absolute inset-0" style={`background: ${item?.backdrop_path ? 'linear-gradient(180deg, rgba(0,0,0,0.7) 100%, rgba(30,30,30,0.5) 100%)' : 'linear-gradient(180deg, #1e293b 0%, #334155 100%)'}`}></div>
+            
+            <!-- Breadcrumbs - Posicionado arriba a la izquierda -->
+            <nav class="relative z-10 pt-6 px-4 max-w-7xl mx-auto hero-breadcrumbs" aria-label="Breadcrumb">
+                <ol class="flex items-center space-x-2 text-sm">
+                    <li>
+                        <a href="/" class="text-white/80 hover:text-white transition-colors flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                            </svg>
+                            Inicio
+                        </a>
+                    </li>
+                    <li class="text-white/60">/</li>
+                    <li>
+                        <a href="/catalogo/topmovies" class="text-white/80 hover:text-white transition-colors">Películas</a>
+                    </li>
+                    <li class="text-white/60">/</li>
+                    <li class="text-white font-medium truncate max-w-xs" title={item?.title}>
+                        {item?.title}
+                    </li>
+                </ol>
+            </nav>
+
             <div class="relative flex flex-col items-center justify-center px-4 py-12 text-center max-w-4xl mx-auto">
                 
                 <!-- 🎬 Título -->
@@ -753,6 +802,41 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                                 )}
                             </ul>
                         </div>
+
+                        <!-- Redes de Transmisión -->
+                        {additionalInfo.networks && additionalInfo.networks.length > 0 && (
+                            <div class="bg-white p-4 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold text-blue-600 mb-3">Redes de Transmisión</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {additionalInfo.networks.map((network: any) => (
+                                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                            {network.logo_path && (
+                                                <img
+                                                    src={`https://image.tmdb.org/t/p/w92${network.logo_path}`}
+                                                    alt={network.name}
+                                                    class="w-12 h-8 object-contain flex-shrink-0"
+                                                    loading="lazy"
+                                                />
+                                            )}
+                                            <div class="min-w-0 flex-1">
+                                                <p class="font-medium text-gray-800 truncate">{network.name}</p>
+                                                {network.origin_country && (
+                                                    <p class="text-sm text-gray-500">{network.origin_country}</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <!-- Eslogan/Tagline -->
+                        {additionalInfo.tagline && (
+                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg shadow-md border-l-4 border-blue-500">
+                                <h3 class="text-lg font-bold text-blue-600 mb-2">Eslogan</h3>
+                                <p class="text-gray-700 italic text-lg">"{additionalInfo.tagline}"</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -877,7 +961,7 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         {/* Reparto */}
                         <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto</h2>
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto Principal</h2>
                             <div class="text-gray-600">
                                 {cast?.length > 0 ? (
                                         <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -920,9 +1004,9 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                             </div>
                         </div>
 
-                        <!-- Equipo -->
+                        <!-- Equipo de Producción -->
                         <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo</h2>
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo de Producción</h2>
                             <div class="text-gray-600">
                                 {directors?.length > 0 ? (
                                 <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
@@ -945,80 +1029,90 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
                         </div>
                     </div>
 
-                    <!-- Marcas, Plataformas y Productoras en dos columnas -->
+                    <!-- Plataformas y Productoras en dos columnas -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Plataformas -->
                         {providerElements.length > 0 && (
                                 <div class="bg-white p-6 rounded-lg shadow-md">
                                     <h2 class="text-2xl font-bold text-blue-600 mb-4">Disponible en</h2>
-                                    <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                        {providerElements.map((provider: {
-                                            name: string;
-                                            logo: string | null;
-                                            link?: string
-                                        }) => (
-                                                <div class="flex flex-col items-center">
-                                                    {provider.logo ? (
-                                                        provider.link ? (
-                                                                <a href={provider.link} target="_blank"
-                                                                   rel="noopener noreferrer">
-                                                                    <img
-                                                                            src={provider.logo}
-                                                                            alt={provider.name}
-                                                                            loading="lazy"
-                                                                            class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
-                                                                    />
-                                                                </a>
-                                                        ) : (
-                                                                <img
-                                                                        src={provider.logo}
-                                                                        alt={provider.name}
-                                                                        loading="lazy"
-                                                                        class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all"
-                                                                />
-                                                        )
-                                                    ) : (
-                                                            <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
-                                                                <span class="text-xs text-gray-500">Sin logo</span>
-                                                            </div>
-                                                    )}
-                                                    <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                    <div class="space-y-4">
+                                        {providersByType.flatrate && providersByType.flatrate.length > 0 && (
+                                            <div>
+                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Incluido con suscripción</h3>
+                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                                    {providersByType.flatrate.map((provider: any) => (
+                                                        <div class="flex flex-col items-center">
+                                                            {provider.logo ? (
+                                                                provider.link ? (
+                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                )
+                                                            ) : (
+                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                                </div>
+                                                            )}
+                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                        ))}
+                                            </div>
+                                        )}
+                                        {providersByType.rent && providersByType.rent.length > 0 && (
+                                            <div>
+                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Alquiler</h3>
+                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                                    {providersByType.rent.map((provider: any) => (
+                                                        <div class="flex flex-col items-center">
+                                                            {provider.logo ? (
+                                                                provider.link ? (
+                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                )
+                                                            ) : (
+                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                                </div>
+                                                            )}
+                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {providersByType.buy && providersByType.buy.length > 0 && (
+                                            <div>
+                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Compra</h3>
+                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
+                                                    {providersByType.buy.map((provider: any) => (
+                                                        <div class="flex flex-col items-center">
+                                                            {provider.logo ? (
+                                                                provider.link ? (
+                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
+                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                    </a>
+                                                                ) : (
+                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
+                                                                )
+                                                            ) : (
+                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
+                                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                                </div>
+                                                            )}
+                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
-                        )}
-
-                        <!-- Productoras -->
-                        {item?.production_companies && item.production_companies.length > 0 && (
-                        <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
-
-                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                            {item.production_companies.map((company: { logo_path?: string; name: string }) => (
-                                <a
-                                href={`/productora/${company.name}`}
-                                class="flex flex-col items-center group"
-                                >
-                                {company?.logo_path ? (
-                                    <img
-                                    src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
-                                    alt={company.name}
-                                    loading="lazy"
-                                    class="w-20 h-20 object-contain rounded-md mb-2 transition-transform duration-200 group-hover:scale-110"
-                                    />
-                                ) : (
-                                    <div class="w-20 h-20 bg-gray-200 rounded-md flex items-center justify-center mb-2 group-hover:bg-gray-300 transition-colors">
-                                    <span class="text-xs text-gray-500">Sin logo</span>
-                                    </div>
-                                )}
-                                <p class="text-sm text-center text-gray-600 group-hover:text-blue-600 font-medium transition-colors">
-                                    {company.name}
-                                </p>
-                                </a>
-                            ))}
-                            </div>
-                        </div>
                         )}
 
                         <!-- MOVIES Recomendaciones -->
