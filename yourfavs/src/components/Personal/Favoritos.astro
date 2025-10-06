@@ -557,7 +557,7 @@ const stats = calculateStats();
                                         filter: filter,
                                         search: searchQuery,
                                         genre: genreFilter,
-                                        seriesPage: (seriesPage + 1).toString(),
+                                        seriesPage: Math.ceil(seriesFavoritas.length / ITEMS_PER_PAGE).toString(),
                                         moviesPage: moviesPage.toString()
                                     }) + '#series-section'}
                                     class="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
@@ -565,7 +565,7 @@ const stats = calculateStats();
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                     </svg>
-                                    Mostrar más series ({Math.min(ITEMS_PER_PAGE, seriesFavoritas.length - seriesItemsToShow)} más)
+                                    Mostrar todas las series restantes ({seriesFavoritas.length - seriesItemsToShow})
                                 </a>
                             </div>
                         )}
@@ -634,14 +634,14 @@ const stats = calculateStats();
                                         search: searchQuery,
                                         genre: genreFilter,
                                         seriesPage: seriesPage.toString(),
-                                        moviesPage: (moviesPage + 1).toString()
+                                        moviesPage: Math.ceil(peliculasFavoritas.length / ITEMS_PER_PAGE).toString()
                                     }) + '#movies-section'}
                                     class="px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:from-red-700 hover:to-pink-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                     </svg>
-                                    Mostrar más películas ({Math.min(ITEMS_PER_PAGE, peliculasFavoritas.length - moviesItemsToShow)} más)
+                                    Mostrar todas las películas restantes ({peliculasFavoritas.length - moviesItemsToShow})
                                 </a>
                             </div>
                         )}

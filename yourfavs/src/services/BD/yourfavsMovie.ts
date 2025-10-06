@@ -231,6 +231,20 @@ export async function clearAllMoviesVerPronto() {
     }
 }
 
+// Eliminar una película de MoviesVerPronto por ID
+export async function deleteMovieVerProntoById(movieId: string) {
+    try {
+        await deleteDoc(doc(db, 'MoviesVerPronto', movieId));
+        return {success: true};
+    } catch (error) {
+        console.error('Error al borrar la película:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+
 import axios from 'axios';
 
 // Necesitarás una API key de TMDB

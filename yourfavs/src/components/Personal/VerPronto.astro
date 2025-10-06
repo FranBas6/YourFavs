@@ -9,6 +9,8 @@ import {
     getMoviesVerPronto,
     clearAllMoviesVerPronto
 } from "../../services/BD/yourfavsMovie";
+import { deleteSerieVerProntoById } from "../../services/BD/yourfavsSerie";
+import { deleteMovieVerProntoById } from "../../services/BD/yourfavsMovie";
 
 // Variable para manejar acciones de borrado y mensajes
 let clearedType = null;
@@ -17,6 +19,8 @@ let clearedType = null;
 if (Astro.request.method === "POST") {
     const formData = await Astro.request.formData();
     const clearAction = formData.get("clear");
+    const deleteId = formData.get("deleteId");
+    const deleteType = formData.get("deleteType");
 
     if (clearAction === "series") {
         await clearAllSeriesVerPronto();
@@ -28,6 +32,14 @@ if (Astro.request.method === "POST") {
         await clearAllSeriesVerPronto();
         await clearAllMoviesVerPronto();
         clearedType = "todos";
+    } else if (deleteId && deleteType) {
+        if (deleteType === "serie") {
+            await deleteSerieVerProntoById(String(deleteId));
+            clearedType = "serie";
+        } else if (deleteType === "pelicula") {
+            await deleteMovieVerProntoById(String(deleteId));
+            clearedType = "pelicula";
+        }
     }
 }
 
@@ -324,18 +336,31 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                         ) : (
                                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                                     {seriesVerPronto.map((item) => (
-                                            <CardSerie
-                                                    id={item.id.toString()}
-                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                    name={item.name}
-                                                    vote_average={item.vote_average}
-                                                    overview={item.overview}
-                                                    first_air_date={item.first_air_date}
-                                                    seasons={item.seasons}
-                                                    last_episode_to_air={item.last_episode_to_air}
-                                                    next_episode_to_air={item.next_episode_to_air}
-                                                    status={item.status}
-                                            />
+                                            <div class="relative">
+                                                <CardSerie
+                                                        id={item.id.toString()}
+                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                        name={item.name}
+                                                        vote_average={item.vote_average}
+                                                        overview={item.overview}
+                                                        first_air_date={item.first_air_date}
+                                                        seasons={item.seasons}
+                                                        last_episode_to_air={item.last_episode_to_air}
+                                                        next_episode_to_air={item.next_episode_to_air}
+                                                        status={item.status}
+                                                />
+                                                <form method="POST" class="inline">
+                                                    <input type="hidden" name="deleteId" value={item.id}/>
+                                                    <input type="hidden" name="deleteType" value="serie"/>
+                                                    <input type="hidden" name="filter" value={filter}/>
+                                                    <button
+                                                            type="submit"
+                                                            class="absolute top-10 right-2 z-20 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-700 shadow-md"
+                                                            aria-label="Eliminar serie">
+                                                        ×
+                                                    </button>
+                                                </form>
+                                            </div>
                                     ))}
                                 </div>
                         )}
@@ -377,14 +402,27 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
                         ) : (
                                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                                     {peliculasVerPronto.map((item) => (
-                                            <CardMovie
-                                                    id={item.id.toString()}
-                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                    title={item.title}
-                                                    vote_average={item.vote_average}
-                                                    overview={item.overview}
-                                                    release_date={item.release_date}
-                                            />
+                                            <div class="relative">
+                                                <CardMovie
+                                                        id={item.id.toString()}
+                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                        title={item.title}
+                                                        vote_average={item.vote_average}
+                                                        overview={item.overview}
+                                                        release_date={item.release_date}
+                                                />
+                                                <form method="POST" class="inline">
+                                                    <input type="hidden" name="deleteId" value={item.id}/>
+                                                    <input type="hidden" name="deleteType" value="pelicula"/>
+                                                    <input type="hidden" name="filter" value={filter}/>
+                                                    <button
+                                                            type="submit"
+                                                            class="absolute top-2 right-2 z-20 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-700 shadow-md"
+                                                            aria-label="Eliminar película">
+                                                        ×
+                                                    </button>
+                                                </form>
+                                            </div>
                                     ))}
                                 </div>
                         )}

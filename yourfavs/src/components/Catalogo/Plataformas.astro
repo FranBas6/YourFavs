@@ -47,7 +47,7 @@ let movies: Movie[] = [];
 let series: Serie[] = [];
 
 // Función para eliminar duplicados en arrays de películas o series por ID
-function removeDuplicates<T extends { id: number }>(items: T[]): T[] {
+function removeDuplicates<T extends { id: number | string }>(items: T[]): T[] {
     return items.filter((item, index, self) =>
         index === self.findIndex((t) => t.id === item.id)
     );
@@ -93,8 +93,8 @@ if (platformParam === 'all') {
     ];
 
     // Eliminar duplicados
-    movies = removeDuplicates(allMovies);
-    series = removeDuplicates(allSeries);
+    movies = removeDuplicates<Movie>(allMovies);
+    series = removeDuplicates<Serie>(allSeries);
 
 } else {
     // Filtrar por plataforma seleccionada con parámetros de ordenación

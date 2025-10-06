@@ -435,6 +435,20 @@ export async function clearAllSeriesVerPronto() {
     }
 }
 
+// Eliminar una serie de SeriesVerPronto por ID
+export async function deleteSerieVerProntoById(serieId: string) {
+    try {
+        await deleteDoc(doc(db, 'SeriesVerPronto', serieId));
+        return {success: true};
+    } catch (error) {
+        console.error('Error al borrar la serie:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+        };
+    }
+}
+
 import axios from 'axios';
 
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
