@@ -1,7 +1,665 @@
 ---
 import Layout from '../layouts/Layout.astro';
-import CatalogoPrincipal from '../components/Catalogo/CatalogoPrincipal.astro';
+import CardMovie from "../components/Cards/CardMovie.astro";
+import CardSerie from "../components/Cards/CardSerie.astro";
+import type {Movie} from "../types/ApiMovie"
+import type {Serie} from "../types/ApiSerie";
+import {
+    getAmazonPrimeMovies, getAppleTVMovies,
+    getDisneyPlusMovies, getFilminMovies,
+    getHBOMaxMovies,
+    getLatestMovies, getMovistarPlusMovies
+} from "../services/API/Movies/tmdbMovies";
+import {
+    getAmazonPrimeSeries, getAppleTVSeries,
+    getDisneyPlusSeries, getFilminSeries,
+    getHBOMaxSeries,
+    getLatestSeries, getMovistarPlusSeries
+} from "../services/API/Series/tmdbSeries";
+import {getMostPopularMovies} from "../services/API/Movies/tmdbMovies";
+import {getMostPopularSeries} from "../services/API/Series/tmdbSeries";
+import {getTopRatedMovies} from "../services/API/Movies/tmdbMovies";
+import {getTopRatedSeries} from "../services/API/Series/tmdbSeries";
+import {getNetflixSeries} from "../services/API/Series/tmdbSeries";
+import {getNetflixMovies} from "../services/API/Movies/tmdbMovies";
+import {getMoviesByCategory} from "../services/API/Movies/tmdbMovies";
+import {getSeriesByCategory} from "../services/API/Series/tmdbSeries";
+
+const page = Number(Astro.request.url.split('?page=')[1] || 1);
+
+const latestMovies = await getLatestMovies({page: page.toString()});
+const latestSeries = await getLatestSeries({page: page.toString()});
+const popularMovies = await getMostPopularMovies({page: page.toString()});
+const popularSeries = await getMostPopularSeries({page: page.toString()});
+const topRatedMovies = await getTopRatedMovies({page: page.toString()});
+const topRatedSeries = await getTopRatedSeries({page: page.toString()});
+
+const pageStr = page.toString();
+
+const netflixMovies = await getNetflixMovies(pageStr);
+const netflixSeries = await getNetflixSeries(pageStr);
+const amazonPrimeSeries = await getAmazonPrimeSeries(pageStr);
+const amazonPrimeMovies = await getAmazonPrimeMovies(pageStr);
+const disneyPlusSeries = await getDisneyPlusSeries(pageStr);
+const disneyPlusMovies = await getDisneyPlusMovies(pageStr);
+const hboMaxSeries = await getHBOMaxSeries(pageStr);
+const hboMaxMovies = await getHBOMaxMovies(pageStr);
+const appleTVSeries = await getAppleTVSeries(pageStr);
+const appleTVMovies = await getAppleTVMovies(pageStr);
+const movistarPlusSeries = await getMovistarPlusSeries(pageStr);
+const movistarPlusMovies = await getMovistarPlusMovies(pageStr);
+const filminSeries = await getFilminSeries(pageStr);
+const filminMovies = await getFilminMovies(pageStr);
+
+// Plataformas y categorías disponibles
+const platforms = [
+    {name: "NETFLIX", slug: "netflix", movies: netflixMovies, series: netflixSeries},
+    {name: "AMAZON PRIME", slug: "amazon", movies: amazonPrimeMovies, series: amazonPrimeSeries},
+    {name: "DISNEY+", slug: "disney", movies: disneyPlusMovies, series: disneyPlusSeries},
+    {name: "HBO MAX", slug: "hbo", movies: hboMaxMovies, series: hboMaxSeries},
+    {name: "APPLE TV+", slug: "apple", movies: appleTVMovies, series: appleTVSeries},
+    {name: "MOVISTAR+", slug: "movistar", movies: movistarPlusMovies, series: movistarPlusSeries},
+    {name: "FILMIN", slug: "filmin", movies: filminMovies, series: filminSeries},
+];
+
+
+const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+
+const allCategories = [
+    {slug: 'accion', name: 'ACCIÓN'},
+    {slug: 'comedia', name: 'COMEDIA'},
+    {slug: 'drama', name: 'DRAMA'},
+    {slug: 'crimen', name: 'CRIMEN'},
+    {slug: 'aventura', name: 'AVENTURA'},
+    {slug: 'fantasia', name: 'FANTASÍA'},
+    {slug: 'ciencia_ficcion', name: 'CIENCIA FICCIÓN'},
+    {slug: 'misterio', name: 'MISTERIO'},
+    {slug: 'terror', name: 'TERROR'},
+    {slug: 'animacion', name: 'ANIMACIÓN'},
+    {slug: 'familia', name: 'FAMILIA'},
+    {slug: 'proximamente', name: 'PRÓXIMAMENTE'},
+];
+
+const randomIndex = Math.floor(Math.random() * allCategories.length);
+const randomCategorySlug = allCategories[randomIndex].slug;
+const randomCategoryName = allCategories[randomIndex].name;
+
+const categoriesMovies = await getMoviesByCategory(randomCategorySlug, page.toString());
+const categoriesSeries = await getSeriesByCategory(randomCategorySlug, page.toString());
+
+const randomCategory = {
+    slug: randomCategorySlug,
+    name: randomCategoryName,
+    movies: categoriesMovies,
+    series: categoriesSeries,
+};
+
+// Definir los géneros comunes
+const genresMap: Record<number, string> = {
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+
+const sections = [
+    {
+        title: "ÚLTIMOS LANZAMIENTOS",
+        movies: latestMovies,
+        series: latestSeries,
+        link: "/catalogo/ultimoslanzamientos",
+        priority: 'high',
+        icon: '🆕'
+    },
+    {
+        title: "MÁS POPULARES",
+        movies: popularMovies,
+        series: popularSeries,
+        link: "/catalogo/maspopulares",
+        priority: 'high',
+        icon: '🔥'
+    },
+    {
+        title: "TOP PELÍCULAS",
+        movies: topRatedMovies,
+        series: [],
+        link: "/catalogo/topmovies",
+        priority: 'medium',
+        icon: '⭐'
+    },
+    {
+        title: "TOP SERIES",
+        movies: [],
+        series: topRatedSeries,
+        link: "/catalogo/topseries",
+        priority: 'medium',
+        icon: '🏆'
+    },
+    {
+        title: `PLATAFORMA DESTACADA: ${randomPlatform.name}`,
+        movies: randomPlatform.movies as Movie[],
+        series: randomPlatform.series as Serie[],
+        link: `/catalogo/plataformas?platform=${randomPlatform.slug}&page=1`,
+        priority: 'low',
+        icon: '📺'
+    },
+    {
+        title: `CATEGORÍA DESTACADA: ${randomCategory.name}`,
+        movies: randomCategory.movies as Movie[],
+        series: randomCategory.series as Serie[],
+        link: `/catalogo/categorias?categoria=${randomCategory.slug}&page=1&type=all`,
+        priority: 'low',
+        icon: '🎬'
+    }
+];
 ---
-<Layout title="YourFavs">
-    <CatalogoPrincipal/>
+<Layout title="YourFavs">     
+    <main class="main-container">
+        <!-- Hero Section mejorado -->
+        <div class="hero-section">
+            <div class="hero-content">
+                <h1 class="hero-title text-coral-red">
+                    <span class="hero-icon">🎬</span>
+                    CATÁLOGO PRINCIPAL
+                </h1>
+                <div class="hero-divider"></div>
+                <p class="hero-description">
+                    Descubre miles de películas y series de las mejores plataformas.
+                    <strong>Tu entretenimiento favorito</strong> en un solo lugar.
+                </p>
+            </div>
+        </div>
+
+        <!-- Contenido principal -->
+        <div class="content-wrapper">
+            {sections
+                .filter((section) => section.movies.length > 0 || section.series.length > 0)
+                .map((section) => (
+                        <article class={`section-card ${section.priority === 'high' ? 'featured-section' : ''}`}>
+                            <header class="section-header">
+                                <div class="section-title-wrapper">
+                                    <span class="section-icon" aria-hidden="true">{section.icon}</span>
+                                    <h2 class="section-title">{section.title}</h2>
+                                    {section.priority === 'high' && (
+                                            <span class="priority-badge">Destacado</span>
+                                    )}
+                                </div>
+                                <a href={section.link} class="view-more-btn">
+                                    <span>Ver más</span>
+                                    <svg class="arrow-icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd"
+                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                                            clip-rule="evenodd"/>
+                                    </svg>
+                                </a>
+                            </header>
+
+                            <div class="section-content">
+                                {section.movies.length > 0 && (
+                                        <div class="content-category">
+                                            <h3 class="category-title">
+                                                <svg class="category-icon" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor">
+                                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                                    <line x1="8" y1="21" x2="16" y2="21"/>
+                                                    <line x1="12" y1="17" x2="12" y2="21"/>
+                                                </svg>
+                                                <span>Películas</span>
+                                                <span class="item-count">({section.movies.length})</span>
+                                            </h3>
+                                            <div class="cards-grid">
+                                                {section.movies.slice(0, 10).map((item) => (
+                                                        <div class="card-container">
+                                                            <CardMovie
+                                                                    id={item.id.toString()}
+                                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                                    title={item.title}
+                                                                    vote_average={item.vote_average}
+                                                                    overview={item.overview}
+                                                                    release_date={item.release_date}
+                                                                    genres={item.genre_ids?.map(id => ({
+                                                                        id,
+                                                                        name: getGenreName(id)
+                                                                    }))}
+                                                            />
+                                                        </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                )}
+
+                                {section.series.length > 0 && (
+                                        <div class="content-category">
+                                            <h3 class="category-title">
+                                                <svg class="category-icon" viewBox="0 0 24 24" fill="none"
+                                                    stroke="currentColor">
+                                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                                    <line x1="8" y1="21" x2="16" y2="21"/>
+                                                    <line x1="12" y1="17" x2="12" y2="21"/>
+                                                    <circle cx="17" cy="8" r="1"/>
+                                                    <circle cx="17" cy="16" r="1"/>
+                                                </svg>
+                                                <span>Series</span>
+                                                <span class="item-count">({section.series.length})</span>
+                                            </h3>
+                                            <div class="cards-grid">
+                                                {section.series.slice(0, 10).map((item) => (
+                                                        <div class="card-container">
+                                                            <CardSerie
+                                                                    id={item.id.toString()}
+                                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                                    name={item.name}
+                                                                    vote_average={item.vote_average}
+                                                                    overview={item.overview}
+                                                                    first_air_date={item.first_air_date}
+                                                                    seasons={item.seasons}
+                                                                    last_episode_to_air={item.last_episode_to_air}
+                                                                    next_episode_to_air={item.next_episode_to_air}
+                                                                    genres={item.genre_ids?.map(id => ({
+                                                                        id,
+                                                                        name: getGenreName(id)
+                                                                    }))}
+                                                            />
+                                                        </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                )}
+                            </div>
+                        </article>
+                ))}
+        </div>
+    </main>
 </Layout>
+
+<style is:global>
+    /* Variables CSS para consistencia */
+    :root {
+        --primary-red: #E63946;
+        --primary-blue: #3B82F6;
+        --secondary-blue: #60A5FA;
+        --background-light: #F8FAFC;
+        --background-dark: #0F172A;
+        --card-background: #FFFFFF;
+        --text-primary: #1E293B;
+        --text-secondary: #64748B;
+        --text-muted: #94A3B8;
+        --border-light: #E2E8F0;
+        --border-medium: #CBD5E1;
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --radius-sm: 0.375rem;
+        --radius-md: 0.5rem;
+        --radius-lg: 0.75rem;
+        --spacing-xs: 0.5rem;
+        --spacing-sm: 0.75rem;
+        --spacing-md: 1rem;
+        --spacing-lg: 1.5rem;
+        --spacing-xl: 2rem;
+        --spacing-2xl: 3rem;
+    }
+
+    /* Base styles */
+    body {
+        background: linear-gradient(135deg, var(--background-light) 0%, #EDF2F7 100%);
+        color: var(--text-primary);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Contenedor principal */
+    .main-container {
+        min-height: 100vh;
+        padding: var(--spacing-lg) var(--spacing-md);
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    /* Hero Section */
+    .hero-section {
+        text-align: center;
+    }
+
+    .hero-content {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .text-coral-red {
+        color: #E63946;
+    }
+
+    .hero-title {
+        font-size: clamp(2rem, 5vw, 3rem);
+        font-weight: 800;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        justify-content: center;
+        text-align: center;
+        flex-wrap: wrap;
+        line-height: 1.2;
+    }
+
+    .hero-icon {
+        font-size: 1.2em;
+        line-height: 1;
+        transform: translateY(-1px);
+    }
+
+    .hero-divider {
+        width: 60px;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-red), var(--primary-blue));
+        margin: 0 auto var(--spacing-lg);
+        border-radius: 2px;
+    }
+
+    .hero-description {
+        font-size: 1.125rem;
+        color: var(--text-secondary);
+        margin-bottom: 20px;
+        line-height: 1.7;
+    }
+
+    /* Content wrapper */
+    .content-wrapper {
+        display: flex;
+        flex-direction: column;
+        gap: var(--spacing-2xl);
+    }
+
+    /* Section cards */
+    .section-card {
+        background: var(--card-background);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-xl);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border-light);
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .section-card:hover {
+        box-shadow: var(--shadow-lg);
+        transform: translateY(-2px);
+    }
+
+    .featured-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+    }
+
+    /* Section header */
+    .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: var(--spacing-xl);
+        padding-bottom: var(--spacing-md);
+        border-bottom: 2px solid var(--border-light);
+        flex-wrap: wrap;
+        gap: var(--spacing-md);
+    }
+
+    .section-title-wrapper {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-md);
+        flex-wrap: wrap;
+    }
+
+    .section-icon {
+        font-size: 1.5rem;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+    }
+
+    .section-title {
+        font-size: clamp(1.25rem, 3vw, 1.875rem);
+        font-weight: 700;
+        color: var(--primary-blue);
+        margin: 0;
+        line-height: 1.2;
+        letter-spacing: -0.025em;
+    }
+
+    .priority-badge {
+        background: linear-gradient(135deg, var(--primary-red), #DC2626);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .view-more-btn {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-xs);
+        color: var(--primary-blue);
+        text-decoration: none;
+        font-weight: 500;
+        padding: var(--spacing-xs) var(--spacing-md);
+        border-radius: var(--radius-md);
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    .view-more-btn:hover {
+        background: var(--primary-blue);
+        color: white;
+        transform: translateX(2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .arrow-icon {
+        width: 16px;
+        height: 16px;
+        transition: transform 0.2s ease;
+    }
+
+    .view-more-btn:hover .arrow-icon {
+        transform: translateX(2px);
+    }
+
+    /* Content categories */
+    .content-category {
+        margin-bottom: var(--spacing-xl);
+    }
+
+    .category-title {
+        display: flex;
+        align-items: center;
+        gap: var(--spacing-sm);
+        margin-bottom: var(--spacing-lg);
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--primary-red);
+    }
+
+    .category-icon {
+        width: 24px;
+        height: 24px;
+        stroke-width: 2;
+    }
+
+    .item-count {
+        color: var(--text-muted);
+        font-weight: 400;
+        font-size: 0.875rem;
+    }
+
+    /* Cards grid */
+    .cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: var(--spacing-lg);
+        margin-bottom: var(--spacing-xl);
+    }
+
+    @media (max-width: 640px) {
+        .cards-grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: var(--spacing-md);
+        }
+    }
+
+    /* Focus states for accessibility */
+    .view-more-btn:focus,
+    .show-more-link:focus {
+        outline: 2px solid var(--primary-blue);
+        outline-offset: 2px;
+    }
+
+    /* Responsive design improvements */
+    @media (max-width: 768px) {
+        .main-container {
+            padding: var(--spacing-md) var(--spacing-sm);
+        }
+
+        .hero-section {
+            padding: var(--spacing-xl) var(--spacing-md);
+        }
+
+        .section-card {
+            padding: var(--spacing-lg);
+        }
+
+        .section-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: var(--spacing-md);
+        }
+
+        .section-title-wrapper {
+            width: 100%;
+        }
+
+        .view-more-btn {
+            align-self: flex-end;
+        }
+
+        .cards-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--spacing-sm);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .hero-title {
+            flex-direction: column;
+            gap: var(--spacing-sm);
+        }
+
+        .hero-icon {
+            font-size: 1.5rem;
+        }
+
+        .cards-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    /* Print styles */
+    @media print {
+        .hero-section,
+        .view-more-btn,
+        .show-more-card {
+            display: none;
+        }
+
+        .section-card {
+            break-inside: avoid;
+            box-shadow: none;
+            border: 1px solid #ccc;
+        }
+
+        body {
+            background: white;
+            color: black;
+        }
+    }
+
+    /* Scroll behavior */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Selection styles */
+    ::selection {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: var(--text-primary);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: var(--background-light);
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: var(--border-medium);
+        border-radius: 4px;
+    }
+
+    /* Performance optimizations */
+    .cards-grid {
+        align-items: stretch;
+    }
+
+    .card-container {
+        display: flex;
+        height: 100%;
+    }
+
+    .card-container > * {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+    }
+
+</style>

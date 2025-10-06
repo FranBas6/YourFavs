@@ -1,7 +1,746 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import BusquedaComponent from "../../components/Catalogo/Busqueda.astro";
+import CardMovie from "../../components/Cards/CardMovie.astro";
+import CardSerie from "../../components/Cards/CardSerie.astro";
+import CardActor from "../../components/Cards/CardActor.astro";
+import CategoriasButton from "../../components/CategoriasButton.astro";
+import {getMoviesByTitle} from "../../services/API/Movies/tmdbMovies";
+import {getSeriesByTitle} from "../../services/API/Series/tmdbSeries";
+import {getActorsByName} from "../../services/API/Actors/tmdbActor";
+
+// Obtener el parámetro de query desde la URL
+const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
+const title = queryParams.get('query') || '';
+
+// Definir los géneros comunes
+const genresMap: Record<number, string> = {
+    // Géneros de películas y series
+    28: "Acción",
+    12: "Aventura",
+    16: "Animación",
+    35: "Comedia",
+    80: "Crimen",
+    99: "Documental",
+    18: "Drama",
+    10751: "Familia",
+    14: "Fantasía",
+    36: "Historia",
+    27: "Terror",
+    10402: "Música",
+    9648: "Misterio",
+    10749: "Romance",
+    878: "Ciencia ficción",
+    10770: "Película de TV",
+    53: "Thriller",
+    10752: "Bélica",
+    37: "Western",
+    // Géneros exclusivos de series
+    10759: "Acción y Aventura",
+    10762: "Infantil",
+    10763: "Noticias",
+    10764: "Reality",
+    10765: "Sci-Fi y Fantasía",
+    10766: "Soap",
+    10767: "Talk",
+    10768: "Guerra y Política"
+};
+
+// Función para obtener el nombre del género según su ID
+function getGenreName(id: number): string {
+    return genresMap[id] || "Otro";
+}
+
+// Función para cargar todas las páginas de películas y series
+async function loadAllPages<T>(
+    getDataFunction: (params: { [key: string]: string }) => Promise<T[]>,
+    searchTerm: string,
+    paramName: string = "title"
+): Promise<T[]> {
+    let page = 1;
+    let allItems: T[] = [];
+    let hasMore = true;
+
+    // Limitar a 5 páginas de resultados para evitar demasiadas solicitudes
+    const maxPages = 5;
+
+    while (hasMore && page <= maxPages) {
+        try {
+            const params: { [key: string]: string } = {page: page.toString()};
+            params[paramName] = searchTerm;
+
+            const result = await getDataFunction(params);
+            if (result.length > 0) {
+                allItems = allItems.concat(result);
+                page++;
+            } else {
+                hasMore = false;
+            }
+        } catch (error) {
+            console.error(`Error al cargar la página ${page}:`, error);
+            hasMore = false;
+        }
+    }
+    return allItems;
+}
+
+// Then call them like:
+const allMovies = await loadAllPages(
+    ({title, page}) => getMoviesByTitle({title, page}),
+    title,
+    "title"
+);
+
+const allSeries = await loadAllPages(
+    ({title, page}) => getSeriesByTitle({title, page}),
+    title,
+    "title"
+);
+
+const allActors = await loadAllPages(
+    ({name, page}) => getActorsByName({name, page}),
+    title,
+    "name"
+);
+
+// Limitar a 65 elementos por categoría
+const limitedMovies = allMovies.slice(0, 65);
+const limitedSeries = allSeries.slice(0, 65);
+const limitedActors = allActors.slice(0, 30);
+
+// Contadores para mostrar
+const totalResults = limitedMovies.length + limitedSeries.length + limitedActors.length;
 ---
 <Layout title="Resultados">
-    <BusquedaComponent/>
+    <div class="search-results-container max-w-7xl mx-auto px-4 py-8">
+    <!-- Cabecera mejorada con mejor jerarquía visual -->
+    <header class="results-header mb-12 text-center">
+        <div class="header-content">
+            <h1 class="main-title text-coral-red font-bold text-3xl sm:text-4xl md:text-5xl mb-6">
+                Resultados para: <span class="search-term text-navy-blue">{title}</span>
+            </h1>
+            <div class="results-summary">
+                <p class="text-slate-700 text-lg leading-relaxed">
+                    {totalResults > 0 ? (
+                            <div class="results-summary mt-4 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-4 text-gray-700">
+                                <div class="summary-main text-base sm:text-lg">
+                                    Encontramos <span class="font-semibold text-coral-red">{totalResults}</span>
+                                    coincidencias
+                                </div>
+                                <div class="summary-breakdown flex flex-wrap justify-center items-center gap-2 text-sm sm:text-base">
+                                    {limitedMovies.length > 0 && (
+                                            <span class="inline-flex items-center gap-1 px-3 py-1 bg-coral-red/10 text-coral-red rounded-full font-medium">
+                🎬 {limitedMovies.length} Películas
+            </span>
+                                    )}
+                                    {limitedSeries.length > 0 && (
+                                            <span class="inline-flex items-center gap-1 px-3 py-1 bg-teal-500/10 text-teal-600 rounded-full font-medium">
+                📺 {limitedSeries.length} Series
+            </span>
+                                    )}
+                                    {limitedActors.length > 0 && (
+                                            <span class="inline-flex items-center gap-1 px-3 py-1 bg-purple-500/10 text-purple-600 rounded-full font-medium">
+                👤 {limitedActors.length} Actores
+            </span>
+                                    )}
+                                </div>
+                            </div>
+
+                    ) : (
+                            <span class="no-results-text">No se encontraron resultados para tu búsqueda</span>
+                    )}
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navegación sticky mejorada -->
+    <nav class="sticky-nav sticky top-4 z-50 mb-12">
+        <div class="nav-container bg-white/95 backdrop-blur-md border border-slate-200 rounded-2xl shadow-xl">
+            <div class="nav-wrapper px-3 py-2">
+                <div class="nav-buttons flex flex-wrap justify-center items-center gap-3">
+
+                    {limitedMovies.length > 0 && (
+                            <CategoriasButton
+                                    href="#peliculas"
+                                    class="nav-button nav-button--movies">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-6h1V5h-1v2zm-2 0h1V5h-1v2zM9 5v2h1V5H9zM5 5v2h1V5H5zm0 8v2h1v-2H5zm0-2v2h1v-2H5zm2 2v2h1v-2H7zm2 0v2h1v-2H9zm2 0v2h1v-2h-1zm2 0v2h1v-2h-1zm-8-2v2h1v-2H5zm2 0v2h1v-2H7zm2 0v2h1v-2H9z"
+                                          clip-rule="evenodd"/>
+                                </svg>
+                                <span>Películas</span>
+                            </CategoriasButton>
+                    )}
+
+                    {limitedSeries.length > 0 && (
+                            <CategoriasButton
+                                    href="#series"
+                                    class="nav-button nav-button--series">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path fill-rule="evenodd"
+                                          d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z"
+                                          clip-rule="evenodd"/>
+                                </svg>
+                                <span>Series</span>
+                            </CategoriasButton>
+                    )}
+
+                    {limitedActors.length > 0 && (
+                            <CategoriasButton
+                                    href="#actores"
+                                    class="nav-button nav-button--actors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20"
+                                     fill="currentColor">
+                                    <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                                </svg>
+                                <span>Actores</span>
+                            </CategoriasButton>
+                    )}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    {totalResults === 0 ? (
+        <!-- Estado sin resultados mejorado -->
+            <div class="no-results-container">
+                <div class="no-results-card bg-white border border-slate-200 rounded-2xl p-12 text-center shadow-lg">
+                    <div class="no-results-icon mb-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-20 h-20 mx-auto text-slate-300" fill="none"
+                             viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                    <h2 class="no-results-title text-2xl font-bold text-coral-red mb-3">
+                        No encontramos resultados para "{title}"
+                    </h2>
+                    <p class="no-results-description text-white mb-8 max-w-lg mx-auto leading-relaxed">
+                        Intenta con otro término de búsqueda o revisa la ortografía. También puedes explorar nuestras
+                        categorías principales.
+                    </p>
+                    <a href="/"
+                       class="back-button inline-flex items-center gap-2 px-6 py-3 bg-navy-blue text-white rounded-xl hover:bg-blue-800 transition-all duration-300 font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                  d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
+                                  clip-rule="evenodd"/>
+                        </svg>
+                        <span>Volver al inicio</span>
+                    </a>
+                </div>
+            </div>
+    ) : (
+        <!-- Contenido principal mejorado -->
+            <main class="content-sections space-y-16">
+                {/* Sección de películas */}
+                {limitedMovies.length > 0 && (
+                        <section id="peliculas" class="content-section scroll-mt-28">
+                            <div class="section-header mb-8">
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-10 h-10 bg-gradient-to-br bg-coral-red rounded-xl flex items-center justify-center shadow-md">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                             viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
+                                        </svg>
+                                    </div>
+                                    <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Películas</h2>
+                                    <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
+                                    <div class="section-count ml-4 px-3 py-1 bg-coral-red/10 text-coral-red text-sm font-medium rounded-full">
+                                        {limitedMovies.length} resultados
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                                {limitedMovies.map((item) => (
+                                        <div class="movie-card card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                            <CardMovie
+                                                    id={item.id.toString()}
+                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                    title={item.title}
+                                                    vote_average={item.vote_average}
+                                                    overview={item.overview}
+                                                    release_date={item.release_date}
+                                                    genres={item.genre_ids?.map((id: number) => ({
+                                                        id,
+                                                        name: getGenreName(id)
+                                                    }))}
+                                            />
+                                        </div>
+                                ))}
+                            </div>
+                        </section>
+                )}
+
+                {/* Sección de series */}
+                {limitedSeries.length > 0 && (
+                        <section id="series" class="content-section scroll-mt-28">
+                            <div class="section-header mb-8">
+                                <div class="flex items-center gap-3 mb-6">
+                                    <div class="w-10 h-10 bg-gradient-to-br bg-blue-500 rounded-xl flex items-center justify-center shadow-md">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
+                                             viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                                        </svg>
+                                    </div>
+                                    <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Series</h2>
+                                    <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
+                                    <div class="section-count ml-4 px-3 py-1 bg-teal-500/10 text-teal-600 text-sm font-medium rounded-full">
+                                        {limitedSeries.length} resultados
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                                {limitedSeries.map((item) => (
+                                        <div class="series-card card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                            <CardSerie
+                                                    id={item.id.toString()}
+                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                    name={item.name}
+                                                    vote_average={item.vote_average}
+                                                    overview={item.overview}
+                                                    first_air_date={item.first_air_date}
+                                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                                    last_episode_to_air={item.last_episode_to_air}
+                                                    next_episode_to_air={item.next_episode_to_air}
+                                            />
+                                        </div>
+                                ))}
+                            </div>
+                        </section>
+                )}
+
+                {/* Sección de actores */}
+                {limitedActors.length > 0 && (
+                        <section id="actores" class="content-section scroll-mt-28">
+                            <div class="section-header mb-8">
+                                <div class="section-title-wrapper flex items-center">
+                                    <h2 class="section-title text-purple-600 font-bold text-2xl md:text-3xl mr-4">
+                                        ACTORES
+                                    </h2>
+                                    <div class="section-divider flex-1 h-0.5 bg-gradient-to-r from-purple-500 to-transparent rounded-full opacity-60"></div>
+                                    <div class="section-count ml-4 px-3 py-1 bg-purple-500/10 text-purple-600 text-sm font-medium rounded-full">
+                                        {limitedActors.length} resultados
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                                {limitedActors.map((item, index) => (
+                                        <div class="actor-card card-wrapper transform hover:scale-105 transition-transform duration-200">
+                                            <CardActor
+                                                    id={item.id.toString()}
+                                                    imagen={item.imagen ? `https://image.tmdb.org/t/p/w500${item.imagen}` : "/placeholder-actor.jpg"}
+                                                    nombre={item.nombre}
+                                                    popularidad={item.popularidad}
+                                                    lugarNacimiento={item.lugarNacimiento || undefined}
+                                                    fechaNacimiento={item.fechaNacimiento || undefined}
+                                            />
+                                        </div>
+                                ))}
+                            </div>
+                        </section>
+                )}
+            </main>
+    )}
+    </div>
 </Layout>
+
+<style is:global>
+    /* Variables CSS mejoradas */
+    :root {
+        --color-coral-red: #E63946;
+        --color-navy-blue: #112d7d;
+        --color-teal: #2a9d8f;
+        --color-purple: #8b5cf6;
+        --color-background: #0f172a;
+        --color-card-bg: #1e293b;
+        --color-text-primary: #f1f5f9;
+        --color-text-secondary: #cbd5e1;
+        --color-border: #334155;
+        --coral-red: #ff6b7a;
+        --coral-red-light: #ff8f9c;
+        --coral-red-dark: #e8495a;
+        --coral-red-alpha: rgba(255, 107, 122, 0.15);
+        --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+        --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        --radius-sm: 8px;
+        --radius-md: 12px;
+        --radius-lg: 16px;
+        --radius-xl: 20px;
+    }
+
+    /* Tipografía mejorada */
+    .search-results-container {
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        line-height: 1.6;
+    }
+
+    /* Header mejorado */
+    .results-header {
+        position: relative;
+    }
+
+    .main-title {
+        letter-spacing: -0.025em;
+        line-height: 1.1;
+    }
+
+    .search-term {
+        position: relative;
+        display: inline-block;
+    }
+
+    .search-term::after {
+        content: '';
+        position: absolute;
+        bottom: -4px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--color-coral-red), var(--color-navy-blue));
+        border-radius: 2px;
+    }
+
+    .results-breakdown {
+        opacity: 0;
+    }
+
+    .nav-container {
+        border: 1px solid rgb(226 232 240);
+        box-shadow: var(--shadow-xl);
+    }
+
+    .nav-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-radius: var(--radius-md);
+        text-decoration: none;
+        font-weight: 500;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .nav-button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+        transition: left 0.5s ease;
+    }
+
+    .nav-button:hover::before {
+        left: 100%;
+    }
+
+    .nav-button--home {
+        background-color: var(--color-navy-blue);
+        color: white;
+    }
+
+    .nav-button--movies {
+        background-color: var(--color-coral-red);
+        color: white;
+    }
+
+    .nav-button--series {
+        background-color: var(--color-teal);
+        color: white;
+    }
+
+    .nav-button--actors {
+        background-color: var(--color-purple);
+        color: white;
+    }
+
+    .nav-button:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .count-badge {
+        background: rgba(255, 255, 255, 0.2);
+        color: inherit;
+        padding: 0.125rem 0.5rem;
+        border-radius: 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    /* Estado sin resultados mejorado */
+    .no-results-container {
+        margin: 2rem 0;
+    }
+
+    .no-results-card {
+        max-width: 32rem;
+        margin: 0 auto;
+    }
+
+
+    @keyframes float {
+        0%, 100% {
+            transform: translateY(0px);
+        }
+        50% {
+            transform: translateY(-10px);
+        }
+    }
+
+    .back-button:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-xl);
+    }
+
+    /* Secciones de contenido mejoradas */
+    .content-section {
+        position: relative;
+    }
+
+    .section-header {
+        position: relative;
+    }
+
+    .section-title {
+        letter-spacing: -0.025em;
+    }
+
+    .section-count {
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Grid responsivo mejorado */
+    .content-grid {
+        gap: 1.5rem;
+    }
+
+    @media (min-width: 640px) {
+        .content-grid {
+            gap: 2rem;
+        }
+    }
+
+    /* Estilos para asegurar cards del mismo tamaño */
+    .card-wrapper {
+        display: flex;
+        height: 100%;
+    }
+
+    .card-wrapper > * {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+    }
+
+    /* Asegurar que todas las imágenes tengan el mismo tamaño */
+    .card-wrapper img {
+        width: 100%;
+        aspect-ratio: 2/3;
+        object-fit: cover;
+    }
+
+    /* Asegurar que los títulos tengan una altura fija */
+    .card-wrapper h3,
+    .card-wrapper h4 {
+        height: 3em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+
+    /* Para el contenido de la tarjeta */
+    .card-wrapper > div {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        background-color: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        height: 100%;
+    }
+
+    /* Para descripciones/overview */
+    .card-wrapper p {
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        flex-grow: 1;
+    }
+
+    /* Scroll suave */
+    html {
+        scroll-behavior: smooth;
+    }
+
+    /* Clases utilitarias */
+    .text-coral-red {
+        color: var(--color-coral-red);
+    }
+
+    .bg-coral-red {
+        background-color: var(--color-coral-red);
+    }
+
+    .text-navy-blue {
+        color: var(--color-navy-blue);
+    }
+
+    .bg-navy-blue {
+        background-color: var(--color-navy-blue);
+    }
+
+    .text-teal-600 {
+        color: #0d9488;
+    }
+
+    .from-teal-500 {
+        --tw-gradient-from: #14b8a6;
+    }
+
+    .bg-teal-500\/10 {
+        background-color: rgb(20 184 166 / 0.1);
+    }
+
+    .text-purple-600 {
+        color: #9333ea;
+    }
+
+    .from-purple-500 {
+        --tw-gradient-from: #a855f7;
+    }
+
+    .bg-purple-500\/10 {
+        background-color: rgb(168 85 247 / 0.1);
+    }
+
+    .bg-coral-red\/10 {
+        background-color: rgb(230 57 70 / 0.1);
+    }
+
+    body {
+        background-color: var(--color-background);
+        color: var(--color-text-primary);
+    }
+
+    .nav-container {
+        background-color: rgba(30, 41, 59, 0.95);
+        border-color: var(--color-border);
+    }
+
+    .no-results-card {
+        background-color: var(--color-card-bg);
+        border-color: var(--color-border);
+        color: var(--color-text-primary);
+    }
+
+    .text-slate-600,
+    .text-gray-600 {
+        color: var(--color-text-secondary);
+    }
+
+    .nav-pill {
+        background: var(--coral-red-alpha);
+        color: var(--coral-red);
+    }
+
+    .section-subtitle {
+        color: var(--coral-red);
+    }
+
+    /* Focus states mejorados */
+    .nav-button:focus,
+    .back-button:focus {
+        outline: 2px solid var(--color-coral-red);
+        outline-offset: 2px;
+    }
+
+    /* NAV responsive mejoras */
+    @media (max-width: 640px) {
+        .nav-buttons {
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 0.5rem;
+            justify-content: flex-start;
+            padding-bottom: 0.5rem;
+            scrollbar-width: none; /* Firefox */
+        }
+
+        .nav-buttons::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        .nav-button {
+            min-width: 44px;
+            padding: 0.5rem 0.5rem;
+            font-size: 0.8rem;
+            border-radius: var(--radius-sm);
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .nav-button span:not(.count-badge) {
+            display: none; /* Solo iconos, opcional */
+        }
+
+        .count-badge {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.4rem;
+            margin-top: 0.1rem;
+        }
+
+        .nav-container {
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+            padding: 0.2rem 0.2rem;
+        }
+    }
+
+    /* Mejoras responsivas */
+    @media (max-width: 768px) {
+        .actor-profile {
+            padding: 1.5rem;
+        }
+
+        .profile-image-container {
+            width: 180px;
+            height: 270px;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+        }
+
+        .quick-nav {
+            justify-content: center;
+        }
+
+        .nav-pill {
+            font-size: 0.85rem;
+            padding: 0.625rem 1rem;
+        }
+
+        .section-header-line {
+            display: none;
+        }
+    }
+</style>
