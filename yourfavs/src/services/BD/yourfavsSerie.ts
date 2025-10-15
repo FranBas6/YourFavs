@@ -9,6 +9,7 @@ interface SeriesFavs {
     poster_path: string;
     vote_average: number;
     overview: string;
+    opinion?: string;
     added_at: Date | string;
     position: number;
     custom_order?: number;
@@ -59,6 +60,7 @@ interface SeriesInterface {
     poster_path: string;
     vote_average: number;
     overview: string;
+    opinion?: string;
     added_at: Date | string;
     first_air_date?: string;
     seasons?: {

@@ -8,6 +8,7 @@ interface MovieInterface {
     title: string;
     release_date: string;
     overview: string;
+    opinion?: string;
     poster_path: string;
     vote_average: number;
     added_at: string;

@@ -24,7 +24,8 @@ import {
     query,
     getDocs,
     orderBy,
-    updateDoc
+    updateDoc,
+    deleteField
 } from "firebase/firestore";
 
 // Configuración de Firebase
@@ -48,6 +49,52 @@ if (Astro.request.method === 'POST') {
         const serieId = String(formData.get('id') || formData.get('serie_id'));
         const action = String(formData.get('action'));
         const actionType = String(formData.get('actionType'));
+
+        // Guardado/actualización de opinión en todas las colecciones donde exista
+        if (action === 'save_opinion' || actionType === 'opinion') {
+            const opinionText = String(formData.get('opinion') || '').trim();
+
+            const collections = [
+                'SeriesFavs',
+                'SeriesPendiente',
+                'SeriesVistas',
+                'SeriesSiguiendo',
+                'LikedSeries',
+                'SeriesVerPronto',
+            ];
+
+            for (const col of collections) {
+                const ref = doc(db, col, serieId);
+                const snap = await getDoc(ref);
+                if (snap.exists()) {
+                    await updateDoc(ref, { opinion: opinionText });
+                }
+            }
+
+            return Astro.redirect(`/serie/${serieId}`);
+        }
+
+        // Eliminar opinión de todas las colecciones donde exista
+        if (action === 'delete_opinion') {
+            const collections = [
+                'SeriesFavs',
+                'SeriesPendiente',
+                'SeriesVistas',
+                'SeriesSiguiendo',
+                'LikedSeries',
+                'SeriesVerPronto',
+            ];
+
+            for (const col of collections) {
+                const ref = doc(db, col, serieId);
+                const snap = await getDoc(ref);
+                if (snap.exists()) {
+                    await updateDoc(ref, { opinion: deleteField() });
+                }
+            }
+
+            return Astro.redirect(`/serie/${serieId}`);
+        }
 
         // Determinar la colección correcta
         let coleccion;
@@ -86,7 +133,7 @@ if (Astro.request.method === 'POST') {
         // Add a parameter for custom position
         const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
 
-        // Manejar acciones de agregar y eliminar
+        // Manejar acciones de agregar, eliminar y actualizar posición
         if (action === 'add' && !serieExiste) {
             // Parsear géneros como objetos
             const genres = JSON.parse(String(formData.get('genres') || '[]'));
@@ -107,6 +154,7 @@ if (Astro.request.method === 'POST') {
                 poster_path: String(formData.get('poster_path') || ''), // Cambiado de poster_path a img
                 vote_average: Number(formData.get('vote_average') || 0),
                 overview: String(formData.get('overview') || 'Sin descripción'),
+                opinion: String(formData.get('opinion') || '').trim() || undefined,
                 added_at: new Date(),
                 // Almacenar como objetos estructurados
                 genres: genres,
@@ -178,6 +226,58 @@ if (Astro.request.method === 'POST') {
                     });
                 }
             }
+        } else if (action === 'update' && serieExiste && coleccion === 'SeriesFavs') {
+            // Actualizar posición dentro de favoritos
+            // Leer nueva posición solicitada
+            const requestedPosition = customPosition !== null ? customPosition : Number(formData.get('custom_position'));
+
+            if (!requestedPosition || Number.isNaN(requestedPosition)) {
+                throw new Error('Nueva posición inválida');
+            }
+
+            // Obtener favoritos actuales ordenados por posición
+            const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
+            const favsSnapshot = await getDocs(favsQuery);
+            const favorites: SeriesFavs[] = [];
+            favsSnapshot.forEach((docSnap) => {
+                favorites.push({id: docSnap.id, ...docSnap.data()} as SeriesFavs);
+            });
+
+            if (favorites.length === 0) {
+                return Astro.redirect(`/serie/${serieId}`);
+            }
+
+            // Posiciones válidas entre 1 y length
+            const maxPos = favorites.length;
+            const newPos = Math.min(Math.max(1, requestedPosition), maxPos);
+
+            const currentFav = favorites.find(f => f.id === serieId);
+            const oldPos = currentFav?.position ?? null;
+
+            if (oldPos === null || oldPos === undefined) {
+                throw new Error('La serie no tiene posición actual definida');
+            }
+
+            if (newPos === oldPos) {
+                return Astro.redirect(`/serie/${serieId}`);
+            }
+
+            // Si se mueve hacia abajo: disminuir en 1 las posiciones entre oldPos+1 y newPos
+            if (newPos > oldPos) {
+                const toDecrement = favorites.filter(f => (f.position || 0) > oldPos && (f.position || 0) <= newPos);
+                for (const fav of toDecrement) {
+                    await updateDoc(doc(db, 'SeriesFavs', fav.id), {position: (fav.position || 0) - 1});
+                }
+            } else {
+                // Se mueve hacia arriba: aumentar en 1 las posiciones entre newPos y oldPos-1
+                const toIncrement = favorites.filter(f => (f.position || 0) >= newPos && (f.position || 0) < oldPos);
+                for (const fav of toIncrement) {
+                    await updateDoc(doc(db, 'SeriesFavs', fav.id), {position: (fav.position || 0) + 1});
+                }
+            }
+
+            // Finalmente, establecer la nueva posición a la serie
+            await updateDoc(docRef, {position: newPos});
         }
 
         // Redireccionar de vuelta a la página de la serie
@@ -314,6 +414,17 @@ const isInVistas = existingInVistas;
 const isInSiguiendo = existingInSiguiendo;
 const isInLiked = existingInLiked;
 const isInVerPronto = existingInVerPronto;
+
+// Resolver opinión actual si existe en cualquier colección
+const opinionFromAny = (
+    (existingInFavs && docSnapFavs.data()?.opinion) ||
+    (existingInPendientes && docSnapPendientes.data()?.opinion) ||
+    (existingInVistas && docSnapVistas.data()?.opinion) ||
+    (existingInSiguiendo && docSnapSiguiendo.data()?.opinion) ||
+    (existingInLiked && docSnapLiked.data()?.opinion) ||
+    (existingInVerPronto && docSnapVerPronto.data()?.opinion) ||
+    ''
+) as string;
 
 // Formatear la fecha para mejor visualización
 const formatDate = (dateString: string): string => {
@@ -768,6 +879,35 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                                     </button>
                                 </form>
 
+                                {isInFavorites && (
+                                    <form method="POST" class="w-full mt-2">
+                                        <input type="hidden" name="id" value={item?.id}/>
+                                        <input type="hidden" name="action" value="update"/>
+                                        <input type="hidden" name="actionType" value="favs"/>
+                                        <div class="mb-3">
+                                            <label for="update-position" class="block text-xs font-medium text-gray-600 mb-1">
+                                                Actualizar posición en favoritos
+                                            </label>
+                                            <div class="flex gap-2">
+                                                <input
+                                                        type="number"
+                                                        id="update-position"
+                                                        name="custom_position"
+                                                        min="1"
+                                                        class="w-full px-3 py-2 text-sm border text-gray-600 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
+                                                        placeholder="Nuevo número"
+                                                />
+                                                <button
+                                                        type="submit"
+                                                        class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors"
+                                                >
+                                                    Actualizar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                )}
+
                                 <!-- Formulario para Ver Pronto -->
                                 <form method="POST" class="w-full">
                                     <input type="hidden" name="id" value={item?.id}/>
@@ -1147,6 +1287,54 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                                 </li>
                             </ul>
                         </div>
+
+                        <!-- Opinión personal -->
+                        {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
+                            <div class="bg-white p-4 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold text-blue-600 mb-3">Tu opinión</h3>
+                                {opinionFromAny ? (
+                                    <div class="space-y-3">
+                                        <blockquote class="relative p-4 bg-blue-50 border border-blue-200 rounded-lg text-gray-800">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400 absolute -top-2 -left-2 bg-white rounded-full" viewBox="0 0 20 20" fill="currentColor">
+                                                <path d="M7.667 10.667H4.333A2.333 2.333 0 012 8.333V5a2.333 2.333 0 012.333-2.333H6a2.333 2.333 0 012.333 2.333v.667A2.333 2.333 0 016 8.333H4.333v2.334h3.334zM15.667 10.667h-3.334A2.333 2.333 0 0110 8.333V5a2.333 2.333 0 012.333-2.333H14a2.333 2.333 0 012.333 2.333v.667A2.333 2.333 0 0114 8.333h-1.667v2.334h3.334z" />
+                                            </svg>
+                                            <p class="whitespace-pre-wrap">{opinionFromAny}</p>
+                                        </blockquote>
+                                        <div class="flex items-center gap-2 justify-end">
+                                            <details>
+                                                <summary class="px-3 py-1.5 text-sm rounded-md bg-blue-600 hover:bg-blue-700 text-white cursor-pointer">Actualizar opinión</summary>
+                                                <div class="mt-3">
+                                                    <form method="POST" class="space-y-3">
+                                                        <input type="hidden" name="id" value={item?.id} />
+                                                        <input type="hidden" name="action" value="save_opinion" />
+                                                        <textarea name="opinion" rows="4" class="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">{opinionFromAny}</textarea>
+                                                        <div class="flex items-center justify-between">
+                                                            <p class="text-xs text-gray-500">Se actualizará en todas tus listas</p>
+                                                            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow">Guardar</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </details>
+                                            <form method="POST">
+                                                <input type="hidden" name="id" value={item?.id} />
+                                                <input type="hidden" name="action" value="delete_opinion" />
+                                                <button type="submit" class="px-3 py-1.5 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white">Eliminar opinión</button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <form method="POST" class="space-y-3">
+                                        <input type="hidden" name="id" value={item?.id} />
+                                        <input type="hidden" name="action" value="save_opinion" />
+                                        <textarea name="opinion" rows="4" class="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Escribe aquí tu opinión..."></textarea>
+                                        <div class="flex items-center justify-between">
+                                            <p class="text-xs text-gray-500">Se guardará en todas tus listas donde esté esta serie</p>
+                                            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow">Guardar opinión</button>
+                                        </div>
+                                    </form>
+                                )}
+                            </div>
+                        )}
 
                         <!-- Redes de Transmisión -->
                         {additionalInfo.networks && additionalInfo.networks.length > 0 && (
