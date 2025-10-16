@@ -1,3 +1,6 @@
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
 export const firebaseConfig = {
     apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
     authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -7,3 +10,9 @@ export const firebaseConfig = {
     appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
     measurementId: import.meta.env.PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
+
+// Inicializar Firebase solo una vez
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+
+// Exportar instancia de Firestore
+export const db = getFirestore(app);

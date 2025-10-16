@@ -1,5 +1,5 @@
-import {initializeApp} from "firebase/app";
-import {getFirestore, collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc} from "firebase/firestore";
+import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc} from "firebase/firestore";
+import { db } from "../../utils/firebaseConfig";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 
@@ -154,22 +154,6 @@ interface RecommendedSeries {
 }
 
 export type {SeriesFavs, SeriesInterface};
-
-// Configuración de Firebase
-const firebaseConfig = {
-    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
-    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
-    measurementId: import.meta.env.PUBLIC_FIREBASE_MEASUREMENT_ID,
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-// Initialize Cloud Firestore and get a reference to the service
-const db = getFirestore(app);
 
 // Función para obtener series favoritas
 export const getSerieFav = async (): Promise<SeriesFavs[]> => {

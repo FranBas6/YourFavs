@@ -13,9 +13,7 @@ import {
     getSeriesAdditionalInfo
 } from "../../services/API/Series/InfoSeries";
 import type {SeriesFavs} from "../../services/BD/yourfavsSerie";
-import {initializeApp} from "firebase/app";
 import {
-    getFirestore,
     collection,
     doc,
     getDoc,
@@ -28,13 +26,8 @@ import {
     deleteField
 } from "firebase/firestore";
 
-// Configuración de Firebase
-import {firebaseConfig} from '../../utils/firebaseConfig';
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-// Initialize Cloud Firestore
-const db = getFirestore(app);
+// Importar la instancia de Firebase y Firestore
+import { db } from '../../utils/firebaseConfig';
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 
