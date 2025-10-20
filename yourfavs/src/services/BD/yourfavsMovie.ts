@@ -255,9 +255,14 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
     try {
         console.log("Obteniendo películas recomendadas...");
 
-        // Solo favoritas como base
-        const favoritas = await getMovieFav();
-        const liked = await getLikedMovies();
+        // Obtener listas personales
+        const [favoritas, liked, vistas, pendientes, verPronto] = await Promise.all([
+            getMovieFav(),
+            getLikedMovies(),
+            getMoviesVistas(),
+            getMoviesPendientes(),
+            getMoviesVerPronto(),
+        ]);
 
         // Si no hay favoritas, no generamos recomendaciones
         if (favoritas.length === 0) {
@@ -265,10 +270,13 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
             return [];
         }
 
-        // IDs que debemos excluir (favoritas + vistas)
+        // IDs que debemos excluir (todas las listas personales)
         const excludeMovieIds = new Set<string>([
             ...favoritas.map(m => m.id),
-            ...liked.map(m => m.id)
+            ...liked.map(m => m.id),
+            ...vistas.map(m => m.id),
+            ...pendientes.map(m => m.id),
+            ...verPronto.map(m => m.id),
         ]);
 
         // 3. Obtener recomendaciones para cada película (con prioridad para favoritas)

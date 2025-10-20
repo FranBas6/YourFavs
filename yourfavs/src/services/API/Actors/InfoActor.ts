@@ -71,9 +71,13 @@ export const getActorDetailsById = async ({id}: { id: string }) => {
             biografia: actorDetails.biography,
             lugarNacimiento: actorDetails.place_of_birth,
             fechaNacimiento: actorDetails.birthday,
+            fechaFallecimiento: actorDetails.deathday ?? null,
             imagen: actorDetails.profile_path,
             popularidad: actorDetails.popularity,
             conocidoPor: actorDetails.known_for_department,
+            genero: typeof actorDetails.gender === 'number' ? actorDetails.gender : null, // 1=female, 2=male, 0/3 unknown
+            alias: Array.isArray(actorDetails.also_known_as) ? actorDetails.also_known_as : [],
+            homepage: actorDetails.homepage || null,
             redes: {
                 imdb: socialLinks.imdb_id ? `https://www.imdb.com/name/${socialLinks.imdb_id}` : null,
                 twitter: socialLinks.twitter_id ? `https://twitter.com/${socialLinks.twitter_id}` : null,

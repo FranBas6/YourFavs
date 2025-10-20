@@ -28,9 +28,11 @@ const actorInfo = actorDetails || {
     biografia: "Información biográfica del actor no disponible.",
     lugarNacimiento: null,
     fechaNacimiento: null,
+    fechaFallecimiento: null,
     imagen: "/placeholder-actor.jpg", // Asegúrate de tener una imagen predeterminada
     popularidad: null,
     conocidoPor: "Actuación",
+    alias: [],
     redes: {
         imdb: null,
         twitter: null,
@@ -95,6 +97,62 @@ const topGenres = Object.entries(movieGenres)
     .slice(0, 3)
     .map(([genreId, _count]) => genresMap[parseInt(genreId)]);
 
+// Calcular edad actual si tiene fecha de nacimiento
+let edadActual: string | null = null;
+if (actorInfo.fechaNacimiento) {
+    const fechaNacimiento = new Date(actorInfo.fechaNacimiento);
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - fechaNacimiento.getFullYear();
+    const mes = hoy.getMonth() - fechaNacimiento.getMonth();
+    if (mes < 0 || (mes === 0 && hoy.getDate() < fechaNacimiento.getDate())) {
+        edad--;
+    }
+    edadActual = `${edad} años`;
+}
+
+// Obtener parámetros de ordenación
+const url = new URL(Astro.request.url);
+const sortBy = url.searchParams.get('sort') || 'popularity';
+
+// Utilidades de ordenación
+function parseDate(value?: string | null): number {
+    if (!value) return 0;
+    const t = Date.parse(value);
+    return isNaN(t) ? 0 : t;
+}
+
+type MovieItem = typeof movies[number];
+type SerieItem = typeof series[number];
+
+function sortMovies(list: MovieItem[], criterion: string): MovieItem[] {
+    const items = [...list];
+    switch (criterion) {
+        case 'popularity':
+            return items.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+        case 'date':
+            return items.sort((a, b) => parseDate(b.release_date) - parseDate(a.release_date));
+        case 'quality':
+        default:
+            return items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0));
+    }
+}
+
+function sortSeries(list: SerieItem[], criterion: string): SerieItem[] {
+    const items = [...list];
+    switch (criterion) {
+        case 'popularity':
+            return items.sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0));
+        case 'date':
+            return items.sort((a, b) => parseDate(b.first_air_date) - parseDate(a.first_air_date));
+        case 'quality':
+        default:
+            return items.sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0));
+    }
+}
+
+const moviesSorted = sortMovies(movies, sortBy);
+const seriesSorted = sortSeries(series, sortBy);
+
 import type {ActorImage} from "../../services/API/Actors/InfoActor";
 
 let posters: ActorImage[] = [];
@@ -113,280 +171,313 @@ if (actor) {
 }
 ---
 <Layout title={`${actorInfo.nombre}`}>
-    <div class="actor-profile-bg"></div>
-    <section class="container mx-auto px-4 py-8 relative">
-        <!-- Perfil del Actor -->
-        <div class="actor-profile mb-7">
-            <div class="flex flex-col md:flex-row items-center md:items-start gap-8">
-                <div class="profile-image-container">
+    <!-- Hero Section con gradiente moderno -->
+    <div class="hero-section">
+        <div class="hero-background"></div>
+        <div class="hero-overlay"></div>
+        
+        <div class="container mx-auto px-4 py-16 relative z-20">
+            <div class="hero-content">
+                <!-- Imagen de perfil -->
+                <div class="profile-card">
                     {actorInfo.imagen ? (
-                            <img
-                                    src={`https://image.tmdb.org/t/p/w500${actorInfo.imagen}`}
-                                    alt={`Foto de ${actorInfo.nombre}`}
-                                    class="profile-image"
-                            />
+                        <img
+                            src={`https://image.tmdb.org/t/p/w500${actorInfo.imagen}`}
+                            alt={actorInfo.nombre}
+                            class="profile-image"
+                        />
                     ) : (
-                            <div class="profile-image-placeholder">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" viewBox="0 0 20 20"
-                                     fill="currentColor">
-                                    <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                                          clip-rule="evenodd"/>
-                                </svg>
-                            </div>
+                        <div class="profile-placeholder">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-24 w-24" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
                     )}
-
+                    
                     {actorInfo.popularidad && (
-                            <div class="popularity-badge">
-                                <div class="popularity-inner">
-                                    <span class="popularity-value">{actorInfo.popularidad.toFixed(1)}</span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
-                                         fill="currentColor">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118l-2.8-2.034c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                                    </svg>
-                                </div>
-                            </div>
+                        <div class="popularity-badge">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118l-2.8-2.034c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            <span>{actorInfo.popularidad.toFixed(1)}</span>
+                        </div>
                     )}
                 </div>
-
-                <div class="flex-1">
-                    <h1 class="text-coral-red font-extrabold text-4xl md:text-5xl lg:text-6xl mb-4">
-                        {actorInfo.nombre}
-                    </h1>
-                    <div class="w-24 h-1 bg-coral-red rounded-full mb-6"></div>
-
-                    <div class="actor-stats flex flex-wrap gap-4 mb-4">
-                        <a href="#peliculas" class="stat-box" style="text-decoration: none;">
-                            <span class="stat-value">{totalProductions}</span>
-                            <span class="stat-label">Producciones</span>
+                
+                <!-- Información principal -->
+                <div class="hero-info">
+                    <h1 class="actor-name">{actorInfo.nombre}</h1>
+                    
+                    {actorInfo.alias && actorInfo.alias.length > 0 && (
+                        <p class="actor-alias">También conocido/a como: {actorInfo.alias.slice(0, 2).join(', ')}</p>
+                    )}
+                    
+                    <div class="actor-meta">
+                        {actorInfo.conocidoPor && (
+                            <span class="meta-badge">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
+                                </svg>
+                                {actorInfo.conocidoPor}
+                            </span>
+                        )}
+                        
+                        {edadActual && (
+                            <span class="meta-badge">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                                </svg>
+                                {edadActual}
+                            </span>
+                        )}
+                        
+                        <span class="meta-badge">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/>
+                            </svg>
+                            {totalProductions} producciones
+                        </span>
+                    </div>
+                    
+                    <!-- Navegación rápida -->
+                    <div class="quick-nav">
+                        <a href="#biografia" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            Biografía
                         </a>
-                        <a href="#peliculas" class="stat-box" style="text-decoration: none;">
-                            <span class="stat-value">{totalMovies}</span>
-                            <span class="stat-label">Películas</span>
+                        <a href="#peliculas" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"/>
+                            </svg>
+                            {totalMovies} Películas
                         </a>
-                        <a href="#series" class="stat-box" style="text-decoration: none;">
-                            <span class="stat-value">{totalSeries}</span>
-                            <span class="stat-label">Series</span>
+                        <a href="#series" class="nav-link">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                            </svg>
+                            {totalSeries} Series
                         </a>
+                        {posters.length > 0 && (
+                            <a href="#galeria" class="nav-link">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                                </svg>
+                                Galería
+                            </a>
+                        )}
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="mt-8">
-                {actorInfo.biografia && (
-                        <div class="actor-bio mb-6">
-                            <h2 class="section-subtitle">Biografía</h2>
-                            <input type="checkbox" id="read-more-toggle" class="bio-toggle hidden"/>
-                            <p class="text-gray-600 dark:text-gray-300 bio-text">
-                                {actorInfo.biografia || "Información biográfica no disponible."}
-                            </p>
-                            <label for="read-more-toggle" class="read-more-btn"></label>
-                        </div>
-                )}
-
-                <!-- Redes Sociales del Actor -->
-                {actorInfo.redes && typeof actorInfo.redes === 'object' && Object.values(actorInfo.redes).some(red => red !== null) && (
-                        <div class="actor-social-links mb-8">
-                            <h2 class="section-subtitle mb-4">Redes Sociales</h2>
-                            <div class="flex flex-wrap gap-3">
-                                {actorInfo.redes?.imdb && (
-                                        <a
-                                                href={actorInfo.redes?.imdb}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="social-link imdb"
-                                                aria-label={`Ver perfil de ${actorInfo.nombre} en IMDb`}
-                                        >
-                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M22.395 0H1.605C.72 0 0 .72 0 1.605v20.79C0 23.28.72 24 1.605 24h20.79C23.28 24 24 23.28 24 22.395V1.605C24 .72 23.28 0 22.395 0zM8.25 18.75H5.625V5.25H8.25v13.5zm7.125-9.375c-.563 0-1.125.375-1.125 1.125v8.25h-2.625V9.375c0-1.688 1.313-3 3-3s3 1.313 3 3v9.375H15V10.5c0-.75-.563-1.125-1.125-1.125z"/>
-                                            </svg>
-                                            <span>IMDb</span>
-                                        </a>
-                                )}
-
-                                {actorInfo.redes?.instagram && (
-                                        <a
-                                                href={actorInfo.redes?.instagram}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="social-link instagram"
-                                                aria-label={`Ver perfil de ${actorInfo.nombre} en Instagram`}
-                                        >
-                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                                            </svg>
-                                            <span>Instagram</span>
-                                        </a>
-                                )}
-
-                                {actorInfo.redes?.twitter && (
-                                        <a
-                                                href={actorInfo.redes?.twitter}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="social-link twitter"
-                                                aria-label={`Ver perfil de ${actorInfo.nombre} en Twitter`}
-                                        >
-                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
-                                            </svg>
-                                            <span>Twitter</span>
-                                        </a>
-                                )}
-
-                                {actorInfo.redes?.facebook && (
-                                        <a
-                                                href={actorInfo.redes?.facebook}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="social-link facebook"
-                                                aria-label={`Ver perfil de ${actorInfo.nombre} en Facebook`}
-                                        >
-                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                                            </svg>
-                                            <span>Facebook</span>
-                                        </a>
-                                )}
-
-                                {actorInfo.redes?.tiktok && (
-                                        <a
-                                                href={actorInfo.redes?.tiktok}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="social-link tiktok"
-                                                aria-label={`Ver perfil de ${actorInfo.nombre} en TikTok`}
-                                        >
-                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
-                                            </svg>
-                                            <span>TikTok</span>
-                                        </a>
-                                )}
-
-                                {actorInfo.redes?.youtube && (
-                                        <a
-                                                href={actorInfo.redes?.youtube}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                class="social-link youtube"
-                                                aria-label={`Ver canal de ${actorInfo.nombre} en YouTube`}
-                                        >
-                                            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                                            </svg>
-                                            <span>YouTube</span>
-                                        </a>
-                                )}
-                            </div>
-                        </div>
-                )}
-
-                <div class="actor-metadata grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                    {actorInfo.fechaNacimiento && (
-                            <div class="metadata-item">
-                                <div class="metadata-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
-                                         viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+    <!-- Contenido principal -->
+    <div class="main-content">
+        <div class="container mx-auto px-4 py-8">
+            
+            <!-- Sección de Información Personal -->
+            <section id="biografia" class="info-section">
+                <div class="section-grid">
+                    <!-- Biografía -->
+                    <div class="bio-card">
+                        <h2 class="section-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                            </svg>
+                            Biografía
+                        </h2>
+                        {actorInfo.biografia ? (
+                            <>
+                                <input type="checkbox" id="bio-toggle" class="bio-toggle hidden" />
+                                <p class="bio-text">{actorInfo.biografia}</p>
+                                <label for="bio-toggle" class="read-more-btn"></label>
+                            </>
+                        ) : (
+                            <p class="text-gray-800 dark:text-gray-600">No hay información biográfica disponible.</p>
+                        )}
+                    </div>
+                    
+                    <!-- Información Personal -->
+                    <div class="personal-info-card">
+                        <h3 class="info-subtitle">Información Personal</h3>
+                        <div class="info-grid">
+                            {actorInfo.fechaNacimiento && (
+                                <div class="info-item">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
                                     </svg>
-                                </div>
-                                <div>
-                                    <span class="metadata-label">Fecha de nacimiento</span>
-                                    <span class="metadata-value">{actorInfo.fechaNacimiento}</span>
-                                </div>
-                            </div>
-                    )}
-                    {actorInfo.lugarNacimiento && (
-                            <div class="metadata-item">
-                                <div class="metadata-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
-                                         viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="metadata-label">Lugar de nacimiento</span>
-                                    <span class="metadata-value">{actorInfo.lugarNacimiento}</span>
-                                </div>
-                            </div>
-                    )}
-                    {actorInfo.conocidoPor && (
-                            <div class="metadata-item">
-                                <div class="metadata-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
-                                         viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                                    </svg>
-                                </div>
-                                <div>
-                                    <span class="metadata-label">Conocido por</span>
-                                    <span class="metadata-value">{actorInfo.conocidoPor}</span>
-                                </div>
-                            </div>
-                    )}
-                    {topGenres.length > 0 && (
-                            <div class="metadata-item col-span-1 md:col-span-2">
-                                <div class="metadata-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none"
-                                         viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                              d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-                                    </svg>
-                                </div>
-                                <div class="w-full">
-                                    <span class="metadata-label block mb-2">Géneros más frecuentes</span>
-                                    <div class="flex flex-wrap gap-2">
-                                        {topGenres.map(genre => (
-                                                <span class="genre-badge">{genre}</span>
-                                        ))}
+                                    <div>
+                                        <span class="info-label">Nacimiento</span>
+                                        <span class="info-value">{actorInfo.fechaNacimiento}</span>
                                     </div>
                                 </div>
-                            </div>
-                    )}
-                </div>
-            </div>
-        </div>
-
-        <!-- Pósters -->
-        <div class="bg-gradient-to-br from-gray-100/80 to-white/50 dark:from-gray-800 dark:to-gray-900 p-6 rounded-2xl shadow-xl mb-8 border border-gray-200 dark:border-gray-700">
-            <h2 class="text-2xl font-bold text-coral-red mb-4">Pósters</h2>
-
-            {posters && posters.length > 0 ? (
-                    <div class="carousel-container relative max-w-full overflow-hidden">
-                        <div class="carousel-track flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                            {posters.slice(0, 25).map((poster, index) => (
-                                    <div class="carousel-slide flex-shrink-0 w-48">
-                                        <a href={`#poster-${index}`}>
-                                            <img
-                                                    src={poster.file_path}
-                                                    alt={`Póster ${poster.vote_average.toFixed(1)}/10`}
-                                                    loading="lazy"
-                                                    class="rounded-lg shadow-md w-full h-64 object-cover"/>
-                                        </a>
-
-                                        {/* Modal de imagen */}
-                                        <div id={`poster-${index}`} class="modal">
-                                            <a href="#" class="modal-close">&times;</a>
-                                            <img
-                                                    src={poster.file_path}
-                                                    alt={`Póster ${poster.vote_average.toFixed(1)}/10`}
-                                            />
+                            )}
+                            
+                            {actorInfo.fechaFallecimiento && (
+                                <div class="info-item">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div>
+                                        <span class="info-label">Fallecimiento</span>
+                                        <span class="info-value">{actorInfo.fechaFallecimiento}</span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {actorInfo.lugarNacimiento && (
+                                <div class="info-item">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div>
+                                        <span class="info-label">Lugar de nacimiento</span>
+                                        <span class="info-value">{actorInfo.lugarNacimiento}</span>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            {topGenres.length > 0 && (
+                                <div class="info-item full-width">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M17.707 9.293a1 1 0 010 1.414l-7 7a1 1 0 01-1.414 0l-7-7A.997.997 0 012 10V5a3 3 0 013-3h5c.256 0 .512.098.707.293l7 7zM5 6a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <div>
+                                        <span class="info-label">Géneros frecuentes</span>
+                                        <div class="genre-tags">
+                                            {topGenres.map(genre => (
+                                                <span class="genre-tag">{genre}</span>
+                                            ))}
                                         </div>
                                     </div>
-                            ))}
+                                </div>
+                            )}
+                        </div>
+                        
+                        <!-- Redes Sociales -->
+                        {actorInfo.redes && Object.values(actorInfo.redes).some(red => red !== null) && (
+                            <div class="social-section">
+                                <h3 class="info-subtitle">Redes Sociales</h3>
+                                <div class="social-links">
+                                    {actorInfo.redes.imdb && (
+                                        <a href={actorInfo.redes.imdb} target="_blank" rel="noopener noreferrer" class="social-link imdb" aria-label="IMDb">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M22.395 0H1.605C.72 0 0 .72 0 1.605v20.79C0 23.28.72 24 1.605 24h20.79C23.28 24 24 23.28 24 22.395V1.605C24 .72 23.28 0 22.395 0zM8.25 18.75H5.625V5.25H8.25v13.5zm7.125-9.375c-.563 0-1.125.375-1.125 1.125v8.25h-2.625V9.375c0-1.688 1.313-3 3-3s3 1.313 3 3v9.375H15V10.5c0-.75-.563-1.125-1.125-1.125z"/>
+                                            </svg>
+                                        </a>
+                                    )}
+                                    {actorInfo.redes.instagram && (
+                                        <a href={actorInfo.redes.instagram} target="_blank" rel="noopener noreferrer" class="social-link instagram" aria-label="Instagram">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                                            </svg>
+                                        </a>
+                                    )}
+                                    {actorInfo.redes.twitter && (
+                                        <a href={actorInfo.redes.twitter} target="_blank" rel="noopener noreferrer" class="social-link twitter" aria-label="Twitter">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                                            </svg>
+                                        </a>
+                                    )}
+                                    {actorInfo.redes.facebook && (
+                                        <a href={actorInfo.redes.facebook} target="_blank" rel="noopener noreferrer" class="social-link facebook" aria-label="Facebook">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                                            </svg>
+                                        </a>
+                                    )}
+                                    {actorInfo.redes.tiktok && (
+                                        <a href={actorInfo.redes.tiktok} target="_blank" rel="noopener noreferrer" class="social-link tiktok" aria-label="TikTok">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
+                                            </svg>
+                                        </a>
+                                    )}
+                                    {actorInfo.redes.youtube && (
+                                        <a href={actorInfo.redes.youtube} target="_blank" rel="noopener noreferrer" class="social-link youtube" aria-label="YouTube">
+                                            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                                            </svg>
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </section>
+
+            <!-- Galería de Imágenes -->
+            {posters.length > 0 && (
+                <section id="galeria" class="gallery-section">
+                    <div class="gallery-card">
+                        <div class="gallery-header">
+                            <h2 class="section-title-main">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clip-rule="evenodd"/>
+                            </svg>
+                            Galería de Imágenes ({posters.length})
+                            </h2>
+                            <button class="toggle-gallery-btn" onclick="toggleGallery()">
+                                <span class="btn-text">Mostrar imágenes</span>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon arrow-icon" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
-            ) : (
-                    <div class="text-center py-6">
-                        <p class="text-gray-600 dark:text-gray-300">No se encontraron pósters para este actor</p>
+                    <div class="gallery-grid" id="gallery-grid" style="display: none;">
+                        {posters.map((poster, index) => (
+                            <a href={`#img-${index}`} class="gallery-item">
+                                <img src={poster.file_path} alt={`Imagen ${index + 1}`} loading="lazy" />
+                                <div class="gallery-overlay">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+                                        <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                </div>
+                                <!-- Modal -->
+                                <div id={`img-${index}`} class="modal">
+                                    <a href="#galeria" class="modal-close">&times;</a>
+                                    <img src={poster.file_path} alt={`Imagen ${index + 1}`} />
+                                </div>
+                            </a>
+                        ))}
                     </div>
+                </section>
             )}
         </div>
+    </div>
+
+    <!-- Controles de ordenación -->
+    <div class="sort-controls mt-5">
+        <h2 class="filmography-title">
+            Filmografía ({totalProductions})
+        </h2>
+        <div class="sort-buttons">
+            <a href="?sort=quality" class={`sort-btn ${sortBy === 'quality' ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118l-2.8-2.034c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+                Mejor Valoradas
+            </a>
+            <a href="?sort=popularity" class={`sort-btn ${sortBy === 'popularity' ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
+                </svg>
+                Más Populares
+            </a>
+            <a href="?sort=date" class={`sort-btn ${sortBy === 'date' ? 'active' : ''}`}>
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/>
+                </svg>
+                Más Recientes
+            </a>
+        </div>
+    </div>
 
         <!-- Sección de Películas -->
         <section id="peliculas" class="mb-16 content-section scroll-mt-24">
@@ -421,7 +512,7 @@ if (actor) {
             ) : (
                     <div class="content-grid">
                         {
-                            movies.map((item) => (
+                            moviesSorted.map((item) => (
                                     <div class="card-wrapper">
                                         <CardMovie
                                                 id={item.id.toString()}
@@ -473,7 +564,7 @@ if (actor) {
             ) : (
                     <div class="content-grid">
                         {
-                            series.map((item) => (
+                            seriesSorted.map((item) => (
                                     <div class="card-wrapper">
                                         <CardSerie
                                                 id={item.id.toString()}
@@ -498,6 +589,29 @@ if (actor) {
     </section>
 </Layout>
 
+<script is:inline>
+    function toggleGallery() {
+        var grid = document.getElementById('gallery-grid');
+        var btn = document.querySelector('.toggle-gallery-btn');
+        if (!grid || !btn) return;
+        var isHidden = grid.style.display === 'none' || grid.style.display === '';
+        grid.style.display = isHidden ? 'grid' : 'none';
+        var textEl = btn.querySelector('.btn-text');
+        if (textEl) textEl.textContent = isHidden ? 'Ocultar imágenes' : 'Mostrar imágenes';
+        btn.classList.toggle('is-open', isHidden);
+        btn.setAttribute('aria-expanded', String(isHidden));
+    }
+    (function(){
+        var onReady = function(){
+            var grid = document.getElementById('gallery-grid');
+            var btn = document.querySelector('.toggle-gallery-btn');
+            if (grid) grid.style.display = 'none';
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady); else onReady();
+    })();
+</script>
+
 <style is:global>
     /* Variables y colores base */
     :root {
@@ -510,6 +624,706 @@ if (actor) {
         --shadow-large: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
         --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         --border-radius: 12px;
+    }
+
+    /* ===== HERO SECTION ===== */
+    .hero-section {
+        position: relative;
+        min-height: 600px;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+    }
+
+    .hero-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, 
+            #667eea 0%, 
+            #764ba2 25%, 
+            #E63946 50%,
+            #f093fb 75%,
+            #f5576c 100%
+        );
+        background-size: 400% 400%;
+        animation: gradientShift 15s ease infinite;
+    }
+
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+     .hero-overlay {
+         position: absolute;
+         top: 0;
+         left: 0;
+         right: 0;
+         bottom: 0;
+         background: linear-gradient(135deg, 
+             rgba(0, 0, 0, 0.4) 0%, 
+             rgba(0, 0, 0, 0.3) 50%,
+             rgba(0, 0, 0, 0.5) 100%
+         );
+         backdrop-filter: blur(2px);
+         z-index: 2;
+     }
+
+    .hero-content {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 3rem;
+        align-items: start;
+    }
+
+    @media (max-width: 768px) {
+        .hero-content {
+            grid-template-columns: 1fr;
+            gap: 2rem;
+            text-align: center;
+        }
+        
+        .profile-card {
+            width: 200px;
+            height: 300px;
+            margin: 0 auto;
+        }
+        
+        .actor-meta {
+            justify-content: center;
+        }
+        
+        .quick-nav {
+            justify-content: center;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .profile-card {
+            width: 160px;
+            height: 240px;
+        }
+        
+        .actor-name {
+            font-size: 2rem;
+        }
+        
+        .nav-link {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+        
+        .meta-badge {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.8rem;
+        }
+    }
+
+    .profile-card {
+        position: relative;
+        width: 280px;
+        height: 420px;
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        box-shadow: var(--shadow-large);
+        transition: var(--transition-smooth);
+    }
+
+    .profile-card:hover {
+        transform: scale(1.02);
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .profile-image {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .profile-placeholder {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #f1f3f4 0%, #e8eaed 100%);
+        color: #9aa0a6;
+    }
+
+    .popularity-badge {
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+        background: linear-gradient(135deg, #FCD34D 0%, #F59E0B 100%);
+        color: #7C2D12;
+        padding: 0.5rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-weight: 700;
+        font-size: 0.875rem;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 2px 4px rgba(0, 0, 0, 0.2);
+        z-index: 2;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(10px);
+    }
+
+    .popularity-badge .icon {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .hero-info {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+
+    .actor-name {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: white;
+        line-height: 1.1;
+        margin: 0;
+        background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    @media (max-width: 768px) {
+        .actor-name {
+            font-size: 2.5rem;
+        }
+    }
+
+    .actor-alias {
+        font-size: 1.125rem;
+        color: rgba(255, 255, 255, 0.9);
+        margin: 0;
+        font-style: italic;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .actor-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .meta-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.15);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .meta-badge .icon {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    .meta-badge:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .quick-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .nav-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: var(--transition-smooth);
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        backdrop-filter: blur(10px);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .nav-link:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .nav-link .icon {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    /* Main Content Styles */
+    .main-content {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        min-height: 50vh;
+        color: #e2e8f0;
+        border-bottom-left-radius: var(--border-radius);
+        border-bottom-right-radius: var(--border-radius);
+        overflow: hidden; /* asegura que el contenido respete el radio */
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25); /* coherente con cards */
+    }
+
+    /* Info Section Styles */
+    .info-section {
+        margin-bottom: 3rem;
+    }
+
+    .section-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .section-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .bio-card, .personal-info-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(15px);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3), 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: #1a202c;
+    }
+
+    .section-title {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--coral-red);
+        margin-bottom: 1.5rem;
+    }
+
+    .section-title .icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .bio-text {
+        line-height: 1.7;
+        color: #1a202c;
+        margin-bottom: 1rem;
+        font-weight: 500;
+    }
+
+    .read-more-btn {
+        display: inline-block;
+        color: var(--coral-red);
+        font-weight: 600;
+        cursor: pointer;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        transition: var(--transition-smooth);
+        border: 1px solid var(--coral-red-alpha);
+    }
+
+    .read-more-btn:hover {
+        background: var(--coral-red-alpha);
+        transform: translateY(-1px);
+    }
+
+    .info-subtitle {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--coral-red);
+        margin-bottom: 1rem;
+    }
+
+    .info-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .info-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        background: rgba(230, 57, 70, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(230, 57, 70, 0.1);
+    }
+
+    .info-item.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .info-item .icon {
+        width: 1.25rem;
+        height: 1.25rem;
+        color: var(--coral-red);
+        flex-shrink: 0;
+        margin-top: 0.125rem;
+    }
+
+    .info-label {
+        display: block;
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 0.25rem;
+        font-size: 0.875rem;
+    }
+
+    .info-value {
+        color: #2d3748;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .genre-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .genre-tag {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        background: var(--coral-red);
+        color: white;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .social-section {
+        margin-top: 2rem;
+        padding-top: 2rem;
+        border-top: 1px solid rgba(230, 57, 70, 0.1);
+    }
+
+    .social-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .social-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 3rem;
+        height: 3rem;
+        border-radius: 50%;
+        text-decoration: none;
+        transition: var(--transition-smooth);
+        box-shadow: var(--shadow-light);
+    }
+
+    .social-link:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-medium);
+    }
+
+    .social-link .icon {
+        width: 1.5rem;
+        height: 1.5rem;
+    }
+
+    .social-link.imdb {
+        background: linear-gradient(135deg, #F5C518 0%, #D4AF37 100%);
+        color: #000;
+    }
+
+    .social-link.instagram {
+        background: linear-gradient(135deg, #E4405F 0%, #C13584 50%, #833AB4 100%);
+        color: white;
+    }
+
+    .social-link.twitter {
+        background: linear-gradient(135deg, #1DA1F2 0%, #0d8bd9 100%);
+        color: white;
+    }
+
+    .social-link.facebook {
+        background: linear-gradient(135deg, #1877F2 0%, #0d5bb8 100%);
+        color: white;
+    }
+
+    .social-link.tiktok {
+        background: linear-gradient(135deg, #000000 0%, #333333 100%);
+        color: white;
+    }
+
+    .social-link.youtube {
+        background: linear-gradient(135deg, #FF0000 0%, #CC0000 100%);
+        color: white;
+    }
+
+    /* Gallery Section Styles */
+    .gallery-section {
+        margin-bottom: 3rem;
+    }
+
+    .gallery-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    /* Gallery header card */
+    .gallery-card {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(15px);
+        border-radius: var(--border-radius);
+        padding: 2rem; /* match other cards */
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3), 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        margin-bottom: 1.5rem;
+        color: #1a202c; /* match other cards */
+    }
+
+    .section-title-main {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--coral-red);
+        margin: 0;
+    }
+
+    .section-title-main .icon {
+        width: 1.75rem;
+        height: 1.75rem;
+    }
+
+    .toggle-gallery-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: var(--coral-red);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: var(--transition-smooth);
+    }
+
+    .toggle-gallery-btn:hover {
+        background: var(--coral-red-dark);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-medium);
+    }
+
+    .arrow-icon {
+        width: 1rem;
+        height: 1rem;
+        transition: transform 0.3s ease;
+    }
+
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .gallery-item {
+        position: relative;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: var(--shadow-light);
+        transition: var(--transition-smooth);
+        text-decoration: none;
+    }
+
+    .gallery-item:hover {
+        transform: translateY(-4px);
+        box-shadow: var(--shadow-large);
+    }
+
+    .gallery-item img {
+        width: 100%;
+        height: 250px;
+        object-fit: cover;
+        display: block;
+    }
+
+    .gallery-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transition: var(--transition-smooth);
+    }
+
+    .gallery-item:hover .gallery-overlay {
+        opacity: 1;
+    }
+
+    .gallery-overlay .icon {
+        width: 2rem;
+        height: 2rem;
+        color: white;
+    }
+
+    /* Sort Controls Styles */
+    .sort-controls {
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(15px);
+        border-radius: var(--border-radius);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.3), 0 10px 20px -5px rgba(0, 0, 0, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .filmography-title {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--coral-red);
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .sort-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .sort-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(230, 57, 70, 0.1);
+        color: var(--coral-red);
+        padding: 0.75rem 1.5rem;
+        border-radius: 50px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: var(--transition-smooth);
+        border: 2px solid transparent;
+    }
+
+    .sort-btn:hover {
+        background: var(--coral-red);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-medium);
+    }
+
+    .sort-btn.active {
+        background: var(--coral-red);
+        color: white;
+        border-color: var(--coral-red-dark);
+    }
+
+    .sort-btn .icon {
+        width: 1rem;
+        height: 1rem;
+    }
+
+    /* Responsive improvements for new components */
+    @media (max-width: 768px) {
+        .gallery-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
+        }
+        
+        .gallery-grid {
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        }
+        
+        .sort-buttons {
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .sort-btn {
+            width: 100%;
+            max-width: 200px;
+            justify-content: center;
+        }
+        
+        .bio-card, .personal-info-card {
+            padding: 1.5rem;
+        }
+        
+        .section-title {
+            font-size: 1.25rem;
+        }
+        
+        .section-title-main {
+            font-size: 1.5rem;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .gallery-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 0.5rem;
+        }
+        
+        .gallery-item img {
+            height: 180px;
+        }
+        
+        .bio-card, .personal-info-card {
+            padding: 1rem;
+        }
+        
+        .info-item {
+            padding: 0.75rem;
+        }
+        
+        .social-links {
+            justify-content: center;
+        }
     }
 
     /* Scroll suave */
@@ -725,7 +1539,8 @@ if (actor) {
         overflow: hidden;
         transition: var(--transition-smooth);
         line-height: 1.7;
-        color: #4a5568;
+        color: #0f172a; /* Slate-900 for strong contrast */
+        font-weight: 500;
     }
 
     .bio-toggle:checked + .bio-text {
@@ -743,6 +1558,11 @@ if (actor) {
         border-radius: 6px;
         transition: var(--transition-smooth);
         border: 1px solid var(--coral-red-alpha);
+        position: relative;
+    }
+
+    .read-more-btn::before {
+        content: "Leer más";
     }
 
     .read-more-btn:hover {
@@ -750,12 +1570,8 @@ if (actor) {
         transform: translateY(-1px);
     }
 
-    .bio-toggle:checked ~ .read-more-btn::after {
+    .bio-toggle:checked ~ .read-more-btn::before {
         content: "Leer menos";
-    }
-
-    .bio-toggle ~ .read-more-btn::after {
-        content: "Leer más";
     }
 
     /* Metadata mejorada */
@@ -936,10 +1752,10 @@ if (actor) {
         height: 100%;
         border-radius: var(--border-radius);
         overflow: hidden;
-        box-shadow: var(--shadow-medium);
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(5px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
+        box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.3), 0 8px 15px -5px rgba(0, 0, 0, 0.2);
+        background: rgba(255, 255, 255, 0.98);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
         transition: var(--transition-smooth);
     }
 
@@ -979,17 +1795,19 @@ if (actor) {
         padding: 0.5rem 1rem 1rem;
         margin: 0;
         font-size: 0.9rem;
-        color: #6c757d;
+        color: #2d3748;
     }
 
     /* Estado vacío mejorado */
     .empty-state {
         text-align: center;
         padding: 4rem 2rem;
-        background: linear-gradient(135deg, rgba(230, 57, 70, 0.03) 0%, rgba(230, 57, 70, 0.01) 100%);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
         border-radius: var(--border-radius);
-        border: 2px dashed rgba(230, 57, 70, 0.2);
+        border: 2px dashed rgba(230, 57, 70, 0.3);
         margin: 2rem 0;
+        box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.2);
     }
 
     .empty-state-icon {
@@ -1007,7 +1825,7 @@ if (actor) {
     }
 
     .empty-state-description {
-        color: #6c757d;
+        color: #2d3748;
         font-size: 1rem;
         line-height: 1.6;
         max-width: 400px;
@@ -1148,6 +1966,11 @@ if (actor) {
             color: #cbd5e0;
         }
 
+        /* Asegura contraste correcto dentro de tarjetas claras */
+        .bio-card .bio-text {
+            color: #0f172a;
+        }
+
         .metadata-item {
             background: rgba(45, 55, 72, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1175,6 +1998,14 @@ if (actor) {
             color: #e2e8f0;
             box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
             border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Gallery header card in dark mode */
+        .gallery-card {
+            background: rgba(26, 32, 44, 0.95);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);
         }
 
         .card-wrapper p {
