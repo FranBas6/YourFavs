@@ -11,7 +11,9 @@ import {
     getMovieRecommendationsOrSimilar,
     getMoviesAdditionalInfo
 } from "../../services/API/Movies/InfoMovies";
+import {initializeApp} from "firebase/app";
 import {
+    getFirestore,
     doc,
     getDoc,
     setDoc,
@@ -20,8 +22,13 @@ import {
     deleteField
 } from "firebase/firestore";
 
-// Importar la instancia de Firebase y Firestore
-import { db } from '../../utils/firebaseConfig';
+// Configuración de Firebase
+import {firebaseConfig} from '../../utils/firebaseConfig';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// Initialize Cloud Firestore
+const db = getFirestore(app);
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 
@@ -45,17 +52,21 @@ if (Astro.request.method === 'POST') {
     }
 
     // Crear un nuevo objeto con los datos de la película
-    const movieData = {
+    const movieDataBase = {
         id: movieId,
         poster_path: String(formData.get('poster_path') || ''),
         title: String(formData.get('title') || 'Sin nombre'),
         vote_average: Number(formData.get('vote_average') || 0),
         overview: String(formData.get('overview') || 'Sin descripción'),
-        opinion: String(formData.get('opinion') || '').trim() || undefined,
         added_at: new Date(),
         genres: genres,
         release_date: String(formData.get('release_date') || ''),
-    };
+    } as const;
+
+    const opinionTextForCreate = String(formData.get('opinion') || '').trim();
+    const movieData = opinionTextForCreate
+        ? { ...movieDataBase, opinion: opinionTextForCreate }
+        : movieDataBase;
 
     // Guardar/actualizar opinión en todas las colecciones
     if (action === 'save_opinion') {

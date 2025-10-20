@@ -12,8 +12,10 @@ import {
     getSerieRecommendationsOrSimilar,
     getSeriesAdditionalInfo
 } from "../../services/API/Series/InfoSeries";
+import {initializeApp} from "firebase/app";
 import type {SeriesFavs} from "../../services/BD/yourfavsSerie";
 import {
+    getFirestore,
     collection,
     doc,
     getDoc,
@@ -26,8 +28,13 @@ import {
     deleteField
 } from "firebase/firestore";
 
-// Importar la instancia de Firebase y Firestore
-import { db } from '../../utils/firebaseConfig';
+// Configuración de Firebase
+import {firebaseConfig} from '../../utils/firebaseConfig';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// Initialize Cloud Firestore
+const db = getFirestore(app);
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 
@@ -141,13 +148,12 @@ if (Astro.request.method === 'POST') {
             const nextEpisodeToAir = JSON.parse(String(formData.get('next_episode_to_air') || 'null'));
 
             // Preparar nueva entrada para la serie con estructura según Props
-            const newEntry = {
+            const baseEntry = {
                 id: serieId,
                 name: String(formData.get('name') || 'Sin nombre'),
                 poster_path: String(formData.get('poster_path') || ''), // Cambiado de poster_path a img
                 vote_average: Number(formData.get('vote_average') || 0),
                 overview: String(formData.get('overview') || 'Sin descripción'),
-                opinion: String(formData.get('opinion') || '').trim() || undefined,
                 added_at: new Date(),
                 // Almacenar como objetos estructurados
                 genres: genres,
@@ -158,6 +164,11 @@ if (Astro.request.method === 'POST') {
                 next_episode_to_air: nextEpisodeToAir,
                 position: 0,
             };
+
+            const opinionForSeries = String(formData.get('opinion') || '').trim();
+            const newEntry = opinionForSeries
+                ? { ...baseEntry, opinion: opinionForSeries }
+                : baseEntry;
 
             // Manejo especial para favoritos para agregar posición
             if (coleccion === 'SeriesFavs') {
