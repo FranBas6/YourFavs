@@ -8,11 +8,191 @@ import {
 } from "../../services/API/Actors/InfoActor";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
+import {initializeApp} from "firebase/app";
+import type {ActorsFavs} from "../../services/BD/yourfavsActor";
+import {
+    getFirestore,
+    collection,
+    doc,
+    getDoc,
+    setDoc,
+    deleteDoc,
+    query,
+    getDocs,
+    orderBy,
+    updateDoc
+} from "firebase/firestore";
+
+// Configuración de Firebase
+import {firebaseConfig} from '../../utils/firebaseConfig';
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+// Initialize Cloud Firestore
+const db = getFirestore(app);
 
 const {actor} = Astro.params;
 
 if (!actor) {
-    throw new Error("ID de la película no encontrado en la URL");
+    throw new Error("ID del actor no encontrado en la URL");
+}
+
+// POST para gestionar actores favoritos
+if (Astro.request.method === 'POST') {
+    try {
+        const formData = await Astro.request.formData();
+        const actorId = String(formData.get('actor_id'));
+        const action = String(formData.get('action'));
+
+        // Referencia al documento del actor en ActorsFavs
+        const docRef = doc(db, 'ActorsFavs', actorId);
+
+        // Verificar si el actor ya existe en favoritos
+        const docSnap = await getDoc(docRef);
+        const actorExiste = docSnap.exists();
+
+        // Obtener posición personalizada si existe
+        const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
+
+        // Manejar acciones de agregar, eliminar y actualizar posición
+        if (action === 'add' && !actorExiste) {
+            // 🔹 Solo guardar ID, posición y fecha - la info actualizada se obtiene desde TMDB
+            const baseEntry = {
+                id: actorId,
+                added_at: new Date(),
+                position: 0,
+            };
+
+            let newEntry = baseEntry;
+
+            // Obtener actores actuales para determinar la posición
+            const actorsFavsRef = collection(db, 'ActorsFavs');
+            const favsQuery = query(actorsFavsRef, orderBy('position'));
+            const favsSnapshot = await getDocs(favsQuery);
+            const currentFavorites: ActorsFavs[] = [];
+
+            favsSnapshot.forEach((doc) => {
+                currentFavorites.push({id: doc.id, ...doc.data()} as ActorsFavs);
+            });
+
+            let newPosition;
+            if (customPosition !== null) {
+                // Si se especifica una posición personalizada
+                // Desplazar actores existentes para hacer espacio
+                const actorsToUpdate = currentFavorites.filter(fav => fav.position >= customPosition);
+
+                // Actualizar posiciones en orden descendente para evitar conflictos
+                for (const fav of actorsToUpdate.sort((a, b) => b.position - a.position)) {
+                    await updateDoc(doc(db, 'ActorsFavs', fav.id), {
+                        position: fav.position + 1
+                    });
+                }
+
+                newPosition = customPosition;
+            } else {
+                // Si no hay posición personalizada, agregar al final
+                newPosition = currentFavorites.length > 0
+                    ? Math.max(...currentFavorites.map(f => f.position || 0)) + 1
+                    : 1;
+            }
+
+            newEntry.position = newPosition;
+
+            // Insertar nuevo actor en Firestore
+            await setDoc(docRef, newEntry);
+
+        } else if (action === 'remove' && actorExiste) {
+            // Eliminar actor de favoritos
+            await deleteDoc(docRef);
+
+            // Reordenar los actores restantes
+            const actorsFavsRef = collection(db, 'ActorsFavs');
+            const favsQuery = query(actorsFavsRef, orderBy('position'));
+            const favsSnapshot = await getDocs(favsQuery);
+            const remainingFavorites: ActorsFavs[] = [];
+
+            favsSnapshot.forEach((doc) => {
+                remainingFavorites.push({id: doc.id, ...doc.data()} as ActorsFavs);
+            });
+
+            // Actualizar posiciones
+            for (let i = 0; i < remainingFavorites.length; i++) {
+                await updateDoc(doc(db, 'ActorsFavs', remainingFavorites[i].id), {
+                    position: i + 1
+                });
+            }
+        } else if (action === 'update' && actorExiste) {
+            // Actualizar posición del actor
+            const requestedPosition = customPosition !== null ? customPosition : Number(formData.get('custom_position'));
+
+            if (!requestedPosition || Number.isNaN(requestedPosition)) {
+                throw new Error('Nueva posición inválida');
+            }
+
+            // Obtener actores actuales ordenados por posición
+            const actorsFavsRef = collection(db, 'ActorsFavs');
+            const favsQuery = query(actorsFavsRef, orderBy('position'));
+            const favsSnapshot = await getDocs(favsQuery);
+            const favorites: ActorsFavs[] = [];
+            favsSnapshot.forEach((docSnap) => {
+                favorites.push({id: docSnap.id, ...docSnap.data()} as ActorsFavs);
+            });
+
+            if (favorites.length === 0) {
+                throw new Error('No hay actores en favoritos');
+            }
+
+            // Encontrar el actor actual
+            const actorIndex = favorites.findIndex(fav => fav.id === actorId);
+            if (actorIndex === -1) {
+                throw new Error('Actor no encontrado en favoritos');
+            }
+
+            const currentActor = favorites[actorIndex];
+            const currentPosition = currentActor.position;
+
+            // Validar que la posición solicitada esté en el rango válido
+            if (requestedPosition < 1 || requestedPosition > favorites.length) {
+                throw new Error(`Posición debe estar entre 1 y ${favorites.length}`);
+            }
+
+            // Si la posición no cambió, no hacer nada
+            if (currentPosition === requestedPosition) {
+                return Astro.redirect(`/actor/${actorId}`);
+            }
+
+            // Mover el actor según la nueva posición
+            if (requestedPosition < currentPosition) {
+                // Mover hacia arriba: incrementar posición de los elementos entre la nueva y la antigua posición
+                for (const fav of favorites) {
+                    if (fav.position >= requestedPosition && fav.position < currentPosition) {
+                        await updateDoc(doc(db, 'ActorsFavs', fav.id), {
+                            position: fav.position + 1
+                        });
+                    }
+                }
+            } else {
+                // Mover hacia abajo: decrementar posición de los elementos entre la antigua y la nueva posición
+                for (const fav of favorites) {
+                    if (fav.position > currentPosition && fav.position <= requestedPosition) {
+                        await updateDoc(doc(db, 'ActorsFavs', fav.id), {
+                            position: fav.position - 1
+                        });
+                    }
+                }
+            }
+
+            // Actualizar la posición del actor actual
+            await updateDoc(doc(db, 'ActorsFavs', actorId), {
+                position: requestedPosition
+            });
+        }
+
+        return Astro.redirect(`/actor/${actorId}`);
+    } catch (error) {
+        console.error('Error al gestionar el actor:', error);
+        return Astro.redirect(`/actor/${actor}`);
+    }
 }
 
 const series = await getSeriesByActorId({id: actor});
@@ -32,6 +212,7 @@ const actorInfo = actorDetails || {
     imagen: "/placeholder-actor.jpg", // Asegúrate de tener una imagen predeterminada
     popularidad: null,
     conocidoPor: "Actuación",
+    genero: null,
     alias: [],
     redes: {
         imdb: null,
@@ -109,6 +290,17 @@ if (actorInfo.fechaNacimiento) {
     }
     edadActual = `${edad} años`;
 }
+
+// Verificar si el actor está en favoritos
+const actorDocRef = doc(db, 'ActorsFavs', actor);
+const actorDocSnap = await getDoc(actorDocRef);
+const isInFavorites = actorDocSnap.exists();
+const currentPosition = isInFavorites ? (actorDocSnap.data() as ActorsFavs).position : null;
+
+// Obtener total de actores favoritos para la validación
+const actorsFavsRef = collection(db, 'ActorsFavs');
+const actorsFavsSnapshot = await getDocs(actorsFavsRef);
+const totalActorsFavorites = actorsFavsSnapshot.size;
 
 // Obtener parámetros de ordenación
 const url = new URL(Astro.request.url);
@@ -266,6 +458,80 @@ if (actor) {
                                 </svg>
                                 Galería
                             </a>
+                        )}
+                    </div>
+                    
+                    <!-- Botones de acción para favoritos -->
+                    <div class="action-buttons-container">
+                        {!isInFavorites ? (
+                            <!-- Botón para añadir a favoritos -->
+                            <form method="POST" class="add-favorite-form">
+                                <input type="hidden" name="actor_id" value={actor} />
+                                <input type="hidden" name="action" value="add" />
+                                
+                                <div class="position-input-group">
+                                    <label for="custom_position" class="position-label">Posición (opcional):</label>
+                                    <input 
+                                        type="number" 
+                                        name="custom_position" 
+                                        id="custom_position"
+                                        min="1"
+                                        placeholder={`1-${totalActorsFavorites + 1}`}
+                                        class="position-input"
+                                    />
+                                </div>
+                                
+                                <button type="submit" class="action-button add-button">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
+                                    </svg>
+                                    Seguir Actor
+                                </button>
+                            </form>
+                        ) : (
+                            <!-- Botones para quitar o cambiar posición -->
+                            <div class="favorite-actions">
+                                <form method="POST" class="inline-form">
+                                    <input type="hidden" name="actor_id" value={actor} />
+                                    <input type="hidden" name="action" value="remove" />
+                                    <button type="submit" class="action-button remove-button">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                                        </svg>
+                                        Dejar de Seguir
+                                    </button>
+                                </form>
+                                
+                                <form method="POST" class="update-position-form">
+                                    <input type="hidden" name="actor_id" value={actor} />
+                                    <input type="hidden" name="action" value="update" />
+                                    
+                                    <div class="position-update-group">
+                                        <label for="update_position" class="position-label">
+                                            Posición actual: <strong>{currentPosition}</strong>
+                                        </label>
+                                        <div class="position-input-container">
+                                            <input 
+                                                type="number" 
+                                                name="custom_position" 
+                                                id="update_position"
+                                                min="1"
+                                                max={totalActorsFavorites}
+                                                value={currentPosition}
+                                                class="position-input"
+                                                required
+                                            />
+                                            <button type="submit" class="action-button update-button">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2h-1.528A6 6 0 004 9.528V4z"/>
+                                                    <path fill-rule="evenodd" d="M8 10a4 4 0 00-3.446 6.032l-1.261 1.26a1 1 0 101.414 1.415l1.261-1.261A4 4 0 108 10zm-2 4a2 2 0 114 0 2 2 0 01-4 0z" clip-rule="evenodd"/>
+                                                </svg>
+                                                Actualizar Posición
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -2217,6 +2483,164 @@ if (actor) {
 
         .carousel-container {
             gap: 0.75rem;
+        }
+    }
+
+    /* Estilos para botones de acción de favoritos */
+    .action-buttons-container {
+        margin-top: 2rem;
+        width: 100%;
+        display: flex;
+        justify-content: center;
+    }
+
+    .add-favorite-form,
+    .favorite-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        background: rgba(255, 255, 255, 0.95);
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .favorite-actions {
+        gap: 1.5rem;
+    }
+
+    .position-input-group,
+    .position-update-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .position-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #374151;
+    }
+
+    .position-input-container {
+        display: flex;
+        gap: 0.75rem;
+        align-items: center;
+    }
+
+    .position-input {
+        flex: 1;
+        padding: 0.625rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #1f2937;
+        transition: all 0.2s;
+    }
+
+    .position-input::placeholder {
+        color: #9ca3af;
+        font-weight: 400;
+    }
+
+    .position-input:focus {
+        outline: none;
+        border-color: #ef4444;
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+
+    .action-button {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .action-button .icon {
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .add-button {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.3);
+    }
+
+    .add-button:hover {
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.4);
+        transform: translateY(-2px);
+    }
+
+    .remove-button {
+        background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(107, 114, 128, 0.3);
+    }
+
+    .remove-button:hover {
+        background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
+        box-shadow: 0 10px 15px -3px rgba(107, 114, 128, 0.4);
+        transform: translateY(-2px);
+    }
+
+    .update-button {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+        box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+        flex: 1;
+    }
+
+    .update-button:hover {
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.4);
+        transform: translateY(-2px);
+    }
+
+    .inline-form {
+        display: inline-block;
+        width: 100%;
+    }
+
+    @media (max-width: 768px) {
+        .action-buttons-container {
+            margin-top: 1.5rem;
+        }
+
+        .add-favorite-form,
+        .favorite-actions {
+            padding: 1rem;
+            max-width: 100%;
+        }
+
+        .action-button {
+            padding: 0.625rem 1.25rem;
+            font-size: 0.8125rem;
+        }
+
+        .position-input-container {
+            flex-direction: column;
+        }
+
+        .position-input {
+            max-width: 100%;
+        }
+
+        .update-button {
+            width: 100%;
         }
     }
 </style>
