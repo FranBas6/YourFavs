@@ -1,23 +1,7 @@
-import {initializeApp} from "firebase/app";
-import {getFirestore, collection, getDocs, query, orderBy, deleteDoc, doc} from "firebase/firestore";
+import {collection, getDocs, query, orderBy, deleteDoc, doc} from "firebase/firestore";
+import { db } from "../../utils/firebaseConfig";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
-
-// Configuración de Firebase
-const firebaseConfig = {
-    apiKey: import.meta.env.PUBLIC_FIREBASE_API_KEY,
-    authDomain: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.PUBLIC_FIREBASE_APP_ID,
-    measurementId: import.meta.env.PUBLIC_FIREBASE_MEASUREMENT_ID,
-};
-
-// Inicializar Firebase
-const app = initializeApp(firebaseConfig);
-// Inicializar Firestore
-const db = getFirestore(app);
 
 interface MovieInterface {
     id: string,
@@ -143,7 +127,7 @@ export const getMoviesVistas = async (): Promise<MovieInterface[]> => {
 // Obtener películas vistas ordenadas por fecha de añadido (más reciente primero)
 export const getLikedMovies = async (): Promise<MovieInterface[]> => {
     try {
-        console.log("Intentando obtener películas vistas...");
+        console.log("Intentando obtener películas que te gustan...");
 
         // Referencia a la colección de películas vistas con ordenamiento
         const likedMoviesRef = collection(db, "LikedMovies");
@@ -164,11 +148,13 @@ export const getLikedMovies = async (): Promise<MovieInterface[]> => {
             return {id: doc.id, ...doc.data()} as MovieInterface;
         });
 
+        console.log(`✅ Se obtuvieron ${result.length} películas que te gustan`);
         return result;
     } catch (error) {
-        console.error("Error al obtener las películas vistas:", error);
+        console.error("❌ Error al obtener las películas que te gustan:", error);
         console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
+        // Lanzar el error para que sea capturado en la página
+        throw new Error(`Error al cargar películas que te gustan: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
 };
 

@@ -9,13 +9,53 @@ import {getMovieFav} from "../../services/BD/yourfavsMovie";
 import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 
-// 🔹 Obtener IDs desde Firebase
-const seriesFavortiasIds = (await getSerieFav()).map(s => s.id);
-const peliculasFavoritasIds = (await getMovieFav()).map(p => p.id);
+let seriesFavoritas: any[] = [];
+let peliculasFavoritas: any[] = [];
+let errorMessage = "";
 
-// 🔹 Obtener detalles desde TMDB
-const seriesFavoritas = await Promise.all(seriesFavortiasIds.map(id => fetchSerieDetails(id)));
-const peliculasFavoritas = await Promise.all(peliculasFavoritasIds.map(id => fetchMovieDetails(id)));
+// Función para procesar en lotes
+async function processBatch<T, R>(
+    items: T[], 
+    processor: (item: T) => Promise<R>, 
+    batchSize: number = 10
+): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(processor));
+        results.push(...batchResults);
+    }
+    return results;
+}
+
+try {
+    console.log("🔄 Iniciando carga de favoritos...");
+    
+    // 🔹 Obtener IDs desde Firebase
+    const [seriesData, moviesData] = await Promise.all([
+        getSerieFav(),
+        getMovieFav()
+    ]);
+    
+    const seriesFavortiasIds = seriesData.map(s => s.id);
+    const peliculasFavoritasIds = moviesData.map(p => p.id);
+    
+    console.log(`📊 Total a cargar: ${seriesFavortiasIds.length} series, ${peliculasFavoritasIds.length} películas`);
+
+    // 🔹 Obtener detalles desde TMDB en lotes
+    const [seriesResults, moviesResults] = await Promise.all([
+        processBatch(seriesFavortiasIds, (id) => fetchSerieDetails(id), 10),
+        processBatch(peliculasFavoritasIds, (id) => fetchMovieDetails(id), 10)
+    ]);
+    
+    seriesFavoritas = seriesResults.filter(s => s !== null);
+    peliculasFavoritas = moviesResults.filter(m => m !== null);
+    
+    console.log(`✅ Cargado exitosamente: ${seriesFavoritas.length} series, ${peliculasFavoritas.length} películas`);
+} catch (error) {
+    console.error("❌ Error al cargar favoritos:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
 
 // Obtener parámetros de URL
 const filter = Astro.url.searchParams.get("filter") || "todos";
@@ -169,6 +209,13 @@ function calculateStats() {
 const stats = calculateStats();
 ---
 <Layout title="Favoritos">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-6 space-y-6">
         <!-- Checkbox oculto para controlar el desplegable -->
         <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>

@@ -9,13 +9,53 @@ import {getMoviesPendientes} from "../../services/BD/yourfavsMovie";
 import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 
-// 🔹 Obtener IDs desde Firebase
-const seriesPendientesIds = (await getSeriesPendientes()).map(s => s.id);
-const peliculasPendientesIds = (await getMoviesPendientes()).map(p => p.id);
+let seriesPendientes: any[] = [];
+let peliculasPendientes: any[] = [];
+let errorMessage = "";
 
-// 🔹 Obtener detalles desde TMDB
-const seriesPendientes = await Promise.all(seriesPendientesIds.map(id => fetchSerieDetails(id)));
-const peliculasPendientes = await Promise.all(peliculasPendientesIds.map(id => fetchMovieDetails(id)));
+// Función para procesar en lotes
+async function processBatch<T, R>(
+    items: T[], 
+    processor: (item: T) => Promise<R>, 
+    batchSize: number = 10
+): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(processor));
+        results.push(...batchResults);
+    }
+    return results;
+}
+
+try {
+    console.log("🔄 Iniciando carga de pendientes...");
+    
+    // 🔹 Obtener IDs desde Firebase
+    const [seriesData, moviesData] = await Promise.all([
+        getSeriesPendientes(),
+        getMoviesPendientes()
+    ]);
+    
+    const seriesPendientesIds = seriesData.map(s => s.id);
+    const peliculasPendientesIds = moviesData.map(p => p.id);
+    
+    console.log(`📊 Total a cargar: ${seriesPendientesIds.length} series, ${peliculasPendientesIds.length} películas`);
+
+    // 🔹 Obtener detalles desde TMDB en lotes
+    const [seriesResults, moviesResults] = await Promise.all([
+        processBatch(seriesPendientesIds, (id) => fetchSerieDetails(id), 10),
+        processBatch(peliculasPendientesIds, (id) => fetchMovieDetails(id), 10)
+    ]);
+    
+    seriesPendientes = seriesResults.filter(s => s !== null);
+    peliculasPendientes = moviesResults.filter(m => m !== null);
+    
+    console.log(`✅ Cargado exitosamente: ${seriesPendientes.length} series, ${peliculasPendientes.length} películas`);
+} catch (error) {
+    console.error("❌ Error al cargar contenido pendiente:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
@@ -168,6 +208,13 @@ function calculateStats() {
 const stats = calculateStats();
 ---
 <Layout title="Pendientes">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-6 space-y-6">
         <!-- Checkbox oculto para controlar el desplegable -->
         <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>

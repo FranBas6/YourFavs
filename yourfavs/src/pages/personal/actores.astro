@@ -16,63 +16,86 @@ function calculateAge(birthday: string | null | undefined): number | null {
     return age;
 }
 
-// 🔹 Obtener IDs y posiciones desde Firebase
-const actorsFav = await getActorsFav();
+let actorsWithDetails: any[] = [];
+let errorMessage = "";
 
-// 🔹 Obtener detalles actualizados desde TMDB para cada actor
-const actorsWithDetails = await Promise.all(
-    actorsFav.map(async (fav) => {
-        // Obtener datos actualizados del actor desde TMDB
-        const actorDetails = await getActorDetailsById({ id: fav.id });
-        if (!actorDetails) return null;
+try {
+    // 🔹 Obtener IDs y posiciones desde Firebase
+    const actorsFav = await getActorsFav();
 
-        // Obtener películas y series del actor desde TMDB
-        const movies = await getMoviesByActorId({ id: fav.id });
-        const series = await getSeriesByActorId({ id: fav.id });
+    // 🔹 Obtener detalles actualizados desde TMDB para cada actor
+    actorsWithDetails = await Promise.all(
+        actorsFav.map(async (fav) => {
+            try {
+                // Obtener datos actualizados del actor desde TMDB
+                const actorDetails = await getActorDetailsById({ id: fav.id });
+                if (!actorDetails) return null;
 
-        const today = new Date();
+                // Obtener películas y series del actor desde TMDB
+                const movies = await getMoviesByActorId({ id: fav.id });
 
-        // Separar películas estrenadas y próximas
-        const releasedMovies = movies
-            .filter((m: any) => m.release_date && new Date(m.release_date) <= today)
-            .sort((a: any, b: any) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
-            .slice(0, 9);
+                const series = await getSeriesByActorId({ id: fav.id });
 
-        const upcomingMovies = movies
-            .filter((m: any) => m.release_date && new Date(m.release_date) > today)
-            .sort((a: any, b: any) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime())
-            .slice(0, 9);
+                const today = new Date();
 
-        // Separar series estrenadas y próximas
-        const releasedSeries = series
-            .filter((s: any) => s.first_air_date && new Date(s.first_air_date) <= today)
-            .sort((a: any, b: any) => new Date(b.first_air_date).getTime() - new Date(a.first_air_date).getTime())
-            .slice(0, 9);
+                // Separar películas estrenadas y próximas
+                const releasedMovies = movies
+                    .filter((m: any) => m.release_date && new Date(m.release_date) <= today)
+                    .sort((a: any, b: any) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
+                    .slice(0, 9);
 
-        const upcomingSeries = series
-            .filter((s: any) => s.first_air_date && new Date(s.first_air_date) > today)
-            .sort((a: any, b: any) => new Date(a.first_air_date).getTime() - new Date(b.first_air_date).getTime())
-            .slice(0, 9);
+                const upcomingMovies = movies
+                    .filter((m: any) => m.release_date && new Date(m.release_date) > today)
+                    .sort((a: any, b: any) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime())
+                    .slice(0, 9);
 
-        return {
-            id: fav.id,
-            position: fav.position,
-            details: actorDetails,
-            age: calculateAge(actorDetails.fechaNacimiento),
-            totalMovies: movies.length,
-            totalSeries: series.length,
-            releasedMovies,
-            releasedSeries,
-            upcomingMovies,
-            upcomingSeries
-        };
-    })
-);
+                // Separar series estrenadas y próximas
+                const releasedSeries = series
+                    .filter((s: any) => s.first_air_date && new Date(s.first_air_date) <= today)
+                    .sort((a: any, b: any) => new Date(b.first_air_date).getTime() - new Date(a.first_air_date).getTime())
+                    .slice(0, 9);
 
-// Filtrar nulos (actores no encontrados en TMDB)
-const actors = actorsWithDetails.filter(actor => actor !== null);
+                const upcomingSeries = series
+                    .filter((s: any) => s.first_air_date && new Date(s.first_air_date) > today)
+                    .sort((a: any, b: any) => new Date(a.first_air_date).getTime() - new Date(b.first_air_date).getTime())
+                    .slice(0, 9);
+
+                return {
+                    id: fav.id,
+                    position: fav.position,
+                    details: actorDetails,
+                    age: calculateAge(actorDetails.fechaNacimiento),
+                    totalMovies: movies.length,
+                    totalSeries: series.length,
+                    releasedMovies,
+                    releasedSeries,
+                    upcomingMovies,
+                    upcomingSeries
+                };
+            } catch (error) {
+                console.error(`Error al obtener detalles del actor ${fav.id}:`, error);
+                return null;
+            }
+        })
+    );
+
+    // Filtrar nulos (actores no encontrados en TMDB)
+    actorsWithDetails = actorsWithDetails.filter(actor => actor !== null);
+} catch (error) {
+    console.error("Error al cargar actores favoritos:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
+
+const actors = actorsWithDetails;
 ---
 <Layout title="Actores Favoritos">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-6 space-y-6">
 
         <!-- Barra de navegación secundaria (Categorías) -->

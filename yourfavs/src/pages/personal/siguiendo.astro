@@ -4,21 +4,29 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getSeriesSiguiendo} from "../../services/BD/yourfavsSerie";
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 
-// 🔹 Obtener IDs desde Firebase
-const seriesSiguiendoIds = (await getSeriesSiguiendo()).map(s => s.id);
+let seriesSiguiendo: any[] = [];
+let errorMessage = "";
 
-// 🔹 Obtener detalles desde TMDB
-const seriesSiguiendo = await Promise.all(seriesSiguiendoIds.map(id => fetchSerieDetails(id)));
+try {
+    // 🔹 Obtener IDs desde Firebase
+    const seriesSiguiendoIds = (await getSeriesSiguiendo()).map(s => s.id);
 
-seriesSiguiendo.sort((a, b) => {
-    const dateA = a.last_episode_to_air?.air_date;
-    const dateB = b.last_episode_to_air?.air_date;
+    // 🔹 Obtener detalles desde TMDB
+    seriesSiguiendo = await Promise.all(seriesSiguiendoIds.map(id => fetchSerieDetails(id)));
 
-    if (!dateA) return 1;
-    if (!dateB) return -1;
+    seriesSiguiendo.sort((a, b) => {
+        const dateA = a.last_episode_to_air?.air_date;
+        const dateB = b.last_episode_to_air?.air_date;
 
-    return new Date(dateB).getTime() - new Date(dateA).getTime();
-});
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+
+        return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+} catch (error) {
+    console.error("Error al cargar series que sigues:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
@@ -66,6 +74,13 @@ function getGenreName(id: number): string {
 }
 ---
 <Layout title="Siguiendo">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-1 space-y-6">
         <!-- Checkbox oculto para controlar el desplegable -->
         <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>

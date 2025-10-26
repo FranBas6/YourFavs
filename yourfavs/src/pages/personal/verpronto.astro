@@ -15,37 +15,51 @@ import { deleteMovieVerProntoById } from "../../services/BD/yourfavsMovie";
 
 // Variable para manejar acciones de borrado y mensajes
 let clearedType = null;
+let errorMessage = "";
 
-// Manejar acciones de borrado ANTES de obtener datos
-if (Astro.request.method === "POST") {
-    const formData = await Astro.request.formData();
-    const clearAction = formData.get("clear");
-    const deleteId = formData.get("deleteId");
-    const deleteType = formData.get("deleteType");
+try {
+    // Manejar acciones de borrado ANTES de obtener datos
+    if (Astro.request.method === "POST") {
+        const formData = await Astro.request.formData();
+        const clearAction = formData.get("clear");
+        const deleteId = formData.get("deleteId");
+        const deleteType = formData.get("deleteType");
 
-    if (clearAction === "series") {
-        await clearAllSeriesVerPronto();
-        clearedType = "series";
-    } else if (clearAction === "peliculas") {
-        await clearAllMoviesVerPronto();
-        clearedType = "peliculas";
-    } else if (clearAction === "todos") {
-        await clearAllSeriesVerPronto();
-        await clearAllMoviesVerPronto();
-        clearedType = "todos";
-    } else if (deleteId && deleteType) {
-        if (deleteType === "serie") {
-            await deleteSerieVerProntoById(String(deleteId));
-            clearedType = "serie";
-        } else if (deleteType === "pelicula") {
-            await deleteMovieVerProntoById(String(deleteId));
-            clearedType = "pelicula";
+        if (clearAction === "series") {
+            await clearAllSeriesVerPronto();
+            clearedType = "series";
+        } else if (clearAction === "peliculas") {
+            await clearAllMoviesVerPronto();
+            clearedType = "peliculas";
+        } else if (clearAction === "todos") {
+            await clearAllSeriesVerPronto();
+            await clearAllMoviesVerPronto();
+            clearedType = "todos";
+        } else if (deleteId && deleteType) {
+            if (deleteType === "serie") {
+                await deleteSerieVerProntoById(String(deleteId));
+                clearedType = "serie";
+            } else if (deleteType === "pelicula") {
+                await deleteMovieVerProntoById(String(deleteId));
+                clearedType = "pelicula";
+            }
         }
     }
+} catch (error) {
+    console.error("Error al procesar acciones:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al procesar la acción";
 }
 
-const seriesVerPronto = await getSeriesVerPronto()
-const peliculasVerPronto = await getMoviesVerPronto()
+let seriesVerPronto: any[] = [];
+let peliculasVerPronto: any[] = [];
+
+try {
+    seriesVerPronto = await getSeriesVerPronto();
+    peliculasVerPronto = await getMoviesVerPronto();
+} catch (error) {
+    console.error("Error al cargar contenido para ver pronto:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
 
 // Obtener parámetros de la URL
 const filter = Astro.url.searchParams.get("filter") || "todos";
@@ -78,6 +92,13 @@ function buildUrl({filter, search = searchQuery, genre = genreFilter}: UrlParams
 const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
 ---
 <Layout title="Ver Pronto">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-8">
         <!-- Primera barra de navegación - Filtros de contenido con botones de borrar -->
         <nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 backdrop-blur-lg shadow-xl rounded-2xl px-6 py-4 mb-4">

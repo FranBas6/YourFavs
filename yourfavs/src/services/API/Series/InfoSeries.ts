@@ -8,6 +8,51 @@ if (!API_KEY) {
 
 const BASE_URL = "https://api.themoviedb.org/3";
 
+// Función auxiliar para verificar si una serie tiene contenido en español de España
+async function checkSeriesSpanishAvailability(seriesId: string): Promise<boolean> {
+    try {
+        // 1. Verificar plataformas de streaming en España
+        const providersUrl = `https://api.themoviedb.org/3/tv/${seriesId}/watch/providers?api_key=${API_KEY}`;
+        const providersRes = await fetch(providersUrl);
+        
+        if (!providersRes.ok) {
+            return false;
+        }
+        
+        const providersData = await providersRes.json();
+        const esProviders = providersData.results?.ES || {};
+        
+        // Verificar si hay alguna plataforma disponible en España
+        const hasProvider = esProviders.flatrate?.length > 0 || 
+                           esProviders.rent?.length > 0 || 
+                           esProviders.buy?.length > 0;
+        
+        // 2. Verificar traducciones para español de España
+        const translationsUrl = `https://api.themoviedb.org/3/tv/${seriesId}/translations?api_key=${API_KEY}`;
+        const translationsRes = await fetch(translationsUrl);
+        
+        let hasSpanishTranslation = false;
+        if (translationsRes.ok) {
+            const translationsData = await translationsRes.json();
+            const translations = translationsData.translations || [];
+            
+            // Buscar traducción específica para español de España (es-ES)
+            hasSpanishTranslation = translations.some((t: any) => 
+                t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES'
+            );
+        }
+        
+        // La serie está disponible en España si:
+        // - Tiene plataformas en España Y tiene traducción es-ES
+        // O al menos tiene plataformas (más permisivo para series)
+        return hasProvider && hasSpanishTranslation;
+        
+    } catch (error) {
+        console.error(`Error verificando disponibilidad en España para serie ${seriesId}:`, error);
+        return false;
+    }
+}
+
 // Obtener serie por ID y sus plataformas de visualización
 export const getSeriesById = async ({id}: { id: string }) => {
     const movieRes = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${API_KEY}&language=es-ES`);
@@ -18,6 +63,11 @@ export const getSeriesById = async ({id}: { id: string }) => {
 
     // Añadir la información de las plataformas de visualización a la serie, incluyendo tipos (incluido, alquiler, compra)
     const esProviders = providers.results?.ES || {};
+    
+    // Verificar si la serie está disponible en España con contenido español de España
+    const availableInSpain = await checkSeriesSpanishAvailability(id);
+    serie.availableInSpain = availableInSpain;
+    
     const mapProviders = (list: any[] | undefined, type: 'flatrate' | 'rent' | 'buy') =>
         (list || []).map((provider: any) => ({
             provider_id: provider.provider_id,

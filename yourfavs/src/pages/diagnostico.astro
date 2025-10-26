@@ -1,0 +1,144 @@
+---
+import Layout from "../layouts/Layout.astro";
+
+let diagnosticInfo = {
+    timestamp: new Date().toISOString(),
+    environment: "production",
+    envVars: {} as Record<string, string>,
+    firebaseStatus: "unknown",
+    errorDetails: null as any
+};
+
+// Verificar variables de entorno
+diagnosticInfo.envVars = {
+    FIREBASE_API_KEY: import.meta.env.PUBLIC_FIREBASE_API_KEY ? "✅ Configurada" : "❌ Falta",
+    FIREBASE_AUTH_DOMAIN: import.meta.env.PUBLIC_FIREBASE_AUTH_DOMAIN ? "✅ Configurada" : "❌ Falta",
+    FIREBASE_PROJECT_ID: import.meta.env.PUBLIC_FIREBASE_PROJECT_ID ? "✅ Configurada" : "❌ Falta",
+    FIREBASE_STORAGE_BUCKET: import.meta.env.PUBLIC_FIREBASE_STORAGE_BUCKET ? "✅ Configurada" : "❌ Falta",
+    FIREBASE_MESSAGING_SENDER_ID: import.meta.env.PUBLIC_FIREBASE_MESSAGING_SENDER_ID ? "✅ Configurada" : "❌ Falta",
+    FIREBASE_APP_ID: import.meta.env.PUBLIC_FIREBASE_APP_ID ? "✅ Configurada" : "❌ Falta",
+    FIREBASE_MEASUREMENT_ID: import.meta.env.PUBLIC_FIREBASE_MEASUREMENT_ID ? "✅ Configurada" : "❌ Falta",
+    TMDB_API_KEY: import.meta.env.PUBLIC_TMDB_API_KEY ? "✅ Configurada" : "❌ Falta",
+};
+
+// Intentar inicializar Firebase
+try {
+    const { db } = await import("../utils/firebaseConfig");
+    diagnosticInfo.firebaseStatus = "✅ Inicializado correctamente";
+    
+    // Intentar una consulta simple
+    const { collection, getDocs } = await import("firebase/firestore");
+    
+    try {
+        const testCollection = collection(db, "LikedMovies");
+        const snapshot = await getDocs(testCollection);
+        diagnosticInfo.firebaseStatus += ` | Colecciones accesibles | ${snapshot.size} documentos en LikedMovies`;
+    } catch (queryError) {
+        diagnosticInfo.firebaseStatus += " | ⚠️ Error al consultar colecciones";
+        diagnosticInfo.errorDetails = {
+            message: queryError instanceof Error ? queryError.message : "Error desconocido",
+            code: (queryError as any).code,
+            stack: queryError instanceof Error ? queryError.stack : undefined
+        };
+    }
+} catch (initError) {
+    diagnosticInfo.firebaseStatus = "❌ Error al inicializar";
+    diagnosticInfo.errorDetails = {
+        message: initError instanceof Error ? initError.message : "Error desconocido",
+        code: (initError as any).code,
+        stack: initError instanceof Error ? initError.stack : undefined
+    };
+}
+---
+
+<Layout title="Diagnóstico del Sistema">
+    <div class="max-w-4xl mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold mb-8 text-white">🔍 Diagnóstico del Sistema</h1>
+        
+        <!-- Timestamp -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-400">⏰ Información General</h2>
+            <p class="text-gray-300">
+                <strong>Timestamp:</strong> {diagnosticInfo.timestamp}
+            </p>
+            <p class="text-gray-300">
+                <strong>Entorno:</strong> {diagnosticInfo.environment}
+            </p>
+        </div>
+
+        <!-- Variables de Entorno -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-400">🔐 Variables de Entorno</h2>
+            <div class="space-y-2">
+                {Object.entries(diagnosticInfo.envVars).map(([key, value]) => (
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-300 font-mono text-sm">{key}</span>
+                        <span class={value.includes("✅") ? "text-green-400" : "text-red-400"}>
+                            {value}
+                        </span>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        <!-- Estado de Firebase -->
+        <div class="bg-gray-800 rounded-lg p-6 mb-6">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-400">🔥 Estado de Firebase</h2>
+            <p class={diagnosticInfo.firebaseStatus.includes("✅") ? "text-green-400" : "text-red-400"}>
+                {diagnosticInfo.firebaseStatus}
+            </p>
+        </div>
+
+        <!-- Detalles del Error (si existe) -->
+        {diagnosticInfo.errorDetails && (
+            <div class="bg-red-900/20 border border-red-500 rounded-lg p-6 mb-6">
+                <h2 class="text-2xl font-semibold mb-4 text-red-400">❌ Detalles del Error</h2>
+                <div class="space-y-2">
+                    <p class="text-gray-300">
+                        <strong>Mensaje:</strong> {diagnosticInfo.errorDetails.message}
+                    </p>
+                    {diagnosticInfo.errorDetails.code && (
+                        <p class="text-gray-300">
+                            <strong>Código:</strong> {diagnosticInfo.errorDetails.code}
+                        </p>
+                    )}
+                    {diagnosticInfo.errorDetails.stack && (
+                        <details class="mt-4">
+                            <summary class="cursor-pointer text-gray-400 hover:text-white">
+                                Ver Stack Trace
+                            </summary>
+                            <pre class="mt-2 p-4 bg-black/50 rounded overflow-x-auto text-xs text-gray-300">
+                                {diagnosticInfo.errorDetails.stack}
+                            </pre>
+                        </details>
+                    )}
+                </div>
+            </div>
+        )}
+
+        <!-- Acciones Recomendadas -->
+        <div class="bg-blue-900/20 border border-blue-500 rounded-lg p-6">
+            <h2 class="text-2xl font-semibold mb-4 text-blue-400">💡 Acciones Recomendadas</h2>
+            <ul class="list-disc list-inside space-y-2 text-gray-300">
+                <li>Verifica que todas las variables de entorno estén configuradas en Netlify</li>
+                <li>Asegúrate de que las reglas de Firebase permitan lectura pública o autenticada</li>
+                <li>Verifica que las colecciones existan en Firebase Console</li>
+                <li>Revisa los logs de Netlify Functions para más detalles</li>
+            </ul>
+        </div>
+
+        <!-- Botón de volver -->
+        <div class="mt-8 text-center">
+            <a href="/" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition">
+                ← Volver al inicio
+            </a>
+        </div>
+    </div>
+</Layout>
+
+<style>
+    body {
+        background: linear-gradient(135deg, #1e3a8a 0%, #312e81 100%);
+        min-height: 100vh;
+    }
+</style>

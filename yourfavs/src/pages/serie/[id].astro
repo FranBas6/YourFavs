@@ -165,7 +165,27 @@ if (Astro.request.method === 'POST') {
                 position: 0,
             };
 
-            const opinionForSeries = String(formData.get('opinion') || '').trim();
+            // Buscar opinión existente en cualquier colección
+            let existingOpinion = '';
+            const collectionsToCheck = [
+                'SeriesFavs',
+                'SeriesPendiente',
+                'SeriesVistas',
+                'SeriesSiguiendo',
+                'LikedSeries',
+                'SeriesVerPronto',
+            ];
+            
+            for (const col of collectionsToCheck) {
+                const checkRef = doc(db, col, serieId);
+                const checkSnap = await getDoc(checkRef);
+                if (checkSnap.exists() && checkSnap.data()?.opinion) {
+                    existingOpinion = checkSnap.data()?.opinion;
+                    break;
+                }
+            }
+            
+            const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
             const newEntry = opinionForSeries
                 ? { ...baseEntry, opinion: opinionForSeries }
                 : baseEntry;
@@ -711,8 +731,16 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
             <div class="relative flex flex-col items-center justify-center px-4 py-12 text-center max-w-4xl mx-auto">
 
                 <!-- Título -->
-                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-lg">
-                    {item?.name}
+                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-lg flex items-center gap-3 justify-center flex-wrap">
+                    <span>{item?.name}</span>
+                    {item?.availableInSpain && (
+                        <span class="inline-flex items-center justify-center shadow-lg" title="Disponible en España">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" class="w-10 h-7 rounded">
+                                <rect width="750" height="500" fill="#AA151B"/>
+                                <rect width="750" height="250" y="125" fill="#F1BF00"/>
+                            </svg>
+                        </span>
+                    )}
                 </h1>
 
                 <!-- Favoritos -->

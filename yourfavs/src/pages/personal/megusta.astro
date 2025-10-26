@@ -11,13 +11,53 @@ import {
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
 
-// 🔹 Obtener IDs desde Firebase
-const seriesMeGustanIds = (await getLikedSeries()).map(s => s.id);
-const moviesMeGustanIds = (await getLikedMovies()).map(m => m.id);
+let likedSeries: any[] = [];
+let likedMovies: any[] = [];
+let errorMessage = "";
 
-// 🔹 Obtener detalles desde TMDB
-const likedSeries = await Promise.all(seriesMeGustanIds.map(id => fetchSerieDetails(id)));
-const likedMovies = await Promise.all(moviesMeGustanIds.map(id => fetchMovieDetails(id)));
+// Función para procesar en lotes
+async function processBatch<T, R>(
+    items: T[], 
+    processor: (item: T) => Promise<R>, 
+    batchSize: number = 10
+): Promise<R[]> {
+    const results: R[] = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const batchResults = await Promise.all(batch.map(processor));
+        results.push(...batchResults);
+    }
+    return results;
+}
+
+try {
+    console.log("🔄 Iniciando carga de contenido que te gusta...");
+    
+    // 🔹 Obtener IDs desde Firebase
+    const [seriesData, moviesData] = await Promise.all([
+        getLikedSeries(),
+        getLikedMovies()
+    ]);
+    
+    const seriesMeGustanIds = seriesData.map(s => s.id);
+    const moviesMeGustanIds = moviesData.map(m => m.id);
+    
+    console.log(`📊 Total a cargar: ${seriesMeGustanIds.length} series, ${moviesMeGustanIds.length} películas`);
+
+    // 🔹 Obtener detalles desde TMDB en lotes de 10
+    const [seriesResults, moviesResults] = await Promise.all([
+        processBatch(seriesMeGustanIds, (id) => fetchSerieDetails(id), 10),
+        processBatch(moviesMeGustanIds, (id) => fetchMovieDetails(id), 10)
+    ]);
+    
+    likedSeries = seriesResults.filter(s => s !== null);
+    likedMovies = moviesResults.filter(m => m !== null);
+    
+    console.log(`✅ Cargado exitosamente: ${likedSeries.length} series, ${likedMovies.length} películas`);
+} catch (error) {
+    console.error("❌ Error al cargar contenido que te gusta:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
@@ -170,6 +210,13 @@ function calculateStats() {
 const stats = calculateStats();
 ---
 <Layout title="Me Gusta">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-6 space-y-6">
         <!-- Checkbox oculto para controlar el desplegable -->
         <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>

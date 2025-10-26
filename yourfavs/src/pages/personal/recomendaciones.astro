@@ -5,8 +5,17 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getRecommendedSeries} from "../../services/BD/yourfavsSerie";
 import {getRecommendedMovies} from "../../services/BD/yourfavsMovie";
 
-const seriesRecomendadas = await getRecommendedSeries()
-const peliculasRecomendadas = await getRecommendedMovies()
+let seriesRecomendadas: any[] = [];
+let peliculasRecomendadas: any[] = [];
+let errorMessage = "";
+
+try {
+    seriesRecomendadas = await getRecommendedSeries();
+    peliculasRecomendadas = await getRecommendedMovies();
+} catch (error) {
+    console.error("Error al cargar recomendaciones:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
@@ -52,6 +61,13 @@ function getGenreName(id: number): string {
 }
 ---
 <Layout title="Recomendaciones">
+    {errorMessage && (
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
+                <strong>Error:</strong> {errorMessage}
+            </div>
+        </div>
+    )}
     <div class="favorites-container max-w-7xl mx-auto px-4 py-8">
         <!-- Primera barra de navegación -->
         <nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 backdrop-blur-lg shadow-xl rounded-2xl px-6 py-4 mb-8">

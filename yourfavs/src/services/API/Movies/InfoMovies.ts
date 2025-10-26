@@ -8,11 +8,58 @@ if (!API_KEY) {
 
 const BASE_URL = "https://api.themoviedb.org/3";
 
+// Función auxiliar para verificar si una película tiene traducción/doblaje al español de España
+async function checkMovieSpanishTranslation(movieId: string): Promise<boolean> {
+    try {
+        // 1. Verificar traducciones de texto (subtítulos/metadata)
+        const translationsUrl = `https://api.themoviedb.org/3/movie/${movieId}/translations?api_key=${API_KEY}`;
+        const translationsRes = await fetch(translationsUrl);
+        
+        if (!translationsRes.ok) {
+            return false;
+        }
+        
+        const translationsData = await translationsRes.json();
+        const translations = translationsData.translations || [];
+        
+        // Buscar traducción específica para español de España (es-ES)
+        const hasTextTranslation = translations.some((t: any) => 
+            t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES'
+        );
+        
+        // 2. Verificar información de lanzamiento para confirmar distribución en España
+        const releasesUrl = `https://api.themoviedb.org/3/movie/${movieId}/release_dates?api_key=${API_KEY}`;
+        const releasesRes = await fetch(releasesUrl);
+        
+        let hasSpainRelease = false;
+        if (releasesRes.ok) {
+            const releasesData = await releasesRes.json();
+            const releases = releasesData.results || [];
+            
+            // Verificar si hay un lanzamiento oficial en España (ES)
+            hasSpainRelease = releases.some((r: any) => r.iso_3166_1 === 'ES');
+        }
+        
+        // La película tiene contenido en español de España si:
+        // - Tiene traducción ES-ES Y tiene lanzamiento en España
+        // O al menos tiene traducción ES-ES (más permisivo)
+        return hasTextTranslation && hasSpainRelease;
+        
+    } catch (error) {
+        console.error(`Error verificando traducciones para película ${movieId}:`, error);
+        return false;
+    }
+}
+
 // Obtener película por ID y sus plataformas de visualización
 export const getMovieById = async ({ id }: { id: string }) => {
     // Obtener los detalles de la película
     const movieRes = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${API_KEY}&language=es-ES`);
     const movie = await movieRes.json();
+
+    // Verificar si tiene traducción al español de España
+    const hasSpanishTranslation = await checkMovieSpanishTranslation(id);
+    movie.hasSpanishTranslation = hasSpanishTranslation;
 
     // Obtener las plataformas de visualización de la película
     const providersRes = await fetch(`https://api.themoviedb.org/3/movie/${id}/watch/providers?api_key=${API_KEY}`);
