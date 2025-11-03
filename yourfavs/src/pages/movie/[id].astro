@@ -432,14 +432,6 @@ const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
                 <div class="flex flex-col items-center gap-3 mb-4">
                     <h1 class="text-4xl md:text-5xl font-bold text-white flex items-center gap-3 justify-center flex-wrap">
                         <span>{item?.title}</span>
-                        {item?.hasSpanishTranslation && (
-                            <span class="inline-flex items-center justify-center shadow-lg" title="Disponible con traducción al español de España">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" class="w-10 h-7 rounded">
-                                    <rect width="750" height="500" fill="#AA151B"/>
-                                    <rect width="750" height="250" y="125" fill="#F1BF00"/>
-                                </svg>
-                            </span>
-                        )}
                     </h1>
                 </div>
 
@@ -449,6 +441,14 @@ const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
                         {item?.vote_average?.toFixed(1)} {getRatingStars(item?.vote_average)}
                     </span>
                     <span>{formatDate(item?.release_date)}</span>
+                    {item?.hasSpanishTranslation && (
+                            <span class="inline-flex items-center justify-center shadow-lg" title="Disponible con traducción al español de España">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" class="w-10 h-7 rounded">
+                                    <rect width="750" height="500" fill="#AA151B"/>
+                                    <rect width="750" height="250" y="125" fill="#F1BF00"/>
+                                </svg>
+                            </span>
+                        )}
                 </div>
 
                 <!-- 🎭 Géneros -->

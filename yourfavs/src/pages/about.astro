@@ -3,20 +3,30 @@ import Layout from "../layouts/Layout.astro";
 ---
 <Layout title="Sobre YourFavs">
     <div class="container mx-auto px-6 py-10 bg-light-gray min-h-screen">
-        <!-- Hero con decoración SVG -->
+        <!-- Hero con logo y título -->
         <div class="relative bg-gradient-to-r from-indigo-100 via-white to-indigo-50 rounded-2xl p-10 shadow-inner overflow-hidden mb-10">
-            <h1 class="text-5xl font-extrabold text-center text-slate-800 drop-shadow-lg animate-fade-in">
+            <!-- Logo centrado -->
+            <div class="flex justify-center mb-6">
+                <img src="/logo_yourfavs.png" 
+                     alt="YourFavs Logo" 
+                     class="w-40 h-40 md:w-48 md:h-48 object-contain drop-shadow-2xl hover:scale-110 transition-transform duration-300 ease-in-out"
+                />
+            </div>
+            
+            <h1 class="text-4xl md:text-5xl font-extrabold text-center text-slate-800 drop-shadow-lg animate-fade-in">
                 YourFavs: Tu Universo Cinematográfico Personal
             </h1>
-            <div class="absolute bottom-0 right-0 opacity-10 w-40 h-40">
-                <!-- SVG de carrete de cine -->
-                <svg viewBox="0 0 64 64" fill="currentColor" class="w-full h-full text-indigo-400">
+            
+            <!-- Elementos decorativos -->
+            <div class="absolute top-5 left-5 opacity-20">
+                <svg viewBox="0 0 64 64" fill="currentColor" class="w-20 h-20 text-indigo-400">
                     <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="4" fill="none"/>
                     <circle cx="32" cy="32" r="6" fill="currentColor"/>
-                    <circle cx="32" cy="10" r="4" fill="currentColor"/>
-                    <circle cx="32" cy="54" r="4" fill="currentColor"/>
-                    <circle cx="10" cy="32" r="4" fill="currentColor"/>
-                    <circle cx="54" cy="32" r="4" fill="currentColor"/>
+                </svg>
+            </div>
+            <div class="absolute bottom-5 right-5 opacity-20">
+                <svg viewBox="0 0 64 64" fill="currentColor" class="w-24 h-24 text-pink-400">
+                    <path d="M 32 10 L 35 22 L 48 22 L 37 30 L 41 42 L 32 34 L 23 42 L 27 30 L 16 22 L 29 22 Z" fill="currentColor"/>
                 </svg>
             </div>
         </div>
@@ -27,27 +37,35 @@ import Layout from "../layouts/Layout.astro";
         <section
                 class="max-w-3xl mx-auto mb-10 bg-white p-8 rounded-2xl shadow-xl border-l-8 border-indigo-500 hover:shadow-2xl transition">
             <h2 class="text-2xl font-semibold text-slate-700 mb-4">¿Qué es YourFavs?</h2>
-            <p class="text-lg text-slate-600 leading-relaxed">
+            <p class="text-lg text-slate-600 leading-relaxed mb-4">
                 YourFavs es mucho más que una simple app de películas. Es tu santuario cinéfilo, donde tú decides qué
                 guardar, cómo organizar y cuándo disfrutar.
                 Aquí las historias viven para ti, con funciones pensadas para que todo esté a un clic: favoritas,
                 pendientes, vistas, recomendaciones automáticas y mucho más.
+            </p>
+            <p class="text-lg text-slate-600 leading-relaxed">
+                Con integración de <strong>Inteligencia Artificial</strong> mediante YourChat, podrás conversar 
+                naturalmente para descubrir nuevo contenido, consultar dónde ver tus películas favoritas, 
+                y recibir recomendaciones personalizadas basadas en tu perfil único. Todo impulsado por 
+                <strong>Google Gemini AI</strong> y datos en tiempo real de <strong>TMDB</strong>.
             </p>
         </section>
 
         <hr class="border-t-2 border-indigo-200 my-12 rounded-full w-1/3 mx-auto">
 
         <!-- Funcionalidades -->
-        <section class="grid md:grid-cols-3 gap-6 mb-10">
+        <section class="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
             <!-- Explora -->
             <div class="bg-white rounded-2xl p-6 shadow-lg border-b-4 border-blue-400 hover:shadow-2xl hover:-translate-y-1 transition">
                 <h3 class="text-xl font-semibold text-slate-700 mb-3">🎥 Explora</h3>
                 <ul class="space-y-2 text-slate-600 text-sm">
                     <li>🌟 Películas y series populares del momento</li>
                     <li>🆕 Últimos lanzamientos en cine y TV</li>
-                    <li>🏆 Rankings de lo más valorado por la comunidad</li>
+                    <li>🏆 Rankings de lo más valorado (Top Movies & Series)</li>
+                    <li>🎬 Películas en cartelera actualmente en cines</li>
                     <li>🔍 Búsqueda avanzada y detallada por título</li>
-                    <li>📺 Filtros por plataformas como Netflix, HBO Max, Disney+ y más</li>
+                    <li>📺 Filtros por plataformas: Netflix, Amazon Prime, Disney+, HBO Max, Apple TV+, Movistar+ y Filmin</li>
+                    <li>🎭 Explora por géneros con más de 20 categorías</li>
                 </ul>
             </div>
 
@@ -55,11 +73,14 @@ import Layout from "../layouts/Layout.astro";
             <div class="bg-white rounded-2xl p-6 shadow-lg border-b-4 border-green-400 hover:shadow-2xl hover:-translate-y-1 transition">
                 <h3 class="text-xl font-semibold text-slate-700 mb-3">🗂️ Organiza</h3>
                 <ul class="space-y-2 text-slate-600 text-sm">
-                    <li>❤️ Guarda tus favoritos</li>
-                    <li>👁️‍🗨️ Marca lo que ya has visto</li>
-                    <li>⏳ Crea listas personalizadas (pendientes, siguiendo...)</li>
-                    <li>📊 Consulta tus estadísticas personales</li>
-                    <li>🗑️ Elimina lo que ya no quieras ver</li>
+                    <li>❤️ Guarda tus favoritos en un solo lugar</li>
+                    <li>👁️ Marca películas y series vistas</li>
+                    <li>👍 Dale "me gusta" al contenido que disfrutaste</li>
+                    <li>⏳ Lista de pendientes para ver más tarde</li>
+                    <li>📺 Sigue series en emisión y recibe notificaciones</li>
+                    <li>� Lista "Ver Pronto" para próximos estrenos</li>
+                    <li>🎬 Guarda tus actores favoritos</li>
+                    <li>🗑️ Elimina contenido individualmente o en lote</li>
                 </ul>
             </div>
 
@@ -67,12 +88,83 @@ import Layout from "../layouts/Layout.astro";
             <div class="bg-white rounded-2xl p-6 shadow-lg border-b-4 border-purple-400 hover:shadow-2xl hover:-translate-y-1 transition">
                 <h3 class="text-xl font-semibold text-slate-700 mb-3">🧠 Descubre</h3>
                 <ul class="space-y-2 text-slate-600 text-sm">
-                    <li>✨ Recomendaciones basadas en tus gustos</li>
-                    <li>🎭 Información de reparto y directores</li>
-                    <li>🔗 Visualiza sagas y conexiones entre películas</li>
-                    <li>🎞️ Mira trailers de YouTube directamente</li>
-                    <li>📚 Explora por géneros como acción, comedia o misterio</li>
+                    <li>✨ Recomendaciones personalizadas basadas en tu historial</li>
+                    <li>🤖 Chat con IA para descubrir contenido nuevo</li>
+                    <li>🎭 Información completa de actores y su filmografía</li>
+                    <li>🏢 Explora productoras y su catálogo completo</li>
+                    <li>🎬 Descubre el equipo técnico: directores, guionistas, productores</li>
+                    <li>🎞️ Trailers de YouTube integrados</li>
+                    <li>📊 Estadísticas detalladas de cada título</li>
+                    <li>⭐ Puntuaciones y valoraciones de usuarios</li>
                 </ul>
+            </div>
+
+            <!-- YourChat IA -->
+            <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 shadow-lg border-b-4 border-pink-400 hover:shadow-2xl hover:-translate-y-1 transition">
+                <h3 class="text-xl font-semibold text-slate-700 mb-3">💬 YourChat IA</h3>
+                <ul class="space-y-2 text-slate-600 text-sm">
+                    <li>🤖 Asistente inteligente powered by Google Gemini</li>
+                    <li>💡 Pregunta por recomendaciones personalizadas</li>
+                    <li>� Consulta dónde ver películas o series</li>
+                    <li>📅 Información sobre próximos estrenos</li>
+                    <li>🎬 Conoce tu perfil de usuario: favoritos, pendientes y más</li>
+                    <li>🗣️ Conversación natural sobre cine y series</li>
+                    <li>🌐 Datos en tiempo real desde TMDB</li>
+                    <li>🧭 Navegación guiada por voz</li>
+                </ul>
+            </div>
+        </section>
+
+        <hr class="border-t-2 border-indigo-200 my-12 rounded-full w-1/3 mx-auto">
+
+        <!-- Funcionalidades Avanzadas -->
+        <section class="max-w-5xl mx-auto mb-10">
+            <h2 class="text-3xl font-bold text-center text-slate-800 mb-8">✨ Funcionalidades Destacadas</h2>
+            
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Gestión Inteligente -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-6 shadow-md border-l-4 border-blue-500">
+                    <h4 class="text-lg font-bold text-blue-900 mb-3">🎯 Gestión Inteligente de Contenido</h4>
+                    <ul class="space-y-2 text-sm text-slate-700">
+                        <li>✅ Sistema de favoritos sincronizado en la nube</li>
+                        <li>📝 Múltiples listas: Favoritos, Pendientes, Vistos, Me Gusta, Ver Pronto</li>
+                        <li>📺 Seguimiento de series en emisión con actualizaciones automáticas</li>
+                        <li>🧹 Opciones de borrado individual o masivo</li>
+                    </ul>
+                </div>
+
+                <!-- Exploración Profunda -->
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-6 shadow-md border-l-4 border-purple-500">
+                    <h4 class="text-lg font-bold text-purple-900 mb-3">🔍 Exploración Profunda</h4>
+                    <ul class="space-y-2 text-sm text-slate-700">
+                        <li>👤 Perfiles detallados de actores con filmografía completa</li>
+                        <li>🏢 Catálogos de productoras y estudios cinematográficos</li>
+                        <li>🎬 Información de equipos: directores, guionistas, productores</li>
+                        <li>📊 Estadísticas y datos curiosos de cada título</li>
+                    </ul>
+                </div>
+
+                <!-- Integración Plataformas -->
+                <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 shadow-md border-l-4 border-green-500">
+                    <h4 class="text-lg font-bold text-green-900 mb-3">📺 Integración con Plataformas</h4>
+                    <ul class="space-y-2 text-sm text-slate-700">
+                        <li>🎬 7 plataformas de streaming soportadas</li>
+                        <li>🌍 Contenido disponible en España actualizado</li>
+                        <li>🔎 Consulta dónde ver cada película o serie</li>
+                        <li>📱 Filtros avanzados por plataforma y género</li>
+                    </ul>
+                </div>
+
+                <!-- IA y Recomendaciones -->
+                <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-6 shadow-md border-l-4 border-orange-500">
+                    <h4 class="text-lg font-bold text-orange-900 mb-3">🤖 Inteligencia Artificial</h4>
+                    <ul class="space-y-2 text-sm text-slate-700">
+                        <li>💬 Chat conversacional con contexto personalizado</li>
+                        <li>🎯 Recomendaciones basadas en tu perfil completo</li>
+                        <li>🔄 Datos en tiempo real desde TMDB</li>
+                        <li>🗺️ Navegación asistida por IA</li>
+                    </ul>
+                </div>
             </div>
         </section>
 
@@ -81,13 +173,30 @@ import Layout from "../layouts/Layout.astro";
         <!-- Tecnologías -->
         <section
                 class="bg-white p-8 rounded-2xl shadow-xl border-l-8 border-rose-400 hover:shadow-2xl transition mb-10">
-            <h2 class="text-2xl font-semibold mb-4 text-slate-700">Tecnologías que lo hacen posible</h2>
-            <div class="flex flex-wrap justify-center gap-4">
-                <span class="tech-badge bg-blue-100 text-blue-800">🚀 Astro</span>
+            <div class="flex items-center justify-center gap-4 mb-6">
+                <img src="/logo_yourfavs.png" 
+                     alt="YourFavs" 
+                     class="w-16 h-16 object-contain"
+                />
+                <h2 class="text-2xl font-semibold text-slate-700">Tecnologías que lo hacen posible</h2>
+            </div>
+            <div class="flex flex-wrap justify-center gap-4 mb-6">
+                <span class="tech-badge bg-blue-100 text-blue-800">🚀 Astro 5</span>
                 <span class="tech-badge bg-cyan-100 text-cyan-800">🎨 Tailwind CSS</span>
-                <span class="tech-badge bg-yellow-100 text-yellow-800">🔐 Firebase</span>
+                <span class="tech-badge bg-yellow-100 text-yellow-800">🔐 Firebase Firestore</span>
                 <span class="tech-badge bg-red-100 text-red-800">🎬 TMDB API</span>
                 <span class="tech-badge bg-purple-100 text-purple-800">📊 TypeScript</span>
+                <span class="tech-badge bg-green-100 text-green-800">🤖 Google Gemini AI</span>
+                <span class="tech-badge bg-indigo-100 text-indigo-800">⚛️ React 18</span>
+                <span class="tech-badge bg-pink-100 text-pink-800">🌐 Netlify</span>
+                <span class="tech-badge bg-orange-100 text-orange-800">📦 Axios</span>
+            </div>
+            <div class="text-sm text-slate-600 space-y-2 max-w-2xl mx-auto">
+                <p><strong>🏗️ Arquitectura:</strong> SSR (Server-Side Rendering) con Astro para máximo rendimiento</p>
+                <p><strong>🔄 Integración:</strong> React para componentes interactivos como YourChat</p>
+                <p><strong>💾 Base de datos:</strong> Firebase para almacenamiento en tiempo real de tus listas personales</p>
+                <p><strong>🧠 IA:</strong> Google Gemini 2.0 Flash Lite para recomendaciones inteligentes</p>
+                <p><strong>🎞️ Contenido:</strong> TMDB (The Movie Database) con más de 1 millón de títulos</p>
             </div>
         </section>
 
@@ -95,15 +204,22 @@ import Layout from "../layouts/Layout.astro";
 
         <!-- Footer -->
         <footer class="text-center text-sm text-slate-500 mt-16 italic tracking-wide">
-            Hecho con <span class="text-red-500">❤️</span> por ti, para ti.<br/>
-            Tu pasión merece su propio universo.
+            Hecho con <span class="text-red-500">❤️</span> por cinéfilos, para cinéfilos.<br/>
+            Tu pasión merece su propio universo.<br/>
+            <span class="text-xs mt-2 block opacity-75">
+                Datos proporcionados por TMDB • IA by Google Gemini • Hosting en Netlify
+            </span>
         </footer>
 
         <!-- Botón CTA centrado -->
-        <div class="flex justify-center mt-7">
+        <div class="flex justify-center gap-4 mt-7">
             <a href="/"
                class="inline-block bg-indigo-600 text-white px-6 py-3 rounded-full shadow hover:bg-indigo-700 transition">
                 Explora tus favoritos
+            </a>
+            <a href="/chat/yourchat"
+               class="inline-block bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-full shadow hover:from-purple-700 hover:to-pink-700 transition">
+                💬 Chatea con IA
             </a>
         </div>
     </div>
@@ -123,5 +239,24 @@ import Layout from "../layouts/Layout.astro";
                 font-size: 2rem;
                 line-height: 2.5rem;
             }
+        }
+
+        /* Animación suave para el logo */
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        img[alt="YourFavs Logo"] {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        /* Efecto de resplandor al hover */
+        img[alt="YourFavs Logo"]:hover {
+            filter: drop-shadow(0 0 20px rgba(99, 102, 241, 0.5));
         }
     </style>
