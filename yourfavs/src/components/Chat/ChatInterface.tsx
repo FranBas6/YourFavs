@@ -73,7 +73,10 @@ export default function ChatInterface() {
     };
 
     useEffect(() => {
-        scrollToBottom();
+        // Solo hacer scroll si hay más de un mensaje (evita scroll en carga inicial)
+        if (messages.length > 1) {
+            scrollToBottom();
+        }
     }, [messages]);
 
     // Cerrar desplegable al hacer clic fuera

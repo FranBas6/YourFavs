@@ -157,6 +157,376 @@ async function getUpcomingMovies() {
 }
 
 /**
+ * Obtener películas similares o recomendaciones basadas en una película
+ * Combina múltiples endpoints para mejores resultados
+ */
+async function getSimilarMovies(movieTitle: string, useSimilar: boolean = true) {
+    try {
+        // Primero buscar la película para obtener su ID y detalles
+        const searchResponse = await fetch(
+            `${BASE_URL}/search/movie?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(movieTitle)}`
+        );
+        const searchData = await searchResponse.json();
+        
+        if (!searchData.results || searchData.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontró la película "${movieTitle}"`
+            };
+        }
+        
+        const movie = searchData.results[0];
+        const movieId = movie.id;
+        
+        // Obtener detalles completos de la película para tener géneros
+        const detailsResponse = await fetch(
+            `${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=es-ES`
+        );
+        const movieDetails = await detailsResponse.json();
+        const movieGenres = movieDetails.genres.map((g: any) => g.id);
+        
+        // Obtener recomendaciones
+        const recommendationsResponse = await fetch(
+            `${BASE_URL}/movie/${movieId}/recommendations?api_key=${API_KEY}&language=es-ES&page=1`
+        );
+        const recommendationsData = await recommendationsResponse.json();
+        
+        // Obtener similares
+        const similarResponse = await fetch(
+            `${BASE_URL}/movie/${movieId}/similar?api_key=${API_KEY}&language=es-ES&page=1`
+        );
+        const similarData = await similarResponse.json();
+        
+        // Combinar ambos resultados
+        let allResults = [
+            ...(recommendationsData.results || []),
+            ...(similarData.results || [])
+        ];
+        
+        if (allResults.length === 0) {
+            return {
+                success: false,
+                error: `No se encontraron películas similares a "${movie.title}"`
+            };
+        }
+        
+        // Eliminar duplicados por ID
+        const uniqueResults = allResults.filter((item, index, self) =>
+            index === self.findIndex((t) => t.id === item.id)
+        );
+        
+        // Calcular puntuación de relevancia para cada película
+        const scoredResults = uniqueResults.map((rec: any) => {
+            let score = rec.vote_average || 0; // Base: valoración
+            
+            // Bonus por géneros compartidos
+            const sharedGenres = rec.genre_ids?.filter((g: number) => movieGenres.includes(g)).length || 0;
+            score += sharedGenres * 1.5; // +1.5 puntos por cada género compartido
+            
+            // Bonus por popularidad
+            score += Math.log10(rec.popularity || 1) * 0.5;
+            
+            // Penalización si la valoración es muy baja (menos de 5)
+            if (rec.vote_average < 5) {
+                score -= 2;
+            }
+            
+            // Bonus si tiene muchos votos (es popular)
+            if (rec.vote_count > 1000) {
+                score += 1;
+            }
+            
+            return {
+                ...rec,
+                relevanceScore: score
+            };
+        });
+        
+        // Ordenar por puntuación de relevancia
+        scoredResults.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+        
+        // Tomar las 10 mejores
+        const topRecommendations = scoredResults.slice(0, 10).map((rec: any) => ({
+            id: rec.id,
+            title: rec.title,
+            overview: rec.overview,
+            release_date: rec.release_date,
+            vote_average: rec.vote_average,
+            genres: rec.genre_ids,
+            formatted: `[MOVIE:${rec.id}:${rec.title}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                basedOn: movie.title,
+                basedOnFormatted: `[MOVIE:${movieId}:${movie.title}]`,
+                basedOnGenres: movieDetails.genres.map((g: any) => g.name).join(', '),
+                recommendations: topRecommendations,
+                totalFound: uniqueResults.length
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al buscar películas similares"
+        };
+    }
+}
+
+/**
+ * Obtener series similares o recomendaciones basadas en una serie
+ * Combina múltiples endpoints para mejores resultados
+ */
+async function getSimilarSeries(seriesName: string, useSimilar: boolean = true) {
+    try {
+        // Primero buscar la serie para obtener su ID
+        const searchResponse = await fetch(
+            `${BASE_URL}/search/tv?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(seriesName)}`
+        );
+        const searchData = await searchResponse.json();
+        
+        if (!searchData.results || searchData.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontró la serie "${seriesName}"`
+            };
+        }
+        
+        const series = searchData.results[0];
+        const seriesId = series.id;
+        
+        // Obtener detalles completos de la serie para tener géneros
+        const detailsResponse = await fetch(
+            `${BASE_URL}/tv/${seriesId}?api_key=${API_KEY}&language=es-ES`
+        );
+        const seriesDetails = await detailsResponse.json();
+        const seriesGenres = seriesDetails.genres.map((g: any) => g.id);
+        
+        // Obtener recomendaciones
+        const recommendationsResponse = await fetch(
+            `${BASE_URL}/tv/${seriesId}/recommendations?api_key=${API_KEY}&language=es-ES&page=1`
+        );
+        const recommendationsData = await recommendationsResponse.json();
+        
+        // Obtener similares
+        const similarResponse = await fetch(
+            `${BASE_URL}/tv/${seriesId}/similar?api_key=${API_KEY}&language=es-ES&page=1`
+        );
+        const similarData = await similarResponse.json();
+        
+        // Combinar ambos resultados
+        let allResults = [
+            ...(recommendationsData.results || []),
+            ...(similarData.results || [])
+        ];
+        
+        if (allResults.length === 0) {
+            return {
+                success: false,
+                error: `No se encontraron series similares a "${series.name}"`
+            };
+        }
+        
+        // Eliminar duplicados por ID
+        const uniqueResults = allResults.filter((item, index, self) =>
+            index === self.findIndex((t) => t.id === item.id)
+        );
+        
+        // Calcular puntuación de relevancia para cada serie
+        const scoredResults = uniqueResults.map((rec: any) => {
+            let score = rec.vote_average || 0; // Base: valoración
+            
+            // Bonus por géneros compartidos
+            const sharedGenres = rec.genre_ids?.filter((g: number) => seriesGenres.includes(g)).length || 0;
+            score += sharedGenres * 1.5; // +1.5 puntos por cada género compartido
+            
+            // Bonus por popularidad
+            score += Math.log10(rec.popularity || 1) * 0.5;
+            
+            // Penalización si la valoración es muy baja (menos de 5)
+            if (rec.vote_average < 5) {
+                score -= 2;
+            }
+            
+            // Bonus si tiene muchos votos (es popular)
+            if (rec.vote_count > 1000) {
+                score += 1;
+            }
+            
+            return {
+                ...rec,
+                relevanceScore: score
+            };
+        });
+        
+        // Ordenar por puntuación de relevancia
+        scoredResults.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+        
+        // Tomar las 10 mejores
+        const topRecommendations = scoredResults.slice(0, 10).map((rec: any) => ({
+            id: rec.id,
+            name: rec.name,
+            overview: rec.overview,
+            first_air_date: rec.first_air_date,
+            vote_average: rec.vote_average,
+            genres: rec.genre_ids,
+            formatted: `[SERIE:${rec.id}:${rec.name}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                basedOn: series.name,
+                basedOnFormatted: `[SERIE:${seriesId}:${series.name}]`,
+                basedOnGenres: seriesDetails.genres.map((g: any) => g.name).join(', '),
+                recommendations: topRecommendations,
+                totalFound: uniqueResults.length
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al buscar series similares"
+        };
+    }
+}
+
+/**
+ * Obtener recomendaciones avanzadas basadas en múltiples películas o criterios complejos
+ * Analiza géneros, directores, actores comunes y da recomendaciones más precisas
+ */
+async function getAdvancedRecommendations(movieTitles: string[]) {
+    try {
+        if (!movieTitles || movieTitles.length === 0) {
+            return {
+                success: false,
+                error: "Debes proporcionar al menos una película"
+            };
+        }
+        
+        // Buscar todas las películas para obtener sus IDs y detalles
+        const movieDetailsPromises = movieTitles.map(async (title) => {
+            const searchResponse = await fetch(
+                `${BASE_URL}/search/movie?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(title)}`
+            );
+            const searchData = await searchResponse.json();
+            
+            if (searchData.results && searchData.results.length > 0) {
+                const movieId = searchData.results[0].id;
+                
+                // Obtener detalles completos
+                const detailsResponse = await fetch(
+                    `${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=es-ES&append_to_response=credits,keywords`
+                );
+                return await detailsResponse.json();
+            }
+            return null;
+        });
+        
+        const moviesDetails = (await Promise.all(movieDetailsPromises)).filter(m => m !== null);
+        
+        if (moviesDetails.length === 0) {
+            return {
+                success: false,
+                error: "No se encontraron las películas especificadas"
+            };
+        }
+        
+        // Analizar géneros comunes
+        const genreCount: { [key: number]: number } = {};
+        moviesDetails.forEach((movie: any) => {
+            movie.genres.forEach((genre: any) => {
+                genreCount[genre.id] = (genreCount[genre.id] || 0) + 1;
+            });
+        });
+        
+        // Obtener los géneros más comunes
+        const topGenres = Object.entries(genreCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([id]) => parseInt(id));
+        
+        // Analizar directores comunes
+        const directorCount: { [key: number]: { count: number, name: string } } = {};
+        moviesDetails.forEach((movie: any) => {
+            const directors = movie.credits?.crew?.filter((c: any) => c.job === 'Director') || [];
+            directors.forEach((director: any) => {
+                if (!directorCount[director.id]) {
+                    directorCount[director.id] = { count: 0, name: director.name };
+                }
+                directorCount[director.id].count += 1;
+            });
+        });
+        
+        // Buscar películas que coincidan con los géneros principales
+        const genresQuery = topGenres.join(',');
+        const discoverResponse = await fetch(
+            `${BASE_URL}/discover/movie?api_key=${API_KEY}&language=es-ES&with_genres=${genresQuery}&sort_by=vote_average.desc&vote_count.gte=500&page=1`
+        );
+        const discoverData = await discoverResponse.json();
+        
+        // Filtrar películas que no estén en la lista original
+        const originalIds = moviesDetails.map((m: any) => m.id);
+        let candidates = discoverData.results.filter((movie: any) => 
+            !originalIds.includes(movie.id)
+        );
+        
+        // Calcular puntuación de relevancia
+        const scoredResults = candidates.map((movie: any) => {
+            let score = movie.vote_average || 0;
+            
+            // Bonus por géneros compartidos con las películas base
+            const sharedGenres = movie.genre_ids?.filter((g: number) => topGenres.includes(g)).length || 0;
+            score += sharedGenres * 2;
+            
+            // Bonus por popularidad
+            score += Math.log10(movie.popularity || 1) * 0.3;
+            
+            // Bonus si tiene alta valoración
+            if (movie.vote_average >= 7.5) {
+                score += 1.5;
+            }
+            
+            return {
+                ...movie,
+                relevanceScore: score
+            };
+        });
+        
+        // Ordenar por puntuación
+        scoredResults.sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+        
+        // Tomar las 12 mejores
+        const topRecommendations = scoredResults.slice(0, 12).map((movie: any) => ({
+            id: movie.id,
+            title: movie.title,
+            overview: movie.overview,
+            release_date: movie.release_date,
+            vote_average: movie.vote_average,
+            formatted: `[MOVIE:${movie.id}:${movie.title}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                basedOnMovies: moviesDetails.map((m: any) => m.title).join(', '),
+                commonGenres: moviesDetails[0]?.genres
+                    .filter((g: any) => topGenres.includes(g.id))
+                    .map((g: any) => g.name)
+                    .join(', '),
+                recommendations: topRecommendations
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al generar recomendaciones avanzadas"
+        };
+    }
+}
+
+/**
  * Obtener proveedores de streaming (plataformas)
  * Busca primero por nombre y luego obtiene las plataformas
  */
@@ -235,6 +605,388 @@ async function getStreamingProviders(title: string, type: 'movie' | 'tv' = 'tv')
 }
 
 /**
+ * Buscar películas de un actor específico (opcionalmente filtradas por género)
+ */
+async function searchMoviesByActor(actorName: string, genreId?: number) {
+    try {
+        // Primero buscar el actor para obtener su ID
+        const searchResponse = await fetch(
+            `${BASE_URL}/search/person?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(actorName)}`
+        );
+        const searchData = await searchResponse.json();
+        
+        if (!searchData.results || searchData.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontró el actor "${actorName}"`
+            };
+        }
+        
+        const actor = searchData.results[0];
+        const actorId = actor.id;
+        
+        // Obtener películas del actor
+        const moviesResponse = await fetch(
+            `${BASE_URL}/person/${actorId}/movie_credits?api_key=${API_KEY}&language=es-ES`
+        );
+        const moviesData = await moviesResponse.json();
+        
+        let movies = moviesData.cast || [];
+        
+        // Filtrar por género si se especifica
+        if (genreId) {
+            movies = movies.filter((movie: any) => 
+                movie.genre_ids && movie.genre_ids.includes(genreId)
+            );
+        }
+        
+        // Ordenar por popularidad y tomar las 10 más relevantes
+        movies.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0));
+        movies = movies.slice(0, 10);
+        
+        if (movies.length === 0) {
+            return {
+                success: false,
+                error: genreId 
+                    ? `No se encontraron películas de ${actor.name} en ese género`
+                    : `No se encontraron películas de ${actor.name}`
+            };
+        }
+        
+        const formattedMovies = movies.map((movie: any) => ({
+            id: movie.id,
+            title: movie.title,
+            character: movie.character,
+            release_date: movie.release_date,
+            vote_average: movie.vote_average,
+            formatted: `[MOVIE:${movie.id}:${movie.title}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                actor: actor.name,
+                totalMovies: moviesData.cast?.length || 0,
+                movies: formattedMovies
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al buscar películas del actor"
+        };
+    }
+}
+
+/**
+ * Buscar películas de un director específico
+ */
+async function searchMoviesByDirector(directorName: string) {
+    try {
+        // Primero buscar el director para obtener su ID
+        const searchResponse = await fetch(
+            `${BASE_URL}/search/person?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(directorName)}`
+        );
+        const searchData = await searchResponse.json();
+        
+        if (!searchData.results || searchData.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontró el director "${directorName}"`
+            };
+        }
+        
+        const director = searchData.results[0];
+        const directorId = director.id;
+        
+        // Obtener películas del director
+        const moviesResponse = await fetch(
+            `${BASE_URL}/person/${directorId}/movie_credits?api_key=${API_KEY}&language=es-ES`
+        );
+        const moviesData = await moviesResponse.json();
+        
+        // Filtrar solo las películas donde es director
+        let movies = (moviesData.crew || []).filter((movie: any) => 
+            movie.job === "Director"
+        );
+        
+        // Ordenar por fecha de lanzamiento (más recientes primero)
+        movies.sort((a: any, b: any) => {
+            const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
+            const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
+            return dateB - dateA;
+        });
+        
+        movies = movies.slice(0, 15); // Más películas para directores
+        
+        if (movies.length === 0) {
+            return {
+                success: false,
+                error: `No se encontraron películas dirigidas por ${director.name}`
+            };
+        }
+        
+        const formattedMovies = movies.map((movie: any) => ({
+            id: movie.id,
+            title: movie.title,
+            release_date: movie.release_date,
+            vote_average: movie.vote_average,
+            formatted: `[MOVIE:${movie.id}:${movie.title}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                director: director.name,
+                totalMovies: movies.length,
+                movies: formattedMovies
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al buscar películas del director"
+        };
+    }
+}
+
+/**
+ * Obtener contenido en tendencia (trending)
+ */
+async function getTrendingContent(type: 'movie' | 'tv' | 'all' = 'all', timeWindow: 'day' | 'week' = 'week') {
+    try {
+        const response = await fetch(
+            `${BASE_URL}/trending/${type}/${timeWindow}?api_key=${API_KEY}&language=es-ES`
+        );
+        const data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+            return {
+                success: false,
+                error: "No se encontró contenido en tendencia"
+            };
+        }
+        
+        const trending = data.results.slice(0, 10).map((item: any) => {
+            const isMovie = item.media_type === 'movie' || type === 'movie';
+            return {
+                id: item.id,
+                title: isMovie ? item.title : item.name,
+                media_type: item.media_type || type,
+                release_date: isMovie ? item.release_date : item.first_air_date,
+                vote_average: item.vote_average,
+                popularity: item.popularity,
+                formatted: isMovie 
+                    ? `[MOVIE:${item.id}:${item.title}]` 
+                    : `[SERIE:${item.id}:${item.name}]`
+            };
+        });
+        
+        return {
+            success: true,
+            data: {
+                timeWindow: timeWindow === 'day' ? 'hoy' : 'esta semana',
+                type: type === 'movie' ? 'películas' : type === 'tv' ? 'series' : 'películas y series',
+                trending: trending
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al obtener contenido en tendencia"
+        };
+    }
+}
+
+/**
+ * Búsqueda avanzada por género y características
+ */
+async function searchByGenreAndKeywords(genreId: number, keywords?: string, minRating?: number) {
+    try {
+        let url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&language=es-ES&with_genres=${genreId}&sort_by=popularity.desc`;
+        
+        // Agregar rating mínimo si se especifica
+        if (minRating) {
+            url += `&vote_average.gte=${minRating}`;
+        }
+        
+        // Si hay keywords, buscarlas primero
+        if (keywords) {
+            const keywordResponse = await fetch(
+                `${BASE_URL}/search/keyword?api_key=${API_KEY}&query=${encodeURIComponent(keywords)}`
+            );
+            const keywordData = await keywordResponse.json();
+            
+            if (keywordData.results && keywordData.results.length > 0) {
+                const keywordId = keywordData.results[0].id;
+                url += `&with_keywords=${keywordId}`;
+            }
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+            return {
+                success: false,
+                error: "No se encontraron películas con esos criterios"
+            };
+        }
+        
+        const movies = data.results.slice(0, 10).map((movie: any) => ({
+            id: movie.id,
+            title: movie.title,
+            release_date: movie.release_date,
+            vote_average: movie.vote_average,
+            overview: movie.overview,
+            formatted: `[MOVIE:${movie.id}:${movie.title}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                criteria: keywords || 'género específico',
+                movies: movies
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error en la búsqueda avanzada"
+        };
+    }
+}
+
+/**
+ * Obtener series que tendrán nuevos episodios próximamente
+ */
+async function getUpcomingSeriesEpisodes() {
+    try {
+        const response = await fetch(
+            `${BASE_URL}/tv/on_the_air?api_key=${API_KEY}&language=es-ES&region=ES`
+        );
+        const data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+            return {
+                success: false,
+                error: "No se encontraron series con próximos episodios"
+            };
+        }
+        
+        const series = data.results.slice(0, 10).map((serie: any) => ({
+            id: serie.id,
+            name: serie.name,
+            first_air_date: serie.first_air_date,
+            vote_average: serie.vote_average,
+            formatted: `[SERIE:${serie.id}:${serie.name}]`
+        }));
+        
+        return {
+            success: true,
+            data: series
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al obtener series con próximos episodios"
+        };
+    }
+}
+
+/**
+ * Buscar películas por década
+ */
+async function searchByDecade(decade: number, genreId?: number) {
+    try {
+        const startYear = decade;
+        const endYear = decade + 9;
+        
+        let url = `${BASE_URL}/discover/movie?api_key=${API_KEY}&language=es-ES&sort_by=popularity.desc&primary_release_date.gte=${startYear}-01-01&primary_release_date.lte=${endYear}-12-31`;
+        
+        if (genreId) {
+            url += `&with_genres=${genreId}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontraron películas de los ${decade}s`
+            };
+        }
+        
+        const movies = data.results.slice(0, 10).map((movie: any) => ({
+            id: movie.id,
+            title: movie.title,
+            release_date: movie.release_date,
+            vote_average: movie.vote_average,
+            formatted: `[MOVIE:${movie.id}:${movie.title}]`
+        }));
+        
+        return {
+            success: true,
+            data: {
+                decade: `${decade}s`,
+                movies: movies
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al buscar películas por década"
+        };
+    }
+}
+
+/**
+ * Obtener top películas/series por género específico
+ */
+async function getTopByGenre(genreId: number, type: 'movie' | 'tv' = 'movie') {
+    try {
+        const response = await fetch(
+            `${BASE_URL}/discover/${type}?api_key=${API_KEY}&language=es-ES&sort_by=vote_average.desc&with_genres=${genreId}&vote_count.gte=100`
+        );
+        const data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontraron ${type === 'movie' ? 'películas' : 'series'} top de ese género`
+            };
+        }
+        
+        const items = data.results.slice(0, 10).map((item: any) => {
+            const isMovie = type === 'movie';
+            return {
+                id: item.id,
+                title: isMovie ? item.title : item.name,
+                release_date: isMovie ? item.release_date : item.first_air_date,
+                vote_average: item.vote_average,
+                formatted: isMovie 
+                    ? `[MOVIE:${item.id}:${item.title}]` 
+                    : `[SERIE:${item.id}:${item.name}]`
+            };
+        });
+        
+        return {
+            success: true,
+            data: {
+                type: type === 'movie' ? 'películas' : 'series',
+                items: items
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al obtener top por género"
+        };
+    }
+}
+
+/**
  * Navegar a una página de la app
  */
 async function navigateToPage(route: string): Promise<{ success: boolean; message: string }> {
@@ -290,6 +1042,66 @@ export const availableFunctions: AIFunction[] = [
         execute: searchSeries
     },
     {
+        name: "getSimilarMovies",
+        description: "Obtiene películas similares combinando recommendations y similar. Usa algoritmo de scoring avanzado con géneros compartidos.",
+        parameters: { movieTitle: "string" },
+        execute: getSimilarMovies
+    },
+    {
+        name: "getSimilarSeries",
+        description: "Obtiene series similares combinando recommendations y similar. Usa algoritmo de scoring avanzado con géneros compartidos.",
+        parameters: { seriesName: "string" },
+        execute: getSimilarSeries
+    },
+    {
+        name: "getAdvancedRecommendations",
+        description: "Genera recomendaciones avanzadas basadas en MÚLTIPLES películas analizando géneros y características comunes. Úsala cuando el usuario mencione varias películas que le gusten.",
+        parameters: { movieTitles: "array de strings (ej: [\"Interstellar\", \"The Martian\", \"Arrival\"])" },
+        execute: getAdvancedRecommendations
+    },
+    {
+        name: "searchMoviesByActor",
+        description: "Busca películas de un actor específico, opcionalmente filtradas por género",
+        parameters: { actorName: "string", genreId: "number (opcional)" },
+        execute: searchMoviesByActor
+    },
+    {
+        name: "searchMoviesByDirector",
+        description: "Busca películas dirigidas por un director específico",
+        parameters: { directorName: "string" },
+        execute: searchMoviesByDirector
+    },
+    {
+        name: "getTrendingContent",
+        description: "Obtiene el contenido más popular del momento (trending)",
+        parameters: { type: "'movie' | 'tv' | 'all' (por defecto 'all')", timeWindow: "'day' | 'week' (por defecto 'week')" },
+        execute: getTrendingContent
+    },
+    {
+        name: "searchByGenreAndKeywords",
+        description: "Búsqueda avanzada de películas por género y características específicas (keywords)",
+        parameters: { genreId: "number", keywords: "string (opcional)", minRating: "number (opcional)" },
+        execute: searchByGenreAndKeywords
+    },
+    {
+        name: "getUpcomingSeriesEpisodes",
+        description: "Obtiene series que tendrán nuevos episodios próximamente",
+        parameters: {},
+        execute: getUpcomingSeriesEpisodes
+    },
+    {
+        name: "searchByDecade",
+        description: "Busca películas de una década específica, opcionalmente filtradas por género",
+        parameters: { decade: "number (ej: 1980, 1990, 2000)", genreId: "number (opcional)" },
+        execute: searchByDecade
+    },
+    {
+        name: "getTopByGenre",
+        description: "Obtiene las mejores películas o series de un género específico",
+        parameters: { genreId: "number", type: "'movie' | 'tv' (por defecto 'movie')" },
+        execute: getTopByGenre
+    },
+    {
         name: "getSeriesDetails",
         description: "Obtiene detalles de una serie incluyendo siguiente episodio y temporadas",
         parameters: { seriesId: "number" },
@@ -328,40 +1140,134 @@ export function getFunctionsContext(): string {
     let context = "\n\n# 🔧 IMPORTANTE - Funciones disponibles:\n\n";
     context += "Tienes acceso a estas funciones para obtener información en tiempo real:\n\n";
     
+    context += "## 📺 Búsqueda de contenido:\n\n";
+    
     context += "1. **getStreamingProviders(title, type)**: Busca dónde ver una película/serie\n";
     context += "   - Ejemplo: USE_FUNCTION: getStreamingProviders(\"Breaking Bad\", \"tv\")\n";
     context += "   - Ejemplo: USE_FUNCTION: getStreamingProviders(\"Inception\", \"movie\")\n\n";
     
-    context += "2. **getMoviesInTheaters()**: Películas en cartelera ahora\n";
+    context += "2. **getSimilarMovies(movieTitle)**: 🌟 MEJORADA - Busca películas similares\n";
+    context += "   - Combina recommendations + similar de TMDB\n";
+    context += "   - Usa algoritmo de scoring: géneros compartidos + valoración + popularidad\n";
+    context += "   - Ejemplo: USE_FUNCTION: getSimilarMovies(\"Interstellar\")\n";
+    context += "   - ⚠️ ÚSALA cuando pidan películas \"similares\", \"como\", \"del estilo de\"\n\n";
+    
+    context += "3. **getSimilarSeries(seriesName)**: 🌟 MEJORADA - Busca series similares\n";
+    context += "   - Combina recommendations + similar de TMDB\n";
+    context += "   - Usa algoritmo de scoring avanzado\n";
+    context += "   - Ejemplo: USE_FUNCTION: getSimilarSeries(\"Breaking Bad\")\n\n";
+    
+    context += "4. **getAdvancedRecommendations(movieTitles)**: 🆕 NUEVA - Recomendaciones basadas en MÚLTIPLES películas\n";
+    context += "   - Analiza géneros y patrones comunes entre varias películas\n";
+    context += "   - Da recomendaciones MUY precisas\n";
+    context += "   - Ejemplo: USE_FUNCTION: getAdvancedRecommendations([\"Interstellar\", \"The Martian\", \"Arrival\"])\n";
+    context += "   - ⚠️ ÚSALA cuando el usuario mencione que le gustaron VARIAS películas\n\n";
+    
+    context += "5. **searchMoviesByActor(actorName, genreId)**: Películas de un actor\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchMoviesByActor(\"Tom Cruise\", 28)\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchMoviesByActor(\"Scarlett Johansson\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas de un actor específico\n\n";
+    
+    context += "6. **searchMoviesByDirector(directorName)**: Películas de un director\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchMoviesByDirector(\"Christopher Nolan\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas de un director\n\n";
+    
+    context += "7. **getTrendingContent(type, timeWindow)**: Contenido más popular\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTrendingContent(\"all\", \"week\")\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTrendingContent(\"movie\", \"day\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten qué es popular, trending, o de moda\n\n";
+    
+    context += "8. **searchByGenreAndKeywords(genreId, keywords, minRating)**: Búsqueda avanzada\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByGenreAndKeywords(878, \"time travel\", 7)\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByGenreAndKeywords(27, \"zombies\")\n";
+    context += "   - ⚠️ ÚSALA para películas con características específicas\n";
+    context += "   - Géneros: Acción=28, Comedia=35, Drama=18, Terror=27, Ciencia Ficción=878, Romance=10749\n\n";
+    
+    context += "9. **searchByDecade(decade, genreId)**: Películas de una época\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByDecade(1980, 27)\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByDecade(1990)\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas de los 80s, 90s, etc.\n\n";
+    
+    context += "10. **getTopByGenre(genreId, type)**: Top películas/series por género\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTopByGenre(35, \"movie\")\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTopByGenre(18, \"tv\")\n";
+    context += "   - ⚠️ ÚSALA para \"mejores películas de comedia\", \"top series de drama\", etc.\n\n";
+    context += "   - ⚠️ ÚSALA cuando pidan películas \"similares\", \"como\", \"del estilo de\"\n\n";
+    
+    context += "3. **getSimilarSeries(seriesName)**: Busca series similares\n";
+    context += "   - Ejemplo: USE_FUNCTION: getSimilarSeries(\"Breaking Bad\")\n\n";
+    
+    context += "4. **searchMoviesByActor(actorName, genreId)**: Películas de un actor\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchMoviesByActor(\"Tom Cruise\", 28)\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchMoviesByActor(\"Scarlett Johansson\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas de un actor específico\n\n";
+    
+    context += "5. **searchMoviesByDirector(directorName)**: Películas de un director\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchMoviesByDirector(\"Christopher Nolan\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas de un director\n\n";
+    
+    context += "6. **getTrendingContent(type, timeWindow)**: Contenido más popular\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTrendingContent(\"all\", \"week\")\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTrendingContent(\"movie\", \"day\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten qué es popular, trending, o de moda\n\n";
+    
+    context += "7. **searchByGenreAndKeywords(genreId, keywords, minRating)**: Búsqueda avanzada\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByGenreAndKeywords(878, \"time travel\", 7)\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByGenreAndKeywords(27, \"zombies\")\n";
+    context += "   - ⚠️ ÚSALA para películas con características específicas\n";
+    context += "   - Géneros: Acción=28, Comedia=35, Drama=18, Terror=27, Ciencia Ficción=878, Romance=10749\n\n";
+    
+    context += "8. **searchByDecade(decade, genreId)**: Películas de una época\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByDecade(1980, 27)\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchByDecade(1990)\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas de los 80s, 90s, etc.\n\n";
+    
+    context += "9. **getTopByGenre(genreId, type)**: Top películas/series por género\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTopByGenre(35, \"movie\")\n";
+    context += "   - Ejemplo: USE_FUNCTION: getTopByGenre(18, \"tv\")\n";
+    context += "   - ⚠️ ÚSALA para \"mejores películas de comedia\", \"top series de drama\", etc.\n\n";
+    
+    context += "## 🎬 Información y estrenos:\n\n";
+    
+    context += "10. **getMoviesInTheaters()**: Películas en cartelera\n";
     context += "   - Ejemplo: USE_FUNCTION: getMoviesInTheaters()\n\n";
     
-    context += "3. **getUpcomingMovies()**: Próximos estrenos\n";
+    context += "11. **getUpcomingMovies()**: Próximos estrenos de cine\n";
     context += "   - Ejemplo: USE_FUNCTION: getUpcomingMovies()\n\n";
     
-    context += "4. **searchMovie(title)**: Buscar info de una película\n";
+    context += "12. **getUpcomingSeriesEpisodes()**: Series con próximos episodios\n";
+    context += "   - Ejemplo: USE_FUNCTION: getUpcomingSeriesEpisodes()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten qué series están en emisión\n\n";
+    
+    context += "13. **searchMovie(title)**: Buscar info de una película\n";
     context += "   - Ejemplo: USE_FUNCTION: searchMovie(\"Oppenheimer\")\n\n";
     
-    context += "5. **searchSeries(name)**: Buscar info de una serie\n";
+    context += "14. **searchSeries(name)**: Buscar info de una serie\n";
     context += "   - Ejemplo: USE_FUNCTION: searchSeries(\"Game of Thrones\")\n\n";
     
-    context += "6. **navigateToPage(route)**: Llevar al usuario a una sección\n";
-    context += "   - Rutas válidas: acción, comedia, drama, terror, ciencia ficción, romance, populares, estrenos, cartelera, top películas, top series, favoritos, pendientes, vistos, me gusta\n";
+    context += "15. **getSeriesDetails(seriesId)**: Detalles de una serie (necesitas el ID)\n";
+    context += "   - Ejemplo: Primero busca con searchSeries, luego usa el ID\n\n";
+    
+    context += "## 🧭 Navegación:\n\n";
+    
+    context += "16. **navigateToPage(route)**: Llevar al usuario a una sección\n";
+    context += "   - Rutas: acción, comedia, drama, terror, ciencia ficción, romance, populares, estrenos, cartelera, top películas, top series, favoritos, pendientes, vistos, me gusta\n";
     context += "   - Ejemplo: USE_FUNCTION: navigateToPage(\"acción\")\n\n";
     
-    context += "⚠️ REGLAS IMPORTANTES:\n";
-    context += "- SIEMPRE usa estas funciones cuando el usuario pregunte algo que requiera datos actuales de TMDB\n";
-    context += "- Para streaming, usa getStreamingProviders con el nombre exacto\n";
-    context += "- Para navegación, usa navigateToPage con la ruta exacta\n";
+    context += "## ⚠️ REGLAS IMPORTANTES:\n\n";
+    context += "- SIEMPRE usa estas funciones cuando el usuario pregunte algo que requiera datos de TMDB\n";
+    context += "- Para recomendaciones similares, usa getSimilarMovies/getSimilarSeries\n";
+    context += "- Para películas de actores/directores, usa las funciones específicas\n";
+    context += "- Para contenido trending/popular, usa getTrendingContent\n";
+    context += "- Para búsquedas con características específicas, usa searchByGenreAndKeywords\n";
     context += "- El formato debe ser EXACTAMENTE: USE_FUNCTION: nombreFuncion(parametro1, parametro2)\n";
-    context += "- Los strings deben ir entre comillas dobles\n\n";
+    context += "- Los strings van entre comillas dobles, los números sin comillas\n\n";
     
-    context += "🎬 FORMATO DE PELÍCULAS Y SERIES:\n";
-    context += "- Cuando menciones una película o serie en tu respuesta, usa el formato que recibes de las funciones\n";
-    context += "- Las funciones devuelven un campo 'formatted' con el formato [MOVIE:id:título] o [SERIE:id:título]\n";
-    context += "- SIEMPRE usa este formato cuando menciones contenido, por ejemplo:\n";
-    context += "  'Te recomiendo ver [MOVIE:123:Inception]' en lugar de 'Te recomiendo ver Inception'\n";
-    context += "  '[SERIE:456:Breaking Bad] está disponible en Netflix'\n";
-    context += "- Esto hará que los nombres aparezcan como badges clickeables para el usuario\n\n";
+    context += "## 🎬 FORMATO DE RESPUESTAS:\n\n";
+    context += "- Cuando menciones películas/series, usa el formato [MOVIE:id:título] o [SERIE:id:título]\n";
+    context += "- Las funciones devuelven este formato en el campo 'formatted'\n";
+    context += "- Ejemplo: 'Te recomiendo [MOVIE:123:Inception]' en lugar de 'Te recomiendo Inception'\n";
+    context += "- Esto crea badges clickeables para el usuario\n\n";
     
     return context;
 }
