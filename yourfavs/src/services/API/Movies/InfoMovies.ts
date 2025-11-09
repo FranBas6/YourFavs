@@ -157,7 +157,7 @@ export const getMovieDirectorsAndRoles = async (movieId: string): Promise<{ name
             return [];
         }
 
-        const relevantRoles = ["Producer", "Executive Producer", "Visual Effects", "Original Music Composer"];
+        const relevantRoles = ["Director", "Producer", "Executive Producer", "Director of Photography", "Original Music Composer", "Screenplay", "Writer", "Editor"];
 
         return data.crew
             .filter((member: any) => relevantRoles.includes(member.job))

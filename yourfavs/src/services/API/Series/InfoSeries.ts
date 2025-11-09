@@ -149,7 +149,7 @@ export const getSeriesDirectorsAndRoles = async (tvId: string): Promise<{ name: 
 
         const data = await response.json();
 
-        const relevantRoles = ["Producer", "Executive Producer", "Visual Effects", "Original Music Composer"];
+        const relevantRoles = ["Director", "Producer", "Executive Producer", "Visual Effects", "Original Music Composer"];
 
         return data.crew
             .filter((member: any) => relevantRoles.includes(member.job))

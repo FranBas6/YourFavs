@@ -162,6 +162,14 @@ interface MovieProvider {
     type?: 'flatrate' | 'rent' | 'buy';
 }
 
+// Definir la interfaz para las productoras
+interface ProductionCompany {
+    id: number;
+    name: string;
+    logo_path?: string;
+    origin_country?: string;
+}
+
 // Obtener datos de la película
 let item = null;
 let cast: MovieCastMember[] = []; // Cambio aquí: de string[] a MovieCastMember[]
@@ -1229,6 +1237,40 @@ const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
                                     </div>
                                 </div>
                         )}
+
+                        <!-- Productoras -->
+                        {item?.production_companies && item.production_companies.length > 0 && (
+                            <div class="bg-white p-6 rounded-lg shadow-md">
+                                <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
+
+                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
+                                    {item.production_companies.map((company: ProductionCompany) => (
+                                        <a
+                                            href={`/productora/${company.name}`}
+                                            class="flex flex-col items-center group"
+                                        >
+                                            {company?.logo_path ? (
+                                                <img
+                                                    src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
+                                                    alt={company.name}
+                                                    loading="lazy"
+                                                    class="w-20 h-20 object-contain rounded-md mb-2 transition-transform duration-200 group-hover:scale-110"
+                                                />
+                                            ) : (
+                                                <div class="w-20 h-20 bg-gray-200 rounded-md flex items-center justify-center mb-2 group-hover:bg-gray-300 transition-colors">
+                                                    <span class="text-xs text-gray-500">Sin logo</span>
+                                                </div>
+                                            )}
+
+                                            <p class="text-sm text-center text-gray-600 group-hover:text-blue-600 font-medium transition-colors">
+                                                {company.name}
+                                            </p>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                         <!-- MOVIES Recomendaciones -->
                         {moviesRecommendations && moviesRecommendations.length > 0 && (
