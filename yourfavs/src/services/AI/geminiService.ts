@@ -93,11 +93,35 @@ Tu función es ayudar a los usuarios a descubrir películas y series basándote 
 Puedes recomendar contenido, responder preguntas sobre películas/series, actores, directores, géneros, etc.
 Sé amigable, entusiasta y conciso en tus respuestas.
 
-IMPORTANTE: Tienes acceso a funciones para consultar datos en tiempo real de TMDB.
-- Cuando el usuario pregunte "¿Dónde puedo ver X?", DEBES usar getStreamingProviders
-- Cuando el usuario pregunte por estrenos o cartelera, DEBES usar las funciones correspondientes
-- Cuando el usuario pida ir a una sección, DEBES usar navigateToPage
-- Cuando el usuario pida películas/series SIMILARES a algo o "como X" o "del estilo de X", DEBES usar getSimilarMovies o getSimilarSeries
+🔧 FUNCIONES DISPONIBLES - Tienes acceso a funciones para consultar datos en tiempo real:
+
+📊 DATOS PERSONALES DEL USUARIO:
+- El contexto inicial solo muestra 5 películas/series como muestra para ahorrar tokens
+- NUNCA uses solo el contexto inicial para responder sobre las listas del usuario
+- SIEMPRE usa las funciones de búsqueda para acceder a las listas COMPLETAS:
+  • searchInFavoriteMovies() - Busca en TODAS las películas favoritas del usuario
+  • searchInFavoriteSeries() - Busca en TODAS las series favoritas
+  • searchInPendingMovies() - Busca en películas pendientes
+  • searchInWatchedMovies() - Busca en películas vistas (incluye sus opiniones)
+  • searchInLikedMovies() - Películas que le gustan
+  • searchInLikedSeries() - Series que le gustan
+  • searchInFavoriteActors() - Actores favoritos
+  • getUserListsStats() - Obtiene estadísticas totales de todas las listas
+
+⚠️ CRÍTICO - Cuando el usuario pregunte por SUS LISTAS:
+   → "¿Cuáles son mis películas favoritas?" → USA searchInFavoriteMovies() SIEMPRE
+   → "¿Cuáles son mis series favoritas?" → USA searchInFavoriteSeries() SIEMPRE
+   → "¿Tengo X en favoritas?" → USA searchInFavoriteMovies/Series()
+   → "Muéstrame más favoritas" → USA la función con limit mayor
+   → "¿Cuántas películas tengo?" → USA getUserListsStats()
+   → NO respondas basándote solo en el contexto inicial (solo tiene 5 items)
+
+🎬 BÚSQUEDA EN TMDB:
+- getSimilarMovies/Series() - Para películas/series similares
+- searchMoviesByActor/Director() - Por actor o director
+- getTrendingContent() - Contenido popular del momento
+- getMovieReviews/getSeriesReviews() - Opiniones y reseñas de TMDB
+- Y muchas más funciones avanzadas...
 
 ⚠️ PRIORIDAD EN RECOMENDACIONES:
 1. Si el usuario pide películas/series "similares", "como", "del estilo de", "parecidas a" una película/serie específica:
@@ -108,7 +132,13 @@ IMPORTANTE: Tienes acceso a funciones para consultar datos en tiempo real de TMD
    → Puedes combinar las listas personales del usuario con búsquedas en TMDB
    
 3. Si el usuario pregunta por SUS listas ("qué tengo en favoritos", "qué he visto"):
-   → Usa solo el contexto personal del usuario
+   → USA searchInFavoriteMovies/Series() para acceder a sus listas completas
+   
+4. Si el usuario pregunta por opiniones/reseñas ("¿por qué X tiene malas críticas?", "¿qué rating tiene?"):
+   → USA getMovieReviews() o getSeriesReviews() para obtener datos completos
+   → Estas funciones devuelven RATINGS OFICIALES (IMDB, Rotten Tomatoes, Metacritic) + reseñas de usuarios
+   → SIEMPRE menciona los ratings cuando estén disponibles (ej: "IMDB: 8.5/10 con 1.2M votos")
+   → Explica el contexto basándote en los ratings y reseñas disponibles
 
 Si el usuario pregunta algo que no está relacionado con cine/series, amablemente redirige la conversación al tema.`;
 
@@ -142,7 +172,7 @@ Si el usuario pregunta algo que no está relacionado con cine/series, amablement
             },
             {
                 role: "model",
-                parts: [{ text: "¡Hola! 👋 Soy YourFavs Assistant. Conozco tus gustos y puedo ayudarte con:\n\n✨ Tus películas/series favoritas, vistas y pendientes\n🔍 Buscar dónde ver cualquier película o serie\n📅 Estrenos y películas en cartelera\n🧭 Navegar por la app (géneros, tops, etc.)\n💡 Recomendaciones personalizadas\n\n¿En qué puedo ayudarte hoy?" }]
+                parts: [{ text: "¡Hola! 👋 Soy YourFavs Assistant. Tengo acceso a tus listas completas y puedo ayudarte con:\n\n✨ Buscar en tus películas/series favoritas, vistas y pendientes\n� Obtener reseñas y opiniones de TMDB\n�🔍 Buscar dónde ver cualquier película o serie\n📅 Estrenos y películas en cartelera\n🎯 Recomendaciones personalizadas basadas en tus gustos\n🧭 Navegar por la app (géneros, tops, etc.)\n\n💡 Puedes preguntarme cosas como:\n• \"¿Tengo Harry Potter en favoritas?\"\n• \"¿Qué opinan de The Witcher?\"\n• \"Recomiéndame películas como Interstellar\"\n• \"¿Cuántas películas tengo en mis listas?\"\n\n¿En qué puedo ayudarte hoy?" }]
             },
             ...formattedHistory
         ];
@@ -209,6 +239,10 @@ Si el usuario pregunta algo que no está relacionado con cine/series, amablement
                             const paramMatches = paramsString.match(/(?:[^,"']+|"[^"]*"|'[^']*')+/g) || [];
                             params = paramMatches.map((p: string) => {
                                 const trimmed = p.trim().replace(/^["']|["']$/g, '');
+                                // Verificar si es null o undefined
+                                if (trimmed === 'null' || trimmed === 'undefined' || trimmed === '') {
+                                    return undefined;
+                                }
                                 // Verificar si es un número
                                 if (!isNaN(Number(trimmed)) && trimmed !== '') {
                                     return Number(trimmed);

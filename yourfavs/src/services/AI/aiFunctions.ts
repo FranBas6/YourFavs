@@ -3,8 +3,23 @@
  * para consultar TMDB y navegar en la app
  */
 
+import { 
+    searchInFavoriteMovies, 
+    searchInFavoriteSeries, 
+    searchInPendingMovies,
+    searchInPendingSeries,
+    searchInWatchedMovies,
+    searchInWatchedSeries,
+    searchInLikedMovies,
+    searchInLikedSeries,
+    searchInFavoriteActors,
+    getUserListsStats 
+} from "./userDataFunctions";
+
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 const BASE_URL = "https://api.themoviedb.org/3";
+const OMDB_API_KEY = import.meta.env.PUBLIC_OMDB_API_KEY;
+const OMDB_BASE_URL = "http://www.omdbapi.com";
 
 export interface AIFunction {
     name: string;
@@ -987,6 +1002,205 @@ async function getTopByGenre(genreId: number, type: 'movie' | 'tv' = 'movie') {
 }
 
 /**
+ * Obtener reseñas/opiniones de una película desde TMDB + OMDB (IMDB, Rotten Tomatoes, Metacritic)
+ */
+async function getMovieReviews(movieTitle: string, limit: number = 5) {
+    try {
+        // Primero buscar la película para obtener su ID y datos
+        const searchResponse = await fetch(
+            `${BASE_URL}/search/movie?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(movieTitle)}`
+        );
+        const searchData = await searchResponse.json();
+        
+        if (!searchData.results || searchData.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontró la película "${movieTitle}"`
+            };
+        }
+        
+        const movie = searchData.results[0];
+        const movieId = movie.id;
+        
+        // Obtener detalles completos para tener el IMDB ID
+        const detailsResponse = await fetch(
+            `${BASE_URL}/movie/${movieId}?api_key=${API_KEY}&language=es-ES`
+        );
+        const detailsData = await detailsResponse.json();
+        const imdbId = detailsData.imdb_id;
+        
+        // Obtener ratings de OMDB (IMDB, Rotten Tomatoes, Metacritic)
+        let omdbRatings = null;
+        if (imdbId) {
+            try {
+                const omdbResponse = await fetch(
+                    `${OMDB_BASE_URL}/?apikey=${OMDB_API_KEY}&i=${imdbId}`
+                );
+                const omdbData = await omdbResponse.json();
+                
+                if (omdbData.Response === "True") {
+                    omdbRatings = {
+                        imdb: omdbData.imdbRating !== "N/A" ? omdbData.imdbRating : null,
+                        imdbVotes: omdbData.imdbVotes !== "N/A" ? omdbData.imdbVotes : null,
+                        rottenTomatoes: omdbData.Ratings?.find((r: any) => r.Source === "Rotten Tomatoes")?.Value || null,
+                        metacritic: omdbData.Ratings?.find((r: any) => r.Source === "Metacritic")?.Value || null,
+                        awards: omdbData.Awards !== "N/A" ? omdbData.Awards : null
+                    };
+                }
+            } catch (error) {
+                console.warn("No se pudieron obtener ratings de OMDB:", error);
+            }
+        }
+        
+        // Obtener reseñas de TMDB
+        const reviewsResponse = await fetch(
+            `${BASE_URL}/movie/${movieId}/reviews?api_key=${API_KEY}&language=es-ES`
+        );
+        const reviewsData = await reviewsResponse.json();
+        
+        // Si no hay reseñas en español, intentar en inglés
+        let reviews = reviewsData.results || [];
+        if (reviews.length === 0) {
+            const reviewsEnResponse = await fetch(
+                `${BASE_URL}/movie/${movieId}/reviews?api_key=${API_KEY}&language=en-US`
+            );
+            const reviewsEnData = await reviewsEnResponse.json();
+            reviews = reviewsEnData.results || [];
+        }
+        
+        // Limitar y formatear reseñas
+        const limitedReviews = reviews.slice(0, limit).map((review: any) => ({
+            author: review.author,
+            rating: review.author_details?.rating || null,
+            content: review.content.length > 500 ? review.content.substring(0, 500) + "..." : review.content,
+            created_at: review.created_at,
+            url: review.url
+        }));
+        
+        return {
+            success: true,
+            data: {
+                movie: movie.title,
+                movieFormatted: `[MOVIE:${movieId}:${movie.title}]`,
+                year: movie.release_date?.substring(0, 4),
+                // Ratings oficiales (OMDB)
+                ratings: omdbRatings,
+                // Reseñas con texto (TMDB)
+                totalReviews: reviews.length,
+                showing: limitedReviews.length,
+                reviews: limitedReviews,
+                message: reviews.length === 0 ? "No hay reseñas de texto disponibles, pero se muestran los ratings oficiales" : null
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al obtener reseñas de la película"
+        };
+    }
+}
+
+/**
+ * Obtener reseñas/opiniones de una serie desde TMDB + OMDB (IMDB ratings)
+ */
+async function getSeriesReviews(seriesName: string, limit: number = 5) {
+    try {
+        // Primero buscar la serie para obtener su ID
+        const searchResponse = await fetch(
+            `${BASE_URL}/search/tv?api_key=${API_KEY}&language=es-ES&query=${encodeURIComponent(seriesName)}`
+        );
+        const searchData = await searchResponse.json();
+        
+        if (!searchData.results || searchData.results.length === 0) {
+            return {
+                success: false,
+                error: `No se encontró la serie "${seriesName}"`
+            };
+        }
+        
+        const series = searchData.results[0];
+        const seriesId = series.id;
+        
+        // Obtener detalles externos (IMDB ID)
+        const externalIdsResponse = await fetch(
+            `${BASE_URL}/tv/${seriesId}/external_ids?api_key=${API_KEY}`
+        );
+        const externalIdsData = await externalIdsResponse.json();
+        const imdbId = externalIdsData.imdb_id;
+        
+        // Obtener ratings de OMDB (IMDB principalmente, series no suelen tener RT/Metacritic)
+        let omdbRatings = null;
+        if (imdbId) {
+            try {
+                const omdbResponse = await fetch(
+                    `${OMDB_BASE_URL}/?apikey=${OMDB_API_KEY}&i=${imdbId}`
+                );
+                const omdbData = await omdbResponse.json();
+                
+                if (omdbData.Response === "True") {
+                    omdbRatings = {
+                        imdb: omdbData.imdbRating !== "N/A" ? omdbData.imdbRating : null,
+                        imdbVotes: omdbData.imdbVotes !== "N/A" ? omdbData.imdbVotes : null,
+                        rottenTomatoes: omdbData.Ratings?.find((r: any) => r.Source === "Rotten Tomatoes")?.Value || null,
+                        metacritic: omdbData.Ratings?.find((r: any) => r.Source === "Metacritic")?.Value || null,
+                        awards: omdbData.Awards !== "N/A" ? omdbData.Awards : null,
+                        seasons: omdbData.totalSeasons !== "N/A" ? omdbData.totalSeasons : null
+                    };
+                }
+            } catch (error) {
+                console.warn("No se pudieron obtener ratings de OMDB para la serie:", error);
+            }
+        }
+        
+        // Obtener reseñas de TMDB
+        const reviewsResponse = await fetch(
+            `${BASE_URL}/tv/${seriesId}/reviews?api_key=${API_KEY}&language=es-ES`
+        );
+        const reviewsData = await reviewsResponse.json();
+        
+        // Si no hay reseñas en español, intentar en inglés
+        let reviews = reviewsData.results || [];
+        if (reviews.length === 0) {
+            const reviewsEnResponse = await fetch(
+                `${BASE_URL}/tv/${seriesId}/reviews?api_key=${API_KEY}&language=en-US`
+            );
+            const reviewsEnData = await reviewsEnResponse.json();
+            reviews = reviewsEnData.results || [];
+        }
+        
+        // Limitar y formatear reseñas
+        const limitedReviews = reviews.slice(0, limit).map((review: any) => ({
+            author: review.author,
+            rating: review.author_details?.rating || null,
+            content: review.content.length > 500 ? review.content.substring(0, 500) + "..." : review.content,
+            created_at: review.created_at,
+            url: review.url
+        }));
+        
+        return {
+            success: true,
+            data: {
+                series: series.name,
+                seriesFormatted: `[SERIE:${seriesId}:${series.name}]`,
+                year: series.first_air_date?.substring(0, 4),
+                // Ratings oficiales (OMDB)
+                ratings: omdbRatings,
+                // Reseñas con texto (TMDB)
+                totalReviews: reviews.length,
+                showing: limitedReviews.length,
+                reviews: limitedReviews,
+                message: reviews.length === 0 ? "No hay reseñas de texto disponibles, pero se muestran los ratings oficiales" : null
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: "Error al obtener reseñas de la serie"
+        };
+    }
+}
+
+/**
  * Navegar a una página de la app
  */
 async function navigateToPage(route: string): Promise<{ success: boolean; message: string }> {
@@ -1082,6 +1296,78 @@ export const availableFunctions: AIFunction[] = [
         description: "Búsqueda avanzada de películas por género y características específicas (keywords)",
         parameters: { genreId: "number", keywords: "string (opcional)", minRating: "number (opcional)" },
         execute: searchByGenreAndKeywords
+    },
+    {
+        name: "searchInFavoriteMovies",
+        description: "Busca en las películas favoritas del usuario. Puede buscar por título o género. ÚSALA cuando el usuario pregunte por sus películas favoritas.",
+        parameters: { searchQuery: "string (opcional - título o género)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInFavoriteMovies
+    },
+    {
+        name: "searchInFavoriteSeries",
+        description: "Busca en las series favoritas del usuario. Puede buscar por título o género. ÚSALA cuando el usuario pregunte por sus series favoritas.",
+        parameters: { searchQuery: "string (opcional - título o género)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInFavoriteSeries
+    },
+    {
+        name: "searchInPendingMovies",
+        description: "Busca en las películas pendientes del usuario. ÚSALA cuando pregunten qué tienen pendiente de ver.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInPendingMovies
+    },
+    {
+        name: "searchInPendingSeries",
+        description: "Busca en las series pendientes del usuario. ÚSALA cuando pregunten por series pendientes.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInPendingSeries
+    },
+    {
+        name: "searchInWatchedMovies",
+        description: "Busca en las películas vistas del usuario. ÚSALA cuando pregunten qué han visto.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInWatchedMovies
+    },
+    {
+        name: "searchInWatchedSeries",
+        description: "Busca en las series vistas del usuario. ÚSALA cuando pregunten por series que han visto.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInWatchedSeries
+    },
+    {
+        name: "searchInLikedMovies",
+        description: "Busca en las películas que le gustan al usuario (marcadas con 'me gusta'). ÚSALA cuando pregunten por películas que les gustan.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInLikedMovies
+    },
+    {
+        name: "searchInLikedSeries",
+        description: "Busca en las series que le gustan al usuario (marcadas con 'me gusta'). ÚSALA cuando pregunten por series que les gustan.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInLikedSeries
+    },
+    {
+        name: "searchInFavoriteActors",
+        description: "Busca en los actores favoritos del usuario. ÚSALA cuando pregunten por sus actores favoritos.",
+        parameters: { searchQuery: "string (opcional)", limit: "number (opcional, por defecto 20)" },
+        execute: searchInFavoriteActors
+    },
+    {
+        name: "getUserListsStats",
+        description: "Obtiene estadísticas de todas las listas del usuario (cuántas películas/series tiene en cada lista). ÚSALA para resúmenes generales.",
+        parameters: {},
+        execute: getUserListsStats
+    },
+    {
+        name: "getMovieReviews",
+        description: "Obtiene ratings oficiales (IMDB, Rotten Tomatoes, Metacritic) + reseñas con texto de usuarios. ÚSALA cuando pregunten por opiniones, ratings o reseñas de una película.",
+        parameters: { movieTitle: "string", limit: "number (opcional, por defecto 5)" },
+        execute: getMovieReviews
+    },
+    {
+        name: "getSeriesReviews",
+        description: "Obtiene ratings oficiales (IMDB principalmente) + reseñas con texto de usuarios. ÚSALA cuando pregunten por opiniones, ratings o reseñas de una serie.",
+        parameters: { seriesName: "string", limit: "number (opcional, por defecto 5)" },
+        execute: getSeriesReviews
     },
     {
         name: "getUpcomingSeriesEpisodes",
@@ -1192,6 +1478,79 @@ export function getFunctionsContext(): string {
     context += "   - Ejemplo: USE_FUNCTION: getTopByGenre(35, \"movie\")\n";
     context += "   - Ejemplo: USE_FUNCTION: getTopByGenre(18, \"tv\")\n";
     context += "   - ⚠️ ÚSALA para \"mejores películas de comedia\", \"top series de drama\", etc.\n\n";
+    
+    context += "## 👤 Búsqueda en listas personales del usuario:\n\n";
+    
+    context += "⚠️ IMPORTANTE: Estas funciones acceden a las listas COMPLETAS (no solo las 5 del contexto inicial)\n";
+    context += "⚠️ Cuando pregunten \"¿Cuáles son mis favoritas?\" DEBES usar estas funciones, NO el contexto inicial\n\n";
+    
+    context += "11. **searchInFavoriteMovies(searchQuery, limit)**: 🔍 Busca en favoritos de películas\n";
+    context += "   - limit por defecto: 20 (puedes pedir más con limit=50)\n";
+    context += "   - Para todas las favoritas sin filtro: USE_FUNCTION: searchInFavoriteMovies()\n";
+    context += "   - Con límite específico: USE_FUNCTION: searchInFavoriteMovies(undefined, 30)\n";
+    context += "   - Buscando algo: USE_FUNCTION: searchInFavoriteMovies(\"Harry Potter\", 20)\n";
+    context += "   - ⚠️ ÚSALA SIEMPRE cuando pregunten \"¿Cuáles son mis películas favoritas?\"\n";
+    context += "   - ⚠️ Si piden \"10 más\", explica que puedes mostrar las siguientes aumentando el limit\n\n";
+    
+    context += "12. **searchInFavoriteSeries(searchQuery, limit)**: 🔍 Busca en favoritos de series\n";
+    context += "   - limit por defecto: 20\n";
+    context += "   - Para todas las favoritas sin filtro: USE_FUNCTION: searchInFavoriteSeries()\n";
+    context += "   - Con límite específico: USE_FUNCTION: searchInFavoriteSeries(undefined, 30)\n";
+    context += "   - Buscando algo: USE_FUNCTION: searchInFavoriteSeries(\"Witcher\")\n";
+    context += "   - ⚠️ ÚSALA SIEMPRE cuando pregunten \"¿Cuáles son mis series favoritas?\"\n\n";
+    
+    context += "13. **searchInPendingMovies(searchQuery, limit)**: 🔍 Busca en películas pendientes\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInPendingMovies()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten qué tienen pendiente de ver\n\n";
+    
+    context += "14. **searchInPendingSeries(searchQuery, limit)**: 🔍 Busca en series pendientes\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInPendingSeries()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por series pendientes\n\n";
+    
+    context += "15. **searchInWatchedMovies(searchQuery, limit)**: 🔍 Busca en películas vistas\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInWatchedMovies()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten qué han visto\n\n";
+    
+    context += "16. **searchInWatchedSeries(searchQuery, limit)**: 🔍 Busca en series vistas\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInWatchedSeries()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por series que han visto\n\n";
+    
+    context += "17. **searchInLikedMovies(searchQuery, limit)**: 💚 Busca en películas que le gustan\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInLikedMovies(\"Marvel\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por películas marcadas como 'me gusta'\n\n";
+    
+    context += "18. **searchInLikedSeries(searchQuery, limit)**: 💚 Busca en series que le gustan\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInLikedSeries()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por series marcadas como 'me gusta'\n\n";
+    
+    context += "19. **searchInFavoriteActors(searchQuery, limit)**: ⭐ Busca en actores favoritos\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInFavoriteActors(\"Tom\")\n";
+    context += "   - Ejemplo: USE_FUNCTION: searchInFavoriteActors()\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por sus actores favoritos\n\n";
+    
+    context += "20. **getUserListsStats()**: 📊 Estadísticas de todas las listas\n";
+    context += "   - Ejemplo: USE_FUNCTION: getUserListsStats()\n";
+    context += "   - ⚠️ ÚSALA para resúmenes: \"Cuántas películas tengo\", \"Mis estadísticas\"\n\n";
+    
+    context += "## 💬 Reseñas y opiniones (IMDB + Rotten Tomatoes + Metacritic + TMDB):\n\n";
+    
+    context += "21. **getMovieReviews(movieTitle, limit)**: 📝 Obtiene ratings oficiales + reseñas\n";
+    context += "   - Ratings de IMDB, Rotten Tomatoes, Metacritic (vía OMDB)\n";
+    context += "   - Reseñas con texto de usuarios (vía TMDB)\n";
+    context += "   - Ejemplo: USE_FUNCTION: getMovieReviews(\"The Witcher\", 5)\n";
+    context += "   - Ejemplo: USE_FUNCTION: getMovieReviews(\"Interstellar\")\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por opiniones, ratings o reseñas de una película\n\n";
+    
+    context += "22. **getSeriesReviews(seriesName, limit)**: 📝 Obtiene ratings oficiales + reseñas\n";
+    context += "   - Ratings de IMDB (y RT/Metacritic si disponibles)\n";
+    context += "   - Reseñas con texto de usuarios (vía TMDB)\n";
+    context += "   - Ejemplo: USE_FUNCTION: getSeriesReviews(\"The Witcher\", 5)\n";
+    context += "   - ⚠️ ÚSALA cuando pregunten por opiniones, ratings o reseñas de una serie\n\n";
+    
+    context += "## 🎬 Otras funciones de búsqueda:\n\n";
+    
+    context += "2. **getSimilarMovies(movieTitle)**: Busca películas similares\n";
+    context += "   - Ejemplo: USE_FUNCTION: getSimilarMovies(\"Interstellar\")\n";
     context += "   - ⚠️ ÚSALA cuando pidan películas \"similares\", \"como\", \"del estilo de\"\n\n";
     
     context += "3. **getSimilarSeries(seriesName)**: Busca series similares\n";
