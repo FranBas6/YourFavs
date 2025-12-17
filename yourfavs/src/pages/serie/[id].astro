@@ -10,7 +10,8 @@ import {
     getEpisodesBySeasonNumber,
     fetchAllSeriesPosters,
     getSerieRecommendationsOrSimilar,
-    getSeriesAdditionalInfo
+    getSeriesAdditionalInfo,
+    getSeriesVideos
 } from "../../services/API/Series/InfoSeries";
 import {initializeApp} from "firebase/app";
 import type {SeriesFavs} from "../../services/BD/yourfavsSerie";
@@ -698,6 +699,118 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
 
 // Obtener información adicional de la serie
 const additionalInfo = await getSeriesAdditionalInfo(id);
+
+// Obtener todos los videos
+const allVideos = await getSeriesVideos(id);
+
+// Categorizar videos
+const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
+const clips = allVideos.filter((v: any) => v.type === 'Clip');
+const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
+const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
+
+// Función para obtener el nombre del idioma en español
+const getLanguageDisplayName = (iso: string) => {
+    const languageMap: Record<string, string> = {
+        'en': 'Inglés',
+        'es': 'Español',
+        'fr': 'Francés',
+        'de': 'Alemán',
+        'it': 'Italiano',
+        'pt': 'Portugués',
+        'ru': 'Ruso',
+        'ja': 'Japonés',
+        'ko': 'Coreano',
+        'zh': 'Chino',
+        'ar': 'Árabe',
+        'hi': 'Hindi',
+        'nl': 'Neerlandés',
+        'sv': 'Sueco',
+        'da': 'Danés',
+        'fi': 'Finlandés',
+        'no': 'Noruego',
+        'pl': 'Polaco',
+        'cs': 'Checo',
+        'hu': 'Húngaro',
+        'tr': 'Turco',
+        'el': 'Griego',
+        'ro': 'Rumano',
+        'hr': 'Croata',
+        'bg': 'Búlgaro',
+        'sr': 'Serbio',
+        'uk': 'Ucraniano',
+        'he': 'Hebreo',
+        'th': 'Tailandés',
+        'vi': 'Vietnamita',
+        'id': 'Indonesio',
+        'ms': 'Malayo',
+        'tl': 'Tagalo',
+        'sw': 'Suajili',
+        'is': 'Islandés',
+        'lv': 'Letón',
+        'lt': 'Lituano',
+        'sk': 'Eslovaco',
+        'sl': 'Esloveno',
+        'et': 'Estonio',
+        'mk': 'Macedonio',
+        'hy': 'Armenio',
+        'ka': 'Georgiano',
+        'am': 'Amárico',
+        'sq': 'Albanés',
+        'mt': 'Maltés',
+        'bs': 'Bosnio',
+        'ne': 'Nepalí',
+        'pa': 'Punjabi',
+        'gu': 'Gujarati',
+        'te': 'Telugu',
+        'ta': 'Tamil',
+        'ml': 'Malabar',
+        'mr': 'Marathi',
+        'kn': 'Kannada',
+        'or': 'Odia',
+        'as': 'Assamés',
+        'bn': 'Bengalí',
+        'si': 'Cingalés',
+        'ur': 'Urdu'
+    };
+    return languageMap[iso] || iso.toUpperCase();
+};
+
+// Función para obtener la clasificación por edades en español
+const getContentRating = (ratings: any[]) => {
+    // Priorizar rating de España (ES), luego US, luego cualquier otro
+    const esRating = ratings.find((r: any) => r.iso_3166_1 === 'ES');
+    const usRating = ratings.find((r: any) => r.iso_3166_1 === 'US');
+    const rating = esRating || usRating || ratings[0];
+    
+    if (!rating) return null;
+    
+    const ratingMap: Record<string, Record<string, string>> = {
+        'ES': {
+            'APTA': 'Apta para todos los públicos',
+            '7': 'No recomendada para menores de 7 años',
+            '12': 'No recomendada para menores de 12 años',
+            '16': 'No recomendada para menores de 16 años',
+            '18': 'No recomendada para menores de 18 años',
+            'X': 'Película X'
+        },
+        'US': {
+            'TV-Y': 'TV-Y - Todos los niños',
+            'TV-Y7': 'TV-Y7 - Niños de 7 años en adelante',
+            'TV-G': 'TV-G - Todos los públicos',
+            'TV-PG': 'TV-PG - Guía parental',
+            'TV-14': 'TV-14 - Padres fuertemente advertidos',
+            'TV-MA': 'TV-MA - Solo adultos'
+        }
+    };
+    
+    const countryMap = ratingMap[rating.iso_3166_1 as string];
+    if (countryMap && countryMap[rating.rating]) {
+        return { text: countryMap[rating.rating], rating: rating.rating };
+    }
+    
+    return { text: `${rating.rating} (${rating.iso_3166_1})`, rating: rating.rating };
+};
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
@@ -1263,34 +1376,69 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                     <!-- Info Cards -->
                     <div class="mt-8 w-full space-y-4">
                         <div class="bg-white p-4 rounded-lg shadow-md">
-                            <h3 class="text-lg font-bold text-blue-600 mb-2">Información</h3>
+                            <h3 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Información
+                            </h3>
                             <ul class="space-y-2">
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Estado:</span>
-                                    <span class="font-medium text-gray-600">{status ? ((statusMap as any)[status] || status) : 'No disponible'}</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Estado:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{status ? ((statusMap as any)[status] || status) : 'No disponible'}</span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Estreno:</span>
-                                    <span class="font-medium text-gray-600">{formatDate(item?.first_air_date)}</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Estreno:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{formatDate(item?.first_air_date)}</span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Finalización:</span>
-                                    <span class="font-medium text-gray-600">
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                        </svg>
+                                        Finalización:
+                                    </span>
+                                    <span class="font-medium text-gray-800">
                                         {item?.last_episode_to_air ? formatDate(item.last_episode_to_air.air_date) : "No disponible"}
                                     </span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Valoración:</span>
-                                    <span class="font-medium text-gray-600">{item?.vote_average?.toFixed(1)}
-                                        ({item?.vote_count} votos)</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                        </svg>
+                                        Valoración:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{item?.vote_average?.toFixed(1)}
+                                        <span class="text-sm text-gray-500 ml-1">({item?.vote_count} votos)</span></span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Popularidad:</span>
-                                    <span class="font-medium text-gray-600">{item?.popularity?.toFixed(1)}</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                        </svg>
+                                        Popularidad:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{item?.popularity?.toFixed(1)}</span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Temporadas:</span>
-                                    <span class="font-medium text-gray-600">
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                                        </svg>
+                                        Temporadas:
+                                    </span>
+                                    <span class="font-medium text-gray-800">
                                         {regularSeasonsCount}
                                         {hasSpecialSeasons &&
                                                 <span class="text-blue-600 text-sm ml-1">(+ {specialSeasonsCount}
@@ -1298,9 +1446,14 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                                         }
                                     </span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Episodios:</span>
-                                    <span class="font-medium text-gray-600">
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                        </svg>
+                                        Episodios:
+                                    </span>
+                                    <span class="font-medium text-gray-800">
                                         {totalRegularEpisodes}
                                         {hasSpecialSeasons &&
                                                 <span class="text-blue-600 text-sm ml-1">
@@ -1309,16 +1462,76 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                                         }
                                     </span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Idioma original:</span>
-                                    <span class="font-medium text-gray-600">{languageMap[item?.original_language] || item?.original_language}</span>
+                                {additionalInfo.episode_run_time && additionalInfo.episode_run_time.length > 0 && (
+                                    <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                        <span class="text-gray-600 flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Duración promedio:
+                                        </span>
+                                        <span class="font-medium text-gray-800">
+                                            {additionalInfo.episode_run_time[0]} min
+                                        </span>
+                                    </li>
+                                )}
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                        </svg>
+                                        Idioma original:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{languageMap[item?.original_language] || item?.original_language}</span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">País:</span>
-                                    <span class="font-medium text-gray-600">{item?.origin_country?.join(", ") || "No disponible"}</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        País:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{item?.origin_country?.join(", ") || "No disponible"}</span>
                                 </li>
                             </ul>
                         </div>
+
+                        <!-- Clasificación por Edades -->
+                        {additionalInfo.content_ratings && additionalInfo.content_ratings.length > 0 && (() => {
+                            const rating = getContentRating(additionalInfo.content_ratings);
+                            return rating ? (
+                                <div class="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg shadow-md border-l-4 border-orange-500">
+                                    <h3 class="text-lg font-bold text-orange-700 mb-2 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        Clasificación
+                                    </h3>
+                                    <p class="text-gray-800 font-semibold text-lg">{rating.text}</p>
+                                </div>
+                            ) : null;
+                        })()}
+
+                        <!-- Idiomas Disponibles -->
+                        {additionalInfo.languages && additionalInfo.languages.length > 0 && (
+                            <div class="bg-white p-4 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                    </svg>
+                                    Idiomas Disponibles
+                                </h3>
+                                <div class="flex flex-wrap gap-2">
+                                    {additionalInfo.languages.map((lang: any) => (
+                                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                                            {getLanguageDisplayName(lang.iso_639_1 || lang)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+    
 
                         <!-- Opinión personal -->
                         {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
@@ -1410,7 +1623,13 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                     <!-- Trailer -->
                     {trailerUrl && (
                             <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                                <h2 class="text-2xl font-bold text-blue-600 mb-4">Trailer</h2>
+                                <h2 class="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Trailer
+                                </h2>
                                 <div class="aspect-video w-full">
                                     <iframe
                                             class="w-full h-full rounded"
@@ -1421,6 +1640,197 @@ const additionalInfo = await getSeriesAdditionalInfo(id);
                                     ></iframe>
                                 </div>
                             </div>
+                    )}
+
+                    <!-- Videos Adicionales -->
+                    {(clips.length > 0 || behindScenes.length > 0 || teasers.length > 0) && (
+                        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Videos Adicionales
+                            </h2>
+                            
+                            <div class="space-y-6">
+                                {/* Clips */}
+                                {clips.length > 0 && (
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Clips</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {clips.slice(0, 4).map((video: any) => (
+                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                                                    <div class="aspect-video">
+                                                        <iframe
+                                                            class="w-full h-full"
+                                                            src={`https://www.youtube.com/embed/${video.key}`}
+                                                            frameborder="0"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowfullscreen
+                                                        ></iframe>
+                                                    </div>
+                                                    <div class="p-3">
+                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Behind the Scenes */}
+                                {behindScenes.length > 0 && (
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Detrás de Cámaras</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {behindScenes.slice(0, 4).map((video: any) => (
+                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                                                    <div class="aspect-video">
+                                                        <iframe
+                                                            class="w-full h-full"
+                                                            src={`https://www.youtube.com/embed/${video.key}`}
+                                                            frameborder="0"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowfullscreen
+                                                        ></iframe>
+                                                    </div>
+                                                    <div class="p-3">
+                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Teasers */}
+                                {teasers.length > 0 && (
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Avances</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {teasers.slice(0, 4).map((video: any) => (
+                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                                                    <div class="aspect-video">
+                                                        <iframe
+                                                            class="w-full h-full"
+                                                            src={`https://www.youtube.com/embed/${video.key}`}
+                                                            frameborder="0"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowfullscreen
+                                                        ></iframe>
+                                                    </div>
+                                                    <div class="p-3">
+                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <!-- Próximo Episodio Destacado -->
+                    {item?.next_episode_to_air && (
+                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg shadow-md mb-8 border-l-4 border-green-500">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0">
+                                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="flex-grow">
+                                    <h2 class="text-2xl font-bold text-green-800 mb-2 flex items-center gap-2">
+                                        Próximo Episodio
+                                    </h2>
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
+                                        {item.next_episode_to_air.name}
+                                    </h3>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
+                                        <span class="flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                                            </svg>
+                                            Temporada {item.next_episode_to_air.season_number}, Episodio {item.next_episode_to_air.episode_number}
+                                        </span>
+                                        <span class="flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            {formatDate(item.next_episode_to_air.air_date)}
+                                        </span>
+                                    </div>
+                                    {item.next_episode_to_air.overview && (
+                                        <p class="text-gray-700 leading-relaxed">
+                                            {item.next_episode_to_air.overview}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <!-- Último Episodio Emitido Destacado -->
+                    {item?.last_episode_to_air && (
+                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-md mb-8 border-l-4 border-blue-500">
+                            <div class="flex items-start gap-4">
+                                <div class="flex-shrink-0">
+                                    {item.last_episode_to_air.still_path ? (
+                                        <img 
+                                            src={`https://image.tmdb.org/t/p/w300${item.last_episode_to_air.still_path}`}
+                                            alt={item.last_episode_to_air.name}
+                                            class="w-24 h-16 object-cover rounded-lg shadow-md"
+                                            loading="lazy"
+                                        />
+                                    ) : (
+                                        <div class="w-24 h-16 bg-blue-200 rounded-lg flex items-center justify-center">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                                <div class="flex-grow">
+                                    <h2 class="text-2xl font-bold text-blue-800 mb-2 flex items-center gap-2">
+                                        Último Episodio Emitido
+                                    </h2>
+                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
+                                        {item.last_episode_to_air.name}
+                                    </h3>
+                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
+                                        <span class="flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+                                            </svg>
+                                            Temporada {item.last_episode_to_air.season_number}, Episodio {item.last_episode_to_air.episode_number}
+                                        </span>
+                                        <span class="flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            {formatDate(item.last_episode_to_air.air_date)}
+                                        </span>
+                                        {item.last_episode_to_air.vote_average > 0 && (
+                                            <span class="flex items-center gap-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                                </svg>
+                                                {item.last_episode_to_air.vote_average.toFixed(1)}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {item.last_episode_to_air.overview && (
+                                        <p class="text-gray-700 leading-relaxed">
+                                            {item.last_episode_to_air.overview}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
                     )}
 
                     <!-- Temporadas con acordeón mejorado para episodios -->

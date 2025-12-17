@@ -591,7 +591,10 @@ const stats = calculateStats();
                                     </div>
                             ) : (
                                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                        {seriesPaginadas.map((item) => (
+                                        {seriesPaginadas.map((item, index) => {
+                                            // Calcular el número de favorito considerando la paginación
+                                            const favoriteNumber = index + 1;
+                                            return (
                                                 <CardSerie
                                                         id={item.id.toString()}
                                                         img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -607,8 +610,10 @@ const stats = calculateStats();
                                                             name: getGenreName(id)
                                                         }))}
                                                         status={item.status}
+                                                        favoriteNumber={favoriteNumber}
                                                 />
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                             )}
                             {hasMoreSeries && (

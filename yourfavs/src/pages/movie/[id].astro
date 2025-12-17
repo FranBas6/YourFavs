@@ -9,7 +9,8 @@ import {
     fetchAllMoviePosters,
     getMovieCollectionInfo,
     getMovieRecommendationsOrSimilar,
-    getMoviesAdditionalInfo
+    getMoviesAdditionalInfo,
+    getMovieVideos
 } from "../../services/API/Movies/InfoMovies";
 import {initializeApp} from "firebase/app";
 import {
@@ -404,6 +405,128 @@ const imdbId = externalIds.imdb_id; // formato: "tt1234567"
 
 // Obtener información adicional de la movie
 const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
+
+// Obtener todos los videos
+const allVideos = await getMovieVideos(id);
+
+// Categorizar videos
+const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
+const clips = allVideos.filter((v: any) => v.type === 'Clip');
+const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
+const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
+
+// Función para obtener el nombre del idioma en español
+const getLanguageDisplayName = (iso: string) => {
+    const languageMap: Record<string, string> = {
+        'en': 'Inglés',
+        'es': 'Español',
+        'fr': 'Francés',
+        'de': 'Alemán',
+        'it': 'Italiano',
+        'pt': 'Portugués',
+        'ru': 'Ruso',
+        'ja': 'Japonés',
+        'ko': 'Coreano',
+        'zh': 'Chino',
+        'ar': 'Árabe',
+        'hi': 'Hindi',
+        'nl': 'Neerlandés',
+        'sv': 'Sueco',
+        'da': 'Danés',
+        'fi': 'Finlandés',
+        'no': 'Noruego',
+        'pl': 'Polaco',
+        'cs': 'Checo',
+        'hu': 'Húngaro',
+        'tr': 'Turco',
+        'el': 'Griego',
+        'ro': 'Rumano',
+        'hr': 'Croata',
+        'bg': 'Búlgaro',
+        'sr': 'Serbio',
+        'uk': 'Ucraniano',
+        'he': 'Hebreo',
+        'th': 'Tailandés',
+        'vi': 'Vietnamita',
+        'id': 'Indonesio',
+        'ms': 'Malayo',
+        'tl': 'Tagalo',
+        'sw': 'Suajili',
+        'is': 'Islandés',
+        'lv': 'Letón',
+        'lt': 'Lituano',
+        'sk': 'Eslovaco',
+        'sl': 'Esloveno',
+        'et': 'Estonio',
+        'mk': 'Macedonio',
+        'hy': 'Armenio',
+        'ka': 'Georgiano',
+        'am': 'Amárico',
+        'sq': 'Albanés',
+        'mt': 'Maltés',
+        'bs': 'Bosnio',
+        'ne': 'Nepalí',
+        'pa': 'Punjabi',
+        'gu': 'Gujarati',
+        'te': 'Telugu',
+        'ta': 'Tamil',
+        'ml': 'Malabar',
+        'mr': 'Marathi',
+        'kn': 'Kannada',
+        'or': 'Odia',
+        'as': 'Assamés',
+        'bn': 'Bengalí',
+        'si': 'Cingalés',
+        'ur': 'Urdu'
+    };
+    return languageMap[iso] || iso.toUpperCase();
+};
+
+// Función para obtener la clasificación por edades en español
+const getContentRating = (ratings: any[]): { text: string; rating: string } | null => {
+    // Priorizar rating de España (ES), luego US, luego cualquier otro
+    const esRating = ratings.find((r: any) => r.iso_3166_1 === 'ES');
+    const usRating = ratings.find((r: any) => r.iso_3166_1 === 'US');
+    const rating = esRating || usRating || ratings[0];
+    
+    if (!rating) return null;
+    
+    const ratingMap: Record<string, Record<string, string>> = {
+        'ES': {
+            'APTA': 'Apta para todos los públicos',
+            '7': 'No recomendada para menores de 7 años',
+            '12': 'No recomendada para menores de 12 años',
+            '16': 'No recomendada para menores de 16 años',
+            '18': 'No recomendada para menores de 18 años',
+            'X': 'Película X'
+        } as Record<string, string>,
+        'US': {
+            'G': 'G - Todos los públicos',
+            'PG': 'PG - Guía parental sugerida',
+            'PG-13': 'PG-13 - Padres fuertemente advertidos',
+            'R': 'R - Restringida',
+            'NC-17': 'NC-17 - Solo adultos'
+        } as Record<string, string>
+    };
+    
+    const countryMap = ratingMap[rating.iso_3166_1 as string];
+    if (countryMap && countryMap[rating.rating]) {
+        return { text: countryMap[rating.rating], rating: rating.rating };
+    }
+    
+    return { text: `${rating.rating} (${rating.iso_3166_1})`, rating: rating.rating };
+};
+
+// Formatear presupuesto y recaudación
+const formatCurrency = (amount: number) => {
+    if (!amount || amount === 0) return null;
+    return new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(amount);
+};
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
@@ -840,43 +963,135 @@ const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
                     <!-- Info Cards -->
                     <div class="mt-8 w-full space-y-4">
                         <div class="bg-white p-4 rounded-lg shadow-md">
-                            <h3 class="text-lg font-bold text-blue-600 mb-2">Información</h3>
+                            <h3 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Información
+                            </h3>
                             <ul class="space-y-2">
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Estreno:</span>
-                                    <span class="font-medium text-gray-600">{formatDate(item?.release_date)}</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        Estreno:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{formatDate(item?.release_date)}</span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Valoración:</span>
-                                    <span class="font-medium text-gray-600">{item?.vote_average?.toFixed(1)}
-                                        ({item?.vote_count} votos)</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                                        </svg>
+                                        Valoración:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{item?.vote_average?.toFixed(1)}
+                                        <span class="text-sm text-gray-500 ml-1">({item?.vote_count} votos)</span></span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Popularidad:</span>
-                                    <span class="font-medium text-gray-600">{item?.popularity?.toFixed(1)}</span>
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                        </svg>
+                                        Popularidad:
+                                    </span>
+                                    <span class="font-medium text-gray-800">{item?.popularity?.toFixed(1)}</span>
                                 </li>
-                                <li class="flex justify-between">
-                                    <span class="text-gray-600">Idioma original:</span>
-                                    <span class="font-medium text-gray-600">
+                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                    <span class="text-gray-600 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                        </svg>
+                                        Idioma original:
+                                    </span>
+                                    <span class="font-medium text-gray-800">
                                         {getLanguageName(item?.original_language)}
                                     </span>
                                 </li>
                                 {item?.original_title && item?.original_title !== item?.title && (
-                                        <li class="flex justify-between">
-                                            <span class="text-gray-600">Título original:</span>
-                                            <span class="font-medium text-gray-600">{item?.original_title}</span>
+                                        <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                            <span class="text-gray-600 flex items-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                                                </svg>
+                                                Título original:
+                                            </span>
+                                            <span class="font-medium text-gray-800 text-right max-w-[60%]">{item?.original_title}</span>
                                         </li>
                                 )}
                                 {item?.runtime && (
-                                        <li class="flex justify-between">
-                                            <span class="text-gray-600">Duración:</span>
-                                            <span class="font-medium text-gray-600">
+                                        <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                            <span class="text-gray-600 flex items-center gap-2">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Duración:
+                                            </span>
+                                            <span class="font-medium text-gray-800">
                                             {Math.floor(item.runtime / 60)} h {item.runtime % 60} min
                                             </span>
                                         </li>
                                 )}
+                                {additionalInfo.budget && additionalInfo.budget > 0 && (
+                                    <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                        <span class="text-gray-600 flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Presupuesto:
+                                        </span>
+                                        <span class="font-medium text-gray-800">{formatCurrency(additionalInfo.budget)}</span>
+                                    </li>
+                                )}
+                                {additionalInfo.revenue && additionalInfo.revenue > 0 && (
+                                    <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
+                                        <span class="text-gray-600 flex items-center gap-2">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                                            </svg>
+                                            Recaudación:
+                                        </span>
+                                        <span class="font-medium text-green-600">{formatCurrency(additionalInfo.revenue)}</span>
+                                    </li>
+                                )}
                             </ul>
                         </div>
+
+                        <!-- Clasificación por Edades -->
+                        {additionalInfo.content_ratings && additionalInfo.content_ratings.length > 0 && (() => {
+                            const rating = getContentRating(additionalInfo.content_ratings);
+                            return rating ? (
+                                <div class="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg shadow-md border-l-4 border-orange-500">
+                                    <h3 class="text-lg font-bold text-orange-700 mb-2 flex items-center gap-2">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                        </svg>
+                                        Clasificación
+                                    </h3>
+                                    <p class="text-gray-800 font-semibold text-lg">{rating.text}</p>
+                                </div>
+                            ) : null;
+                        })()}
+
+                        <!-- Idiomas Disponibles -->
+                        {additionalInfo.languages && additionalInfo.languages.length > 0 && (
+                            <div class="bg-white p-4 rounded-lg shadow-md">
+                                <h3 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
+                                    </svg>
+                                    Idiomas Disponibles
+                                </h3>
+                                <div class="flex flex-wrap gap-2">
+                                    {additionalInfo.languages.map((lang: any) => (
+                                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                                            {getLanguageDisplayName(lang.iso_639_1 || lang)}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <!-- Opinión personal -->
                         {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
@@ -968,7 +1183,13 @@ const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
                     <!-- Trailer -->
                     {trailerUrl && (
                             <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                                <h2 class="text-2xl font-bold text-blue-600 mb-4">Trailer</h2>
+                                <h2 class="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Trailer
+                                </h2>
                                 <div class="aspect-video w-full">
                                     <iframe
                                             class="w-full h-full rounded"
@@ -979,6 +1200,95 @@ const additionalInfo = await getMoviesAdditionalInfo(tmdbId);
                                     ></iframe>
                                 </div>
                             </div>
+                    )}
+
+                    <!-- Videos Adicionales -->
+                    {(clips.length > 0 || behindScenes.length > 0 || teasers.length > 0) && (
+                        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                            <h2 class="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                </svg>
+                                Videos Adicionales
+                            </h2>
+                            
+                            <div class="space-y-6">
+                                {/* Clips */}
+                                {clips.length > 0 && (
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Clips</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {clips.slice(0, 4).map((video: any) => (
+                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                                                    <div class="aspect-video">
+                                                        <iframe
+                                                            class="w-full h-full"
+                                                            src={`https://www.youtube.com/embed/${video.key}`}
+                                                            frameborder="0"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowfullscreen
+                                                        ></iframe>
+                                                    </div>
+                                                    <div class="p-3">
+                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Behind the Scenes */}
+                                {behindScenes.length > 0 && (
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Detrás de Cámaras</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {behindScenes.slice(0, 4).map((video: any) => (
+                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                                                    <div class="aspect-video">
+                                                        <iframe
+                                                            class="w-full h-full"
+                                                            src={`https://www.youtube.com/embed/${video.key}`}
+                                                            frameborder="0"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowfullscreen
+                                                        ></iframe>
+                                                    </div>
+                                                    <div class="p-3">
+                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Teasers */}
+                                {teasers.length > 0 && (
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Avances</h3>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {teasers.slice(0, 4).map((video: any) => (
+                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
+                                                    <div class="aspect-video">
+                                                        <iframe
+                                                            class="w-full h-full"
+                                                            src={`https://www.youtube.com/embed/${video.key}`}
+                                                            frameborder="0"
+                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                            allowfullscreen
+                                                        ></iframe>
+                                                    </div>
+                                                    <div class="p-3">
+                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     )}
 
                     <!-- Colección -->

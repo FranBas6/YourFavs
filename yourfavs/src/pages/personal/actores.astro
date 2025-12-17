@@ -1,7 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import { getActorsFav } from "../../services/BD/yourfavsActor";
-import { getActorDetailsById, getMoviesByActorId, getSeriesByActorId } from "../../services/API/Actors/InfoActor";
+import { getActorDetailsById, getMoviesAndSeriesByActorId } from "../../services/API/Actors/InfoActor";
 
 // Función auxiliar para calcular edad
 function calculateAge(birthday: string | null | undefined): number | null {
@@ -16,6 +16,28 @@ function calculateAge(birthday: string | null | undefined): number | null {
     return age;
 }
 
+// Función auxiliar para procesar producciones (películas/series)
+function processProductions<T extends { release_date?: string; first_air_date?: string }>(
+    items: T[],
+    dateField: 'release_date' | 'first_air_date',
+    limit: number = 9
+) {
+    const today = new Date();
+    const dateKey = dateField === 'release_date' ? 'release_date' : 'first_air_date';
+    
+    const released = items
+        .filter((item: any) => item[dateKey] && new Date(item[dateKey]) <= today)
+        .sort((a: any, b: any) => new Date(b[dateKey]).getTime() - new Date(a[dateKey]).getTime())
+        .slice(0, limit);
+
+    const upcoming = items
+        .filter((item: any) => item[dateKey] && new Date(item[dateKey]) > today)
+        .sort((a: any, b: any) => new Date(a[dateKey]).getTime() - new Date(b[dateKey]).getTime())
+        .slice(0, limit);
+
+    return { released, upcoming };
+}
+
 let actorsWithDetails: any[] = [];
 let errorMessage = "";
 
@@ -24,6 +46,7 @@ try {
     const actorsFav = await getActorsFav();
 
     // 🔹 Obtener detalles actualizados desde TMDB para cada actor
+    // Optimización: Limitar a 6 producciones por categoría para mejorar rendimiento
     actorsWithDetails = await Promise.all(
         actorsFav.map(async (fav) => {
             try {
@@ -31,34 +54,12 @@ try {
                 const actorDetails = await getActorDetailsById({ id: fav.id });
                 if (!actorDetails) return null;
 
-                // Obtener películas y series del actor desde TMDB
-                const movies = await getMoviesByActorId({ id: fav.id });
+                // Obtener películas y series del actor en una sola llamada optimizada
+                const { movies, series } = await getMoviesAndSeriesByActorId({ id: fav.id });
 
-                const series = await getSeriesByActorId({ id: fav.id });
-
-                const today = new Date();
-
-                // Separar películas estrenadas y próximas
-                const releasedMovies = movies
-                    .filter((m: any) => m.release_date && new Date(m.release_date) <= today)
-                    .sort((a: any, b: any) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime())
-                    .slice(0, 9);
-
-                const upcomingMovies = movies
-                    .filter((m: any) => m.release_date && new Date(m.release_date) > today)
-                    .sort((a: any, b: any) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime())
-                    .slice(0, 9);
-
-                // Separar series estrenadas y próximas
-                const releasedSeries = series
-                    .filter((s: any) => s.first_air_date && new Date(s.first_air_date) <= today)
-                    .sort((a: any, b: any) => new Date(b.first_air_date).getTime() - new Date(a.first_air_date).getTime())
-                    .slice(0, 9);
-
-                const upcomingSeries = series
-                    .filter((s: any) => s.first_air_date && new Date(s.first_air_date) > today)
-                    .sort((a: any, b: any) => new Date(a.first_air_date).getTime() - new Date(b.first_air_date).getTime())
-                    .slice(0, 9);
+                // Procesar películas y series usando función auxiliar
+                const { released: releasedMovies, upcoming: upcomingMovies } = processProductions(movies, 'release_date', 9);
+                const { released: releasedSeries, upcoming: upcomingSeries } = processProductions(series, 'first_air_date',9);
 
                 return {
                     id: fav.id,
@@ -246,6 +247,8 @@ const actors = actorsWithDetails;
                                         src={imageUrlSmall} 
                                         alt={actor.details.nombre}
                                         class="w-16 h-16 rounded-full object-cover border-2 border-red-400 shadow-md"
+                                        loading="lazy"
+                                        decoding="async"
                                     />
                                 </div>
                                 
@@ -289,12 +292,14 @@ const actors = actorsWithDetails;
                             {/* Contenido expandible */}
                             <div class="actor-content">
                                 <div class="p-4 pt-0 border-t border-gray-200 bg-white/30">
-                                    {/* Imagen grande del actor cuando se expande */}
+                                    {/* Imagen grande del actor cuando se expande - solo carga cuando está expandido */}
                                     <div class="actor-expanded-image flex justify-center py-4">
                                         <img 
                                             src={imageUrlLarge} 
                                             alt={actor.details.nombre}
                                             class="w-48 h-48 rounded-full object-cover border-4 border-red-400 shadow-2xl"
+                                            loading="lazy"
+                                            decoding="async"
                                         />
                                     </div>
 
@@ -315,12 +320,14 @@ const actors = actorsWithDetails;
                                                             : '/placeholder-movie.png';
                                                         return (
                                                             <a href={`/movie/${movie.id}`} 
-                                                               class="movie-card flex-shrink-0 group w-28">
+                                                               class="production-card flex-shrink-0 group w-28">
                                                                 <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                                                                     <img 
                                                                         src={posterUrl} 
                                                                         alt={movie.title}
                                                                         class="w-full h-40 object-cover"
+                                                                        loading="lazy"
+                                                                        decoding="async"
                                                                     />
                                                                     <div class="absolute top-1 left-1 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded">
                                                                         Próximo
@@ -349,12 +356,14 @@ const actors = actorsWithDetails;
                                                             : '/placeholder-serie.png';
                                                         return (
                                                             <a href={`/serie/${serie.id}`} 
-                                                               class="serie-card flex-shrink-0 group w-28">
+                                                               class="production-card flex-shrink-0 group w-28">
                                                                 <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                                                                     <img 
                                                                         src={posterUrl} 
                                                                         alt={serie.name}
                                                                         class="w-full h-40 object-cover"
+                                                                        loading="lazy"
+                                                                        decoding="async"
                                                                     />
                                                                     <div class="absolute top-1 left-1 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded">
                                                                         Próximo
@@ -397,12 +406,14 @@ const actors = actorsWithDetails;
                                                             : '/placeholder-movie.png';
                                                         return (
                                                             <a href={`/movie/${movie.id}`} 
-                                                               class="movie-card flex-shrink-0 group w-28">
+                                                               class="production-card flex-shrink-0 group w-28">
                                                                 <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                                                                     <img 
                                                                         src={posterUrl} 
                                                                         alt={movie.title}
                                                                         class="w-full h-40 object-cover"
+                                                                        loading="lazy"
+                                                                        decoding="async"
                                                                     />
                                                                     {movie.vote_average > 0 && (
                                                                         <div class="absolute top-1 right-1 bg-black/70 text-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
@@ -444,12 +455,14 @@ const actors = actorsWithDetails;
                                                             : '/placeholder-serie.png';
                                                         return (
                                                             <a href={`/serie/${serie.id}`} 
-                                                               class="serie-card flex-shrink-0 group w-28">
+                                                               class="production-card flex-shrink-0 group w-28">
                                                                 <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
                                                                     <img 
                                                                         src={posterUrl} 
                                                                         alt={serie.name}
                                                                         class="w-full h-40 object-cover"
+                                                                        loading="lazy"
+                                                                        decoding="async"
                                                                     />
                                                                     {serie.vote_average > 0 && (
                                                                         <div class="absolute top-1 right-1 bg-black/70 text-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
@@ -604,8 +617,8 @@ const actors = actorsWithDetails;
         background: #9ca3af;
     }
 
-    /* Efecto hover en tarjetas de películas/series */
-    .movie-card, .serie-card {
+    /* Efecto hover en tarjetas de producciones */
+    .production-card {
         transition: transform 0.3s ease;
     }
 

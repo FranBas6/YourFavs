@@ -465,6 +465,22 @@ export async function getMovieRecommendationsOrSimilar(movieId: number): Promise
     };
 }
 
+// Función para obtener todos los videos de una película
+export const getMovieVideos = async (movieId: string) => {
+    try {
+        const url = `https://api.themoviedb.org/3/movie/${movieId}/videos?api_key=${API_KEY}&language=es-ES`;
+        const res = await fetch(url);
+        if (!res.ok) {
+            throw new Error(`Error en la solicitud: ${res.statusText}`);
+        }
+        const data = await res.json();
+        return data.results || [];
+    } catch (error) {
+        console.error("Hubo un error al obtener los videos:", error);
+        return [];
+    }
+};
+
 // Función para obtener información adicional de la movie (redes, palabras clave, etc.)
 export const getMoviesAdditionalInfo = async (movieId: string) => {
     try {
@@ -482,17 +498,21 @@ export const getMoviesAdditionalInfo = async (movieId: string) => {
             content_ratings: detailData.content_ratings?.results || [],
             episode_run_time: detailData.episode_run_time || [],
             languages: detailData.spoken_languages || [],
-            tagline: detailData.tagline || null
+            tagline: detailData.tagline || null,
+            budget: detailData.budget || null,
+            revenue: detailData.revenue || null
         };
     } catch (error) {
-        console.error('Error al obtener información adicional de la serie:', error);
+        console.error('Error al obtener información adicional de la película:', error);
         return {
             keywords: [],
             networks: [],
             content_ratings: [],
             episode_run_time: [],
             languages: [],
-            tagline: null
+            tagline: null,
+            budget: null,
+            revenue: null
         };
     }
 };

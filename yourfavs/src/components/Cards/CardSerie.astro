@@ -42,6 +42,7 @@ interface Props {
     genres?: { id: number, name: string }[];
     status?: string; // Estado de la serie (En emisión, Finalizada, etc.)
     character?: string; // Papel del actor en la serie
+    favoriteNumber?: number; // Número de favorito de la serie
 }
 
 const {
@@ -56,7 +57,8 @@ const {
     next_episode_to_air,
     genres,
     status,
-    character
+    character,
+    favoriteNumber
 } = Astro.props;
 
 // Calculate number of seasons
@@ -157,6 +159,15 @@ const getRatingColor = (rating: number): string => {
                     alt={`Poster for ${name}`}
                     loading="lazy"
             />
+
+            <!-- Favorite Number Badge -->
+            {favoriteNumber && (
+                    <div class="absolute bottom-0 left-0 z-10 m-3">
+                        <div class="badge bg-gradient-to-r from-yellow-500 to-orange-500 text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-lg flex items-center gap-1">
+                            #{favoriteNumber}
+                        </div>
+                    </div>
+            )}
 
             <div class={`rating-badge ${getRatingColor(vote_average)} flex items-center justify-center shadow-lg`}>
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" viewBox="0 0 20 20"

@@ -3,6 +3,37 @@ import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 
+// Función optimizada para obtener películas y series en una sola llamada
+export const getMoviesAndSeriesByActorId = async ({id}: { id: string }): Promise<{ movies: Movie[]; series: Serie[] }> => {
+    try {
+        // Una sola llamada para obtener todos los créditos combinados
+        const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
+        const creditsRes = await fetch(creditsUrl);
+        if (!creditsRes.ok) throw new Error(`Error al obtener créditos: ${creditsRes.statusText}`);
+        const creditsData = await creditsRes.json();
+
+        // Separar películas y series
+        const movies: Movie[] = creditsData.cast.filter((item: any) => item.media_type === "movie");
+        const series: Serie[] = creditsData.cast.filter((item: any) => item.media_type === "tv");
+
+        // Función auxiliar para ordenar
+        const sortByPopularityAndRating = (a: any, b: any) => {
+            const popularityDiff = (b as any).popularity - (a as any).popularity;
+            if (popularityDiff !== 0) return popularityDiff;
+            return (b as any).vote_average - (a as any).vote_average;
+        };
+
+        return {
+            movies: movies.sort(sortByPopularityAndRating),
+            series: series.sort(sortByPopularityAndRating)
+        };
+
+    } catch (error) {
+        console.error("Hubo un error al obtener los créditos del actor:", error);
+        return { movies: [], series: [] };
+    }
+};
+
 // Obtener series en las que participa un actor o actriz por ID
 export const getSeriesByActorId = async ({id}: { id: string }): Promise<Serie[]> => {
     try {
