@@ -1,40 +1,24 @@
 ---
-// Importaciones y configuración Firebase
 import Layout from "../../layouts/Layout.astro";
 import {
-    getSeriesById,
-    getSeriesCast,
-    getSeriesDirectorsAndRoles,
-    getSeriesTrailer,
-    getSeriesStatus,
-    getEpisodesBySeasonNumber,
-    fetchAllSeriesPosters,
-    getSerieRecommendationsOrSimilar,
-    getSeriesAdditionalInfo,
+    getLanguageDisplayName, getContentRating,
+    formatDate, getRatingStars, formatTrailerUrl, providerLinks
+} from "../../utils/constants/helpers/media-helpers";
+import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
+import type { GuestStar } from "../../types/Media";
+import {handleSerieFavAction} from "../../services/BD/series/yourfavsSerie";
+import '../../styles/pages/serie/serie.css';
+import {
+    getSeriesById, getSeriesCast, getSeriesDirectorsAndRoles,
+    getSeriesTrailer, getSeriesStatus, getEpisodesBySeasonNumber,
+    fetchAllSeriesPosters, getSerieRecommendationsOrSimilar, getSeriesAdditionalInfo,
     getSeriesVideos
 } from "../../services/API/Series/InfoSeries";
 import {initializeApp} from "firebase/app";
-import type {SeriesFavs} from "../../services/BD/yourfavsSerie";
-import {
-    getFirestore,
-    collection,
-    doc,
-    getDoc,
-    setDoc,
-    deleteDoc,
-    query,
-    getDocs,
-    orderBy,
-    updateDoc,
-    deleteField
-} from "firebase/firestore";
-
-// Configuración de Firebase
+import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// Initialize Cloud Firestore
 const db = getFirestore(app);
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
@@ -43,318 +27,15 @@ if (!id) {
     throw new Error("ID de la serie no encontrado en la URL");
 }
 
-// POST actualizado para Firebase con objetos estructurados según Props
 if (Astro.request.method === 'POST') {
     try {
         const formData = await Astro.request.formData();
-        const serieId = String(formData.get('id') || formData.get('serie_id'));
-        const action = String(formData.get('action'));
-        const actionType = String(formData.get('actionType'));
-
-        // Guardado/actualización de opinión en todas las colecciones donde exista
-        if (action === 'save_opinion' || actionType === 'opinion') {
-            const opinionText = String(formData.get('opinion') || '').trim();
-
-            const collections = [
-                'SeriesFavs',
-                'SeriesPendiente',
-                'SeriesVistas',
-                'SeriesSiguiendo',
-                'LikedSeries',
-                'SeriesVerPronto',
-            ];
-
-            for (const col of collections) {
-                const ref = doc(db, col, serieId);
-                const snap = await getDoc(ref);
-                if (snap.exists()) {
-                    await updateDoc(ref, { opinion: opinionText });
-                }
-            }
-
-            return Astro.redirect(`/serie/${serieId}`);
-        }
-
-        // Eliminar opinión de todas las colecciones donde exista
-        if (action === 'delete_opinion') {
-            const collections = [
-                'SeriesFavs',
-                'SeriesPendiente',
-                'SeriesVistas',
-                'SeriesSiguiendo',
-                'LikedSeries',
-                'SeriesVerPronto',
-            ];
-
-            for (const col of collections) {
-                const ref = doc(db, col, serieId);
-                const snap = await getDoc(ref);
-                if (snap.exists()) {
-                    await updateDoc(ref, { opinion: deleteField() });
-                }
-            }
-
-            return Astro.redirect(`/serie/${serieId}`);
-        }
-
-        // Determinar la colección correcta
-        let coleccion;
-        switch (actionType) {
-            case 'pendientes':
-                coleccion = 'SeriesPendiente';
-                break;
-            case 'vistas':
-                coleccion = 'SeriesVistas';
-                break;
-            case 'siguiendo':
-                coleccion = 'SeriesSiguiendo';
-                break;
-            case 'liked':
-                coleccion = 'LikedSeries';
-                break;
-            case 'favs':
-                coleccion = 'SeriesFavs';
-                break;
-            case 'verpronto':
-                coleccion = 'SeriesVerPronto';
-                break;
-            default:
-                throw new Error(`Tipo de acción no válido: ${actionType}`);
-        }
-
-        // Referencia a la colección
-        const coleccionRef = collection(db, coleccion);
-        // Referencia al documento específico
-        const docRef = doc(db, coleccion, serieId);
-
-        // Verificar si la serie ya existe en la colección
-        const docSnap = await getDoc(docRef);
-        const serieExiste = docSnap.exists();
-
-        // Add a parameter for custom position
-        const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
-
-        // Manejar acciones de agregar, eliminar y actualizar posición
-        if (action === 'add' && !serieExiste) {
-            // Parsear géneros como objetos
-            const genres = JSON.parse(String(formData.get('genres') || '[]'));
-
-            // Parsear temporadas como objetos
-            const seasons = JSON.parse(String(formData.get('seasons') || '[]'));
-
-            // Parsear último episodio emitido como objeto
-            const lastEpisodeToAir = JSON.parse(String(formData.get('last_episode_to_air') || 'null'));
-
-            // Parsear próximo episodio a emitir como objeto
-            const nextEpisodeToAir = JSON.parse(String(formData.get('next_episode_to_air') || 'null'));
-
-            // Preparar nueva entrada para la serie con estructura según Props
-            const baseEntry = {
-                id: serieId,
-                name: String(formData.get('name') || 'Sin nombre'),
-                poster_path: String(formData.get('poster_path') || ''), // Cambiado de poster_path a img
-                vote_average: Number(formData.get('vote_average') || 0),
-                overview: String(formData.get('overview') || 'Sin descripción'),
-                added_at: new Date(),
-                // Almacenar como objetos estructurados
-                genres: genres,
-                first_air_date: String(formData.get('first_air_date') || ''),
-                status: String(formData.get('status') || ''),
-                seasons: seasons,
-                last_episode_to_air: lastEpisodeToAir,
-                next_episode_to_air: nextEpisodeToAir,
-                position: 0,
-            };
-
-            // Buscar opinión existente en cualquier colección
-            let existingOpinion = '';
-            const collectionsToCheck = [
-                'SeriesFavs',
-                'SeriesPendiente',
-                'SeriesVistas',
-                'SeriesSiguiendo',
-                'LikedSeries',
-                'SeriesVerPronto',
-            ];
-            
-            for (const col of collectionsToCheck) {
-                const checkRef = doc(db, col, serieId);
-                const checkSnap = await getDoc(checkRef);
-                if (checkSnap.exists() && checkSnap.data()?.opinion) {
-                    existingOpinion = checkSnap.data()?.opinion;
-                    break;
-                }
-            }
-            
-            const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
-            const newEntry = opinionForSeries
-                ? { ...baseEntry, opinion: opinionForSeries }
-                : baseEntry;
-
-            // Manejo especial para favoritos para agregar posición
-            if (coleccion === 'SeriesFavs') {
-                // Obtener favoritos actuales ordenados por posición
-                const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
-                const favsSnapshot = await getDocs(favsQuery);
-                const currentFavorites: SeriesFavs[] = [];
-
-                favsSnapshot.forEach((doc) => {
-                    currentFavorites.push({id: doc.id, ...doc.data()} as SeriesFavs);
-                });
-
-                let newPosition;
-                if (customPosition !== null) {
-                    // Si se especifica una posición personalizada
-                    // Desplazar series existentes para hacer espacio para la nueva
-                    const seriesToUpdate = currentFavorites.filter(fav => fav.position >= customPosition);
-
-                    // Actualizar posiciones en orden descendente para evitar conflictos
-                    for (const fav of seriesToUpdate.sort((a, b) => b.position - a.position)) {
-                        await updateDoc(doc(db, 'SeriesFavs', fav.id), {
-                            position: fav.position + 1
-                        });
-                    }
-
-                    newPosition = customPosition;
-                } else {
-                    // Si no hay posición personalizada, agregar al final
-                    newPosition = currentFavorites.length > 0
-                        ? Math.max(...currentFavorites.map(f => f.position || 0)) + 1
-                        : 1;
-                }
-
-                newEntry.position = newPosition;
-            }
-
-            // Insertar nueva serie en Firestore
-            await setDoc(docRef, newEntry);
-
-        } else if (action === 'remove' && serieExiste) {
-            // Eliminar serie de la colección seleccionada
-            await deleteDoc(docRef);
-
-            // Si se elimina de favoritos, reordenar los favoritos restantes
-            if (coleccion === 'SeriesFavs') {
-                // Obtener favoritos restantes ordenados por posición
-                const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
-                const favsSnapshot = await getDocs(favsQuery);
-                const remainingFavorites: SeriesFavs[] = [];
-
-                favsSnapshot.forEach((doc) => {
-                    remainingFavorites.push({id: doc.id, ...doc.data()} as SeriesFavs);
-                });
-
-                // Actualizar posiciones
-                for (let i = 0; i < remainingFavorites.length; i++) {
-                    await updateDoc(doc(db, 'SeriesFavs', remainingFavorites[i].id), {
-                        position: i + 1
-                    });
-                }
-            }
-        } else if (action === 'update' && serieExiste && coleccion === 'SeriesFavs') {
-            // Actualizar posición dentro de favoritos
-            // Leer nueva posición solicitada
-            const requestedPosition = customPosition !== null ? customPosition : Number(formData.get('custom_position'));
-
-            if (!requestedPosition || Number.isNaN(requestedPosition)) {
-                throw new Error('Nueva posición inválida');
-            }
-
-            // Obtener favoritos actuales ordenados por posición
-            const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
-            const favsSnapshot = await getDocs(favsQuery);
-            const favorites: SeriesFavs[] = [];
-            favsSnapshot.forEach((docSnap) => {
-                favorites.push({id: docSnap.id, ...docSnap.data()} as SeriesFavs);
-            });
-
-            if (favorites.length === 0) {
-                return Astro.redirect(`/serie/${serieId}`);
-            }
-
-            // Posiciones válidas entre 1 y length
-            const maxPos = favorites.length;
-            const newPos = Math.min(Math.max(1, requestedPosition), maxPos);
-
-            const currentFav = favorites.find(f => f.id === serieId);
-            const oldPos = currentFav?.position ?? null;
-
-            if (oldPos === null || oldPos === undefined) {
-                throw new Error('La serie no tiene posición actual definida');
-            }
-
-            if (newPos === oldPos) {
-                return Astro.redirect(`/serie/${serieId}`);
-            }
-
-            // Si se mueve hacia abajo: disminuir en 1 las posiciones entre oldPos+1 y newPos
-            if (newPos > oldPos) {
-                const toDecrement = favorites.filter(f => (f.position || 0) > oldPos && (f.position || 0) <= newPos);
-                for (const fav of toDecrement) {
-                    await updateDoc(doc(db, 'SeriesFavs', fav.id), {position: (fav.position || 0) - 1});
-                }
-            } else {
-                // Se mueve hacia arriba: aumentar en 1 las posiciones entre newPos y oldPos-1
-                const toIncrement = favorites.filter(f => (f.position || 0) >= newPos && (f.position || 0) < oldPos);
-                for (const fav of toIncrement) {
-                    await updateDoc(doc(db, 'SeriesFavs', fav.id), {position: (fav.position || 0) + 1});
-                }
-            }
-
-            // Finalmente, establecer la nueva posición a la serie
-            await updateDoc(docRef, {position: newPos});
-        }
-
-        // Redireccionar de vuelta a la página de la serie
-        return Astro.redirect(`/serie/${serieId}`);
-
+        const redirectUrl = await handleSerieFavAction(formData);
+        return Astro.redirect(redirectUrl);
     } catch (error) {
-        console.error("Error en el procesamiento POST:", error);
-
-        if (error instanceof Error) {
-            throw new Error(`Error al procesar la solicitud: ${error.message}`);
-        } else {
-            throw new Error("Error al procesar la solicitud: error desconocido");
-        }
+        console.error('Error al gestionar la serie:', error);
+        return Astro.redirect(`/serie/${id}`);
     }
-
-}
-
-// Add a function to calculate episode runtime
-function formatRuntime(minutes: number): string {
-    if (!minutes) return "Duración no disponible";
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return hours > 0 ? `${hours} hr ${remainingMinutes} min` : `${minutes} min`;
-}
-
-// Función para obtener estadísticas de temporada
-function getSeasonStats(seasonNumber: number, seasonEpisodes: any[]) {
-    if (!seasonEpisodes || seasonEpisodes.length === 0) {
-        return {
-            totalEpisodes: 0,
-            averageRating: "0.0",
-            averageRuntime: "No disponible"
-        };
-    }
-
-    const totalEpisodes = seasonEpisodes.length;
-    
-    // Calcular rating promedio
-    const ratingsSum = seasonEpisodes.reduce((sum, ep) => sum + (ep.vote_average || 0), 0);
-    const averageRating = totalEpisodes > 0 ? (ratingsSum / totalEpisodes).toFixed(1) : "0.0";
-    
-    // Calcular duración promedio
-    const runtimesSum = seasonEpisodes.reduce((sum, ep) => sum + (ep.runtime || 0), 0);
-    const episodesWithRuntime = seasonEpisodes.filter(ep => ep.runtime && ep.runtime > 0);
-    const averageRuntimeMinutes = episodesWithRuntime.length > 0 ? Math.round(runtimesSum / episodesWithRuntime.length) : 0;
-    const averageRuntime = averageRuntimeMinutes > 0 ? formatRuntime(averageRuntimeMinutes) : "No disponible";
-
-    return {
-        totalEpisodes,
-        averageRating,
-        averageRuntime
-    };
 }
 
 let item = await getSeriesById({id});
@@ -393,17 +74,8 @@ if (item?.seasons) {
 const regularSeasons = item?.seasons?.filter(season => season.season_number > 0) || [];
 const specialSeasons = item?.seasons?.filter(season => season.season_number === 0) || [];
 
-// Calcular episodios por separado
-const calculateRegularEpisodes = () => {
-    return regularSeasons.reduce((total, season) => total + (season.episode_count || 0), 0);
-};
-
-const calculateSpecialEpisodes = () => {
-    return specialSeasons.reduce((total, season) => total + (season.episode_count || 0), 0);
-};
-
-const totalRegularEpisodes = calculateRegularEpisodes();
-const totalSpecialEpisodes = calculateSpecialEpisodes();
+const totalRegularEpisodes = regularSeasons.reduce((total, season) => total + (season.episode_count || 0), 0);
+const totalSpecialEpisodes = specialSeasons.reduce((total, season) => total + (season.episode_count || 0), 0);
 const totalEpisodes = totalRegularEpisodes + totalSpecialEpisodes; // Total completo para compatibilidad
 
 // Verificar si la serie ya está en las diferentes bases de datos
@@ -451,137 +123,17 @@ const opinionFromAny = (
     ''
 ) as string;
 
-// Formatear la fecha para mejor visualización
-const formatDate = (dateString: string): string => {
-    if (!dateString) return "No disponible";
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    }).format(date);
-};
-
 // Calcular años en emisión
-const calculateYearsActive = () => {
+const yearsActiveCalc = (() => {
     if (!item?.first_air_date) return "Desconocido";
-
     const startYear = new Date(item.first_air_date).getFullYear();
     let endYear: string = "presente";
-
     if (status === "Ended" || status === "Canceled") {
         const lastAirDate = item?.last_episode_to_air?.air_date;
-        endYear = lastAirDate
-            ? String(new Date(lastAirDate).getFullYear())
-            : "desconocido";
+        endYear = lastAirDate ? String(new Date(lastAirDate).getFullYear()) : "desconocido";
     }
-
     return `${startYear} - ${endYear}`;
-};
-
-const languageMap: { [key: string]: string } = {
-    en: "Inglés",
-    es: "Español",
-    fr: "Francés",
-    de: "Alemán",
-    it: "Italiano",
-    pt: "Portugués",
-    ru: "Ruso",
-    ja: "Japonés",
-    ko: "Coreano",
-    zh: "Chino",
-    ar: "Árabe",
-    nl: "Neerlandés",
-    sv: "Sueco",
-    da: "Danés",
-    fi: "Finlandés",
-    no: "Noruego",
-    pl: "Polaco",
-    cs: "Checo",
-    hu: "Húngaro",
-    tr: "Turco",
-    el: "Griego",
-    ro: "Rumano",
-    hr: "Croata",
-    bg: "Búlgaro",
-    sr: "Serbio",
-    uk: "Ucraniano",
-    he: "Hebreo",
-    th: "Tailandés",
-    vi: "Vietnamita",
-    id: "Indonesio",
-    ms: "Malayo",
-    tl: "Tagalo",
-    sw: "Suajili",
-    sw_KE: "Suajili (Kenia)",
-    is: "Islandés",
-    lv: "Letón",
-    lt: "Lituano",
-    sk: "Eslovaco",
-    sl: "Esloveno",
-    et: "Estonio",
-    mk: "Macedonio",
-    hy: "Armenio",
-    ka: "Georgiano",
-    am: "Amárico",
-    sq: "Albanés",
-    mt: "Maltés",
-    bs: "Bosnio",
-    ne: "Nepalí",
-    pa: "Punjabi",
-    gu: "Gujarati",
-    te: "Telugu",
-    ta: "Tamil",
-    ml: "Malabar",
-    mr: "Marathi",
-    kn: "Kannada",
-    or: "Odia",
-    as: "Assamés",
-    bn: "Bengalí",
-    si: "Cingalés",
-    hi: "Hindi",
-    ur: "Urdu",
-};
-
-const providerLinks: Record<string, string> = {
-    'Netflix': 'https://www.netflix.com/',
-    'Disney Plus': 'https://www.disneyplus.com/',
-    'HBO Max': 'https://www.hbomax.com/',
-    'Amazon Prime Video': 'https://www.primevideo.com/',
-    'Amazon Video': 'https://www.amazon.com/dp/B08J4Q4Z5D',
-    'Apple TV+': 'https://tv.apple.com/',
-    'Apple TV': 'https://tv.apple.com/',
-    'Filmin': 'https://www.filmin.es/',
-    'Movistar Plus+': 'https://www.movistarplus.es/',
-    'Rakuten TV': 'https://rakuten.tv/',
-    'SkyShowtime': 'https://www.skyshowtime.com/',
-    'MUBI': 'https://mubi.com/',
-    'FlixOlé': 'https://flixole.com/',
-    'Atresplayer': 'https://www.atresplayer.com/',
-    'RTVE Play': 'https://www.rtve.es/play/',
-    'Google Play Movies': 'https://play.google.com/store/movies',
-    'YouTube': 'https://www.youtube.com/',
-    'Microsoft Store': 'https://www.microsoft.com/store/movies',
-    'Plex': 'https://www.plex.tv/',
-    'fuboTV': 'https://www.fubo.tv/',
-    'Hayu': 'https://www.hayu.com/',
-    'Curiosity Stream': 'https://curiositystream.com/',
-    'GuideDoc': 'https://guidedoc.tv/',
-    'MagellanTV': 'https://www.magellantv.com/',
-    'DOCSVILLE': 'https://www.docsville.com/',
-    'WOW Presents Plus': 'https://www.wowpresentsplus.com/',
-    'Mitele': 'https://www.mitele.es/',
-    'StarzPlay': 'https://www.starzplay.com/',
-    'Paramount+': 'https://www.paramountplus.com/',
-    'Peacock': 'https://www.peacocktv.com/',
-    'Tubi': 'https://tubitv.com/',
-    'Pluto TV': 'https://pluto.tv/',
-    'Crunchyroll': 'https://www.crunchyroll.com/',
-    'Funimation': 'https://www.funimation.com/',
-    'Vix': 'https://vix.com/',
-    'Cinepolis Klic': 'https://www.cinepolisklic.com/'
-    // Agrega más proveedores según sea necesario
-};
+})();
 
 const providerElements = item?.providers?.map((provider) => {
     const link = providerLinks[provider.provider_name];
@@ -609,17 +161,7 @@ const statusMap = {
     Pilot: "Piloto",
 };
 
-
-const yearsActive = calculateYearsActive();
-
-// Función para convertir rating a estrellas
-const getRatingStars = (rating: number): string => {
-    if (!rating) return "";
-    const fullStars = Math.floor(rating / 2);
-    const halfStar = rating % 2 >= 1 ? 1 : 0;
-    const emptyStars = 5 - fullStars - halfStar;
-    return "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(emptyStars);
-};
+const yearsActive = yearsActiveCalc;
 
 // Ordenar temporadas: primero las regulares, luego las especiales
 const sortedSeasons = item?.seasons?.sort((a, b) => {
@@ -634,29 +176,6 @@ const sortedSeasons = item?.seasons?.sort((a, b) => {
 const hasSpecialSeasons = specialSeasons.length > 0;
 const regularSeasonsCount = regularSeasons.length;
 const specialSeasonsCount = specialSeasons.length;
-
-function formatTrailerUrl(url: string): string {
-    // Si ya es una URL de embed, devolverla tal cual
-    if (url.includes('youtube.com/embed/')) {
-        return url;
-    }
-
-    let videoId = '';
-
-    if (url.includes('youtube.com/watch')) {
-        const urlObj = new URL(url);
-        const id = urlObj.searchParams.get('v');
-        if (id) videoId = id;
-    } else if (url.includes('youtu.be/')) {
-        videoId = url.split('youtu.be/')[1].split('?')[0];
-    }
-
-    if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
-    }
-
-    return url;
-}
 
 import type {PosterImage} from '../../services/API/Series/InfoSeries'; // Asegúrate de exportar este tipo desde tu archivo api.ts
 
@@ -673,14 +192,7 @@ if (id) {
     }
 }
 
-interface GuestStar {
-    id: number;
-    name: string;
-    character: string;
-    profile_path?: string;
-}
-
-// Recomendaciones o similares// Series
+// Recomendaciones o similares
 const seriesRecommendationsData = await getSerieRecommendationsOrSimilar(item.id);
 const seriesRecommendations = seriesRecommendationsData.success ? seriesRecommendationsData.recommendations : [];
 const seriesRecommendationType = seriesRecommendationsData.type || 'recommendations';
@@ -708,109 +220,6 @@ const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
 const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
-
-// Función para obtener el nombre del idioma en español
-const getLanguageDisplayName = (iso: string) => {
-    const languageMap: Record<string, string> = {
-        'en': 'Inglés',
-        'es': 'Español',
-        'fr': 'Francés',
-        'de': 'Alemán',
-        'it': 'Italiano',
-        'pt': 'Portugués',
-        'ru': 'Ruso',
-        'ja': 'Japonés',
-        'ko': 'Coreano',
-        'zh': 'Chino',
-        'ar': 'Árabe',
-        'hi': 'Hindi',
-        'nl': 'Neerlandés',
-        'sv': 'Sueco',
-        'da': 'Danés',
-        'fi': 'Finlandés',
-        'no': 'Noruego',
-        'pl': 'Polaco',
-        'cs': 'Checo',
-        'hu': 'Húngaro',
-        'tr': 'Turco',
-        'el': 'Griego',
-        'ro': 'Rumano',
-        'hr': 'Croata',
-        'bg': 'Búlgaro',
-        'sr': 'Serbio',
-        'uk': 'Ucraniano',
-        'he': 'Hebreo',
-        'th': 'Tailandés',
-        'vi': 'Vietnamita',
-        'id': 'Indonesio',
-        'ms': 'Malayo',
-        'tl': 'Tagalo',
-        'sw': 'Suajili',
-        'is': 'Islandés',
-        'lv': 'Letón',
-        'lt': 'Lituano',
-        'sk': 'Eslovaco',
-        'sl': 'Esloveno',
-        'et': 'Estonio',
-        'mk': 'Macedonio',
-        'hy': 'Armenio',
-        'ka': 'Georgiano',
-        'am': 'Amárico',
-        'sq': 'Albanés',
-        'mt': 'Maltés',
-        'bs': 'Bosnio',
-        'ne': 'Nepalí',
-        'pa': 'Punjabi',
-        'gu': 'Gujarati',
-        'te': 'Telugu',
-        'ta': 'Tamil',
-        'ml': 'Malabar',
-        'mr': 'Marathi',
-        'kn': 'Kannada',
-        'or': 'Odia',
-        'as': 'Assamés',
-        'bn': 'Bengalí',
-        'si': 'Cingalés',
-        'ur': 'Urdu'
-    };
-    return languageMap[iso] || iso.toUpperCase();
-};
-
-// Función para obtener la clasificación por edades en español
-const getContentRating = (ratings: any[]) => {
-    // Priorizar rating de España (ES), luego US, luego cualquier otro
-    const esRating = ratings.find((r: any) => r.iso_3166_1 === 'ES');
-    const usRating = ratings.find((r: any) => r.iso_3166_1 === 'US');
-    const rating = esRating || usRating || ratings[0];
-    
-    if (!rating) return null;
-    
-    const ratingMap: Record<string, Record<string, string>> = {
-        'ES': {
-            'APTA': 'Apta para todos los públicos',
-            '7': 'No recomendada para menores de 7 años',
-            '12': 'No recomendada para menores de 12 años',
-            '16': 'No recomendada para menores de 16 años',
-            '18': 'No recomendada para menores de 18 años',
-            'X': 'Película X'
-        },
-        'US': {
-            'TV-Y': 'TV-Y - Todos los niños',
-            'TV-Y7': 'TV-Y7 - Niños de 7 años en adelante',
-            'TV-G': 'TV-G - Todos los públicos',
-            'TV-PG': 'TV-PG - Guía parental',
-            'TV-14': 'TV-14 - Padres fuertemente advertidos',
-            'TV-MA': 'TV-MA - Solo adultos'
-        }
-    };
-    
-    const countryMap = ratingMap[rating.iso_3166_1 as string];
-    if (countryMap && countryMap[rating.rating]) {
-        return { text: countryMap[rating.rating], rating: rating.rating };
-    }
-    
-    return { text: `${rating.rating} (${rating.iso_3166_1})`, rating: rating.rating };
-};
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
@@ -1482,7 +891,7 @@ const getContentRating = (ratings: any[]) => {
                                         </svg>
                                         Idioma original:
                                     </span>
-                                    <span class="font-medium text-gray-800">{languageMap[item?.original_language] || item?.original_language}</span>
+                                    <span class="font-medium text-gray-800">{getLanguageDisplayName(item?.original_language || '')}</span>
                                 </li>
                                 <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
                                     <span class="text-gray-600 flex items-center gap-2">
@@ -1846,7 +1255,7 @@ const getContentRating = (ratings: any[]) => {
                         <div class="space-y-6">
                             {sortedSeasons.map((season) => {
                                 const seasonEpisodes = allSeasonEpisodes[season.season_number] || [];
-                                const stats = getSeasonStats(season.season_number, seasonEpisodes);
+                                const stats = getSeasonStats(seasonEpisodes);
                                 
                                 return (
                                     <details
@@ -2385,231 +1794,3 @@ const getContentRating = (ratings: any[]) => {
         </div>
     </article>
 </Layout>
-
-<style>
-    /* Estilos básicos */
-    .transition-all {
-        transition: all 0.3s ease-in-out;
-    }
-
-    .text-yellow-400 {
-        color: #fbbf24;
-    }
-
-    /* Efecto hover para imágenes */
-    img.hover\:scale-105:hover {
-        transform: scale(1.05);
-    }
-
-    /* Gradiente para el texto sobre imágenes oscuras */
-    .text-shadow {
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    /* Mejorar legibilidad para estrellas de rating */
-    .rating-stars {
-        letter-spacing: 1px;
-    }
-
-    /* Estilos para la animación del acordeón */
-    .transform {
-        transition-property: transform;
-    }
-
-    .transition-transform {
-        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-        transition-duration: 300ms;
-    }
-
-    .rotate-180 {
-        transform: rotate(180deg);
-    }
-
-    /* Añade estos estilos a tu sección de <style> */
-    details > summary {
-        list-style: none;
-    }
-
-    details > summary::-webkit-details-marker {
-        display: none;
-    }
-
-    details[open] > summary svg {
-        transform: rotate(180deg);
-    }
-
-    /* Estilos mejorados para el overview de temporadas */
-    .season-overview {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        transition: all 0.3s ease-in-out;
-    }
-
-    /* Cuando el details está abierto, muestra el texto completo */
-    details[open] .season-overview {
-        display: block;
-        -webkit-line-clamp: unset;
-        overflow: visible;
-    }
-
-    /* Additional styles for enhanced episode view */
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    .modal:target {
-        display: flex;
-    }
-
-    .modal img {
-        max-width: 90%;
-        max-height: 90%;
-        border-radius: 0.5rem;
-    }
-
-    .modal-close {
-        position: absolute;
-        top: 2rem;
-        right: 2rem;
-        color: white;
-        font-size: 2rem;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    /* Estilos CSS para el componente */
-    .recommendations-carousel {
-        position: relative;
-    }
-
-    /* Gradientes laterales para indicar scroll */
-    .recommendations-carousel::before,
-    .recommendations-carousel::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 30px;
-        z-index: 5;
-        pointer-events: none;
-    }
-
-    /* Animación de aparición de las cards */
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .animate-fade-in-up {
-        animation: fadeInUp 0.5s ease forwards;
-        opacity: 0;
-    }
-
-    /* Clases para truncar texto */
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    /* Hover effects mejorados */
-    .recommendation-card {
-        transition: transform 0.3s ease;
-    }
-
-    .recommendation-card:hover {
-        transform: translateY(-8px);
-    }
-
-    /* Responsive design */
-    @media (max-width: 768px) {
-        .recommendation-card {
-            width: 140px;
-        }
-
-        .recommendations-carousel::before,
-        .recommendations-carousel::after {
-            width: 20px;
-        }
-
-        .recommendations-container {
-            padding-left: 4px;
-            padding-right: 4px;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .recommendation-card {
-            width: 120px;
-        }
-
-        .recommendations-carousel {
-            padding: 0;
-        }
-    }
-
-    /* Mejora de accesibilidad */
-    @media (prefers-reduced-motion: reduce) {
-        .animate-fade-in-up {
-            animation: none;
-            opacity: 1;
-        }
-
-        .recommendation-card,
-        .recommendation-card img,
-        .recommendation-card > a > div,
-        .recommendation-card .bg-white\/90 {
-            transition: none;
-        }
-    }
-
-    /* Indicador visual de que se puede hacer scroll */
-    .recommendations-container {
-        scroll-snap-type: x mandatory;
-    }
-
-    .recommendation-card {
-        scroll-snap-align: start;
-    }
-
-    /* Estilos adicionales para mejor UX */
-    .recommendations-container:hover {
-        cursor: grab;
-    }
-
-    .recommendations-container:active {
-        cursor: grabbing;
-    }
-</style>

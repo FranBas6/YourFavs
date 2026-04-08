@@ -1,4 +1,7 @@
 ---
+import '../../styles/components/cards.css';
+import {getRatingColor, isRecentRelease} from "../../utils/constants/helpers/card-helpers";
+
 interface Props {
     id: string;
     name: string;
@@ -104,25 +107,9 @@ const getAirPeriod = () => {
     return `${releaseYear}`;
 };
 
-// Limitar géneros a mostrar
 const displayGenres = genres?.slice(0, 2) || [];
-
-// Calcular si la serie es reciente (menos de 3 meses)
-const isRecent = first_air_date ?
-    (new Date().getTime() - new Date(first_air_date).getTime()) < (90 * 24 * 60 * 60 * 1000) :
-    false;
-
-// Calcular si es trending (rating mayor a 8)
+const isRecent = isRecentRelease(first_air_date);
 const isTrending = vote_average >= 8.0;
-
-// Color de fondo basado en la calificación
-const getRatingColor = (rating: number): string => {
-    if (rating >= 8) return "bg-emerald-500 text-white";
-    if (rating >= 7) return "bg-green-500 text-white";
-    if (rating >= 6) return "bg-yellow-500 text-gray-900";
-    if (rating >= 5) return "bg-orange-500 text-white";
-    return "bg-red-500 text-white";
-};
 ---
 <div class="media-card group">
     <a
@@ -255,109 +242,25 @@ const getRatingColor = (rating: number): string => {
 </div>
 
 <style>
-    .media-card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        will-change: transform;
-    }
-
-    .media-card:hover {
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-        z-index: 1;
-    }
-
     .rating-badge {
-        @apply absolute top-2 right-2 flex items-center text-xs font-bold px-2 py-1 rounded;
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        display: flex;
+        align-items: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .year-badge {
-        @apply text-xs font-medium px-2 py-1 rounded bg-gray-700 text-coral-white text-center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .genre-tag {
-        @apply text-xs px-2 py-0.5 rounded-full bg-dark-blue text-coral-white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        transition: background-color 0.2s ease, transform 0.2s ease;
     }
 
     .info-pill {
-        @apply flex items-center gap-1;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
         padding: 2px 6px;
         border-radius: 4px;
         background-color: rgba(255, 255, 255, 0.1);
-    }
-
-    .view-details-btn {
-        @apply text-xs flex items-center justify-center py-2 px-4 rounded-full font-medium text-coral-plat bg-dark-blue transition duration-200 backdrop-blur-sm;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background-color: rgba(17, 45, 125, 0.8);
-    }
-
-    .view-details-btn:hover {
-        background-color: #FACC15;
-        color: #111827;
-        box-shadow: 0 2px 8px rgba(250, 204, 21, 0.5);
-    }
-
-    /* Line clamp para limitar líneas de texto */
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .provider-logo {
-        transition: transform 0.2s ease;
-    }
-
-    .provider-logo:hover {
-        transform: scale(1.5);
-        z-index: 2;
-    }
-
-    .badge {
-        backdrop-filter: blur(4px);
-        animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-        0% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.8;
-        }
-        100% {
-            opacity: 1;
-        }
-    }
-
-    .bg-midnight-blue {
-        background-color: #0F172A;
-    }
-
-    .bg-dark-blue {
-        background-color: #1E3A8A;
-    }
-
-    .text-coral-plat {
-        color: #ffffff;
-    }
-
-    .text-coral-white {
-        color: #d5d5d2;
-    }
-
-    .bg-pastel-yellow {
-        background-color: #FACC15;
     }
 </style>

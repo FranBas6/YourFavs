@@ -1,0 +1,225 @@
+    /* Estilos básicos */
+    .transition-all {
+        transition: all 0.3s ease-in-out;
+    }
+
+    .text-yellow-400 {
+        color: #fbbf24;
+    }
+
+    /* Efecto hover para imágenes */
+    img.hover\:scale-105:hover {
+        transform: scale(1.05);
+    }
+
+    /* Gradiente para el texto sobre imágenes oscuras */
+    .text-shadow {
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Mejorar legibilidad para estrellas de rating */
+    .rating-stars {
+        letter-spacing: 1px;
+    }
+
+    /* Estilos para la animación del acordeón */
+    .transform {
+        transition-property: transform;
+    }
+
+    .transition-transform {
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        transition-duration: 300ms;
+    }
+
+    .rotate-180 {
+        transform: rotate(180deg);
+    }
+
+    /* Añade estos estilos a tu sección de <style> */
+    details > summary {
+        list-style: none;
+    }
+
+    details > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    details[open] > summary svg {
+        transform: rotate(180deg);
+    }
+
+    /* Estilos mejorados para el overview de temporadas */
+    .season-overview {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        transition: all 0.3s ease-in-out;
+    }
+
+    /* Cuando el details está abierto, muestra el texto completo */
+    details[open] .season-overview {
+        display: block;
+        -webkit-line-clamp: unset;
+        overflow: visible;
+    }
+
+    /* Additional styles for enhanced episode view */
+    .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .modal:target {
+        display: flex;
+    }
+
+    .modal img {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 0.5rem;
+    }
+
+    .modal-close {
+        position: absolute;
+        top: 2rem;
+        right: 2rem;
+        color: white;
+        font-size: 2rem;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    /* Estilos CSS para el componente */
+    .recommendations-carousel {
+        position: relative;
+    }
+
+    /* Gradientes laterales para indicar scroll */
+    .recommendations-carousel::before,
+    .recommendations-carousel::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 30px;
+        z-index: 5;
+        pointer-events: none;
+    }
+
+    /* Animación de aparición de las cards */
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .animate-fade-in-up {
+        animation: fadeInUp 0.5s ease forwards;
+        opacity: 0;
+    }
+
+    /* Clases para truncar texto */
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .line-clamp-3 {
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    /* Hover effects mejorados */
+    .recommendation-card {
+        transition: transform 0.3s ease;
+    }
+
+    .recommendation-card:hover {
+        transform: translateY(-8px);
+    }
+
+    /* Responsive design */
+    @media (max-width: 768px) {
+        .recommendation-card {
+            width: 140px;
+        }
+
+        .recommendations-carousel::before,
+        .recommendations-carousel::after {
+            width: 20px;
+        }
+
+        .recommendations-container {
+            padding-left: 4px;
+            padding-right: 4px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .recommendation-card {
+            width: 120px;
+        }
+
+        .recommendations-carousel {
+            padding: 0;
+        }
+    }
+
+    /* Mejora de accesibilidad */
+    @media (prefers-reduced-motion: reduce) {
+        .animate-fade-in-up {
+            animation: none;
+            opacity: 1;
+        }
+
+        .recommendation-card,
+        .recommendation-card img,
+        .recommendation-card > a > div,
+        .recommendation-card .bg-white\/90 {
+            transition: none;
+        }
+    }
+
+    /* Indicador visual de que se puede hacer scroll */
+    .recommendations-container {
+        scroll-snap-type: x mandatory;
+    }
+
+    .recommendation-card {
+        scroll-snap-align: start;
+    }
+
+    /* Estilos adicionales para mejor UX */
+    .recommendations-container:hover {
+        cursor: grab;
+    }
+
+    .recommendations-container:active {
+        cursor: grabbing;
+    }

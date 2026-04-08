@@ -1,0 +1,233 @@
+:root {
+    --color-primary: #3B82F6;
+    --color-secondary: #2563EB;
+    --color-background: #F3F4F6;
+    --color-text: #1F2937;
+    --color-text-light: #6B7280;
+
+    --color-midnight-blue: #006ea7;
+    --color-dark-blue: #112d7d;
+    --color-coral-plat: #ffffff;
+    --color-coral-white: #d5d5d2;
+    --color-pastel-yellow: #FACC15;
+
+    --coral-red: #ff6b7a;
+    --coral-red-light: #ff8f9c;
+    --coral-red-dark: #e8495a;
+    --coral-red-alpha: rgba(255, 107, 122, 0.15);
+}
+
+.bg-light-gray {
+    background-color: #F3F4F6;
+}
+
+html {
+    font-family: 'Poppins', sans-serif;
+    scroll-behavior: smooth;
+    color-scheme: light;
+    font-size: 16px;
+}
+
+@media (max-width: 640px) {
+    html {
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 768px) {
+    main {
+        padding-bottom: 6rem;
+    }
+}
+
+body {
+    color: var(--color-text);
+    margin: 0;
+    padding: 0;
+    transition: background-color 0.3s ease;
+    width: 100%;
+    overflow-x: hidden;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+@media (max-width: 640px) {
+    ::-webkit-scrollbar {
+        width: 4px;
+    }
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+.container {
+    width: 100%;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+/* Grid responsivo básico */
+.grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.grid-cols-1 {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+    .sm\:grid-cols-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sm\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 768px) {
+    .md\:grid-cols-3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .md\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1024px) {
+    .lg\:grid-cols-4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .lg\:grid-cols-5 {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+/* Botón flotante para volver arriba */
+.back-to-top-container {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+}
+
+.back-to-top-container.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.back-to-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    background: var(--coral-red);
+    color: white;
+    border-radius: 50%;
+    box-shadow: var(--shadow-large);
+    transition: var(--transition-smooth);
+    text-decoration: none;
+    opacity: 0.9;
+}
+
+.back-to-top svg {
+    width: 20px;
+    height: 20px;
+}
+
+.back-to-top:hover {
+    transform: translateY(-4px) scale(1.1);
+    opacity: 1;
+    box-shadow: 0 20px 40px -10px rgba(230, 57, 70, 0.4);
+}
+
+.back-to-top:focus {
+    outline: none;
+}
+
+@media (min-width: 768px) {
+    .back-to-top-container {
+        bottom: 1.5rem;
+        right: 1.5rem;
+    }
+
+    .back-to-top {
+        width: 56px;
+        height: 56px;
+    }
+
+    .back-to-top svg {
+        width: 24px;
+        height: 24px;
+    }
+}
+
+a, button, input {
+    transition: all 0.2s ease-in-out;
+}
+
+/* Skip link accesible */
+.skip-link {
+    position: absolute;
+    left: -999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+}
+
+.skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    width: auto;
+    height: auto;
+    padding: .5rem .75rem;
+    z-index: 100;
+    background: var(--color-primary);
+    color: white;
+    border-radius: .5rem;
+    text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+        scroll-behavior: auto !important;
+    }
+}

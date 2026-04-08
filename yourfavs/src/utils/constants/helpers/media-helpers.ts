@@ -1,0 +1,220 @@
+const languageMap: Record<string, string> = {
+    'en': 'Inglés',
+    'es': 'Español',
+    'fr': 'Francés',
+    'de': 'Alemán',
+    'it': 'Italiano',
+    'pt': 'Portugués',
+    'ru': 'Ruso',
+    'ja': 'Japonés',
+    'ko': 'Coreano',
+    'zh': 'Chino',
+    'ar': 'Árabe',
+    'hi': 'Hindi',
+    'nl': 'Neerlandés',
+    'sv': 'Sueco',
+    'da': 'Danés',
+    'fi': 'Finlandés',
+    'no': 'Noruego',
+    'pl': 'Polaco',
+    'cs': 'Checo',
+    'hu': 'Húngaro',
+    'tr': 'Turco',
+    'el': 'Griego',
+    'ro': 'Rumano',
+    'hr': 'Croata',
+    'bg': 'Búlgaro',
+    'sr': 'Serbio',
+    'uk': 'Ucraniano',
+    'he': 'Hebreo',
+    'th': 'Tailandés',
+    'vi': 'Vietnamita',
+    'id': 'Indonesio',
+    'ms': 'Malayo',
+    'tl': 'Tagalo',
+    'sw': 'Suajili',
+    'is': 'Islandés',
+    'lv': 'Letón',
+    'lt': 'Lituano',
+    'sk': 'Eslovaco',
+    'sl': 'Esloveno',
+    'et': 'Estonio',
+    'mk': 'Macedonio',
+    'hy': 'Armenio',
+    'ka': 'Georgiano',
+    'am': 'Amárico',
+    'sq': 'Albanés',
+    'mt': 'Maltés',
+    'bs': 'Bosnio',
+    'ne': 'Nepalí',
+    'pa': 'Punjabi',
+    'gu': 'Gujarati',
+    'te': 'Telugu',
+    'ta': 'Tamil',
+    'ml': 'Malabar',
+    'mr': 'Marathi',
+    'kn': 'Kannada',
+    'or': 'Odia',
+    'as': 'Assamés',
+    'bn': 'Bengalí',
+    'si': 'Cingalés',
+    'ur': 'Urdu'
+};
+
+export function getLanguageDisplayName(iso: string): string {
+    return languageMap[iso] || iso.toUpperCase();
+}
+
+const ratingMap: Record<string, Record<string, string>> = {
+    'ES': {
+        'APTA': 'Apta para todos los públicos',
+        '7': 'No recomendada para menores de 7 años',
+        '12': 'No recomendada para menores de 12 años',
+        '16': 'No recomendada para menores de 16 años',
+        '18': 'No recomendada para menores de 18 años',
+        'X': 'Película X'
+    },
+    'US': {
+        // Movies
+        'G': 'G - Todos los públicos',
+        'PG': 'PG - Guía parental sugerida',
+        'PG-13': 'PG-13 - Padres fuertemente advertidos',
+        'R': 'R - Restringida',
+        'NC-17': 'NC-17 - Solo adultos',
+        // TV Series
+        'TV-Y': 'TV-Y - Todos los niños',
+        'TV-Y7': 'TV-Y7 - Niños de 7 años en adelante',
+        'TV-G': 'TV-G - Todos los públicos',
+        'TV-PG': 'TV-PG - Guía parental',
+        'TV-14': 'TV-14 - Padres fuertemente advertidos',
+        'TV-MA': 'TV-MA - Solo adultos'
+    }
+};
+
+export function getContentRating(ratings: any[]): { text: string; rating: string } | null {
+    const esRating = ratings.find((r: any) => r.iso_3166_1 === 'ES');
+    const usRating = ratings.find((r: any) => r.iso_3166_1 === 'US');
+    const rating = esRating || usRating || ratings[0];
+
+    if (!rating) return null;
+
+    const countryMap = ratingMap[rating.iso_3166_1 as string];
+    if (countryMap && countryMap[rating.rating]) {
+        return { text: countryMap[rating.rating], rating: rating.rating };
+    }
+
+    return { text: `${rating.rating} (${rating.iso_3166_1})`, rating: rating.rating };
+}
+
+export function formatDate(dateString: string): string {
+    if (!dateString) return "No disponible";
+    const date = new Date(dateString);
+    return new Intl.DateTimeFormat('es-ES', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    }).format(date);
+}
+
+export function getRatingStars(rating: number): string {
+    if (!rating) return "";
+    const fullStars = Math.floor(rating / 2);
+    const halfStar = rating % 2 >= 1 ? 1 : 0;
+    const emptyStars = 5 - fullStars - halfStar;
+    return "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(emptyStars);
+}
+
+export function formatTrailerUrl(url: string): string {
+    if (url.includes('youtube.com/embed/')) return url;
+
+    let videoId = '';
+    if (url.includes('youtube.com/watch')) {
+        const urlObj = new URL(url);
+        const id = urlObj.searchParams.get('v');
+        if (id) videoId = id;
+    } else if (url.includes('youtu.be/')) {
+        videoId = url.split('youtu.be/')[1].split('?')[0];
+    }
+
+    return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+}
+
+export const providerLinks: Record<string, string> = {
+    'Netflix': 'https://www.netflix.com/',
+    'Disney Plus': 'https://www.disneyplus.com/',
+    'HBO Max': 'https://www.hbomax.com/',
+    'Amazon Prime Video': 'https://www.primevideo.com/',
+    'Amazon Video': 'https://www.amazon.com/dp/B08J4Q4Z5D',
+    'Apple TV+': 'https://tv.apple.com/',
+    'Apple TV': 'https://tv.apple.com/',
+    'Filmin': 'https://www.filmin.es/',
+    'Movistar Plus+': 'https://www.movistarplus.es/',
+    'Rakuten TV': 'https://rakuten.tv/',
+    'SkyShowtime': 'https://www.skyshowtime.com/',
+    'MUBI': 'https://mubi.com/',
+    'FlixOlé': 'https://flixole.com/',
+    'Atresplayer': 'https://www.atresplayer.com/',
+    'RTVE Play': 'https://www.rtve.es/play/',
+    'Google Play Movies': 'https://play.google.com/store/movies',
+    'YouTube': 'https://www.youtube.com/',
+    'Microsoft Store': 'https://www.microsoft.com/store/movies',
+    'Plex': 'https://www.plex.tv/',
+    'fuboTV': 'https://www.fubo.tv/',
+    'Hayu': 'https://www.hayu.com/',
+    'Curiosity Stream': 'https://curiositystream.com/',
+    'GuideDoc': 'https://guidedoc.tv/',
+    'MagellanTV': 'https://www.magellantv.com/',
+    'DOCSVILLE': 'https://www.docsville.com/',
+    'WOW Presents Plus': 'https://www.wowpresentsplus.com/',
+    'Mitele': 'https://www.mitele.es/',
+    'StarzPlay': 'https://www.starzplay.com/',
+    'Paramount+': 'https://www.paramountplus.com/',
+    'Peacock': 'https://www.peacocktv.com/',
+    'Tubi': 'https://tubitv.com/',
+    'Pluto TV': 'https://pluto.tv/',
+    'Crunchyroll': 'https://www.crunchyroll.com/',
+    'Funimation': 'https://www.funimation.com/',
+    'Vix': 'https://vix.com/',
+    'Cinepolis Klic': 'https://www.cinepolisklic.com/'
+};
+
+export function formatFirebaseDate(dateValue: any): string {
+    if (!dateValue) return 'Fecha desconocida';
+
+    // Timestamp de Firebase (objeto con seconds y nanoseconds)
+    if (dateValue && typeof dateValue === 'object' && 'seconds' in dateValue) {
+        try {
+            const date = new Date(dateValue.seconds * 1000);
+            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+        } catch { /* ignore */ }
+    }
+
+    // String con formato Firebase ("6 de octubre de 2025 a las...")
+    if (typeof dateValue === 'string') {
+        const match = dateValue.match(/^(.+?)\s+a las/);
+        if (match) return match[1];
+        return dateValue;
+    }
+
+    // Date o número
+    try {
+        const date = new Date(dateValue);
+        if (!isNaN(date.getTime())) {
+            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+        }
+    } catch { /* ignore */ }
+
+    return 'Fecha desconocida';
+}
+
+export function getFirebaseTimestamp(dateValue: any): number {
+    if (!dateValue) return 0;
+    if (dateValue && typeof dateValue === 'object' && 'seconds' in dateValue) {
+        return dateValue.seconds * 1000;
+    }
+    try {
+        return new Date(dateValue).getTime();
+    } catch {
+        return 0;
+    }
+}

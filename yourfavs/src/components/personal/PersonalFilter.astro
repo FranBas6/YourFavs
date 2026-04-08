@@ -1,0 +1,41 @@
+---
+import {buildUrl} from "../../utils/buildUrl";
+
+interface Props {
+    pageUrl: URL;
+    filter: string;
+    searchQuery?: string;
+    genreFilter?: string;
+}
+
+const { pageUrl, filter, searchQuery = '', genreFilter = '' } = Astro.props;
+
+const showAll = filter === 'todos';
+const showSeries = filter === 'series';
+const showMovies = filter === 'peliculas';
+---
+<nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 backdrop-blur-lg shadow-xl rounded-2xl px-6 py-4 mb-4">
+    <div class="flex flex-wrap justify-center items-center gap-4">
+        <div class="flex flex-wrap justify-center gap-4">
+            <a href={buildUrl(pageUrl, {filter: 'todos', search: searchQuery, genre: genreFilter})}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                ${showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Todo el contenido
+            </a>
+            <a href={buildUrl(pageUrl, {filter: 'series', search: searchQuery, genre: genreFilter})}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                ${showSeries ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Series
+            </a>
+            <a href={buildUrl(pageUrl, {filter: 'peliculas', search: searchQuery, genre: genreFilter})}
+               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
+                ${showMovies ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
+                "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
+                Películas
+            </a>
+        </div>
+        <slot />
+    </div>
+</nav>

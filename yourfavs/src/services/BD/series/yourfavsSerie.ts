@@ -1,5 +1,165 @@
-import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc} from "firebase/firestore";
-import { db } from "../../utils/firebaseConfig";
+import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, getDoc, setDoc, deleteField} from "firebase/firestore";
+import { db } from "../../../utils/firebaseConfig";
+
+const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'];
+
+const ACTION_TYPE_MAP: Record<string, string> = {
+    'favs': 'SeriesFavs',
+    'pendientes': 'SeriesPendiente',
+    'vistas': 'SeriesVistas',
+    'siguiendo': 'SeriesSiguiendo',
+    'liked': 'LikedSeries',
+    'verpronto': 'SeriesVerPronto',
+};
+
+export async function handleSerieFavAction(formData: FormData): Promise<string> {
+    const serieId = String(formData.get('id') || formData.get('serie_id'));
+    const action = String(formData.get('action'));
+    const actionType = String(formData.get('actionType'));
+
+    // Guardar opinión en todas las colecciones
+    if (action === 'save_opinion' || actionType === 'opinion') {
+        const opinionText = String(formData.get('opinion') || '').trim();
+        for (const col of SERIE_COLLECTIONS) {
+            const ref = doc(db, col, serieId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                await updateDoc(ref, { opinion: opinionText });
+            }
+        }
+        return `/serie/${serieId}`;
+    }
+
+    // Eliminar opinión
+    if (action === 'delete_opinion') {
+        for (const col of SERIE_COLLECTIONS) {
+            const ref = doc(db, col, serieId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                await updateDoc(ref, { opinion: deleteField() });
+            }
+        }
+        return `/serie/${serieId}`;
+    }
+
+    // Determinar colección
+    const coleccion = ACTION_TYPE_MAP[actionType];
+    if (!coleccion) throw new Error(`Tipo de acción no válido: ${actionType}`);
+
+    const docRef = doc(db, coleccion, serieId);
+    const docSnap = await getDoc(docRef);
+    const serieExiste = docSnap.exists();
+    const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
+
+    if (action === 'add' && !serieExiste) {
+        const genres = JSON.parse(String(formData.get('genres') || '[]'));
+        const seasons = JSON.parse(String(formData.get('seasons') || '[]'));
+        const lastEpisodeToAir = JSON.parse(String(formData.get('last_episode_to_air') || 'null'));
+        const nextEpisodeToAir = JSON.parse(String(formData.get('next_episode_to_air') || 'null'));
+
+        const baseEntry: Record<string, any> = {
+            id: serieId,
+            name: String(formData.get('name') || 'Sin nombre'),
+            poster_path: String(formData.get('poster_path') || ''),
+            vote_average: Number(formData.get('vote_average') || 0),
+            overview: String(formData.get('overview') || 'Sin descripción'),
+            added_at: new Date(),
+            genres, first_air_date: String(formData.get('first_air_date') || ''),
+            status: String(formData.get('status') || ''),
+            seasons, last_episode_to_air: lastEpisodeToAir, next_episode_to_air: nextEpisodeToAir,
+            position: 0,
+        };
+
+        // Buscar opinión existente
+        let existingOpinion = '';
+        for (const col of SERIE_COLLECTIONS) {
+            const checkSnap = await getDoc(doc(db, col, serieId));
+            if (checkSnap.exists() && checkSnap.data()?.opinion) {
+                existingOpinion = checkSnap.data()?.opinion;
+                break;
+            }
+        }
+
+        const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
+        const newEntry = opinionForSeries ? { ...baseEntry, opinion: opinionForSeries } : baseEntry;
+
+        // Manejo de posición para favoritos
+        if (coleccion === 'SeriesFavs') {
+            const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
+            const favsSnapshot = await getDocs(favsQuery);
+            const currentFavorites: SeriesFavs[] = [];
+            favsSnapshot.forEach((d) => {
+                currentFavorites.push({id: d.id, ...d.data()} as SeriesFavs);
+            });
+
+            let newPosition: number;
+            if (customPosition !== null) {
+                const seriesToUpdate = currentFavorites.filter(fav => fav.position >= customPosition);
+                for (const fav of seriesToUpdate.sort((a, b) => b.position - a.position)) {
+                    await updateDoc(doc(db, 'SeriesFavs', fav.id), { position: fav.position + 1 });
+                }
+                newPosition = customPosition;
+            } else {
+                newPosition = currentFavorites.length > 0
+                    ? Math.max(...currentFavorites.map(f => f.position || 0)) + 1
+                    : 1;
+            }
+            newEntry.position = newPosition;
+        }
+
+        await setDoc(docRef, newEntry);
+
+    } else if (action === 'remove' && serieExiste) {
+        await deleteDoc(docRef);
+
+        if (coleccion === 'SeriesFavs') {
+            const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
+            const favsSnapshot = await getDocs(favsQuery);
+            const remainingFavorites: SeriesFavs[] = [];
+            favsSnapshot.forEach((d) => {
+                remainingFavorites.push({id: d.id, ...d.data()} as SeriesFavs);
+            });
+            for (let i = 0; i < remainingFavorites.length; i++) {
+                await updateDoc(doc(db, 'SeriesFavs', remainingFavorites[i].id), { position: i + 1 });
+            }
+        }
+
+    } else if (action === 'update' && serieExiste && coleccion === 'SeriesFavs') {
+        const requestedPosition = customPosition !== null ? customPosition : Number(formData.get('custom_position'));
+        if (!requestedPosition || Number.isNaN(requestedPosition)) throw new Error('Nueva posición inválida');
+
+        const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
+        const favsSnapshot = await getDocs(favsQuery);
+        const favorites: SeriesFavs[] = [];
+        favsSnapshot.forEach((d) => {
+            favorites.push({id: d.id, ...d.data()} as SeriesFavs);
+        });
+
+        if (favorites.length === 0) return `/serie/${serieId}`;
+
+        const currentFav = favorites.find(f => f.id === serieId);
+        const oldPos = currentFav?.position ?? null;
+        if (oldPos === null) throw new Error('La serie no tiene posición actual definida');
+
+        const maxPos = favorites.length;
+        const newPos = Math.min(Math.max(1, requestedPosition), maxPos);
+
+        if (newPos !== oldPos) {
+            if (newPos > oldPos) {
+                for (const fav of favorites.filter(f => (f.position || 0) > oldPos && (f.position || 0) <= newPos)) {
+                    await updateDoc(doc(db, 'SeriesFavs', fav.id), { position: (fav.position || 0) - 1 });
+                }
+            } else {
+                for (const fav of favorites.filter(f => (f.position || 0) >= newPos && (f.position || 0) < oldPos)) {
+                    await updateDoc(doc(db, 'SeriesFavs', fav.id), { position: (fav.position || 0) + 1 });
+                }
+            }
+            await updateDoc(docRef, { position: newPos });
+        }
+    }
+
+    return `/serie/${serieId}`;
+}
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
 

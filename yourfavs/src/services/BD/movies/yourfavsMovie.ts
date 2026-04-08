@@ -1,5 +1,93 @@
-import {collection, getDocs, query, orderBy, deleteDoc, doc} from "firebase/firestore";
-import { db } from "../../utils/firebaseConfig";
+import {collection, getDocs, query, orderBy, deleteDoc, doc, getDoc, setDoc, updateDoc, deleteField} from "firebase/firestore";
+import { db } from "../../../utils/firebaseConfig";
+
+const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
+
+const LIST_TYPE_MAP: Record<string, string> = {
+    'favorites': 'MovieFavs',
+    'pendientes': 'MoviesPendientes',
+    'vistas': 'MoviesVistas',
+    'verPronto': 'MoviesVerPronto',
+    'liked': 'LikedMovies',
+};
+
+export async function handleMovieFavAction(formData: FormData): Promise<string> {
+    const movieId = String(formData.get('id'));
+    const action = String(formData.get('action'));
+    const listType = String(formData.get('list_type'));
+
+    let genres = [];
+    try {
+        genres = JSON.parse(String(formData.get('genres')) || '[]');
+    } catch { /* ignore */ }
+
+    const movieDataBase = {
+        id: movieId,
+        poster_path: String(formData.get('poster_path') || ''),
+        title: String(formData.get('title') || 'Sin nombre'),
+        vote_average: Number(formData.get('vote_average') || 0),
+        overview: String(formData.get('overview') || 'Sin descripción'),
+        added_at: new Date(),
+        genres: genres,
+        release_date: String(formData.get('release_date') || ''),
+    };
+
+    // Buscar opinión existente en cualquier colección
+    let existingOpinion = '';
+    for (const col of MOVIE_COLLECTIONS) {
+        const checkSnap = await getDoc(doc(db, col, movieId));
+        if (checkSnap.exists() && checkSnap.data()?.opinion) {
+            existingOpinion = checkSnap.data()?.opinion;
+            break;
+        }
+    }
+
+    const opinionTextForCreate = String(formData.get('opinion') || '').trim() || existingOpinion;
+    const movieData = opinionTextForCreate
+        ? { ...movieDataBase, opinion: opinionTextForCreate }
+        : movieDataBase;
+
+    // Guardar opinión en todas las colecciones
+    if (action === 'save_opinion') {
+        const opinionText = String(formData.get('opinion') || '').trim();
+        for (const col of MOVIE_COLLECTIONS) {
+            const ref = doc(db, col, movieId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                await updateDoc(ref, { opinion: opinionText });
+            }
+        }
+        return `/movie/${movieId}`;
+    }
+
+    // Eliminar opinión en todas las colecciones
+    if (action === 'delete_opinion') {
+        for (const col of MOVIE_COLLECTIONS) {
+            const ref = doc(db, col, movieId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                await updateDoc(ref, { opinion: deleteField() });
+            }
+        }
+        return `/movie/${movieId}`;
+    }
+
+    // Agregar o eliminar de una lista específica
+    const collectionName = LIST_TYPE_MAP[listType];
+    if (!collectionName) return `/movie/${movieId}`;
+
+    const docRef = doc(db, collectionName, movieId);
+    const docSnap = await getDoc(docRef);
+    const exists = docSnap.exists();
+
+    if (action === 'add' && !exists) {
+        await setDoc(docRef, movieData);
+    } else if (action === 'remove' && exists) {
+        await deleteDoc(docRef);
+    }
+
+    return `/movie/${movieId}`;
+}
 
 const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
 

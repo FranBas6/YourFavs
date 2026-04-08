@@ -2,180 +2,37 @@
 import Layout from "../../layouts/Layout.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {
-    getNetflixSeries,
-    getAmazonPrimeSeries,
-    getDisneyPlusSeries,
-    getHBOMaxSeries,
-    getAppleTVSeries,
-    getMovistarPlusSeries,
-    getFilminSeries
-} from "../../services/API/Series/tmdbSeries";
-import {
-    getNetflixMovies,
-    getAmazonPrimeMovies,
-    getDisneyPlusMovies,
-    getHBOMaxMovies,
-    getAppleTVMovies,
-    getMovistarPlusMovies,
-    getFilminMovies
-} from "../../services/API/Movies/tmdbMovies";
-
-// Import the types from your type definition files
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
+import {getGenreName} from "../../utils/constants/genres";
+import {platformList, fetchAllPlatforms, fetchPlatformBySlug} from "../../utils/constants/platforms";
+import FilterBar from "../../components/FilterBar.astro";
+import Pagination from "../../components/Pagination.astro";
+import '../../styles/pages/catalogo/shared.css';
+import '../../styles/pages/catalogo/plataformas.css';
 
-// Obtener parámetros desde la URL
 const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const page = Number(urlParams.get('page')) || 1;
 const pageStr = page.toString();
 const platformParam = urlParams.get('platform') || 'all';
-const type = urlParams.get('type') || 'all'; // 'all', 'movies', 'series'
+const type = urlParams.get('type') || 'all';
 
-// Definir plataformas disponibles
-const platforms = [
-    {id: 'netflix', name: 'NETFLIX', logo: '/logos/plataformas/netflix.svg'},
-    {id: 'amazon', name: 'AMAZON PRIME', logo: '/logos/plataformas/amazon.svg'},
-    {id: 'disney', name: 'DISNEY+', logo: '/logos/plataformas/disney.svg'},
-    {id: 'hbo', name: 'HBO MAX', logo: '/logos/plataformas/hbo.svg'},
-    {id: 'apple', name: 'APPLE TV+', logo: '/logos/plataformas/apple.svg'},
-    {id: 'movistar', name: 'MOVISTAR+', logo: '/logos/plataformas/movistar.svg'},
-    {id: 'filmin', name: 'FILMIN', logo: '/logos/plataformas/filmin.svg'}
-];
-
-// Cargar las películas y series para la página actual basado en la plataforma seleccionada
 let movies: Movie[] = [];
 let series: Serie[] = [];
 
-// Función para eliminar duplicados en arrays de películas o series por ID
-function removeDuplicates<T extends { id: number | string }>(items: T[]): T[] {
-    return items.filter((item, index, self) =>
-        index === self.findIndex((t) => t.id === item.id)
-    );
-}
-
-// Cargar todo el contenido si no hay filtro o filtrar por plataforma
 if (platformParam === 'all') {
-    // Cargar todas las plataformas con los parámetros de ordenación
-    const netflixSeries = await getNetflixSeries(pageStr);
-    const netflixMovies = await getNetflixMovies(pageStr);
-    const amazonPrimeSeries = await getAmazonPrimeSeries(pageStr);
-    const amazonPrimeMovies = await getAmazonPrimeMovies(pageStr);
-    const disneyPlusSeries = await getDisneyPlusSeries(pageStr);
-    const disneyPlusMovies = await getDisneyPlusMovies(pageStr);
-    const hboMaxSeries = await getHBOMaxSeries(pageStr);
-    const hboMaxMovies = await getHBOMaxMovies(pageStr);
-    const appleTVSeries = await getAppleTVSeries(pageStr);
-    const appleTVMovies = await getAppleTVMovies(pageStr);
-    const movistarPlusSeries = await getMovistarPlusSeries(pageStr);
-    const movistarPlusMovies = await getMovistarPlusMovies(pageStr);
-    const filminSeries = await getFilminSeries(pageStr);
-    const filminMovies = await getFilminMovies(pageStr);
-
-    // Combinar todos los resultados
-    const allMovies = [
-        ...netflixMovies,
-        ...amazonPrimeMovies,
-        ...disneyPlusMovies,
-        ...hboMaxMovies,
-        ...appleTVMovies,
-        ...movistarPlusMovies,
-        ...filminMovies
-    ];
-
-    const allSeries = [
-        ...netflixSeries,
-        ...amazonPrimeSeries,
-        ...disneyPlusSeries,
-        ...hboMaxSeries,
-        ...appleTVSeries,
-        ...movistarPlusSeries,
-        ...filminSeries
-    ];
-
-    // Eliminar duplicados
-    movies = removeDuplicates<Movie>(allMovies);
-    series = removeDuplicates<Serie>(allSeries);
-
+    const allPlatforms = await fetchAllPlatforms(pageStr);
+    const allMovies = allPlatforms.flatMap(p => p.movies);
+    const allSeries = allPlatforms.flatMap(p => p.series);
+    // Eliminar duplicados por ID
+    movies = allMovies.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
+    series = allSeries.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
 } else {
-    // Filtrar por plataforma seleccionada con parámetros de ordenación
-    switch (platformParam) {
-        case 'netflix':
-            movies = await getNetflixMovies(pageStr);
-            series = await getNetflixSeries(pageStr);
-            break;
-        case 'amazon':
-            movies = await getAmazonPrimeMovies(pageStr);
-            series = await getAmazonPrimeSeries(pageStr);
-            break;
-        case 'disney':
-            movies = await getDisneyPlusMovies(pageStr);
-            series = await getDisneyPlusSeries(pageStr);
-            break;
-        case 'hbo':
-            movies = await getHBOMaxMovies(pageStr);
-            series = await getHBOMaxSeries(pageStr);
-            break;
-        case 'apple':
-            movies = await getAppleTVMovies(pageStr);
-            series = await getAppleTVSeries(pageStr);
-            break;
-        case 'movistar':
-            movies = await getMovistarPlusMovies(pageStr);
-            series = await getMovistarPlusSeries(pageStr);
-            break;
-        case 'filmin':
-            movies = await getFilminMovies(pageStr);
-            series = await getFilminSeries(pageStr);
-            break;
-    }
+    const result = await fetchPlatformBySlug(platformParam, pageStr);
+    movies = result.movies;
+    series = result.series;
 }
 
-// Función para crear URL con parámetros actualizados
-function createUrlWithParams(newParams: Record<string, string>) {
-    const currentParams = new URLSearchParams(urlParams);
-
-    // Actualizar con nuevos parámetros
-    Object.entries(newParams).forEach(([key, value]) => {
-        currentParams.set(key, value);
-    });
-
-    // Si cambiamos sortBy, platform o cualquier parámetro que requiera reiniciar página, volvemos a página 1
-    if (newParams.sortBy || newParams.platform) {
-        currentParams.set('page', '1');
-    }
-
-    return `?${currentParams.toString()}`;
-}
-
-// Función para obtener el nombre del género
-function getGenreName(id: number) {
-    // Implementar lógica para obtener el nombre del género
-    const genres: Record<number, string> = {
-        28: 'Acción',
-        12: 'Aventura',
-        16: 'Animación',
-        35: 'Comedia',
-        80: 'Crimen',
-        99: 'Documental',
-        18: 'Drama',
-        10751: 'Familia',
-        14: 'Fantasía',
-        36: 'Historia',
-        27: 'Terror',
-        10402: 'Música',
-        9648: 'Misterio',
-        10749: 'Romance',
-        878: 'Ciencia ficción',
-        10770: 'Película de TV',
-        53: 'Thriller',
-        10752: 'Guerra',
-        37: 'Western'
-    };
-    return genres[id] || 'Desconocido';
-}
-
-// Total de páginas
 const totalPages = 190;
 ---
 <Layout title="Plataformas">
@@ -198,7 +55,7 @@ const totalPages = 190;
         <section class="mb-8">
             <h3 class="text-xl font-semibold text-gray-700 mb-4">Filtrar por plataforma</h3>
             <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-4">
-                <a href={createUrlWithParams({platform: 'all'})}
+                <a href={`?page=1&type=${type}&platform=all`}
                 class={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all shadow-sm hover:shadow-md hover:scale-105 ${
                     platformParam === 'all'
                         ? 'bg-ice-blue text-white border-ice-blue'
@@ -207,10 +64,10 @@ const totalPages = 190;
                     <span class="text-sm font-medium">Todas</span>
                 </a>
 
-                {platforms.map((platform) => (
-                        <a href={createUrlWithParams({platform: platform.id})}
+                {platformList.map((platform) => (
+                        <a href={`?page=1&type=${type}&platform=${platform.slug}`}
                         class={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all shadow-sm hover:shadow-md hover:scale-105 ${
-                            platformParam === platform.id
+                            platformParam === platform.slug
                                 ? 'bg-ice-blue text-white border-ice-blue'
                                 : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                         }`}>
@@ -221,38 +78,7 @@ const totalPages = 190;
             </div>
         </section>
 
-        <!-- Navegación de filtros mejorada -->
-        <div class="flex justify-center sticky top-5 z-40 mb-8">
-            <div class="inline-flex bg-white/95 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-gray-200">
-                <a href={`?page=1&type=all&platform=${platformParam}`}
-                class={`filter-btn ${type === 'all' ? 'active' : ''}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M19 11H5m14-4H3m16 8H7m10 4H5"/>
-                    </svg>
-                    Todo
-                </a>
-                <a href={`?page=1&type=movies&platform=${platformParam}`}
-                class={`filter-btn ${type === 'movies' ? 'active' : ''}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                    </svg>
-                    Películas
-                </a>
-                <a href={`?page=1&type=series&platform=${platformParam}`}
-                class={`filter-btn ${type === 'series' ? 'active' : ''}`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                    </svg>
-                    Series
-                </a>
-            </div>
-        </div>
+        <FilterBar currentType={type} buildUrl={(t) => `?page=1&type=${t}&platform=${platformParam}`} />
 
         <!-- Información de paginación superior mejorada y más responsive -->
         <div class="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 md:p-6 mb-8 shadow-sm border border-gray-100">
@@ -306,7 +132,7 @@ const totalPages = 190;
                 } de {
                     platformParam === 'all'
                         ? 'todas las plataformas'
-                        : platforms.find(p => p.id === platformParam)?.name
+                        : platformList.find(p => p.slug === platformParam)?.name
                 }
         </span>
             </h2>
@@ -392,340 +218,6 @@ const totalPages = 190;
                 </div>
         )}
 
-        <!-- Paginación mejorada -->
-        <nav aria-label="Paginación" class="mt-12">
-            <!-- Navegación móvil -->
-            <div class="flex sm:hidden items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-                <a href={`?page=${Math.max(1, page - 1)}&type=${type}&platform=${platformParam}`}
-                class={`pagination-btn-mobile ${page === 1 ? 'disabled' : ''}`}
-                aria-disabled={page === 1}>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                    </svg>
-                    Anterior
-                </a>
-
-                <div class="flex items-center gap-2 px-4">
-                    <span class="text-sm text-gray-600">Página</span>
-                    <span class="px-3 py-1 bg-coral-red text-white rounded-lg font-semibold text-sm">{page}</span>
-                    <span class="text-sm text-gray-600">/{totalPages}</span>
-                </div>
-
-                <a href={`?page=${Math.min(totalPages, page + 1)}&type=${type}&platform=${platformParam}`}
-                class={`pagination-btn-mobile ${page === totalPages ? 'disabled' : ''}`}
-                aria-disabled={page === totalPages}>
-                    Siguiente
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </a>
-            </div>
-
-            <!-- Navegación escritorio -->
-            <div class="hidden sm:flex justify-center">
-                <div class="inline-flex items-center bg-white rounded-xl p-2 shadow-sm border border-gray-100">
-                    <!-- Botón anterior -->
-                    <a href={`?page=${Math.max(1, page - 1)}&type=${type}&platform=${platformParam}`}
-                    class={`pagination-btn ${page === 1 ? 'disabled' : ''}`}
-                    aria-disabled={page === 1}>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                        Anterior
-                    </a>
-
-                    <!-- Primera página -->
-                    {page > 2 && (
-                            <>
-                                <a href={`?page=1&type=${type}&platform=${platformParam}`} class="pagination-number">1</a>
-                                {page > 3 && <span class="px-2 text-gray-400">...</span>}
-                            </>
-                    )}
-
-                    <!-- Página anterior -->
-                    {page > 1 && (
-                            <a href={`?page=${page - 1}&type=${type}&platform=${platformParam}`}
-                            class="pagination-number">{page - 1}</a>
-                    )}
-
-                    <!-- Página actual -->
-                    <span class="pagination-number active">{page}</span>
-
-                    <!-- Página siguiente -->
-                    {page < totalPages && (
-                            <a href={`?page=${page + 1}&type=${type}&platform=${platformParam}`}
-                            class="pagination-number">{page + 1}</a>
-                    )}
-
-                    <!-- Última página -->
-                    {page < totalPages - 1 && (
-                            <>
-                                {page < totalPages - 2 && <span class="px-2 text-gray-400">...</span>}
-                                <a href={`?page=${totalPages}&type=${type}&platform=${platformParam}`}
-                                class="pagination-number">{totalPages}</a>
-                            </>
-                    )}
-
-                    <!-- Botón siguiente -->
-                    <a href={`?page=${Math.min(totalPages, page + 1)}&type=${type}&platform=${platformParam}`}
-                    class={`pagination-btn ${page === totalPages ? 'disabled' : ''}`}
-                    aria-disabled={page === totalPages}>
-                        Siguiente
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </a>
-                </div>
-            </div>
-        </nav>
+        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => `?page=${p}&type=${type}&platform=${platformParam}`} />
     </section>
 </Layout>
-
-<style is:global>
-    html {
-        scroll-behavior: smooth;
-    }
-
-    .text-coral-red {
-        color: #E63946;
-    }
-
-    .bg-coral-red {
-        background-color: #E63946;
-    }
-
-    .border-coral-red {
-        border-color: #E63946;
-    }
-
-    .underline-custom {
-        text-decoration: underline;
-        text-decoration-color: #E63946; /* el color coral */
-    }
-
-    #toggleSidebar:checked ~ #sidebar {
-        transform: translateX(0);
-    }
-
-    .bg-ice-blue {
-        background-color: #3B82F6;
-    }
-
-    .border-ice-blue {
-        border-color: #3B82F6;
-    }
-
-    /* Estilos para asegurar cards del mismo tamaño */
-    .card-wrapper {
-        display: flex;
-        height: 100%;
-    }
-
-    .card-wrapper > * {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-        height: 100%;
-    }
-
-    /* Asegurar que todas las imágenes tengan el mismo tamaño */
-    .card-wrapper img {
-        width: 100%;
-        aspect-ratio: 2/3;
-        object-fit: cover;
-    }
-
-    /* Asegurar que los títulos tengan una altura fija */
-    .card-wrapper h3,
-    .card-wrapper h4 {
-        height: 3em;
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-    }
-
-    /* Para el contenido de la tarjeta */
-    .card-wrapper > div {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        background-color: white;
-        border-radius: 0.5rem;
-        overflow: hidden;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        height: 100%;
-    }
-
-    /* Para descripciones/overview */
-    .card-wrapper p {
-        overflow: hidden;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        flex-grow: 1;
-    }
-
-    @media (prefers-color-scheme: dark) {
-        .card-wrapper > div {
-            background-color: #1E1E1E;
-            color: #E5E5E5;
-        }
-    }
-
-    @keyframes click-bounce {
-        0% {
-            transform: scale(1);
-        }
-        50% {
-            transform: scale(0.93);
-        }
-        100% {
-            transform: scale(1);
-        }
-    }
-
-    .button-bounce:active {
-        animation: click-bounce 0.25s ease-in-out;
-    }
-
-    /* Por defecto, mostrar ambas secciones */
-    #peliculas, #series {
-        display: block;
-    }
-
-    /* Cuando se hace clic en "Ir a Películas" (#peliculas está activo) */
-    #peliculas:target ~ #series {
-        display: none;
-    }
-
-    /* Cuando se hace clic en "Ir a Series" (#series está activo) */
-    #series:target ~ #peliculas {
-        display: none;
-    }
-
-    /* Alternativa más específica si la anterior no funciona debido a la estructura HTML */
-    body:has(#peliculas:target) #series {
-        display: none;
-    }
-
-    body:has(#series:target) #peliculas {
-        display: none;
-    }
-
-    /* Filtros mejorados */
-    .filter-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1.25rem;
-        border-radius: 1rem;
-        font-weight: 600;
-        font-size: 0.875rem;
-        text-decoration: none;
-        transition: all 0.2s ease-in-out;
-        color: #6B7280;
-        background-color: transparent;
-    }
-
-    .filter-btn:hover {
-        background-color: #F3F4F6;
-        color: #374151;
-        transform: translateY(-1px);
-    }
-
-    .filter-btn.active {
-        background-color: #E63946;
-        color: white;
-        box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
-    }
-
-    /* Paginación mejorada */
-    .pagination-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1rem;
-        border-radius: 0.75rem;
-        font-weight: 600;
-        font-size: 0.875rem;
-        text-decoration: none;
-        transition: all 0.2s ease-in-out;
-        color: #374151;
-        background-color: #F9FAFB;
-        border: 1px solid #E5E7EB;
-    }
-
-    .pagination-btn:hover:not(.disabled) {
-        background-color: #E63946;
-        color: white;
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(230, 57, 70, 0.3);
-    }
-
-    .pagination-btn.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        pointer-events: none;
-    }
-
-    .pagination-btn-mobile {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        padding: 0.75rem 1rem;
-        border-radius: 0.75rem;
-        font-weight: 600;
-        font-size: 0.875rem;
-        text-decoration: none;
-        transition: all 0.2s ease-in-out;
-        color: #374151;
-        background-color: #F9FAFB;
-        border: 1px solid #E5E7EB;
-        min-width: 100px;
-        justify-content: center;
-    }
-
-    .pagination-btn-mobile:hover:not(.disabled) {
-        background-color: #E63946;
-        color: white;
-        transform: translateY(-1px);
-    }
-
-    .pagination-btn-mobile.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        pointer-events: none;
-    }
-
-    .pagination-number {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 2.5rem;
-        height: 2.5rem;
-        border-radius: 0.75rem;
-        font-weight: 600;
-        font-size: 0.875rem;
-        text-decoration: none;
-        transition: all 0.2s ease-in-out;
-        color: #6B7280;
-        background-color: transparent;
-    }
-
-    .pagination-number:hover {
-        background-color: #F3F4F6;
-        color: #374151;
-    }
-
-    .pagination-number.active {
-        background-color: #E63946;
-        color: white;
-        box-shadow: 0 2px 8px rgba(230, 57, 70, 0.3);
-    }
-
-</style>

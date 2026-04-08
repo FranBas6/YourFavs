@@ -1,34 +1,23 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import type { Movie } from "../../types/ApiMovie";
+import type { CastMember, Provider, ProductionCompany } from "../../types/Media";
 import {
-    getMovieById,
-    getMovieCast,
-    getMovieDirectorsAndRoles,
-    getMovieTrailer,
-    fetchAllMoviePosters,
-    getMovieCollectionInfo,
-    getMovieRecommendationsOrSimilar,
-    getMoviesAdditionalInfo,
-    getMovieVideos
+    getLanguageDisplayName, getContentRating,
+    formatDate, getRatingStars, formatTrailerUrl, providerLinks
+} from "../../utils/constants/helpers/media-helpers";
+import {formatCurrency} from "../../utils/constants/helpers/movie-helpers";
+import {handleMovieFavAction} from "../../services/BD/movies/yourfavsMovie";
+import '../../styles/pages/movie/movie.css';
+import {
+    getMovieById, getMovieCast, getMovieDirectorsAndRoles,
+    getMovieTrailer, fetchAllMoviePosters, getMovieCollectionInfo,
+    getMovieRecommendationsOrSimilar, getMoviesAdditionalInfo, getMovieVideos
 } from "../../services/API/Movies/InfoMovies";
 import {initializeApp} from "firebase/app";
-import {
-    getFirestore,
-    doc,
-    getDoc,
-    setDoc,
-    deleteDoc,
-    updateDoc,
-    deleteField
-} from "firebase/firestore";
-
-// Configuración de Firebase
+import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-// Initialize Cloud Firestore
 const db = getFirestore(app);
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
@@ -37,150 +26,27 @@ if (!id) {
     throw new Error("ID de la película no encontrado en la URL");
 }
 
-// Procesar el formulario cuando se envíe un POST
 if (Astro.request.method === 'POST') {
-    const formData = await Astro.request.formData();
-    const movieId = String(formData.get('id'));
-    const action = String(formData.get('action'));
-    const listType = String(formData.get('list_type'));
-
-    // Procesar géneros en formato JSON
-    let genres = [];
     try {
-        genres = JSON.parse(String(formData.get('genres')) || '[]');
+        const formData = await Astro.request.formData();
+        const redirectUrl = await handleMovieFavAction(formData);
+        return Astro.redirect(redirectUrl);
     } catch (error) {
-        console.error("Error al parsear los géneros:", error);
-    }
-
-    // Crear un nuevo objeto con los datos de la película
-    const movieDataBase = {
-        id: movieId,
-        poster_path: String(formData.get('poster_path') || ''),
-        title: String(formData.get('title') || 'Sin nombre'),
-        vote_average: Number(formData.get('vote_average') || 0),
-        overview: String(formData.get('overview') || 'Sin descripción'),
-        added_at: new Date(),
-        genres: genres,
-        release_date: String(formData.get('release_date') || ''),
-    } as const;
-
-    // Buscar opinión existente en cualquier colección
-    let existingOpinion = '';
-    const collectionsToCheck = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
-    
-    for (const col of collectionsToCheck) {
-        const checkRef = doc(db, col, movieId);
-        const checkSnap = await getDoc(checkRef);
-        if (checkSnap.exists() && checkSnap.data()?.opinion) {
-            existingOpinion = checkSnap.data()?.opinion;
-            break;
-        }
-    }
-
-    const opinionTextForCreate = String(formData.get('opinion') || '').trim() || existingOpinion;
-    const movieData = opinionTextForCreate
-        ? { ...movieDataBase, opinion: opinionTextForCreate }
-        : movieDataBase;
-
-    // Guardar/actualizar opinión en todas las colecciones
-    if (action === 'save_opinion') {
-        const opinionText = String(formData.get('opinion') || '').trim();
-        const collections = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
-        for (const col of collections) {
-            const ref = doc(db, col, movieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { opinion: opinionText });
-            }
-        }
+        console.error('Error al gestionar la película:', error);
         return Astro.redirect(`/movie/${id}`);
     }
-
-    // Eliminar opinión en todas las colecciones
-    if (action === 'delete_opinion') {
-        const collections = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
-        for (const col of collections) {
-            const ref = doc(db, col, movieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { opinion: deleteField() });
-            }
-        }
-        return Astro.redirect(`/movie/${id}`);
-    }
-
-    // Determinar en qué colección de Firestore realizar la operación según el tipo de lista
-    let collectionName;
-    if (listType === 'favorites') {
-        collectionName = 'MovieFavs';
-    } else if (listType === 'pendientes') {
-        collectionName = 'MoviesPendientes';
-    } else if (listType === 'vistas') {
-        collectionName = 'MoviesVistas';
-    } else if (listType === 'verPronto') {
-        collectionName = 'MoviesVerPronto';
-    } else if (listType === 'liked') {
-        collectionName = 'LikedMovies';
-    } else {
-        console.error("Tipo de lista no reconocido:", listType);
-        return Astro.redirect(`/movie/${id}`); // Redirigir si el tipo de lista no es válido
-    }
-
-    if (collectionName) {
-        // Crear referencia al documento en la colección apropiada
-        const docRef = doc(db, collectionName, movieId);
-
-        // Verificar si la película ya existe en la lista correspondiente
-        const docSnap = await getDoc(docRef);
-        const exists = docSnap.exists();
-
-        if (action === 'add' && !exists) {
-            // Insertar la película en Firestore
-            await setDoc(docRef, movieData);
-        } else if (action === 'remove' && exists) {
-            // Eliminar la película de Firestore
-            await deleteDoc(docRef);
-        }
-    }
-
-    // Redirigir de vuelta a la página de la película
-    return Astro.redirect(`/movie/${id}`);
-}
-
-// Definir la interfaz para el reparto
-interface MovieCastMember {
-    name: string;
-    character: string;
-    id: number;
-    profile_path?: string; // Añadida la propiedad que faltaba
-}
-
-// Definir la interfaz para los providers
-interface MovieProvider {
-    provider_id: number;
-    provider_name: string;
-    logo_path: string;
-    type?: 'flatrate' | 'rent' | 'buy';
-}
-
-// Definir la interfaz para las productoras
-interface ProductionCompany {
-    id: number;
-    name: string;
-    logo_path?: string;
-    origin_country?: string;
 }
 
 // Obtener datos de la película
 let item = null;
-let cast: MovieCastMember[] = []; // Cambio aquí: de string[] a MovieCastMember[]
+let cast: CastMember[] = []; // Cambio aquí: de string[] a CastMember[]
 let directors: { name: string; job: string }[] = [];
 let trailerUrl: string | null = null;
 let title = "Película no encontrada";
 
 if (id) {
     item = await getMovieById({id});
-    cast = await getMovieCast(id); // Ahora retorna MovieCastMember[]
+    cast = await getMovieCast(id); // Ahora retorna CastMember[]
     directors = await getMovieDirectorsAndRoles(id);
     trailerUrl = await getMovieTrailer(id);
     title = item?.title || title;
@@ -235,58 +101,7 @@ const opinionFromAny = (
     ''
 ) as string;
 
-// Formatear la fecha para mejor visualización
-const formatDate = (dateString: string) => {
-    if (!dateString) return "No disponible";
-    const date = new Date(dateString);
-    return new Intl.DateTimeFormat('es-ES', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    }).format(date);
-};
-
-const providerLinks: Record<string, string> = {
-    'Netflix': 'https://www.netflix.com/',
-    'Disney Plus': 'https://www.disneyplus.com/',
-    'HBO Max': 'https://www.hbomax.com/',
-    'Amazon Prime Video': 'https://www.primevideo.com/',
-    'Amazon Video': 'https://www.amazon.com/dp/B08J4Q4Z5D',
-    'Apple TV+': 'https://tv.apple.com/',
-    'Apple TV': 'https://tv.apple.com/',
-    'Filmin': 'https://www.filmin.es/',
-    'Movistar Plus+': 'https://www.movistarplus.es/',
-    'Rakuten TV': 'https://rakuten.tv/',
-    'SkyShowtime': 'https://www.skyshowtime.com/',
-    'MUBI': 'https://mubi.com/',
-    'FlixOlé': 'https://flixole.com/',
-    'Atresplayer': 'https://www.atresplayer.com/',
-    'RTVE Play': 'https://www.rtve.es/play/',
-    'Google Play Movies': 'https://play.google.com/store/movies',
-    'YouTube': 'https://www.youtube.com/',
-    'Microsoft Store': 'https://www.microsoft.com/store/movies',
-    'Plex': 'https://www.plex.tv/',
-    'fuboTV': 'https://www.fubo.tv/',
-    'Hayu': 'https://www.hayu.com/',
-    'Curiosity Stream': 'https://curiositystream.com/',
-    'GuideDoc': 'https://guidedoc.tv/',
-    'MagellanTV': 'https://www.magellantv.com/',
-    'DOCSVILLE': 'https://www.docsville.com/',
-    'WOW Presents Plus': 'https://www.wowpresentsplus.com/',
-    'Mitele': 'https://www.mitele.es/',
-    'StarzPlay': 'https://www.starzplay.com/',
-    'Paramount+': 'https://www.paramountplus.com/',
-    'Peacock': 'https://www.peacocktv.com/',
-    'Tubi': 'https://tubitv.com/',
-    'Pluto TV': 'https://pluto.tv/',
-    'Crunchyroll': 'https://www.crunchyroll.com/',
-    'Funimation': 'https://www.funimation.com/',
-    'Vix': 'https://vix.com/',
-    'Cinepolis Klic': 'https://www.cinepolisklic.com/'
-    // Agrega más proveedores según sea necesario
-};
-
-const providerElements = item?.providers?.map((provider: MovieProvider) => {
+const providerElements = item?.providers?.map((provider: Provider) => {
     const link = providerLinks[provider.provider_name];
     const hasLogo = !!provider.logo_path;
     return {
@@ -304,39 +119,6 @@ const providersByType = providerElements.reduce((acc: Record<string, any[]>, p: 
     acc[key].push(p);
     return acc;
 }, {} as Record<string, any[]>);
-
-// Función para convertir rating a estrellas
-const getRatingStars = (rating: number) => {
-    if (!rating) return "";
-    const fullStars = Math.floor(rating / 2);
-    const halfStar = rating % 2 >= 1 ? 1 : 0;
-    const emptyStars = 5 - fullStars - halfStar;
-
-    return "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(emptyStars);
-};
-
-function formatTrailerUrl(url: string): string {
-    // Si ya es una URL de embed, devolverla tal cual
-    if (url.includes('youtube.com/embed/')) {
-        return url;
-    }
-
-    let videoId = '';
-
-    if (url.includes('youtube.com/watch')) {
-        const urlObj = new URL(url);
-        const id = urlObj.searchParams.get('v');
-        if (id) videoId = id;
-    } else if (url.includes('youtu.be/')) {
-        videoId = url.split('youtu.be/')[1].split('?')[0];
-    }
-
-    if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`;
-    }
-
-    return url;
-}
 
 import type {PosterImage} from '../../services/API/Movies/InfoMovies'; // Asegúrate de exportar este tipo desde tu archivo api.ts
 
@@ -361,27 +143,6 @@ if (item?.belongs_to_collection) {
     } catch (error) {
         console.error('Error al obtener información de la colección:', error);
     }
-}
-
-// Lenguajes mapeados para mostrar nombres en español
-const languageMap = {
-    en: "Inglés",
-    es: "Español",
-    fr: "Francés",
-    de: "Alemán",
-    it: "Italiano",
-    pt: "Portugués",
-    ru: "Ruso",
-    ja: "Japonés",
-    ko: "Coreano",
-    zh: "Chino",
-    ar: "Árabe",
-    hi: "Hindi",
-    // Añade más mapeos según necesites
-};
-
-function getLanguageName(code: string): string {
-    return languageMap[code as keyof typeof languageMap] || code;
 }
 
 // Recomendaciones o similares
@@ -414,119 +175,6 @@ const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
 const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
-
-// Función para obtener el nombre del idioma en español
-const getLanguageDisplayName = (iso: string) => {
-    const languageMap: Record<string, string> = {
-        'en': 'Inglés',
-        'es': 'Español',
-        'fr': 'Francés',
-        'de': 'Alemán',
-        'it': 'Italiano',
-        'pt': 'Portugués',
-        'ru': 'Ruso',
-        'ja': 'Japonés',
-        'ko': 'Coreano',
-        'zh': 'Chino',
-        'ar': 'Árabe',
-        'hi': 'Hindi',
-        'nl': 'Neerlandés',
-        'sv': 'Sueco',
-        'da': 'Danés',
-        'fi': 'Finlandés',
-        'no': 'Noruego',
-        'pl': 'Polaco',
-        'cs': 'Checo',
-        'hu': 'Húngaro',
-        'tr': 'Turco',
-        'el': 'Griego',
-        'ro': 'Rumano',
-        'hr': 'Croata',
-        'bg': 'Búlgaro',
-        'sr': 'Serbio',
-        'uk': 'Ucraniano',
-        'he': 'Hebreo',
-        'th': 'Tailandés',
-        'vi': 'Vietnamita',
-        'id': 'Indonesio',
-        'ms': 'Malayo',
-        'tl': 'Tagalo',
-        'sw': 'Suajili',
-        'is': 'Islandés',
-        'lv': 'Letón',
-        'lt': 'Lituano',
-        'sk': 'Eslovaco',
-        'sl': 'Esloveno',
-        'et': 'Estonio',
-        'mk': 'Macedonio',
-        'hy': 'Armenio',
-        'ka': 'Georgiano',
-        'am': 'Amárico',
-        'sq': 'Albanés',
-        'mt': 'Maltés',
-        'bs': 'Bosnio',
-        'ne': 'Nepalí',
-        'pa': 'Punjabi',
-        'gu': 'Gujarati',
-        'te': 'Telugu',
-        'ta': 'Tamil',
-        'ml': 'Malabar',
-        'mr': 'Marathi',
-        'kn': 'Kannada',
-        'or': 'Odia',
-        'as': 'Assamés',
-        'bn': 'Bengalí',
-        'si': 'Cingalés',
-        'ur': 'Urdu'
-    };
-    return languageMap[iso] || iso.toUpperCase();
-};
-
-// Función para obtener la clasificación por edades en español
-const getContentRating = (ratings: any[]): { text: string; rating: string } | null => {
-    // Priorizar rating de España (ES), luego US, luego cualquier otro
-    const esRating = ratings.find((r: any) => r.iso_3166_1 === 'ES');
-    const usRating = ratings.find((r: any) => r.iso_3166_1 === 'US');
-    const rating = esRating || usRating || ratings[0];
-    
-    if (!rating) return null;
-    
-    const ratingMap: Record<string, Record<string, string>> = {
-        'ES': {
-            'APTA': 'Apta para todos los públicos',
-            '7': 'No recomendada para menores de 7 años',
-            '12': 'No recomendada para menores de 12 años',
-            '16': 'No recomendada para menores de 16 años',
-            '18': 'No recomendada para menores de 18 años',
-            'X': 'Película X'
-        } as Record<string, string>,
-        'US': {
-            'G': 'G - Todos los públicos',
-            'PG': 'PG - Guía parental sugerida',
-            'PG-13': 'PG-13 - Padres fuertemente advertidos',
-            'R': 'R - Restringida',
-            'NC-17': 'NC-17 - Solo adultos'
-        } as Record<string, string>
-    };
-    
-    const countryMap = ratingMap[rating.iso_3166_1 as string];
-    if (countryMap && countryMap[rating.rating]) {
-        return { text: countryMap[rating.rating], rating: rating.rating };
-    }
-    
-    return { text: `${rating.rating} (${rating.iso_3166_1})`, rating: rating.rating };
-};
-
-// Formatear presupuesto y recaudación
-const formatCurrency = (amount: number) => {
-    if (!amount || amount === 0) return null;
-    return new Intl.NumberFormat('es-ES', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0
-    }).format(amount);
-};
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
@@ -1006,7 +654,7 @@ const formatCurrency = (amount: number) => {
                                         Idioma original:
                                     </span>
                                     <span class="font-medium text-gray-800">
-                                        {getLanguageName(item?.original_language)}
+                                        {getLanguageDisplayName(item?.original_language)}
                                     </span>
                                 </li>
                                 {item?.original_title && item?.original_title !== item?.title && (
@@ -1680,180 +1328,3 @@ const formatCurrency = (amount: number) => {
         </div>
     </article>
 </Layout>
-
-<style>
-    /* Estilos básicos */
-    .transition-all {
-        transition: all 0.3s ease-in-out;
-    }
-
-    .text-yellow-400 {
-        color: #fbbf24;
-    }
-
-    /* Efecto hover para imágenes */
-    img.hover\:scale-105:hover {
-        transform: scale(1.05);
-    }
-
-    /* Gradiente para el texto sobre imágenes oscuras */
-    .text-shadow {
-        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    /* Mejorar legibilidad para estrellas de rating */
-    .rating-stars {
-        letter-spacing: 1px;
-    }
-
-    .modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
-        display: none;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    .modal:target {
-        display: flex;
-    }
-
-    .modal img {
-        max-width: 90%;
-        max-height: 90%;
-        border-radius: 0.5rem;
-    }
-
-    .modal-close {
-        position: absolute;
-        top: 2rem;
-        right: 2rem;
-        color: white;
-        font-size: 2rem;
-        text-decoration: none;
-        font-weight: bold;
-    }
-
-    /* Estilos CSS para el componente */
-    .recommendations-carousel {
-        position: relative;
-    }
-
-    /* Gradientes laterales para indicar scroll */
-    .recommendations-carousel::before,
-    .recommendations-carousel::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        bottom: 0;
-        width: 30px;
-        z-index: 5;
-        pointer-events: none;
-    }
-
-    /* Animación de aparición de las cards */
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-
-    .animate-fade-in-up {
-        animation: fadeInUp 0.5s ease forwards;
-        opacity: 0;
-    }
-
-    /* Clases para truncar texto */
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    /* Hover effects mejorados */
-    .recommendation-card {
-        transition: transform 0.3s ease;
-    }
-
-    .recommendation-card:hover {
-        transform: translateY(-8px);
-    }
-
-    /* Responsive design */
-    @media (max-width: 768px) {
-        .recommendation-card {
-            width: 140px;
-        }
-
-        .recommendations-carousel::before,
-        .recommendations-carousel::after {
-            width: 20px;
-        }
-
-        .recommendations-container {
-            padding-left: 4px;
-            padding-right: 4px;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .recommendation-card {
-            width: 120px;
-        }
-
-        .recommendations-carousel {
-            padding: 0;
-        }
-    }
-
-    /* Mejora de accesibilidad */
-    @media (prefers-reduced-motion: reduce) {
-        .animate-fade-in-up {
-            animation: none;
-            opacity: 1;
-        }
-
-        .recommendation-card,
-        .recommendation-card img,
-        .recommendation-card > a > div,
-        .recommendation-card .bg-white\/90 {
-            transition: none;
-        }
-    }
-
-    /* Indicador visual de que se puede hacer scroll */
-    .recommendations-container {
-        scroll-snap-type: x mandatory;
-    }
-
-    .recommendation-card {
-        scroll-snap-align: start;
-    }
-
-    /* Estilos adicionales para mejor UX */
-    .recommendations-container:hover {
-        cursor: grab;
-    }
-
-    .recommendations-container:active {
-        cursor: grabbing;
-    }
-</style>

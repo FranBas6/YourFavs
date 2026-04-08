@@ -1,4 +1,8 @@
 ---
+import '../../styles/components/cards.css';
+import {formatCardDate, getPopularityColor} from "../../utils/constants/helpers/card-helpers";
+import {calculateAge} from "../../utils/constants/helpers/actor-helpers";
+
 interface Props {
     id: string;
     nombre: string;
@@ -17,42 +21,8 @@ const {
     fechaNacimiento
 } = Astro.props;
 
-// Formatear la fecha en formato legible
-const formatDate = (dateString: string | undefined) => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {year: 'numeric', month: 'short', day: 'numeric'});
-};
-
-// Calcular edad
-const calculateAge = (birthday: string | undefined) => {
-    if (!birthday) return null;
-    const birthDate = new Date(birthday);
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    return age;
-};
-
-// Placeholder para imagen no disponible
 const placeholderImg = "/placeholder-actor.jpg";
-
-// Calcular si el actor es popular (popularidad mayor a 15)
 const isPopular = popularidad >= 15;
-
-// Color de fondo basado en la popularidad
-const getPopularityColor = (pop: number) => {
-    if (pop >= 20) return "bg-emerald-500 text-white";
-    if (pop >= 15) return "bg-green-500 text-white";
-    if (pop >= 10) return "bg-yellow-500 text-gray-900";
-    if (pop >= 5) return "bg-orange-500 text-white";
-    return "bg-red-500 text-white";
-};
-
-// Calcular edad
 const age = calculateAge(fechaNacimiento);
 ---
 <div class="media-card group">
@@ -112,7 +82,7 @@ const age = calculateAge(fechaNacimiento);
                               d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <span class="font-semibold text-pastel-yellow">Nacimiento:</span>
-                    <span class="ml-1">{fechaNacimiento ? formatDate(fechaNacimiento) : "No disponible"}</span>
+                    <span class="ml-1">{fechaNacimiento ? formatCardDate(fechaNacimiento) : "No disponible"}</span>
                     {age && <span class="ml-1 text-pastel-yellow">({age} años)</span>}
                 </div>
 
@@ -145,30 +115,15 @@ const age = calculateAge(fechaNacimiento);
 </div>
 
 <style>
-    .media-card {
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        will-change: transform;
-    }
-
-    .media-card:hover {
-        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
-        z-index: 1;
-    }
-
     .rating-badge {
-        @apply absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded;
+        position: absolute;
+        top: 0.75rem;
+        right: 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .year-badge {
-        @apply text-xs font-medium px-2 py-1 rounded bg-gray-700 text-coral-white text-center;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    .genre-tag {
-        @apply text-xs px-2 py-0.5 rounded-full bg-dark-blue text-coral-white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        transition: background-color 0.2s ease, transform 0.2s ease;
     }
 
     .genre-tag:hover {
@@ -177,74 +132,9 @@ const age = calculateAge(fechaNacimiento);
     }
 
     .info-pill {
-        @apply flex items-center gap-1 mb-1;
-    }
-
-    .view-details-btn {
-        @apply text-xs flex items-center justify-center py-2 px-4 rounded-full font-medium text-coral-plat bg-dark-blue transition duration-200 backdrop-blur-sm;
-        border: 1px solid rgba(255, 255, 255, 0.15);
-        background-color: rgba(17, 45, 125, 0.8);
-    }
-
-    .view-details-btn:hover {
-        background-color: #FACC15;
-        color: #111827;
-        box-shadow: 0 2px 8px rgba(250, 204, 21, 0.5);
-    }
-
-    /* Line clamp para limitar líneas de texto */
-    .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .line-clamp-3 {
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-
-    .badge {
-        backdrop-filter: blur(4px);
-        animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-        0% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.8;
-        }
-        100% {
-            opacity: 1;
-        }
-    }
-
-    .bg-midnight-blue {
-        background-color: #0F172A;
-    }
-
-    .bg-dark-blue {
-        background-color: #1E3A8A;
-    }
-
-    .text-coral-plat {
-        color: #ffffff;
-    }
-
-    .text-coral-white {
-        color: #d5d5d2;
-    }
-
-    .bg-pastel-yellow {
-        background-color: #FACC15;
-    }
-
-    .text-pastel-yellow {
-        color: #FACC15;
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-bottom: 0.25rem;
     }
 </style>

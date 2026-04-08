@@ -1,0 +1,89 @@
+.stats-toggle {
+    display: none;
+}
+
+.stats-panel {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: opacity 0.4s ease, max-height 0.4s ease;
+    pointer-events: none;
+}
+
+.stats-toggle:checked + .stats-button-container + .stats-panel {
+    max-height: 3000px;
+    opacity: 1;
+    pointer-events: all;
+    overflow: visible;
+}
+
+.stats-toggle:checked + .stats-button-container .stats-chevron {
+    transform: rotate(180deg);
+}
+
+.stats-toggle:checked + .stats-button-container .stats-toggle-btn {
+    background: linear-gradient(135deg, #7c3aed, #ec4899);
+    transform: scale(1.02);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3);
+}
+
+.stats-content {
+    transform: translateY(-10px);
+    transition: transform 0.3s ease-out 0.1s;
+}
+
+.stats-toggle:checked + .stats-button-container + .stats-panel .stats-content {
+    transform: translateY(0);
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.stats-toggle-btn:hover {
+    transform: scale(1.05);
+}
+
+.stats-chevron {
+    transition: transform 0.3s ease;
+}
+
+.series-stats, .movies-stats, .top-genres, .top-decades {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.visual-summary {
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(147, 51, 234, 0.1);
+}
+
+@media (max-width: 640px) {
+    .stats-panel {
+        margin: 0;
+        border-radius: 1rem;
+    }
+
+    .stats-content {
+        padding: 0.75rem !important;
+    }
+
+    .detailed-stats,
+    .popularity-stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .general-stats {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .series-stats,
+    .movies-stats,
+    .top-genres,
+    .top-decades {
+        padding: 0.75rem !important;
+        overflow-x: hidden;
+    }
+}
