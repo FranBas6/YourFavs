@@ -18,55 +18,38 @@ let seriesPendientes: any[] = [];
 let peliculasPendientes: any[] = [];
 let errorMessage = "";
 
-// Variables globales para almacenar datos de Firebase
 let seriesData: any[] = [];
 let moviesData: any[] = [];
 
-try {
-    console.log("🔄 Iniciando carga de pendientes...");
-    
-    // 🔹 Obtener IDs desde Firebase
-    [seriesData, moviesData] = await Promise.all([
-        getSeriesPendientes(),
-        getMoviesPendientes()
-    ]);
-    
-    const seriesPendientesIds = seriesData.map(s => s.id);
-    const peliculasPendientesIds = moviesData.map(p => p.id);
-    
-    console.log(`📊 Total a cargar: ${seriesPendientesIds.length} series, ${peliculasPendientesIds.length} películas`);
-
-    // 🔹 Obtener detalles desde TMDB en lotes
-    const [seriesResults, moviesResults] = await Promise.all([
-        processBatch(seriesPendientesIds, (id) => fetchSerieDetails(id), 10),
-        processBatch(peliculasPendientesIds, (id) => fetchMovieDetails(id), 10)
-    ]);
-    
-    seriesPendientes = seriesResults.filter(s => s !== null);
-    peliculasPendientes = moviesResults.filter(m => m !== null);
-    
-    console.log(`✅ Cargado exitosamente: ${seriesPendientes.length} series, ${peliculasPendientes.length} películas`);
-} catch (error) {
-    console.error("❌ Error al cargar contenido pendiente:", error);
-    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
-}
-
-// Obtener parámetros de URL
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
 const genreFilter = Astro.url.searchParams.get("genre") || "";
-
 const showSeries = filter === "series" || filter === "todos";
 const showMovies = filter === "peliculas" || filter === "todos";
 const showAll = filter === "todos";
 
-// Paginación - obtener parámetros
 const seriesPage = parseInt(Astro.url.searchParams.get("seriesPage") || "1");
 const moviesPage = parseInt(Astro.url.searchParams.get("moviesPage") || "1");
-
 const ITEMS_PER_PAGE = 20;
 
-// Calcular elementos a mostrar
+try {
+    [seriesData, moviesData] = await Promise.all([
+        getSeriesPendientes(),
+        getMoviesPendientes()
+    ]);
+
+    const [seriesResults, moviesResults] = await Promise.all([
+        processBatch(seriesData.map(s => s.id), (id) => fetchSerieDetails(id), 10),
+        processBatch(moviesData.map(p => p.id), (id) => fetchMovieDetails(id), 10)
+    ]);
+
+    seriesPendientes = seriesResults.filter(s => s !== null);
+    peliculasPendientes = moviesResults.filter(m => m !== null);
+} catch (error) {
+    console.error("Error al cargar contenido pendiente:", error);
+    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+}
+
 const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
 const moviesItemsToShow = moviesPage * ITEMS_PER_PAGE;
 
@@ -76,14 +59,13 @@ const peliculasPaginadas = peliculasPendientes.slice(0, moviesItemsToShow);
 const hasMoreSeries = seriesPendientes.length > seriesItemsToShow;
 const hasMoreMovies = peliculasPendientes.length > moviesItemsToShow;
 
-
 const pageUrl = Astro.url;
 
 const stats = calculateStats({
     seriesData,
     moviesData,
     seriesDetails: seriesPendientes,
-    moviesDetails: peliculasPendientes
+    moviesDetails: peliculasPendientes,
 });
 ---
 <Layout title="Pendientes">
@@ -137,7 +119,7 @@ const stats = calculateStats({
                                 </span>
                                 <span class="text-sm text-blue-600 bg-blue-100 rounded-full px-3 py-1 font-bold">
                                     {seriesPaginadas.length}
-                                    {searchQuery || genreFilter ? ` de ${seriesPendientes.length}` : ` de ${seriesPendientes.length}`}
+                                    {searchQuery || genreFilter ? ` de ${seriesData.length}` : ` de ${seriesData.length}`}
                                 </span>
                             </h3>
 
@@ -190,7 +172,7 @@ const stats = calculateStats({
                                             filter: filter,
                                             search: searchQuery,
                                             genre: genreFilter,
-                                            seriesPage: Math.ceil(seriesPendientes.length / ITEMS_PER_PAGE).toString(),
+                                            seriesPage: Math.ceil(seriesData.length / ITEMS_PER_PAGE).toString(),
                                             moviesPage: moviesPage.toString()
                                         }) + '#series-section'}
                                         class="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
@@ -198,7 +180,7 @@ const stats = calculateStats({
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                         </svg>
-                                        Mostrar todas las series restantes ({seriesPendientes.length - seriesItemsToShow})
+                                        Mostrar todas las series restantes ({seriesData.length - seriesItemsToShow})
                                     </a>
                                 </div>
                             )}
@@ -220,7 +202,7 @@ const stats = calculateStats({
                                 </span>
                                 <span class="text-sm text-red-600 bg-red-100 rounded-full px-3 py-1 font-bold">
                                     {peliculasPaginadas.length}
-                                    {searchQuery || genreFilter ? ` de ${peliculasPendientes.length}` : ` de ${peliculasPendientes.length}`}
+                                    {searchQuery || genreFilter ? ` de ${moviesData.length}` : ` de ${moviesData.length}`}
                                 </span>
                             </h3>
 
@@ -267,14 +249,14 @@ const stats = calculateStats({
                                             search: searchQuery,
                                             genre: genreFilter,
                                             seriesPage: seriesPage.toString(),
-                                            moviesPage: Math.ceil(peliculasPendientes.length / ITEMS_PER_PAGE).toString()
+                                            moviesPage: Math.ceil(moviesData.length / ITEMS_PER_PAGE).toString()
                                         }) + '#movies-section'}
                                         class="px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:from-red-700 hover:to-pink-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                                         </svg>
-                                        Mostrar todas las películas restantes ({peliculasPendientes.length - moviesItemsToShow})
+                                        Mostrar todas las películas restantes ({moviesData.length - moviesItemsToShow})
                                     </a>
                                 </div>
                             )}

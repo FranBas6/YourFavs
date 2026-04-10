@@ -12,26 +12,36 @@ import {allCategories} from "../utils/constants/categories";
 import '../styles/pages/index.css';
 
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
-
-const latestMovies = await getLatestMovies({page: page.toString()});
-const latestSeries = await getLatestSeries({page: page.toString()});
-const popularMovies = await getMostPopularMovies({page: page.toString()});
-const popularSeries = await getMostPopularSeries({page: page.toString()});
-const topRatedMovies = await getTopRatedMovies({page: page.toString()});
-const topRatedSeries = await getTopRatedSeries({page: page.toString()});
-
 const pageStr = page.toString();
-
-const platforms = await fetchAllPlatforms(pageStr);
-
-const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
 
 const randomIndex = Math.floor(Math.random() * allCategories.length);
 const randomCategorySlug = allCategories[randomIndex].slug;
 const randomCategoryName = allCategories[randomIndex].name;
 
-const categoriesMovies = await getMoviesByCategory(randomCategorySlug, page.toString());
-const categoriesSeries = await getSeriesByCategory(randomCategorySlug, page.toString());
+// Todas las llamadas TMDB en paralelo (antes eran 8 secuenciales + 1 paralela)
+const [
+    latestMovies,
+    latestSeries,
+    popularMovies,
+    popularSeries,
+    topRatedMovies,
+    topRatedSeries,
+    platforms,
+    categoriesMovies,
+    categoriesSeries,
+] = await Promise.all([
+    getLatestMovies({page: pageStr}),
+    getLatestSeries({page: pageStr}),
+    getMostPopularMovies({page: pageStr}),
+    getMostPopularSeries({page: pageStr}),
+    getTopRatedMovies({page: pageStr}),
+    getTopRatedSeries({page: pageStr}),
+    fetchAllPlatforms(pageStr),
+    getMoviesByCategory(randomCategorySlug, pageStr),
+    getSeriesByCategory(randomCategorySlug, pageStr),
+]);
+
+const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
 
 const randomCategory = {
     slug: randomCategorySlug,

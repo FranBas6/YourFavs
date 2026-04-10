@@ -14,23 +14,25 @@ import '../../styles/pages/catalogo/busqueda.css';
 
 const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
 const title = queryParams.get('query') || '';
-const allMovies = await loadAllPages(
-    ({title, page}) => getMoviesByTitle({title, page}),
-    title,
-    "title"
-);
 
-const allSeries = await loadAllPages(
-    ({title, page}) => getSeriesByTitle({title, page}),
-    title,
-    "title"
-);
-
-const allActors = await loadAllPages(
-    ({name, page}) => getActorsByName({name, page}),
-    title,
-    "name"
-);
+// Las 3 búsquedas en paralelo (antes eran secuenciales)
+const [allMovies, allSeries, allActors] = await Promise.all([
+    loadAllPages(
+        ({title, page}) => getMoviesByTitle({title, page}),
+        title,
+        "title"
+    ),
+    loadAllPages(
+        ({title, page}) => getSeriesByTitle({title, page}),
+        title,
+        "title"
+    ),
+    loadAllPages(
+        ({name, page}) => getActorsByName({name, page}),
+        title,
+        "name"
+    ),
+]);
 
 // Limitar a 65 elementos por categoría
 const limitedMovies = allMovies.slice(0, 65);

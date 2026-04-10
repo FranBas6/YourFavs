@@ -22,3 +22,36 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
+
+# Cache para páginas de catálogo (contenido público, cambia poco)
+# CDN de Netlify cachea 5 min, browser 1 min
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
+
+[[headers]]
+  for = "/catalogo/*"
+  [headers.values]
+    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
+
+[[headers]]
+  for = "/movie/*"
+  [headers.values]
+    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
+
+[[headers]]
+  for = "/serie/*"
+  [headers.values]
+    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
+
+[[headers]]
+  for = "/actor/*"
+  [headers.values]
+    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
+
+# Las páginas personales NO se cachean (datos del usuario)
+[[headers]]
+  for = "/personal/*"
+  [headers.values]
+    Cache-Control = "private, no-cache, no-store"
