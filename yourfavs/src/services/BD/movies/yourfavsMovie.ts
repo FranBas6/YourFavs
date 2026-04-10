@@ -89,8 +89,6 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     return `/movie/${movieId}`;
 }
 
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
-
 interface MovieInterface {
     id: string,
     title: string;
@@ -116,220 +114,49 @@ interface RecommendedMovie {
     genres: number[];
 }
 
-// Obtener películas favoritas ordenadas por fecha de añadido (más reciente primero)
-export const getMovieFav = async (): Promise<MovieInterface[]> => {
+// Helper para obtener documentos de una colección ordenados por fecha
+async function getMovieCollection(collectionName: string): Promise<MovieInterface[]> {
     try {
-        console.log("Intentando obtener películas favoritas...");
-
-        // Referencia a la colección de películas favoritas con ordenamiento
-        const movieFavsRef = collection(db, "MovieFavs");
-        const q = query(movieFavsRef, orderBy("added_at", "desc"));
-
-        // Obtener documentos ordenados
+        const ref = collection(db, collectionName);
+        const q = query(ref, orderBy("added_at", "desc"));
         const querySnapshot = await getDocs(q);
 
-        console.log("Resultado de la consulta ordenado:", querySnapshot);
+        if (querySnapshot.empty) return [];
 
-        if (querySnapshot.empty) {
-            console.warn("No se encontraron películas favoritas.");
-            return [];
-        }
-
-        // Convertir los documentos a un array de datos con el tipo MovieFavs
-        const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return {id: doc.id, ...doc.data()} as MovieInterface;
-        });
-
-        return result;
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MovieInterface));
     } catch (error) {
-        console.error("Error al obtener las películas favoritas:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+        console.error(`Error al obtener ${collectionName}:`, error);
         return [];
-    }
-};
-
-// Obtener películas pendientes ordenadas por fecha de añadido (más reciente primero)
-export const getMoviesPendientes = async (): Promise<MovieInterface[]> => {
-    try {
-        console.log("Intentando obtener películas pendientes...");
-
-        // Referencia a la colección de películas pendientes con ordenamiento
-        const moviesPendientesRef = collection(db, "MoviesPendientes");
-        const q = query(moviesPendientesRef, orderBy("added_at", "desc"));
-
-        // Obtener documentos ordenados
-        const querySnapshot = await getDocs(q);
-
-        console.log("Resultado de la consulta ordenado:", querySnapshot);
-
-        if (querySnapshot.empty) {
-            console.warn("No se encontraron películas pendientes.");
-            return [];
-        }
-
-        // Convertir los documentos a un array de datos con el tipo MoviesPendientes
-        const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return {id: doc.id, ...doc.data()} as MovieInterface;
-        });
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las películas pendientes:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-// Obtener películas vistas ordenadas por fecha de añadido (más reciente primero)
-export const getMoviesVistas = async (): Promise<MovieInterface[]> => {
-    try {
-        console.log("Intentando obtener películas vistas...");
-
-        // Referencia a la colección de películas vistas con ordenamiento
-        const moviesVistasRef = collection(db, "MoviesVistas");
-        const q = query(moviesVistasRef, orderBy("added_at", "desc"));
-
-        // Obtener documentos ordenados
-        const querySnapshot = await getDocs(q);
-
-        console.log("Resultado de la consulta ordenado:", querySnapshot);
-
-        if (querySnapshot.empty) {
-            console.warn("No se encontraron películas vistas.");
-            return [];
-        }
-
-        // Convertir los documentos a un array de datos con el tipo MoviesVistas
-        const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return {id: doc.id, ...doc.data()} as MovieInterface;
-        });
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las películas vistas:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-// Obtener películas vistas ordenadas por fecha de añadido (más reciente primero)
-export const getLikedMovies = async (): Promise<MovieInterface[]> => {
-    try {
-        console.log("Intentando obtener películas que te gustan...");
-
-        // Referencia a la colección de películas vistas con ordenamiento
-        const likedMoviesRef = collection(db, "LikedMovies");
-        const q = query(likedMoviesRef, orderBy("added_at", "desc"));
-
-        // Obtener documentos ordenados
-        const querySnapshot = await getDocs(q);
-
-        console.log("Resultado de la consulta ordenado:", querySnapshot);
-
-        if (querySnapshot.empty) {
-            console.warn("No se encontraron películas que te gustan.");
-            return [];
-        }
-
-        // Convertir los documentos a un array de datos con el tipo MoviesVistas
-        const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return {id: doc.id, ...doc.data()} as MovieInterface;
-        });
-
-        console.log(`✅ Se obtuvieron ${result.length} películas que te gustan`);
-        return result;
-    } catch (error) {
-        console.error("❌ Error al obtener las películas que te gustan:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        // Lanzar el error para que sea capturado en la página
-        throw new Error(`Error al cargar películas que te gustan: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-};
-
-// Obtener películas para ver pronto ordenadas por fecha de añadido (más reciente primero)
-export const getMoviesVerPronto = async (): Promise<MovieInterface[]> => {
-    try {
-        console.log("Intentando obtener películas para ver pronto...");
-
-        // Referencia a la colección de películas pendientes con ordenamiento
-        const moviesVerProntoRef = collection(db, "MoviesVerPronto");
-        const q = query(moviesVerProntoRef, orderBy("added_at", "desc"));
-
-        // Obtener documentos ordenados
-        const querySnapshot = await getDocs(q);
-
-        console.log("Resultado de la consulta ordenado:", querySnapshot);
-
-        if (querySnapshot.empty) {
-            console.warn("No se encontraron películas para ver pronto.");
-            return [];
-        }
-
-        // Convertir los documentos a un array de datos con el tipo MoviesPendientes
-        const result: MovieInterface[] = querySnapshot.docs.map(doc => {
-            return {id: doc.id, ...doc.data()} as MovieInterface;
-        });
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las películas para ver pronto:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-export async function clearAllMoviesVerPronto() {
-    try {
-        const peliculasVerProntoRef = collection(db, 'MoviesVerPronto');
-        const querySnapshot = await getDocs(peliculasVerProntoRef);
-
-        const deletePromises: Promise<void>[] = [];
-        querySnapshot.forEach((docSnapshot) => {
-            deletePromises.push(deleteDoc(doc(db, 'MoviesVerPronto', docSnapshot.id)));
-        });
-
-        await Promise.all(deletePromises);
-
-        return {
-            success: true,
-            deletedCount: deletePromises.length,
-            message: `Se borraron ${deletePromises.length} películas exitosamente`
-        };
-
-    } catch (error) {
-        console.error('Error al borrar todas las películas:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            message: 'Error al borrar las películas'
-        };
     }
 }
 
-// Eliminar una película de MoviesVerPronto por ID
-export async function deleteMovieVerProntoById(movieId: string) {
-    try {
-        await deleteDoc(doc(db, 'MoviesVerPronto', movieId));
-        return {success: true};
-    } catch (error) {
-        console.error('Error al borrar la película:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        };
-    }
+export const getMovieFav = () => getMovieCollection("MovieFavs");
+export const getMoviesPendientes = () => getMovieCollection("MoviesPendientes");
+export const getMoviesVistas = () => getMovieCollection("MoviesVistas");
+export const getLikedMovies = () => getMovieCollection("LikedMovies");
+export const getMoviesVerPronto = () => getMovieCollection("MoviesVerPronto");
+
+export async function clearAllMoviesVerPronto(): Promise<void> {
+    const peliculasVerProntoRef = collection(db, 'MoviesVerPronto');
+    const querySnapshot = await getDocs(peliculasVerProntoRef);
+
+    const deletePromises: Promise<void>[] = [];
+    querySnapshot.forEach((docSnapshot) => {
+        deletePromises.push(deleteDoc(doc(db, 'MoviesVerPronto', docSnapshot.id)));
+    });
+
+    await Promise.all(deletePromises);
 }
 
-import axios from 'axios';
+export async function deleteMovieVerProntoById(movieId: string): Promise<void> {
+    await deleteDoc(doc(db, 'MoviesVerPronto', movieId));
+}
 
-// Necesitarás una API key de TMDB
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+import { processBatch } from '../../../utils/processBatch';
+import { tmdbFetchList } from '../../API/shared/tmdbClient';
 
 export const getRecommendedMovies = async (limit: number = 20): Promise<RecommendedMovie[]> => {
     try {
-        console.log("Obteniendo películas recomendadas...");
-
-        // Obtener listas personales
         const [favoritas, liked, vistas, pendientes, verPronto] = await Promise.all([
             getMovieFav(),
             getLikedMovies(),
@@ -338,11 +165,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
             getMoviesVerPronto(),
         ]);
 
-        // Si no hay favoritas, no generamos recomendaciones
-        if (favoritas.length === 0) {
-            console.warn("No hay películas favoritas para generar recomendaciones.");
-            return [];
-        }
+        if (favoritas.length === 0) return [];
 
         // IDs que debemos excluir (todas las listas personales)
         const excludeMovieIds = new Set<string>([
@@ -353,54 +176,35 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
             ...verPronto.map(m => m.id),
         ]);
 
-        // 3. Obtener recomendaciones para cada película (con prioridad para favoritas)
-        const recommendationPromises = [];
+        // Obtener recomendaciones en lotes de 5 para respetar rate limits de TMDB
+        const allRecommendationsArrays = await processBatch(
+            favoritas,
+            (movie) => fetchRecommendationsForMovie(movie.id, 2.0),
+            5
+        );
 
-        // Primero procesamos las favoritas (mayor peso)
-        for (const movie of favoritas) {
-            recommendationPromises.push(fetchRecommendationsForMovie(movie.id, 2.0)); // Mayor peso
-        }
+        const allRecommendations = allRecommendationsArrays.flat();
 
-        // 4. Obtener y procesar todas las recomendaciones
-        const allRecommendationsArrays = await Promise.all(recommendationPromises);
-
-        // 5. Unir todas las recomendaciones
-        let allRecommendations: RecommendedMovie[] = [];
-        allRecommendationsArrays.forEach(recommendations => {
-            allRecommendations = [...allRecommendations, ...recommendations];
-        });
-
-        // 6. Filtrar películas que ya existen en tus colecciones
+        // Filtrar, deduplicar, ordenar y limitar
         const filteredRecommendations = allRecommendations.filter(rec =>
             !excludeMovieIds.has(rec.id)
         );
 
-        // 7. Eliminar duplicados y agregar puntuaciones
         const uniqueRecommendations = removeDuplicatesAndCalculateScores(filteredRecommendations);
-
-        // 8. Ordenar por puntuación (de mayor a menor)
         uniqueRecommendations.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        // 9. Limitar el número de resultados
-        const limitedRecommendations = uniqueRecommendations.slice(0, limit);
-
-        console.log(`Se generaron ${limitedRecommendations.length} recomendaciones de películas`);
-
-        return limitedRecommendations;
+        return uniqueRecommendations.slice(0, limit);
     } catch (error) {
         console.error("Error al obtener películas recomendadas:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         return [];
     }
 };
 
 const fetchRecommendationsForMovie = async (movieId: string, weight: number = 1.0): Promise<RecommendedMovie[]> => {
     try {
-        const url = `${TMDB_BASE_URL}/movie/${movieId}/recommendations?api_key=${API_KEY}&language=es-ES`;
-        const response = await axios.get(url);
+        const results = await tmdbFetchList<any>(`/movie/${movieId}/recommendations`);
 
-        // Transformar los resultados al formato que necesitamos
-        return response.data.results.map((item: any) => ({
+        return results.map((item: any) => ({
             id: item.id.toString(),
             title: item.title,
             poster_path: item.poster_path,
@@ -408,7 +212,8 @@ const fetchRecommendationsForMovie = async (movieId: string, weight: number = 1.
             overview: item.overview,
             release_date: item.release_date,
             popularity: item.popularity,
-            score: (item.vote_average * 0.5 + item.popularity * 0.2) * weight // Calcular puntuación ponderada
+            genres: item.genre_ids || [],
+            score: (item.vote_average * 0.5 + item.popularity * 0.2) * weight,
         }));
     } catch (error) {
         console.error(`Error al obtener recomendaciones para película ${movieId}:`, error);
@@ -419,23 +224,14 @@ const fetchRecommendationsForMovie = async (movieId: string, weight: number = 1.
 const removeDuplicatesAndCalculateScores = (recommendations: RecommendedMovie[]): RecommendedMovie[] => {
     const uniqueMap = new Map<string, RecommendedMovie>();
 
-    // Procesar cada recomendación
-    recommendations.forEach(rec => {
-        const existingRec = uniqueMap.get(rec.id);
-
-        if (existingRec) {
-            // Si ya existe, combinar puntuaciones y actualizar
-            const combinedScore = (existingRec.score || 0) + (rec.score || 0);
-            uniqueMap.set(rec.id, {
-                ...existingRec,
-                score: combinedScore
-            });
+    for (const rec of recommendations) {
+        const existing = uniqueMap.get(rec.id);
+        if (existing) {
+            uniqueMap.set(rec.id, { ...existing, score: (existing.score || 0) + (rec.score || 0) });
         } else {
-            // Si no existe, agregar a map
             uniqueMap.set(rec.id, rec);
         }
-    });
+    }
 
-    // Convertir Map de vuelta a array
     return Array.from(uniqueMap.values());
 };

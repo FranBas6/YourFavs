@@ -1,7 +1,7 @@
 import {type APISerie, type Serie} from "../../../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
 import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
 
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
+const API_KEY = import.meta.env.TMDB_API_KEY;
 
 // Función optimizada para obtener películas y series en una sola llamada
 export const getMoviesAndSeriesByActorId = async ({id}: { id: string }): Promise<{ movies: Movie[]; series: Serie[] }> => {

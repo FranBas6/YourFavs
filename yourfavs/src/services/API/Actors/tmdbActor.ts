@@ -1,4 +1,4 @@
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
+const API_KEY = import.meta.env.TMDB_API_KEY;
 
 // Tipo detallado para Actor
 export interface Actor {

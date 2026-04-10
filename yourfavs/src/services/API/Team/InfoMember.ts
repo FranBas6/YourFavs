@@ -1,9 +1,9 @@
 import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
 
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
+const API_KEY = import.meta.env.TMDB_API_KEY;
 
 if (!API_KEY) {
-    throw new Error("🚨 No se encontró la clave de API de TMDB. Asegúrate de definir PUBLIC_TMDB_API_KEY en tu .env");
+    throw new Error("🚨 No se encontró la clave de API de TMDB. Asegúrate de definir TMDB_API_KEY en tu .env");
 }
 
 export async function getMoviesAndSeriesByMemberName(

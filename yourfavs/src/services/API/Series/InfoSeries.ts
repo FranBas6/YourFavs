@@ -1,105 +1,63 @@
-import {type APISerie, type Serie} from "../../../types/ApiSerie.ts";
-
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
-
-if (!API_KEY) {
-    throw new Error("🚨 No se encontró la clave de API de TMDB. Asegúrate de definir PUBLIC_TMDB_API_KEY en tu .env");
-}
+import { type Serie } from "../../../types/ApiSerie.ts";
+import { tmdbFetch, API_KEY } from '../shared/tmdbClient';
+import {
+    getTrailer as sharedGetTrailer,
+    getVideos as sharedGetVideos,
+    getAdditionalInfo as sharedGetAdditionalInfo,
+    getDirectorsAndRoles as sharedGetDirectorsAndRoles,
+    mapAndDeduplicateProviders,
+    getRecommendationsOrSimilar as sharedGetRecommendationsOrSimilar,
+} from '../shared/tmdbInfoService';
 
 const BASE_URL = "https://api.themoviedb.org/3";
 
-// Función auxiliar para verificar si una serie tiene contenido en español de España
+// --- Funciones únicas de series ---
+
 async function checkSeriesSpanishAvailability(seriesId: string): Promise<boolean> {
     try {
-        // 1. Verificar plataformas de streaming en España
-        const providersUrl = `https://api.themoviedb.org/3/tv/${seriesId}/watch/providers?api_key=${API_KEY}`;
+        const providersUrl = `${BASE_URL}/tv/${seriesId}/watch/providers?api_key=${API_KEY}`;
         const providersRes = await fetch(providersUrl);
-        
-        if (!providersRes.ok) {
-            return false;
-        }
-        
+
+        if (!providersRes.ok) return false;
+
         const providersData = await providersRes.json();
         const esProviders = providersData.results?.ES || {};
-        
-        // Verificar si hay alguna plataforma disponible en España
-        const hasProvider = esProviders.flatrate?.length > 0 || 
-                           esProviders.rent?.length > 0 || 
-                           esProviders.buy?.length > 0;
-        
-        // 2. Verificar traducciones para español de España
-        const translationsUrl = `https://api.themoviedb.org/3/tv/${seriesId}/translations?api_key=${API_KEY}`;
+        const hasProvider = esProviders.flatrate?.length > 0 ||
+            esProviders.rent?.length > 0 ||
+            esProviders.buy?.length > 0;
+
+        const translationsUrl = `${BASE_URL}/tv/${seriesId}/translations?api_key=${API_KEY}`;
         const translationsRes = await fetch(translationsUrl);
-        
+
         let hasSpanishTranslation = false;
         if (translationsRes.ok) {
             const translationsData = await translationsRes.json();
             const translations = translationsData.translations || [];
-            
-            // Buscar traducción específica para español de España (es-ES)
-            hasSpanishTranslation = translations.some((t: any) => 
+            hasSpanishTranslation = translations.some((t: any) =>
                 t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES'
             );
         }
-        
-        // La serie está disponible en España si:
-        // - Tiene plataformas en España Y tiene traducción es-ES
-        // O al menos tiene plataformas (más permisivo para series)
+
         return hasProvider && hasSpanishTranslation;
-        
     } catch (error) {
         console.error(`Error verificando disponibilidad en España para serie ${seriesId}:`, error);
         return false;
     }
 }
 
-// Obtener serie por ID y sus plataformas de visualización
-export const getSeriesById = async ({id}: { id: string }) => {
-    const movieRes = await fetch(`https://api.themoviedb.org/3/tv/${id}?api_key=${API_KEY}&language=es-ES`);
-    const providersRes = await fetch(`https://api.themoviedb.org/3/tv/${id}/watch/providers?api_key=${API_KEY}`);
+export const getSeriesById = async ({ id }: { id: string }) => {
+    const [serie, providersData] = await Promise.all([
+        tmdbFetch<Serie>(`/tv/${id}`),
+        tmdbFetch<{ results: any }>(`/tv/${id}/watch/providers`, {}),
+    ]);
 
-    const serie = await movieRes.json() as Serie;
-    const providers = await providersRes.json();
-
-    // Añadir la información de las plataformas de visualización a la serie, incluyendo tipos (incluido, alquiler, compra)
-    const esProviders = providers.results?.ES || {};
-    
-    // Verificar si la serie está disponible en España con contenido español de España
-    const availableInSpain = await checkSeriesSpanishAvailability(id);
-    serie.availableInSpain = availableInSpain;
-    
-    const mapProviders = (list: any[] | undefined, type: 'flatrate' | 'rent' | 'buy') =>
-        (list || []).map((provider: any) => ({
-            provider_id: provider.provider_id,
-            provider_name: provider.provider_name,
-            logo_path: provider.logo_path,
-            type
-        }));
-
-    const flatrate = mapProviders(esProviders.flatrate, 'flatrate');
-    const rent = mapProviders(esProviders.rent, 'rent');
-    const buy = mapProviders(esProviders.buy, 'buy');
-
-    // Combinar y deduplicar por provider_id conservando el tipo preferente (flatrate > rent > buy)
-    const combined = [...flatrate, ...rent, ...buy];
-    const uniqueById = new Map<number, { provider_id: number; provider_name: string; logo_path: string; type: 'flatrate' | 'rent' | 'buy' }>();
-    for (const p of combined) {
-        const existing = uniqueById.get(p.provider_id);
-        if (!existing) {
-            uniqueById.set(p.provider_id, p);
-        } else {
-            // Priorizar flatrate sobre rent/buy
-            const priority = { flatrate: 3, rent: 2, buy: 1 } as const;
-            if (priority[p.type] > priority[existing.type]) uniqueById.set(p.provider_id, p);
-        }
-    }
-
-    serie.providers = Array.from(uniqueById.values());
+    const esProviders = providersData.results?.ES || {};
+    serie.availableInSpain = await checkSeriesSpanishAvailability(id);
+    serie.providers = mapAndDeduplicateProviders(esProviders);
 
     return serie;
 };
 
-// Interfaz para el tipo de datos del reparto
 interface CastMember {
     id: number;
     name: string;
@@ -107,119 +65,50 @@ interface CastMember {
     profile_path?: string;
 }
 
-// Función para obtener el reparto completo de todas las temporadas
 export const getSeriesCast = async (tvId: string): Promise<CastMember[]> => {
-    const seriesUrl = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${API_KEY}&language=es-ES`;
-    const seriesResponse = await fetch(seriesUrl);
-    const seriesData = await seriesResponse.json();
-
-    const totalSeasons = seriesData.number_of_seasons;
-    const allCast = new Map<number, CastMember>();
-
-    for (let season = 1; season <= totalSeasons; season++) {
-        const url = `https://api.themoviedb.org/3/tv/${tvId}/season/${season}/credits?api_key=${API_KEY}&language=es-ES`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        data.cast?.forEach((actor: any) => {
-            if (!allCast.has(actor.id)) {
-                allCast.set(actor.id, {
-                    id: actor.id,
-                    name: actor.name,
-                    character: actor.character || '',
-                    profile_path: actor.profile_path || null, // ✅ recogemos la imagen si existe
-                });
-            }
-        });
-    }
-
-    return Array.from(allCast.values());
-};
-
-// Función para obtener los directores y sus roles en una serie
-export const getSeriesDirectorsAndRoles = async (tvId: string): Promise<{ name: string, job: string }[]> => {
-    const url = `https://api.themoviedb.org/3/tv/${tvId}/credits?api_key=${API_KEY}&language=es-ES`;
-
     try {
-        const response = await fetch(url);
+        const seriesData = await tmdbFetch<{ number_of_seasons: number }>(`/tv/${tvId}`);
+        const totalSeasons = seriesData.number_of_seasons;
+        const allCast = new Map<number, CastMember>();
 
-        if (!response.ok) {
-            throw new Error(`Error en la solicitud: ${response.statusText}`);
+        for (let season = 1; season <= totalSeasons; season++) {
+            try {
+                const data = await tmdbFetch<{ cast?: any[] }>(`/tv/${tvId}/season/${season}/credits`);
+                data.cast?.forEach((actor: any) => {
+                    if (!allCast.has(actor.id)) {
+                        allCast.set(actor.id, {
+                            id: actor.id,
+                            name: actor.name,
+                            character: actor.character || '',
+                            profile_path: actor.profile_path || null,
+                        });
+                    }
+                });
+            } catch {
+                // Si falla una temporada, continuar con las demás
+            }
         }
 
-        const data = await response.json();
-
-        const relevantRoles = ["Director", "Producer", "Executive Producer", "Visual Effects", "Original Music Composer"];
-
-        return data.crew
-            .filter((member: any) => relevantRoles.includes(member.job))
-            .map((director: any) => ({name: director.name, job: director.job}))
+        return Array.from(allCast.values());
     } catch (error) {
-        console.error("Hubo un error al obtener los datos de los directores y roles:", error);
+        console.error(`Error al obtener el reparto de la serie ${tvId}:`, error);
         return [];
     }
 };
 
-// Funcion para obtener el trailer de una serie
-export const getSeriesTrailer = async (seriesId: string): Promise<string | null> => {
-    const url = `https://api.themoviedb.org/3/tv/${seriesId}/videos?api_key=${API_KEY}&language=es-ES`;
-
-    try {
-        const res = await fetch(url);
-        if (!res.ok) {
-            throw new Error(`Error en la solicitud: ${res.statusText}`);
-        }
-
-        const data = await res.json();
-        const trailer = data.results.find((video: any) => video.type === 'Trailer' && video.site === 'YouTube');
-
-        // Si se encuentra el trailer, devolver el enlace al video en YouTube
-        return trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null;
-    } catch (error) {
-        console.error("Hubo un error al obtener el trailer:", error);
-        return null;
-    }
-};
-
-// Funcion para obtener el estado de una serie
 export const getSeriesStatus = async (seriesId: string): Promise<string | null> => {
-    const url = `https://api.themoviedb.org/3/tv/${seriesId}?api_key=${API_KEY}&language=es-ES`;
-
     try {
-        const res = await fetch(url);
-        if (!res.ok) {
-            throw new Error(`Error en la solicitud: ${res.statusText}`);
-        }
-
-        const data = await res.json();
-        const status = data.status; // Obtiene el estado de la serie (ej. 'Returning Series', 'Ended', 'Canceled')
-
-        // Devolver el estado de la serie
-        return status || null;
+        const data = await tmdbFetch<{ status: string }>(`/tv/${seriesId}`);
+        return data.status || null;
     } catch (error) {
-        console.error("Hubo un error al obtener el estado de la serie:", error);
+        console.error("Error al obtener el estado de la serie:", error);
         return null;
     }
 };
 
-// Modifica tu función getEpisodesBySeasonNumber para mostrar más detalles
 export async function getEpisodesBySeasonNumber(serieId: number | string, seasonNumber: number): Promise<any[]> {
     try {
-        const url = `https://api.themoviedb.org/3/tv/${serieId}/season/${seasonNumber}?api_key=${API_KEY}&language=es-ES`;
-
-        console.log(`Intentando acceder a: ${url.replace(API_KEY, "API_KEY_HIDDEN")}`);
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Error de API: ${response.status} - ${errorText}`);
-            throw new Error(`Error obteniendo episodios: ${response.status}`);
-        }
-
-        const data = await response.json();
-        console.log(`Datos obtenidos para temporada ${seasonNumber}, episodios: ${data.episodes?.length || 0}`);
-
+        const data = await tmdbFetch<{ episodes?: any[] }>(`/tv/${serieId}/season/${seasonNumber}`);
         return data.episodes || [];
     } catch (error) {
         console.error("Error en getEpisodesBySeasonNumber:", error);
@@ -238,41 +127,34 @@ interface TMDBPosterImage {
     width: number;
 }
 
-// Interfaz para nuestra respuesta procesada
 export interface PosterImage {
     aspect_ratio: number;
     height: number;
     iso_639_1: string | null;
-    file_path: string; // Esta ya incluye la URL base
+    file_path: string;
     vote_average: number;
     vote_count: number;
     width: number;
 }
 
-// Función para obtener posters de una serie y sus temporadas
 export const fetchAllSeriesPosters = async (
     serieId: string | number,
     language: string = "es-ES"
 ): Promise<PosterImage[]> => {
     const numericId = typeof serieId === 'string' ? parseInt(serieId, 10) : serieId;
-    const baseUrl = `https://api.themoviedb.org/3`;
     const fullImagePath = (path: string) => `https://image.tmdb.org/t/p/original${path}`;
 
     try {
-        // Obtener datos de la serie (para conocer las temporadas)
-        const seriesRes = await fetch(`${baseUrl}/tv/${numericId}?api_key=${API_KEY}`);
-        const seriesData = await seriesRes.json();
+        const seriesData = await tmdbFetch<{ seasons: any[] }>(`/tv/${numericId}`, {});
         const seasons = seriesData.seasons || [];
 
-        // Obtener pósters generales de la serie
-        const seriesImagesRes = await fetch(`${baseUrl}/tv/${numericId}/images?api_key=${API_KEY}`);
+        const seriesImagesRes = await fetch(`${BASE_URL}/tv/${numericId}/images?api_key=${API_KEY}`);
         const seriesImagesData = await seriesImagesRes.json();
         let posters: TMDBPosterImage[] = seriesImagesData.posters || [];
 
-        // Obtener pósters de cada temporada (incluyendo especiales - temporada 0)
         for (const season of seasons) {
             const seasonNumber = season.season_number;
-            const seasonImagesRes = await fetch(`${baseUrl}/tv/${numericId}/season/${seasonNumber}/images?api_key=${API_KEY}`);
+            const seasonImagesRes = await fetch(`${BASE_URL}/tv/${numericId}/season/${seasonNumber}/images?api_key=${API_KEY}`);
             const seasonImagesData = await seasonImagesRes.json();
 
             if (Array.isArray(seasonImagesData.posters)) {
@@ -280,242 +162,125 @@ export const fetchAllSeriesPosters = async (
             }
         }
 
-        // Filtrar por idioma si se ha indicado uno específico
         if (language !== "" && language !== "all") {
             posters = posters.filter(poster => poster.iso_639_1 === language.split('-')[0] || poster.iso_639_1 === null);
         }
 
-        // Formatear con ruta completa
         return posters.map(poster => ({
             ...poster,
-            file_path: fullImagePath(poster.file_path)
+            file_path: fullImagePath(poster.file_path),
         }));
-
     } catch (error) {
         console.error(`Error al obtener los pósters de la serie ${numericId}:`, error);
         return [];
     }
 };
 
-type TMDBResponse = {
-    results: Serie[];
-    total_results: number;
-    total_pages: number;
-    page: number;
-};
+// --- Funciones delegadas a módulos compartidos ---
 
-// Método para obtener series recomendadas desde TMDB
+export const getSeriesDirectorsAndRoles = async (tvId: string) =>
+    sharedGetDirectorsAndRoles('tv', tvId, [
+        "Director", "Producer", "Executive Producer", "Visual Effects", "Original Music Composer"
+    ]);
+
+export const getSeriesTrailer = async (seriesId: string) =>
+    sharedGetTrailer('tv', seriesId);
+
+export const getSeriesVideos = async (seriesId: string) =>
+    sharedGetVideos('tv', seriesId);
+
+export const getSeriesAdditionalInfo = async (seriesId: string) =>
+    sharedGetAdditionalInfo('tv', seriesId);
+
+// --- Recomendaciones ---
+
+function mapSerieDetail(data: any): Serie {
+    return {
+        adult: false,
+        backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w500${data.backdrop_path}` : "",
+        genres: data.genres ?? [],
+        genre_ids: data.genres?.map((g: any) => g.id) ?? [],
+        id: data.id,
+        origin_country: data.origin_country ?? [],
+        original_language: data.original_language,
+        original_name: data.original_name,
+        overview: data.overview,
+        popularity: data.popularity,
+        poster_path: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : "",
+        first_air_date: data.first_air_date,
+        name: data.name,
+        vote_average: data.vote_average,
+        vote_count: data.vote_count,
+        languages: data.languages,
+        seasons: data.seasons,
+        production_companies: data.production_companies,
+        homepage: data.homepage,
+        last_episode_to_air: data.last_episode_to_air,
+        next_episode_to_air: data.next_episode_to_air,
+        providers: [],
+    };
+}
+
+function mapSerieSimilar(data: any): Serie {
+    return {
+        adult: false,
+        backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w500${data.backdrop_path}` : "",
+        genres: [],
+        genre_ids: data.genre_ids ?? [],
+        id: data.id,
+        origin_country: data.origin_country ?? [],
+        original_language: data.original_language,
+        original_name: data.original_name,
+        overview: data.overview,
+        popularity: data.popularity,
+        poster_path: `https://image.tmdb.org/t/p/w500${data.poster_path}`,
+        first_air_date: data.first_air_date,
+        name: data.name,
+        vote_average: data.vote_average,
+        vote_count: data.vote_count,
+        languages: undefined,
+        seasons: undefined,
+        production_companies: undefined,
+        homepage: undefined,
+        last_episode_to_air: undefined,
+        next_episode_to_air: undefined,
+        providers: [],
+    };
+}
+
 export async function getSerieRecommendations(serieId: number): Promise<{
     success: boolean;
     recommendations: Serie[];
     total_results?: number;
     error?: string;
 }> {
-    try {
-        const serieRes = await fetch(`https://api.themoviedb.org/3/tv/${serieId}?api_key=${API_KEY}&language=es-ES`);
-        if (!serieRes.ok) throw new Error(`Error ${serieRes.status}: ${serieRes.statusText}`);
-        const serieData = await serieRes.json();
-
-        const recRes = await fetch(`https://api.themoviedb.org/3/tv/${serieId}/recommendations?api_key=${API_KEY}&language=es-ES&page=1`);
-        if (!recRes.ok) throw new Error(`Error ${recRes.status}: ${recRes.statusText}`);
-        const recData: TMDBResponse = await recRes.json();
-
-        const filteredRaw = recData.results.filter((serie: any) => serie.poster_path);
-
-        const detailedPromises = filteredRaw.slice(0, 20).map(async (serie: any) => {
-            const res = await fetch(`https://api.themoviedb.org/3/tv/${serie.id}?api_key=${API_KEY}&language=es-ES`);
-            if (!res.ok) return null;
-            const data = await res.json();
-
-            return {
-                adult: false,
-                backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w500${data.backdrop_path}` : "",
-                genres: data.genres ?? [],
-                genre_ids: data.genres?.map((g: any) => g.id) ?? [],
-                id: data.id,
-                origin_country: data.origin_country ?? [],
-                original_language: data.original_language,
-                original_name: data.original_name,
-                overview: data.overview,
-                popularity: data.popularity,
-                poster_path: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : "",
-                first_air_date: data.first_air_date,
-                name: data.name,
-                vote_average: data.vote_average,
-                vote_count: data.vote_count,
-                languages: data.languages,
-                seasons: data.seasons,
-                production_companies: data.production_companies,
-                homepage: data.homepage,
-                last_episode_to_air: data.last_episode_to_air,
-                next_episode_to_air: data.next_episode_to_air,
-                providers: [] // puedes añadirlo luego con lógica extra si lo necesitas
-            } as Serie;
-        });
-
-        const detailedSeries = (await Promise.all(detailedPromises)).filter(Boolean).slice(0, 12) as Serie[];
-
-        return {
-            success: true,
-            recommendations: detailedSeries,
-            total_results: recData.total_results
-        };
-
-    } catch (error) {
-        console.error('Error al obtener recomendaciones de series:', error);
-        return {
-            success: false,
-            recommendations: [],
-            error: error instanceof Error ? error.message : 'Error desconocido'
-        };
-    }
+    const result = await sharedGetRecommendationsOrSimilar<Serie>('tv', serieId, mapSerieDetail);
+    return {
+        success: result.success,
+        recommendations: result.recommendations,
+        error: result.error,
+    };
 }
 
-
-// Método alternativo para obtener series similares si no hay recomendaciones
 export async function getSimilarSeries(serieId: number): Promise<{
     success: boolean;
     recommendations: Serie[];
     total_results?: number;
     error?: string;
 }> {
-    try {
-        const response = await fetch(
-            `https://api.themoviedb.org/3/tv/${serieId}/similar?api_key=${API_KEY}&language=es-ES&page=1`
-        );
-        if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-
-        const data: TMDBResponse = await response.json();
-
-        const similarSeries = data.results
-            .filter((serie: any) => serie.poster_path)
-            .slice(0, 12)
-            .map((serie: any): Serie => ({
-                adult: false,
-                backdrop_path: serie.backdrop_path ? `https://image.tmdb.org/t/p/w500${serie.backdrop_path}` : "",
-                genres: [], // Se omite en este nivel, pero puedes completarlo si haces fetch detallado
-                genre_ids: serie.genre_ids ?? [],
-                id: serie.id,
-                origin_country: serie.origin_country ?? [],
-                original_language: serie.original_language,
-                original_name: serie.original_name,
-                overview: serie.overview,
-                popularity: serie.popularity,
-                poster_path: `https://image.tmdb.org/t/p/w500${serie.poster_path}`,
-                first_air_date: serie.first_air_date,
-                name: serie.name,
-                vote_average: serie.vote_average,
-                vote_count: serie.vote_count,
-                languages: undefined,
-                seasons: undefined,
-                production_companies: undefined,
-                homepage: undefined,
-                last_episode_to_air: undefined,
-                next_episode_to_air: undefined,
-                providers: []
-            }));
-
-        return {
-            success: true,
-            recommendations: similarSeries,
-            total_results: data.total_results
-        };
-
-    } catch (error) {
-        console.error('Error al obtener series similares:', error);
-        return {
-            success: false,
-            recommendations: [],
-            error: error instanceof Error ? error.message : 'Error desconocido'
-        };
-    }
+    const result = await sharedGetRecommendationsOrSimilar<Serie>('tv', serieId, mapSerieSimilar);
+    return {
+        success: result.success,
+        recommendations: result.recommendations,
+        error: result.error,
+    };
 }
 
-
-// Método combinado: intenta recomendaciones y luego similares si es necesario
 export async function getSerieRecommendationsOrSimilar(serieId: number): Promise<{
     success: boolean;
     recommendations: Serie[];
     type: 'recommendations' | 'similar' | 'combined';
     error?: string;
 }> {
-    let result = await getSerieRecommendations(serieId);
-
-    if (!result.success || result.recommendations.length < 6) {
-        const similarResult = await getSimilarSeries(serieId);
-
-        if (similarResult.success) {
-            if (result.success && result.recommendations.length > 0) {
-                const combined = [...result.recommendations, ...similarResult.recommendations];
-                const unique = combined.filter((serie: Serie, index: number, self: Serie[]) =>
-                    index === self.findIndex((s: Serie) => s.id === serie.id)
-                );
-
-                return {
-                    success: true,
-                    recommendations: unique.slice(0, 12),
-                    type: 'combined'
-                };
-            } else {
-                return {
-                    success: true,
-                    recommendations: similarResult.recommendations,
-                    type: 'similar'
-                };
-            }
-        }
-    }
-
-    return {
-        ...result,
-        type: 'recommendations'
-    };
+    return sharedGetRecommendationsOrSimilar<Serie>('tv', serieId, mapSerieDetail);
 }
-
-// Función para obtener todos los videos de una serie
-export const getSeriesVideos = async (seriesId: string) => {
-    try {
-        const url = `https://api.themoviedb.org/3/tv/${seriesId}/videos?api_key=${API_KEY}&language=es-ES`;
-        const res = await fetch(url);
-        if (!res.ok) {
-            throw new Error(`Error en la solicitud: ${res.statusText}`);
-        }
-        const data = await res.json();
-        return data.results || [];
-    } catch (error) {
-        console.error("Hubo un error al obtener los videos:", error);
-        return [];
-    }
-};
-
-// Función para obtener información adicional de la serie (redes, palabras clave, etc.)
-export const getSeriesAdditionalInfo = async (seriesId: string) => {
-    try {
-        // Obtener keywords
-        const keywordsRes = await fetch(`${BASE_URL}/tv/${seriesId}/keywords?api_key=${API_KEY}`);
-        const keywordsData = await keywordsRes.json();
-        
-        // Obtener información detallada de la serie que incluye networks
-        const detailRes = await fetch(`${BASE_URL}/tv/${seriesId}?api_key=${API_KEY}&language=es-ES&append_to_response=content_ratings`);
-        const detailData = await detailRes.json();
-        
-        return {
-            keywords: keywordsData.results || [],
-            networks: detailData.networks || [],
-            content_ratings: detailData.content_ratings?.results || [],
-            episode_run_time: detailData.episode_run_time || [],
-            languages: detailData.spoken_languages || [],
-            tagline: detailData.tagline || null
-        };
-    } catch (error) {
-        console.error('Error al obtener información adicional de la serie:', error);
-        return {
-            keywords: [],
-            networks: [],
-            content_ratings: [],
-            episode_run_time: [],
-            languages: [],
-            tagline: null
-        };
-    }
-};

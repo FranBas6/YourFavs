@@ -1,8 +1,6 @@
 import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, getDoc, setDoc} from "firebase/firestore";
 import { db } from "../../../utils/firebaseConfig";
 
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY; // Reemplázalo con tu API Key de TMDb
-
 interface ActorsFavs {
     id: string;
     position: number;
@@ -111,39 +109,17 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
     return `/actor/${actorId}`;
 }
 
-// Función para obtener actores favoritos ordenados por posición
 export const getActorsFav = async (): Promise<ActorsFavs[]> => {
     try {
-        console.log("Intentando obtener actores favoritos...");
-
-        // Crear una referencia a la colección
         const actorsFavsRef = collection(db, "ActorsFavs");
-
-        // Consultar ordenando por position
         const q = query(actorsFavsRef, orderBy("position"));
         const querySnapshot = await getDocs(q);
 
-        // Procesar los resultados
-        const result: ActorsFavs[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as ActorsFavs);
-        });
+        if (querySnapshot.empty) return [];
 
-        console.log("Resultado de la consulta:", result);
-
-        if (result.length === 0) {
-            console.warn("No se encontraron actores favoritos.");
-            return [];
-        }
-
-        return result;
+        return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as ActorsFavs));
     } catch (error) {
         console.error("Error al obtener los actores favoritos:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         return [];
     }
 };

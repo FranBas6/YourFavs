@@ -161,8 +161,6 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     return `/serie/${serieId}`;
 }
 
-const API_KEY = import.meta.env.PUBLIC_TMDB_API_KEY;
-
 interface SeriesFavs {
     id: string;
     name: string;
@@ -271,7 +269,7 @@ interface RecommendedSeries {
     vote_average: number;
     overview: string;
     score?: number; // Puntuación calculada
-    added_at: Date | string;
+    added_at?: Date | string;
     first_air_date?: string;
     seasons?: {
         air_date: string,
@@ -315,47 +313,38 @@ interface RecommendedSeries {
 
 export type {SeriesFavs, SeriesInterface};
 
-// Función para obtener series favoritas
-export const getSerieFav = async (): Promise<SeriesFavs[]> => {
+// Helper para obtener documentos de una colección ordenados por fecha
+async function getSeriesCollection<T>(collectionName: string, orderField: string = "added_at", orderDirection: "asc" | "desc" = "desc"): Promise<T[]> {
     try {
-        console.log("Intentando obtener series favoritas...");
-
-        // Crear una referencia a la colección
-        const seriesFavsRef = collection(db, "SeriesFavs");
-
-        // Consultar ordenando por position
-        const q = query(seriesFavsRef, orderBy("position"));
+        const ref = collection(db, collectionName);
+        const q = query(ref, orderBy(orderField, orderDirection));
         const querySnapshot = await getDocs(q);
 
-        // Procesar los resultados
-        const result: SeriesFavs[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as SeriesFavs);
-        });
+        if (querySnapshot.empty) return [];
 
-        console.log("Resultado de la consulta:", result);
+        return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as T));
+    } catch (error) {
+        console.error(`Error al obtener ${collectionName}:`, error);
+        return [];
+    }
+}
 
-        if (result.length === 0) {
-            console.warn("No se encontraron series favoritas.");
-            return [];
-        }
+// getSerieFav tiene lógica especial: ordena por position e inicializa posiciones si no existen
+export const getSerieFav = async (): Promise<SeriesFavs[]> => {
+    try {
+        const result = await getSeriesCollection<SeriesFavs>("SeriesFavs", "position", "asc");
+        if (result.length === 0) return [];
 
-        // Si no hay position establecido, inicializar basado en el orden por defecto
         const seriesWithOrder: SeriesFavs[] = result.map((series, index) => ({
             ...series,
-            custom_order: series.position ?? index
+            custom_order: series.position ?? index,
         }));
 
-        // Si ninguna serie tiene position, establecer orden inicial
         if (seriesWithOrder.every(series => series.position === null || series.position === undefined)) {
             await Promise.all(
                 seriesWithOrder.map((series, index) => {
                     const serieRef = doc(db, "SeriesFavs", series.id);
-                    return updateDoc(serieRef, {position: index});
+                    return updateDoc(serieRef, { position: index });
                 })
             );
         }
@@ -363,333 +352,108 @@ export const getSerieFav = async (): Promise<SeriesFavs[]> => {
         return seriesWithOrder;
     } catch (error) {
         console.error("Error al obtener las series favoritas:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         return [];
     }
 };
 
-// Función para obtener series pendientes ordenadas por fecha de añadido (más reciente primero)
-export const getSeriesPendientes = async (): Promise<SeriesInterface[]> => {
-    try {
-        console.log("Intentando obtener series pendientes...");
+export const getSeriesPendientes = () => getSeriesCollection<SeriesInterface>("SeriesPendiente");
+export const getSeriesVistas = () => getSeriesCollection<SeriesInterface>("SeriesVistas");
+export const getSeriesSiguiendo = () => getSeriesCollection<SeriesInterface>("SeriesSiguiendo");
+export const getLikedSeries = () => getSeriesCollection<SeriesInterface>("LikedSeries");
+export const getSeriesVerPronto = () => getSeriesCollection<SeriesInterface>("SeriesVerPronto");
 
-        // Crear una referencia a la colección con ordenamiento
-        const seriesPendientesRef = collection(db, "SeriesPendiente");
-        const q = query(seriesPendientesRef, orderBy("added_at", "desc"));
+export async function clearAllSeriesVerPronto(): Promise<void> {
+    const seriesVerProntoRef = collection(db, 'SeriesVerPronto');
+    const querySnapshot = await getDocs(seriesVerProntoRef);
 
-        // Obtener todos los documentos de la colección ordenados
-        const querySnapshot = await getDocs(q);
+    const deletePromises: Promise<void>[] = [];
+    querySnapshot.forEach((docSnapshot) => {
+        deletePromises.push(deleteDoc(doc(db, 'SeriesVerPronto', docSnapshot.id)));
+    });
 
-        // Procesar los resultados
-        const result: SeriesInterface[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as SeriesInterface);
-        });
-
-        console.log("Resultado de la consulta ordenado:", result);
-
-        if (result.length === 0) {
-            console.warn("No se encontraron series pendientes.");
-            return [];
-        }
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las series pendientes:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-// Función para obtener series vistas ordenadas por fecha de añadido (más reciente primero)
-export const getSeriesVistas = async (): Promise<SeriesInterface[]> => {
-    try {
-        console.log("Intentando obtener series vistas...");
-
-        // Crear una referencia a la colección con ordenamiento
-        const seriesVistasRef = collection(db, "SeriesVistas");
-        const q = query(seriesVistasRef, orderBy("added_at", "desc"));
-
-        // Obtener todos los documentos de la colección ordenados
-        const querySnapshot = await getDocs(q);
-
-        // Procesar los resultados
-        const result: SeriesInterface[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as SeriesInterface);
-        });
-
-        console.log("Resultado de la consulta ordenado:", result);
-
-        if (result.length === 0) {
-            console.warn("No se encontraron series vistas.");
-            return [];
-        }
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las series vistas:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-// Función para obtener series siguiendo ordenadas por fecha de añadido (más reciente primero)
-export const getSeriesSiguiendo = async (): Promise<SeriesInterface[]> => {
-    try {
-        console.log("Intentando obtener series siguiendo...");
-
-        // Crear una referencia a la colección con ordenamiento
-        const seriesSiguiendoRef = collection(db, "SeriesSiguiendo");
-        const q = query(seriesSiguiendoRef, orderBy("added_at", "desc"));
-
-        // Obtener todos los documentos de la colección ordenados
-        const querySnapshot = await getDocs(q);
-
-        // Procesar los resultados
-        const result: SeriesInterface[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as SeriesInterface);
-        });
-
-        console.log("Resultado de la consulta ordenado:", result);
-
-        if (result.length === 0) {
-            console.warn("No se encontraron series siguiendo.");
-            return [];
-        }
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las series siguiendo:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-// Función para obtener series que te han gustado ordenadas por fecha de añadido (más reciente primero)
-export const getLikedSeries = async (): Promise<SeriesInterface[]> => {
-    try {
-        console.log("Intentando obtener series que te gustan...");
-
-        // Crear una referencia a la colección con ordenamiento
-        const likedSeriesRef = collection(db, "LikedSeries");
-        const q = query(likedSeriesRef, orderBy("added_at", "desc"));
-
-        // Obtener todos los documentos de la colección ordenados
-        const querySnapshot = await getDocs(q);
-
-        // Procesar los resultados
-        const result: SeriesInterface[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as SeriesInterface);
-        });
-
-        console.log("Resultado de la consulta ordenado:", result);
-
-        if (result.length === 0) {
-            console.warn("No se encontraron series que te gustan.");
-            return [];
-        }
-
-        console.log(`✅ Se obtuvieron ${result.length} series que te gustan`);
-        return result;
-    } catch (error) {
-        console.error("❌ Error al obtener las series que te gustan:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        // Lanzar el error para que sea capturado en la página
-        throw new Error(`Error al cargar series que te gustan: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-};
-
-// Función para obtener series pendientes ordenadas por fecha de añadido (más reciente primero)
-export const getSeriesVerPronto = async (): Promise<SeriesInterface[]> => {
-    try {
-        console.log("Intentando obtener series para ver pronto...");
-
-        // Crear una referencia a la colección con ordenamiento
-        const seriesVerProntoRef = collection(db, "SeriesVerPronto");
-        const q = query(seriesVerProntoRef, orderBy("added_at", "desc"));
-
-        // Obtener todos los documentos de la colección ordenados
-        const querySnapshot = await getDocs(q);
-
-        // Procesar los resultados
-        const result: SeriesInterface[] = [];
-        querySnapshot.forEach((doc) => {
-            // Añadir el ID del documento y todos los datos
-            result.push({
-                id: doc.id,
-                ...doc.data()
-            } as SeriesInterface);
-        });
-
-        console.log("Resultado de la consulta ordenado:", result);
-
-        if (result.length === 0) {
-            console.warn("No se encontraron series para ver pronto.");
-            return [];
-        }
-
-        return result;
-    } catch (error) {
-        console.error("Error al obtener las series para ver pronto:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-        return [];
-    }
-};
-
-export async function clearAllSeriesVerPronto() {
-    try {
-        const seriesVerProntoRef = collection(db, 'SeriesVerPronto');
-        const querySnapshot = await getDocs(seriesVerProntoRef);
-
-        const deletePromises: Promise<void>[] = [];
-        querySnapshot.forEach((docSnapshot) => {
-            deletePromises.push(deleteDoc(doc(db, 'SeriesVerPronto', docSnapshot.id)));
-        });
-
-        await Promise.all(deletePromises);
-
-        return {
-            success: true,
-            deletedCount: deletePromises.length,
-            message: `Se borraron ${deletePromises.length} series exitosamente`
-        };
-
-    } catch (error) {
-        console.error('Error al borrar todas las series:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            message: 'Error al borrar las series'
-        };
-    }
+    await Promise.all(deletePromises);
 }
 
-// Eliminar una serie de SeriesVerPronto por ID
-export async function deleteSerieVerProntoById(serieId: string) {
-    try {
-        await deleteDoc(doc(db, 'SeriesVerPronto', serieId));
-        return {success: true};
-    } catch (error) {
-        console.error('Error al borrar la serie:', error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-        };
-    }
+export async function deleteSerieVerProntoById(serieId: string): Promise<void> {
+    await deleteDoc(doc(db, 'SeriesVerPronto', serieId));
 }
 
-import axios from 'axios';
-
-const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
+import { processBatch } from '../../../utils/processBatch';
+import { tmdbFetchList } from '../../API/shared/tmdbClient';
 
 export const getRecommendedSeries = async (limit: number = 20): Promise<RecommendedSeries[]> => {
     try {
-        console.log("Obteniendo series recomendadas...");
-
-        // 1. Obtener todas tus series actuales
-        const [favoritas, siguiendo, gustadas] = await Promise.all([
+        // Obtener todas las listas (incluyendo vistas y pendientes para exclusión completa)
+        const [favoritas, siguiendo, gustadas, vistas, pendientes, verPronto] = await Promise.all([
             getSerieFav(),
             getSeriesSiguiendo(),
-            getLikedSeries()
+            getLikedSeries(),
+            getSeriesVistas(),
+            getSeriesPendientes(),
+            getSeriesVerPronto(),
         ]);
 
-        // 2. Extraer los IDs únicos de todas las series
-        const allSeriesIds = new Set<string>();
-        [...favoritas, ...siguiendo, ...gustadas].forEach(serie => {
-            allSeriesIds.add(serie.id);
-        });
+        // IDs a excluir de las recomendaciones (todas las colecciones)
+        const excludeIds = new Set<string>();
+        [...favoritas, ...siguiendo, ...gustadas, ...vistas, ...pendientes, ...verPronto]
+            .forEach(serie => excludeIds.add(serie.id));
 
-        console.log(`Se encontraron ${allSeriesIds.size} series únicas para generar recomendaciones`);
-
-        // Si no hay series, no podemos hacer recomendaciones
-        if (allSeriesIds.size === 0) {
-            console.warn("No hay series para generar recomendaciones.");
+        if (favoritas.length === 0 && siguiendo.length === 0 && gustadas.length === 0) {
             return [];
         }
 
-        // 3. Obtener recomendaciones para cada serie (con prioridad para favoritas)
-        const recommendationPromises = [];
+        // Construir lista de series a consultar con sus pesos, deduplicando por ID
+        const processedIds = new Set<string>();
+        const seriesToFetch: { id: string; weight: number }[] = [];
 
-        // Primero procesamos las favoritas (mayor peso)
         for (const serie of favoritas) {
-            recommendationPromises.push(fetchRecommendationsForSeries(serie.id, 2.0)); // Mayor peso
+            if (!processedIds.has(serie.id)) {
+                processedIds.add(serie.id);
+                seriesToFetch.push({ id: serie.id, weight: 2.0 });
+            }
         }
-
-        // Luego las que estás siguiendo (peso medio-alto)
         for (const serie of siguiendo) {
-            // Evitamos duplicados que ya estén en favoritas
-            if (!favoritas.some(fav => fav.id === serie.id)) {
-                recommendationPromises.push(fetchRecommendationsForSeries(serie.id, 1.75));
+            if (!processedIds.has(serie.id)) {
+                processedIds.add(serie.id);
+                seriesToFetch.push({ id: serie.id, weight: 1.75 });
             }
         }
-
-        // Luego las que te han gustado (peso medio)
         for (const serie of gustadas) {
-            // Evitamos duplicados que ya estén en favoritas
-            if (!favoritas.some(fav => fav.id === serie.id)) {
-                recommendationPromises.push(fetchRecommendationsForSeries(serie.id, 1.5));
+            if (!processedIds.has(serie.id)) {
+                processedIds.add(serie.id);
+                seriesToFetch.push({ id: serie.id, weight: 1.5 });
             }
         }
 
-        // 4. Obtener y procesar todas las recomendaciones
-        const allRecommendationsArrays = await Promise.all(recommendationPromises);
-
-        // 5. Unir todas las recomendaciones
-        let allRecommendations: RecommendedSeries[] = [];
-        allRecommendationsArrays.forEach(recommendations => {
-            allRecommendations = [...allRecommendations, ...recommendations];
-        });
-
-        // 6. Filtrar series que ya existen en tus colecciones
-        const filteredRecommendations = allRecommendations.filter(rec =>
-            !allSeriesIds.has(rec.id)
+        // Obtener recomendaciones en lotes de 5 para respetar rate limits de TMDB
+        const allRecommendationsArrays = await processBatch(
+            seriesToFetch,
+            (item) => fetchRecommendationsForSeries(item.id, item.weight),
+            5
         );
 
-        // 7. Eliminar duplicados y agregar puntuaciones
-        const uniqueRecommendations = removeDuplicatesAndCalculateScores(filteredRecommendations);
+        const allRecommendations = allRecommendationsArrays.flat();
 
-        // 8. Ordenar por puntuación (de mayor a menor)
+        // Filtrar, deduplicar, ordenar y limitar
+        const filteredRecommendations = allRecommendations.filter(rec =>
+            !excludeIds.has(rec.id)
+        );
+
+        const uniqueRecommendations = removeDuplicatesAndCalculateScores(filteredRecommendations);
         uniqueRecommendations.sort((a, b) => (b.score || 0) - (a.score || 0));
 
-        // 9. Limitar el número de resultados
-        const limitedRecommendations = uniqueRecommendations.slice(0, limit);
-
-        console.log(`Se generaron ${limitedRecommendations.length} recomendaciones de series`);
-
-        return limitedRecommendations;
+        return uniqueRecommendations.slice(0, limit);
     } catch (error) {
         console.error("Error al obtener series recomendadas:", error);
-        console.error("Detalles del error:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
         return [];
     }
 };
 
 const fetchRecommendationsForSeries = async (seriesId: string, weight: number = 1.0): Promise<RecommendedSeries[]> => {
     try {
-        const url = `${TMDB_BASE_URL}/tv/${seriesId}/recommendations?api_key=${API_KEY}&language=es-ES`;
-        const response = await axios.get(url);
+        const results = await tmdbFetchList<any>(`/tv/${seriesId}/recommendations`);
 
-        // Transformar los resultados al formato que necesitamos
-        return response.data.results.map((item: any) => ({
+        return results.map((item: any) => ({
             id: item.id.toString(),
             name: item.name,
             poster_path: item.poster_path,
@@ -697,7 +461,7 @@ const fetchRecommendationsForSeries = async (seriesId: string, weight: number = 
             overview: item.overview,
             first_air_date: item.first_air_date,
             popularity: item.popularity,
-            score: (item.vote_average * 0.5 + item.popularity * 0.2) * weight // Calcular puntuación ponderada
+            score: (item.vote_average * 0.5 + item.popularity * 0.2) * weight,
         }));
     } catch (error) {
         console.error(`Error al obtener recomendaciones para serie ${seriesId}:`, error);
@@ -708,24 +472,15 @@ const fetchRecommendationsForSeries = async (seriesId: string, weight: number = 
 const removeDuplicatesAndCalculateScores = (recommendations: RecommendedSeries[]): RecommendedSeries[] => {
     const uniqueMap = new Map<string, RecommendedSeries>();
 
-    // Procesar cada recomendación
-    recommendations.forEach(rec => {
-        const existingRec = uniqueMap.get(rec.id);
-
-        if (existingRec) {
-            // Si ya existe, combinar puntuaciones y actualizar
-            const combinedScore = (existingRec.score || 0) + (rec.score || 0);
-            uniqueMap.set(rec.id, {
-                ...existingRec,
-                score: combinedScore
-            });
+    for (const rec of recommendations) {
+        const existing = uniqueMap.get(rec.id);
+        if (existing) {
+            uniqueMap.set(rec.id, { ...existing, score: (existing.score || 0) + (rec.score || 0) });
         } else {
-            // Si no existe, agregar a map
             uniqueMap.set(rec.id, rec);
         }
-    });
+    }
 
-    // Convertir Map de vuelta a array
     return Array.from(uniqueMap.values());
 };
 
