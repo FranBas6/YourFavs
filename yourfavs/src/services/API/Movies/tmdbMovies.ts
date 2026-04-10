@@ -65,13 +65,7 @@ export const getNowPlayingMoviesInSpain = async ({ page }: { page?: string }): P
 
 // --- Categorías (lógica única: "upcoming") ---
 
-const genreMap: Record<string, number | "upcoming"> = {
-    accion: 28, aventura: 12, animacion: 16, comedia: 35, crimen: 80,
-    documental: 99, drama: 18, familia: 10751, fantasia: 14, historico: 36,
-    terror: 27, musical: 10402, misterio: 9648, romance: 10749,
-    ciencia_ficcion: 878, pelicula_tv: 10770, suspense: 53, belica: 10752,
-    western: 37, proximamente: "upcoming",
-};
+import { MOVIE_GENRE_SLUGS as genreMap } from '../../../utils/constants/genreSlugs';
 
 const isUpcomingMovie = (releaseDate: string): boolean => {
     const today = new Date();

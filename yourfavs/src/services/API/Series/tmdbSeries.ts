@@ -50,14 +50,7 @@ export const getLatestSeries = async ({ page }: { page?: string }): Promise<Seri
 
 // --- Categorías (lógica única: "on_the_air" y "horror") ---
 
-const genreMap: Record<string, number | "on_the_air" | "horror"> = {
-    accion: 10759, aventura: 10759, animacion: 16, comedia: 35, crimen: 80,
-    documental: 99, drama: 18, familia: 10751, infantil: 10762, misterio: 9648,
-    noticias: 10763, reality: 10764, ciencia_ficcion: 10765, fantasia: 10765,
-    romance: 10749, telenovela: 10766, talkshow: 10767,
-    terror: "horror", guerra_politica: 10768, western: 37,
-    proximamente: "on_the_air",
-};
+import { SERIE_GENRE_SLUGS as genreMap } from '../../../utils/constants/genreSlugs';
 
 export const getSeriesByCategory = async (category: string, page: string = "1"): Promise<Serie[]> => {
     const normalizedCategory = category.trim().toLowerCase();
