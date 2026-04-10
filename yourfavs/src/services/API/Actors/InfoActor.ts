@@ -1,100 +1,51 @@
-import {type APISerie, type Serie} from "../../../types/ApiSerie.ts"; // Asegúrate de tener este tipo definido
-import {type APIMovie, type Movie} from "../../../types/ApiMovie.ts";
+import { type Serie } from "../../../types/ApiSerie.ts";
+import { type Movie } from "../../../types/ApiMovie.ts";
+import { tmdbFetch, originalUrl } from '../shared/tmdbClient';
 
-const API_KEY = import.meta.env.TMDB_API_KEY;
+const sortByPopularityAndRating = (a: any, b: any) => {
+    const popDiff = b.popularity - a.popularity;
+    return popDiff !== 0 ? popDiff : b.vote_average - a.vote_average;
+};
 
-// Función optimizada para obtener películas y series en una sola llamada
-export const getMoviesAndSeriesByActorId = async ({id}: { id: string }): Promise<{ movies: Movie[]; series: Serie[] }> => {
+export const getMoviesAndSeriesByActorId = async ({ id }: { id: string }): Promise<{ movies: Movie[]; series: Serie[] }> => {
     try {
-        // Una sola llamada para obtener todos los créditos combinados
-        const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
-        const creditsRes = await fetch(creditsUrl);
-        if (!creditsRes.ok) throw new Error(`Error al obtener créditos: ${creditsRes.statusText}`);
-        const creditsData = await creditsRes.json();
-
-        // Separar películas y series
-        const movies: Movie[] = creditsData.cast.filter((item: any) => item.media_type === "movie");
-        const series: Serie[] = creditsData.cast.filter((item: any) => item.media_type === "tv");
-
-        // Función auxiliar para ordenar
-        const sortByPopularityAndRating = (a: any, b: any) => {
-            const popularityDiff = (b as any).popularity - (a as any).popularity;
-            if (popularityDiff !== 0) return popularityDiff;
-            return (b as any).vote_average - (a as any).vote_average;
-        };
-
+        const creditsData = await tmdbFetch<{ cast: any[] }>(`/person/${id}/combined_credits`);
         return {
-            movies: movies.sort(sortByPopularityAndRating),
-            series: series.sort(sortByPopularityAndRating)
+            movies: creditsData.cast.filter((item: any) => item.media_type === 'movie').sort(sortByPopularityAndRating),
+            series: creditsData.cast.filter((item: any) => item.media_type === 'tv').sort(sortByPopularityAndRating),
         };
-
     } catch (error) {
-        console.error("Hubo un error al obtener los créditos del actor:", error);
+        console.error('Error al obtener los créditos del actor:', error);
         return { movies: [], series: [] };
     }
 };
 
-// Obtener series en las que participa un actor o actriz por ID
-export const getSeriesByActorId = async ({id}: { id: string }): Promise<Serie[]> => {
+export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[]> => {
     try {
-        // Obtener créditos combinados directamente con el ID
-        const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
-        const creditsRes = await fetch(creditsUrl);
-        if (!creditsRes.ok) throw new Error(`Error al obtener créditos: ${creditsRes.statusText}`);
-        const creditsData = await creditsRes.json();
-
-        const series: Serie[] = creditsData.cast.filter((item: any) => item.media_type === "tv");
-
-        // Ordenar primero por popularidad (de mayor a menor) y luego por valoración
-        return series.sort((a, b) => {
-            const popularityDiff = (b as any).popularity - (a as any).popularity;
-            if (popularityDiff !== 0) return popularityDiff;
-            return (b as any).vote_average - (a as any).vote_average;
-        });
-
+        const creditsData = await tmdbFetch<{ cast: any[] }>(`/person/${id}/combined_credits`);
+        return creditsData.cast.filter((item: any) => item.media_type === 'tv').sort(sortByPopularityAndRating);
     } catch (error) {
-        console.error("Hubo un error al obtener las series del actor:", error);
+        console.error('Error al obtener las series del actor:', error);
         return [];
     }
 };
 
-// Obtener películas en las que participa un actor o actriz por ID
-export const getMoviesByActorId = async ({id}: { id: string }): Promise<Movie[]> => {
+export const getMoviesByActorId = async ({ id }: { id: string }): Promise<Movie[]> => {
     try {
-        // Obtener créditos combinados directamente con el ID
-        const creditsUrl = `https://api.themoviedb.org/3/person/${id}/combined_credits?api_key=${API_KEY}&language=es-ES`;
-        const creditsRes = await fetch(creditsUrl);
-        if (!creditsRes.ok) throw new Error(`Error al obtener créditos: ${creditsRes.statusText}`);
-        const creditsData = await creditsRes.json();
-
-        const movies: Movie[] = creditsData.cast.filter((item: any) => item.media_type === "movie");
-
-        // Ordenar primero por popularidad (de mayor a menor) y luego por valoración
-        return movies.sort((a, b) => {
-            const popularityDiff = (b as any).popularity - (a as any).popularity;
-            if (popularityDiff !== 0) return popularityDiff;
-            return (b as any).vote_average - (a as any).vote_average;
-        });
-
+        const creditsData = await tmdbFetch<{ cast: any[] }>(`/person/${id}/combined_credits`);
+        return creditsData.cast.filter((item: any) => item.media_type === 'movie').sort(sortByPopularityAndRating);
     } catch (error) {
-        console.error("Hubo un error al obtener las películas del actor:", error);
+        console.error('Error al obtener las películas del actor:', error);
         return [];
     }
 };
 
-// Obtener detalles de un actor o actriz por ID
-export const getActorDetailsById = async ({id}: { id: string }) => {
+export const getActorDetailsById = async ({ id }: { id: string }) => {
     try {
-        const [detailsRes, socialsRes] = await Promise.all([
-            fetch(`https://api.themoviedb.org/3/person/${id}?api_key=${API_KEY}&language=es-ES`),
-            fetch(`https://api.themoviedb.org/3/person/${id}/external_ids?api_key=${API_KEY}`)
+        const [actorDetails, socialLinks] = await Promise.all([
+            tmdbFetch<any>(`/person/${id}`),
+            tmdbFetch<any>(`/person/${id}/external_ids`, {}),
         ]);
-
-        if (!detailsRes.ok) throw new Error(`Error al obtener los detalles: ${detailsRes.statusText}`);
-        if (!socialsRes.ok) throw new Error(`Error al obtener redes sociales: ${socialsRes.statusText}`);
-
-        const actorDetails = await detailsRes.json();
-        const socialLinks = await socialsRes.json();
 
         return {
             id: actorDetails.id,
@@ -106,7 +57,7 @@ export const getActorDetailsById = async ({id}: { id: string }) => {
             imagen: actorDetails.profile_path,
             popularidad: actorDetails.popularity,
             conocidoPor: actorDetails.known_for_department,
-            genero: typeof actorDetails.gender === 'number' ? actorDetails.gender : null, // 1=female, 2=male, 0/3 unknown
+            genero: typeof actorDetails.gender === 'number' ? actorDetails.gender : null,
             alias: Array.isArray(actorDetails.also_known_as) ? actorDetails.also_known_as : [],
             homepage: actorDetails.homepage || null,
             redes: {
@@ -116,11 +67,10 @@ export const getActorDetailsById = async ({id}: { id: string }) => {
                 facebook: socialLinks.facebook_id ? `https://facebook.com/${socialLinks.facebook_id}` : null,
                 tiktok: socialLinks.tiktok_id ? `https://www.tiktok.com/@${socialLinks.tiktok_id}` : null,
                 youtube: socialLinks.youtube_id ? `https://www.youtube.com/${socialLinks.youtube_id}` : null,
-            }
+            },
         };
-
     } catch (error) {
-        console.error("Hubo un error al obtener los detalles del actor:", error);
+        console.error('Error al obtener los detalles del actor:', error);
         return null;
     }
 };
@@ -139,7 +89,7 @@ export interface ActorImage {
     aspect_ratio: number;
     height: number;
     iso_639_1: string | null;
-    file_path: string; // ruta completa
+    file_path: string;
     vote_average: number;
     vote_count: number;
     width: number;
@@ -150,26 +100,20 @@ export const fetchActorImages = async (
     language: string = "es-ES"
 ): Promise<ActorImage[]> => {
     const numericId = typeof actorId === 'string' ? parseInt(actorId, 10) : actorId;
-    const baseUrl = `https://api.themoviedb.org/3`;
-    const fullImagePath = (path: string) => `https://image.tmdb.org/t/p/original${path}`;
 
     try {
-        const res = await fetch(`${baseUrl}/person/${numericId}/images?api_key=${API_KEY}`);
-        const data = await res.json();
+        const data = await tmdbFetch<{ profiles: TMDBProfileImage[] }>(`/person/${numericId}/images`, {});
 
-        let images: TMDBProfileImage[] = data.profiles || [];
+        let images = data.profiles || [];
 
-        // Filtrar por idioma si aplica (aunque los perfiles suelen ser sin idioma)
         if (language !== "" && language !== "all") {
             images = images.filter(img => img.iso_639_1 === language.split('-')[0] || img.iso_639_1 === null);
         }
 
-        // Formatear imágenes con ruta completa
         return images.map(img => ({
             ...img,
-            file_path: fullImagePath(img.file_path)
+            file_path: originalUrl(img.file_path),
         }));
-
     } catch (error) {
         console.error(`Error al obtener imágenes del actor ${numericId}:`, error);
         return [];

@@ -5,6 +5,15 @@ if (!API_KEY) {
 }
 
 export const BASE_URL = "https://api.themoviedb.org/3";
+export const IMAGE_BASE = "https://image.tmdb.org/t/p";
+
+// Helpers para construir URLs de imagen TMDB
+export const posterUrl = (path: string | null, size: string = "w500") =>
+    path ? `${IMAGE_BASE}/${size}${path}` : "";
+export const backdropUrl = (path: string | null, size: string = "w780") =>
+    path ? `${IMAGE_BASE}/${size}${path}` : "";
+export const originalUrl = (path: string | null) =>
+    path ? `${IMAGE_BASE}/original${path}` : "";
 
 export type MediaType = 'movie' | 'tv';
 

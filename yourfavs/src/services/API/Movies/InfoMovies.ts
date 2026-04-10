@@ -1,5 +1,5 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
-import { tmdbFetch, API_KEY } from '../shared/tmdbClient';
+import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
 import {
     getTrailer as sharedGetTrailer,
     getVideos as sharedGetVideos,
@@ -108,7 +108,7 @@ export const fetchAllMoviePosters = async (
     language: string = "es-ES"
 ): Promise<PosterImage[]> => {
     const numericId = typeof movieId === 'string' ? parseInt(movieId, 10) : movieId;
-    const fullImagePath = (path: string) => `https://image.tmdb.org/t/p/original${path}`;
+    const fullImagePath = (path: string) => originalUrl(path);
 
     try {
         const movieImagesRes = await fetch(`${BASE_URL}/movie/${numericId}/images?api_key=${API_KEY}`);
@@ -153,13 +153,13 @@ export const getMovieCollectionInfo = async (
         return {
             id: data.id,
             name: data.name,
-            poster_path: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null,
-            backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w780${data.backdrop_path}` : null,
+            poster_path: posterUrl(data.poster_path) || null,
+            backdrop_path: backdropUrl(data.backdrop_path) || null,
             overview: data.overview || null,
             parts: data.parts?.map((part: any) => ({
                 id: part.id,
                 title: part.title,
-                poster_path: part.poster_path ? `https://image.tmdb.org/t/p/w200${part.poster_path}` : null,
+                poster_path: posterUrl(part.poster_path, 'w200') || null,
                 release_date: part.release_date,
             })) || [],
         };
@@ -191,13 +191,13 @@ export const getMoviesAdditionalInfo = async (movieId: string) =>
 function mapMovieDetail(data: any): Movie {
     return {
         adult: data.adult,
-        backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w500${data.backdrop_path}` : "",
+        backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
         genre_ids: data.genres?.map((g: any) => g.id) || [],
         id: data.id.toString(),
         original_language: data.original_language,
         overview: data.overview,
         popularity: data.popularity,
-        poster_path: `https://image.tmdb.org/t/p/w500${data.poster_path}`,
+        poster_path: posterUrl(data.poster_path),
         title: data.title,
         vote_average: data.vote_average,
         vote_count: data.vote_count,

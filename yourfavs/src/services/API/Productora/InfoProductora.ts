@@ -1,10 +1,5 @@
-import { type APIMovie, type Movie } from "../../../types/ApiMovie.ts";
-
-const API_KEY = import.meta.env.TMDB_API_KEY;
-
-if (!API_KEY) {
-    throw new Error("🚨 No se encontró la clave de API de TMDB. Asegúrate de definir TMDB_API_KEY en tu .env");
-}
+import { type Movie } from "../../../types/ApiMovie.ts";
+import { tmdbFetch, posterUrl, backdropUrl } from '../shared/tmdbClient';
 
 export async function getMoviesAndSeriesByCompanyName(
     companyName: string,
@@ -19,151 +14,89 @@ export async function getMoviesAndSeriesByCompanyName(
 }> {
     try {
         // 1. Buscar el ID de la productora
-        const searchRes = await fetch(
-            `https://api.themoviedb.org/3/search/company?api_key=${API_KEY}&query=${encodeURIComponent(companyName)}`
-        );
-        if (!searchRes.ok) throw new Error(`Error ${searchRes.status}: ${searchRes.statusText}`);
-        const searchData = await searchRes.json();
+        const searchData = await tmdbFetch<{ results: any[] }>('/search/company', {
+            query: encodeURIComponent(companyName),
+        });
 
         if (!searchData.results.length) {
-            return {
-                success: false,
-                movies: [],
-                series: [],
-                error: `No se encontró la productora "${companyName}"`,
-            };
+            return { success: false, movies: [], series: [], error: `No se encontró la productora "${companyName}"` };
         }
 
-        const company = searchData.results[0];
-        const companyId = company.id;
+        const companyId = searchData.results[0].id;
 
-        // 2. Obtener información detallada de la productora
-        const detailsRes = await fetch(
-            `https://api.themoviedb.org/3/company/${companyId}?api_key=${API_KEY}&language=es-ES`
-        );
-        const companyInfo = detailsRes.ok ? await detailsRes.json() : null;
+        // 2. Info de la productora + películas + series en paralelo
+        const [companyInfo, moviesData, seriesData] = await Promise.all([
+            tmdbFetch<any>(`/company/${companyId}`).catch(() => null),
+            fetchAllPages(companyId, 'movie', 10),
+            fetchAllPages(companyId, 'tv', 10),
+        ]);
 
-        // 3. Obtener películas (todas las páginas que quieras)
-        const moviesData = await fetchAllPages(
-            `https://api.themoviedb.org/3/discover/movie?api_key=${API_KEY}&language=es-ES&with_companies=${companyId}`,
-            10 // 🔹 hasta 5 páginas (100 resultados)
-        );
-
-        // 4. Obtener series
-        const seriesData = await fetchAllPages(
-            `https://api.themoviedb.org/3/discover/tv?api_key=${API_KEY}&language=es-ES&with_companies=${companyId}`,
-            10
-        );
-
-        // 5. Función de score
         const calculateScore = (item: any, type: "movie" | "tv"): number => {
-            switch (sortBy) {
-                case "popularity":
-                    return item.popularity || 0;
-                case "date":
-                    const dateField = type === "movie" ? "release_date" : "first_air_date";
-                    const date = item[dateField];
-                    return date ? new Date(date).getTime() : 0;
-                case "quality":
-                default:
-                    return item.vote_average || 0; // ✅ solo nota media
+            if (sortBy === "popularity") return item.popularity || 0;
+            if (sortBy === "date") {
+                const date = item[type === "movie" ? "release_date" : "first_air_date"];
+                return date ? new Date(date).getTime() : 0;
             }
+            return item.vote_average || 0;
         };
 
-        // 6. Procesar películas
-        const movies = (moviesData || [])
-            .filter(
-                (movie: any) =>
-                    movie.poster_path &&
-                    movie.vote_average > 0 &&
-                    movie.vote_count > 5 &&
-                    (!excludeId || movie.id !== excludeId)
-            )
-            .map((movie: any) => ({
-                ...movie,
-                score: calculateScore(movie, "movie"),
-            }))
-            .sort((a: any, b: any) => b.score - a.score)
-            .map(
-                (movie: any): Movie => ({
-                    adult: movie.adult,
-                    backdrop_path: movie.backdrop_path
-                        ? `https://image.tmdb.org/t/p/w500${movie.backdrop_path}`
-                        : "",
-                    genre_ids: movie.genre_ids,
-                    id: movie.id.toString(),
-                    original_language: movie.original_language,
-                    overview: movie.overview,
-                    popularity: movie.popularity,
-                    poster_path: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
-                    title: movie.title,
-                    vote_average: movie.vote_average,
-                    vote_count: movie.vote_count,
-                    original_title: movie.original_title,
-                    release_date: movie.release_date,
-                    video: movie.video,
-                })
-            );
+        const filterAndSort = (items: any[], type: "movie" | "tv") =>
+            items
+                .filter((item: any) => item.poster_path && item.vote_average > 0 && item.vote_count > 5 && (!excludeId || item.id !== excludeId))
+                .sort((a: any, b: any) => calculateScore(b, type) - calculateScore(a, type));
 
-        // 7. Procesar series
-        const series = (seriesData || [])
-            .filter(
-                (serie: any) =>
-                    serie.poster_path &&
-                    serie.vote_average > 0 &&
-                    serie.vote_count > 5 &&
-                    (!excludeId || serie.id !== excludeId)
-            )
-            .map((serie: any) => ({
-                ...serie,
-                score: calculateScore(serie, "tv"),
-            }))
-            .sort((a: any, b: any) => b.score - a.score)
-            .map((serie: any) => ({
-                adult: serie.adult,
-                backdrop_path: serie.backdrop_path
-                    ? `https://image.tmdb.org/t/p/w500${serie.backdrop_path}`
-                    : "",
-                genre_ids: serie.genre_ids,
-                id: serie.id.toString(),
-                original_language: serie.original_language,
-                overview: serie.overview,
-                popularity: serie.popularity,
-                poster_path: `https://image.tmdb.org/t/p/w500${serie.poster_path}`,
-                name: serie.name,
-                original_name: serie.original_name,
-                first_air_date: serie.first_air_date,
-                vote_average: serie.vote_average,
-                vote_count: serie.vote_count,
-                origin_country: serie.origin_country,
-            }));
+        const movies: Movie[] = filterAndSort(moviesData, "movie").map((movie: any) => ({
+            adult: movie.adult,
+            backdrop_path: backdropUrl(movie.backdrop_path),
+            genre_ids: movie.genre_ids,
+            id: movie.id.toString(),
+            original_language: movie.original_language,
+            overview: movie.overview,
+            popularity: movie.popularity,
+            poster_path: posterUrl(movie.poster_path),
+            title: movie.title,
+            vote_average: movie.vote_average,
+            vote_count: movie.vote_count,
+            original_title: movie.original_title,
+            release_date: movie.release_date,
+            video: movie.video,
+        }));
 
-        return {
-            success: true,
-            companyInfo,
-            movies,
-            series,
-        };
+        const series = filterAndSort(seriesData, "tv").map((serie: any) => ({
+            adult: serie.adult,
+            backdrop_path: backdropUrl(serie.backdrop_path),
+            genre_ids: serie.genre_ids,
+            id: serie.id.toString(),
+            original_language: serie.original_language,
+            overview: serie.overview,
+            popularity: serie.popularity,
+            poster_path: posterUrl(serie.poster_path),
+            name: serie.name,
+            original_name: serie.original_name,
+            first_air_date: serie.first_air_date,
+            vote_average: serie.vote_average,
+            vote_count: serie.vote_count,
+            origin_country: serie.origin_country,
+        }));
+
+        return { success: true, companyInfo, movies, series };
     } catch (error) {
         console.error("Error al obtener información de la productora:", error);
-        return {
-            success: false,
-            movies: [],
-            series: [],
-            error: error instanceof Error ? error.message : "Error desconocido",
-        };
+        return { success: false, movies: [], series: [], error: error instanceof Error ? error.message : "Error desconocido" };
     }
 }
 
-// ✅ Función auxiliar para traer varias páginas
-async function fetchAllPages(url: string, totalPages: number = 5) {
+async function fetchAllPages(companyId: number, mediaType: string, totalPages: number = 5): Promise<any[]> {
     let results: any[] = [];
     for (let page = 1; page <= totalPages; page++) {
-        const res = await fetch(`${url}&page=${page}`);
-        if (!res.ok) break;
-        const data = await res.json();
-        results = results.concat(data.results || []);
-        if (page >= data.total_pages) break; // parar si ya no hay más páginas
+        try {
+            const data = await tmdbFetch<{ results: any[]; total_pages: number }>(`/discover/${mediaType}`, {
+                with_companies: companyId.toString(),
+                page: page.toString(),
+            });
+            results = results.concat(data.results || []);
+            if (page >= data.total_pages) break;
+        } catch { break; }
     }
     return results;
 }

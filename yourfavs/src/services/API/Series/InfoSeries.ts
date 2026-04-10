@@ -1,5 +1,5 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
-import { tmdbFetch, API_KEY } from '../shared/tmdbClient';
+import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
 import {
     getTrailer as sharedGetTrailer,
     getVideos as sharedGetVideos,
@@ -142,7 +142,7 @@ export const fetchAllSeriesPosters = async (
     language: string = "es-ES"
 ): Promise<PosterImage[]> => {
     const numericId = typeof serieId === 'string' ? parseInt(serieId, 10) : serieId;
-    const fullImagePath = (path: string) => `https://image.tmdb.org/t/p/original${path}`;
+    const fullImagePath = (path: string) => originalUrl(path);
 
     try {
         const seriesData = await tmdbFetch<{ seasons: any[] }>(`/tv/${numericId}`, {});
@@ -197,7 +197,7 @@ export const getSeriesAdditionalInfo = async (seriesId: string) =>
 function mapSerieDetail(data: any): Serie {
     return {
         adult: false,
-        backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w500${data.backdrop_path}` : "",
+        backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
         genres: data.genres ?? [],
         genre_ids: data.genres?.map((g: any) => g.id) ?? [],
         id: data.id,
@@ -206,7 +206,7 @@ function mapSerieDetail(data: any): Serie {
         original_name: data.original_name,
         overview: data.overview,
         popularity: data.popularity,
-        poster_path: data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : "",
+        poster_path: posterUrl(data.poster_path),
         first_air_date: data.first_air_date,
         name: data.name,
         vote_average: data.vote_average,
@@ -224,7 +224,7 @@ function mapSerieDetail(data: any): Serie {
 function mapSerieSimilar(data: any): Serie {
     return {
         adult: false,
-        backdrop_path: data.backdrop_path ? `https://image.tmdb.org/t/p/w500${data.backdrop_path}` : "",
+        backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
         genres: [],
         genre_ids: data.genre_ids ?? [],
         id: data.id,
@@ -233,7 +233,7 @@ function mapSerieSimilar(data: any): Serie {
         original_name: data.original_name,
         overview: data.overview,
         popularity: data.popularity,
-        poster_path: `https://image.tmdb.org/t/p/w500${data.poster_path}`,
+        poster_path: posterUrl(data.poster_path),
         first_air_date: data.first_air_date,
         name: data.name,
         vote_average: data.vote_average,

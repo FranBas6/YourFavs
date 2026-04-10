@@ -27,15 +27,6 @@ if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
     );
 }
 
-console.log("✅ Firebase config cargada:", {
-    projectId: firebaseConfig.projectId,
-    authDomain: firebaseConfig.authDomain
-});
-
 // Inicializar Firebase solo una vez
 export const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-
-// Inicializar Firestore
 export const db = getFirestore(app);
-
-console.log("✅ Firebase inicializado correctamente");
