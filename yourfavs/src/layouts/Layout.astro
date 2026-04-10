@@ -14,7 +14,7 @@ interface Props {
 const {title, description = "Tu plataforma favorita para descubrir películas y series"} = Astro.props;
 ---
 <!DOCTYPE html>
-<html lang="es" view-transition>
+<html lang="es">
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -23,7 +23,6 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
     <meta name="description" content={description}/>
     <meta name="theme-color" content="#3B82F6"/>
     <link rel="canonical" href={Astro.url.href}/>
-    <link rel="manifest" href="/site.webmanifest"/>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
     <meta property="og:image" content="/og-image.png"/>
     <meta name="twitter:card" content="summary_large_image"/>
@@ -51,7 +50,7 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
 <Header/>
 <main id="content" class="max-w-7xl w-full px-3 sm:px-6 lg:px-8 mx-auto pt-4 sm:pt-6 md:pt-8 lg:pt-10">
     <slot/>
-    
+
     <!-- Botón flotante para volver arriba -->
     <div class="back-to-top-container">
         <a href="#top" title="Subir al inicio" aria-label="Subir al inicio" class="back-to-top">
@@ -78,32 +77,29 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
 </footer>
 <script is:inline>
     (function () {
-        // Mostrar/ocultar botón volver arriba
-        var onReady = function () {
-            var el = document.querySelector('.back-to-top-container');
-            if (!el) return;
+        // Back-to-top
+        var el = document.querySelector('.back-to-top-container');
+        if (el) {
             var reveal = function () {
                 var scrolled = window.scrollY || document.documentElement.scrollTop;
                 if (scrolled > 400) el.classList.add('is-visible'); else el.classList.remove('is-visible');
             };
             reveal();
             window.addEventListener('scroll', reveal, { passive: true });
-        };
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', onReady); else onReady();
+        }
 
-        // Toggle de tema si existe un botón en el Header
-        var bindThemeToggle = function () {
-            var btn = document.querySelector('.theme-toggle');
-            if (!btn) return;
+        // Theme toggle
+        var btn = document.querySelector('.theme-toggle');
+        if (btn) {
             btn.addEventListener('click', function () {
                 var html = document.documentElement;
                 var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                 html.setAttribute('data-theme', next);
                 try { localStorage.setItem('theme', next); } catch {}
             });
-        };
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindThemeToggle); else bindThemeToggle();
+        }
     })();
-    </script>
+</script>
+<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 </body>
 </html>

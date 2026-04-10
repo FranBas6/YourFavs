@@ -38,12 +38,15 @@ if (Astro.request.method === 'POST') {
     }
 }
 
-let item = await getSeriesById({id});
-let cast = await getSeriesCast(id);
-let directors = await getSeriesDirectorsAndRoles(id);
-let trailerUrl = await getSeriesTrailer(id);
-let status = await getSeriesStatus(id);
-let title = item?.name || "Serie no encontrada"; // Valor por defecto
+// Todas las llamadas TMDB iniciales en paralelo
+let [item, cast, directors, trailerUrl, status] = await Promise.all([
+    getSeriesById({id}),
+    getSeriesCast(id),
+    getSeriesDirectorsAndRoles(id),
+    getSeriesTrailer(id),
+    getSeriesStatus(id),
+]);
+let title = item?.name || "Serie no encontrada";
 
 // Cliente data actualizado con la estructura de Props
 const clientData = {
@@ -60,14 +63,15 @@ const clientData = {
     next_episode_to_air: item?.next_episode_to_air || null
 };
 
-// Obtener episodios de TODAS las temporadas (incluyendo especiales)
+// Obtener episodios de TODAS las temporadas en paralelo (antes era secuencial)
 const allSeasonEpisodes: { [key: number]: any[] } = {};
 if (item?.seasons) {
-    for (const season of item.seasons) {
-        // Ahora incluimos TODAS las temporadas, incluyendo las especiales (season_number === 0)
-        const episodes = await getEpisodesBySeasonNumber(id, season.season_number);
-        allSeasonEpisodes[season.season_number] = episodes || [];
-    }
+    const episodeResults = await Promise.all(
+        item.seasons.map((season: any) => getEpisodesBySeasonNumber(id, season.season_number))
+    );
+    item.seasons.forEach((season: any, i: number) => {
+        allSeasonEpisodes[season.season_number] = episodeResults[i] || [];
+    });
 }
 
 // Separar temporadas regulares y especiales
@@ -177,43 +181,30 @@ const hasSpecialSeasons = specialSeasons.length > 0;
 const regularSeasonsCount = regularSeasons.length;
 const specialSeasonsCount = specialSeasons.length;
 
-import type {PosterImage} from '../../services/API/Series/InfoSeries'; // Asegúrate de exportar este tipo desde tu archivo api.ts
+import type {PosterImage} from '../../services/API/Series/InfoSeries';
 
-let posters: PosterImage[] = [];
+// Segundo bloque de datos — todo en paralelo
+const apiKey = import.meta.env.TMDB_API_KEY;
+const tmdbId = item?.id;
 
-if (id) {
-    try {
-        // Obtener todos los pósters
-        const allPosters = await fetchAllSeriesPosters(id);
-        // Limitar a un máximo de 50 pósters
-        posters = allPosters.slice(0, 40);
-    } catch (error) {
-        console.error('Error al obtener pósters:', error);
-    }
-}
+const [
+    allPosters,
+    seriesRecommendationsData,
+    externalIds,
+    additionalInfo,
+    allVideos,
+] = await Promise.all([
+    id ? fetchAllSeriesPosters(id).catch(() => []) : Promise.resolve([]),
+    tmdbId ? getSerieRecommendationsOrSimilar(tmdbId) : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
+    tmdbId ? fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/external_ids?api_key=${apiKey}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({}),
+    id ? getSeriesAdditionalInfo(id) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null }),
+    id ? getSeriesVideos(id) : Promise.resolve([]),
+]);
 
-// Recomendaciones o similares
-const seriesRecommendationsData = await getSerieRecommendationsOrSimilar(item.id);
+const posters: PosterImage[] = allPosters.slice(0, 40);
 const seriesRecommendations = seriesRecommendationsData.success ? seriesRecommendationsData.recommendations : [];
 const seriesRecommendationType = seriesRecommendationsData.type || 'recommendations';
-
-const apiKey = import.meta.env.TMDB_API_KEY;
-
-// Si tienes el ID de TMDB de la serie
-const tmdbId = item.id; // tu ID de TMDB
-
-// Hacer petición para obtener external_ids
-const response = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/external_ids?api_key=${apiKey}`);
-const externalIds = await response.json();
-
-// El IMDB ID estará en externalIds.imdb_id
-const imdbId = externalIds.imdb_id; // formato: "tt1234567"
-
-// Obtener información adicional de la serie
-const additionalInfo = await getSeriesAdditionalInfo(id);
-
-// Obtener todos los videos
-const allVideos = await getSeriesVideos(id);
+const imdbId = externalIds.imdb_id;
 
 // Categorizar videos
 const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
@@ -1794,3 +1785,5 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
         </div>
     </article>
 </Layout>
+
+<script is:inline src="/js/optimistic-actions.js"></script>
