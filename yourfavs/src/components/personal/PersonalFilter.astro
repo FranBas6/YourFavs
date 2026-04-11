@@ -6,36 +6,98 @@ interface Props {
     filter: string;
     searchQuery?: string;
     genreFilter?: string;
+    availableGenres?: string[];
 }
 
-const { pageUrl, filter, searchQuery = '', genreFilter = '' } = Astro.props;
+const { pageUrl, filter, searchQuery = '', genreFilter = '', availableGenres = [] } = Astro.props;
 
-const showAll = filter === 'todos';
-const showSeries = filter === 'series';
-const showMovies = filter === 'peliculas';
+const typeFilters = [
+    { key: 'todos', label: 'Todo', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
+    { key: 'series', label: 'Series', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+    { key: 'peliculas', label: 'Películas', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z' },
+];
+
+const hasActiveFilters = searchQuery || genreFilter || filter !== 'todos';
+const activeCount = [searchQuery ? 1 : 0, genreFilter ? 1 : 0, filter !== 'todos' ? 1 : 0].reduce((a, b) => a + b, 0);
 ---
-<nav class="z-50 bg-gradient-to-r from-blue-900 to-indigo-900 backdrop-blur-lg shadow-xl rounded-2xl px-6 py-4 mb-4">
-    <div class="flex flex-wrap justify-center items-center gap-4">
-        <div class="flex flex-wrap justify-center gap-4">
-            <a href={buildUrl(pageUrl, {filter: 'todos', search: searchQuery, genre: genreFilter})}
-               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
-                ${showAll ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
-                "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
-                Todo el contenido
-            </a>
-            <a href={buildUrl(pageUrl, {filter: 'series', search: searchQuery, genre: genreFilter})}
-               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
-                ${showSeries ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
-                "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
-                Series
-            </a>
-            <a href={buildUrl(pageUrl, {filter: 'peliculas', search: searchQuery, genre: genreFilter})}
-               class={`px-5 py-2 rounded-full text-sm font-semibold tracking-wide transition-all
-                ${showMovies ? "bg-white text-blue-900 ring-2 ring-white shadow-lg scale-105" :
-                "bg-blue-700 text-white hover:bg-blue-600 hover:scale-105"}`}>
-                Películas
-            </a>
+<details class="group relative" open={hasActiveFilters ? true : undefined}>
+    <summary class="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-all text-sm font-medium text-gray-600 whitespace-nowrap">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+        </svg>
+        Filtros
+        {activeCount > 0 && (
+            <span class="text-xs px-1.5 py-0.5 bg-red-500 text-white rounded-full font-medium leading-none">{activeCount}</span>
+        )}
+    </summary>
+
+    <div class="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-lg">
+        <!-- Tipo -->
+        <div class="flex flex-wrap gap-1.5 justify-center">
+            {typeFilters.map(f => (
+                <a href={buildUrl(pageUrl, { filter: f.key, search: searchQuery, genre: genreFilter })}
+                   class={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                       ${filter === f.key
+                           ? 'bg-red-500 text-white shadow-sm shadow-red-200'
+                           : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d={f.icon}/>
+                    </svg>
+                    {f.label}
+                </a>
+            ))}
         </div>
-        <slot />
+
+        <!-- Búsqueda -->
+        <form method="get" class="relative">
+            <input type="hidden" name="filter" value={filter}/>
+            {genreFilter && <input type="hidden" name="genre" value={genreFilter}/>}
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input
+                name="search"
+                type="text"
+                value={searchQuery}
+                placeholder="Buscar por nombre..."
+                class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:border-red-300 focus:ring-1 focus:ring-red-200 focus:bg-white transition-all"
+                autocomplete="off"
+            />
+        </form>
+
+        <!-- Géneros -->
+        {availableGenres.length > 0 && (
+            <div>
+                <p class="text-xs text-gray-400 mb-2">Género</p>
+                <div class="flex flex-wrap gap-1.5">
+                    <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: '' })}
+                       class={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border
+                           ${!genreFilter
+                               ? 'bg-gray-800 text-white border-gray-800'
+                               : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
+                        Todos
+                    </a>
+                    {availableGenres.map(genre => (
+                        <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre })}
+                           class={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border
+                               ${genreFilter === genre
+                                   ? 'bg-gray-800 text-white border-gray-800'
+                                   : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
+                            {genre}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        <!-- Limpiar filtros -->
+        {hasActiveFilters && (
+            <div class="flex justify-center pt-1">
+                <a href={buildUrl(pageUrl, { filter: 'todos', search: '', genre: '' })}
+                   class="text-xs text-gray-400 hover:text-red-500 transition-colors">
+                    Limpiar filtros
+                </a>
+            </div>
+        )}
     </div>
-</nav>
+</details>

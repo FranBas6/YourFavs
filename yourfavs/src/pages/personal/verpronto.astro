@@ -5,11 +5,14 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getSeriesVerPronto} from "../../services/BD/series/yourfavsSerie";
 import {getMoviesVerPronto} from "../../services/BD/movies/yourfavsMovie";
 import {handleVerProntoAction} from "../../services/BD/actions/handleVerProntoAction";
+import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
+import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
+import {getGenreName} from "../../utils/constants/genres";
+import {processBatch} from "../../utils/processBatch";
+import {posterUrl} from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
-import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import '../../styles/pages/personal/personal.css';
 
-// Variable para manejar acciones de borrado y mensajes
 let clearedType = null;
 let errorMessage = "";
 
@@ -25,249 +28,182 @@ if (Astro.request.method === "POST") {
 
 let seriesVerPronto: any[] = [];
 let peliculasVerPronto: any[] = [];
+let seriesData: any[] = [];
+let moviesData: any[] = [];
 
 try {
-    seriesVerPronto = await getSeriesVerPronto();
-    peliculasVerPronto = await getMoviesVerPronto();
+    [seriesData, moviesData] = await Promise.all([
+        getSeriesVerPronto(),
+        getMoviesVerPronto()
+    ]);
+
+    const [seriesResults, moviesResults] = await Promise.all([
+        processBatch(seriesData.map(s => s.id), (id) => fetchSerieDetails(id), 10),
+        processBatch(moviesData.map(p => p.id), (id) => fetchMovieDetails(id), 10)
+    ]);
+
+    seriesVerPronto = seriesResults.filter(s => s !== null);
+    peliculasVerPronto = moviesResults.filter(m => m !== null);
 } catch (error) {
     console.error("Error al cargar contenido para ver pronto:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
 
-// Obtener parámetros de la URL
 const filter = Astro.url.searchParams.get("filter") || "todos";
-const searchQuery = Astro.url.searchParams.get("search") || "";
-const genreFilter = Astro.url.searchParams.get("genre") || "";
-
-// Determinar qué mostrar
 const showSeries = filter === "series" || filter === "todos";
 const showMovies = filter === "peliculas" || filter === "todos";
 const showAll = filter === "todos";
-const pageUrl = Astro.url;
-
-// Mensaje de confirmación si se borró algo
 const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
+const hasSeries = seriesVerPronto.length > 0;
+const hasMovies = peliculasVerPronto.length > 0;
+const hasContent = hasSeries || hasMovies;
 ---
 <Layout title="Ver Pronto">
-    {errorMessage && (
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
-                <strong>Error:</strong> {errorMessage}
+    <section class="px-1 sm:py-8">
+        {errorMessage && (
+            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
+                {errorMessage}
             </div>
+        )}
+
+        {clearedMessage && (
+            <div class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm mb-6 flex items-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                </svg>
+                {clearedMessage === 'series' ? 'Series borradas' : clearedMessage === 'peliculas' ? 'Películas borradas' : clearedMessage === 'todos' ? 'Todo borrado' : 'Elemento eliminado'}
+            </div>
+        )}
+
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Ver Pronto</h1>
+            <p class="text-gray-500 text-base">Contenido que quieres ver próximamente</p>
+        </header>
+
+        <div class="mb-4">
+            <PersonalNav currentPage="/personal/verpronto" />
         </div>
-    )}
-    <div class="favorites-container max-w-7xl mx-auto px-4 py-8">
-        <PersonalFilter pageUrl={pageUrl} filter={filter}>
-            <!-- Botones de borrar -->
-            <div class="flex flex-wrap justify-center gap-2">
-                {(seriesVerPronto.length > 0 || peliculasVerPronto.length > 0) && showAll && (
-                    <form method="POST" class="inline">
-                        <input type="hidden" name="filter" value={filter}/>
+
+        <!-- Botones de borrado masivo -->
+        {hasContent && (
+            <div class="flex flex-wrap gap-2 mb-6">
+                {hasSeries && hasMovies && showAll && (
+                    <form method="POST">
                         <button type="submit" name="clear" value="todos"
-                            class="px-3 py-1.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center gap-1 text-xs font-medium">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                            </svg>
+                            class="px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all">
                             Borrar todo
                         </button>
                     </form>
                 )}
-                {seriesVerPronto.length > 0 && (showSeries || showAll) && (
-                    <form method="POST" class="inline">
-                        <input type="hidden" name="filter" value={filter}/>
+                {hasSeries && (showSeries || showAll) && (
+                    <form method="POST">
                         <button type="submit" name="clear" value="series"
-                            class="px-3 py-1.5 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200 flex items-center gap-1 text-xs font-medium">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                            </svg>
+                            class="px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all">
                             Borrar series
                         </button>
                     </form>
                 )}
-                {peliculasVerPronto.length > 0 && (showMovies || showAll) && (
-                    <form method="POST" class="inline">
-                        <input type="hidden" name="filter" value={filter}/>
+                {hasMovies && (showMovies || showAll) && (
+                    <form method="POST">
                         <button type="submit" name="clear" value="peliculas"
-                            class="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200 flex items-center gap-1 text-xs font-medium">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/>
-                            </svg>
+                            class="px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all">
                             Borrar películas
                         </button>
                     </form>
                 )}
             </div>
-        </PersonalFilter>
-
-        <PersonalNav currentPage="/personal/verpronto" />
-
-        <!-- Mensaje de confirmación -->
-        {clearedMessage && (
-                <div class="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                clip-rule="evenodd"/>
-                        </svg>
-                        {clearedMessage === 'series' ? 'Series borradas exitosamente' :
-                            clearedMessage === 'peliculas' ? 'Películas borradas exitosamente' :
-                                'Todo el contenido borrado exitosamente'}
-                    </div>
-                </div>
         )}
 
-        <!-- Contenedor principal de contenido -->
-        <div class="content-sections space-y-12">
-            {/* SECCIÓN DE VER PRONTO */}
-            <div class="favorites-section animate-fadeIn">
-                <div class="section-header flex items-center gap-4 mb-6">
-                    <div class="flex-grow h-0.5 bg-gradient-to-r "></div>
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-indigo-500" viewBox="0 0 24 24"
-                            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                            stroke-linejoin="round">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                            <line x1="8" y1="21" x2="16" y2="21"/>
-                            <line x1="12" y1="17" x2="12" y2="21"/>
-                            <polygon points="10,8 16,12 10,16"/>
-                        </svg>
-                        Ver Pronto
+        <div class="space-y-10">
+            {/* Series */}
+            {(showSeries || showAll) && (
+                <section id="series-section" class="scroll-mt-20">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                        Series
+                        <span class="text-sm font-normal text-gray-400">({seriesVerPronto.length})</span>
                     </h2>
-                    <div class="flex-grow h-0.5 bg-gradient-to-r "></div>
-                </div>
 
-                {/* Series Ver Pronto */}
-                {(showSeries || showAll) && (
-                        <section class="mb-8">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-blue-50 rounded-lg px-4 py-3 border-l-4 border-blue-500">
-                                <span class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                    </svg>
-                                Series para ver Pronto
-                                </span>
-                                <span class="text-sm text-blue-600 bg-blue-100 rounded-full px-3 py-1 font-bold">
-                                    {seriesVerPronto.length}
-                                </span>
-                            </h3>
+                    {seriesVerPronto.length === 0 && (
+                        <div class="text-center py-10 text-gray-400">
+                            <p>No tienes series para ver pronto</p>
+                        </div>
+                    )}
+                    {seriesVerPronto.length > 0 && (
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {seriesVerPronto.map((item) => (
+                                <div class="flex flex-col h-full">
+                                    <CardSerie
+                                        id={item.id.toString()}
+                                        img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                        name={item.name}
+                                        vote_average={item.vote_average}
+                                        overview={item.overview}
+                                        first_air_date={item.first_air_date}
+                                        seasons={item.seasons}
+                                        last_episode_to_air={item.last_episode_to_air}
+                                        next_episode_to_air={item.next_episode_to_air}
+                                        genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                        status={item.status}
+                                    />
+                                    <form method="POST" class="mt-1.5">
+                                        <input type="hidden" name="deleteId" value={item.id}/>
+                                        <input type="hidden" name="deleteType" value="serie"/>
+                                        <button type="submit"
+                                            class="w-full py-1.5 text-xs font-medium text-red-500 hover:text-white hover:bg-red-500 border border-red-200 rounded-lg transition-all"
+                                            aria-label="Eliminar serie">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            )}
 
-                            {seriesVerPronto.length === 0 ? (
-                                    <div class="empty-state bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-xl p-8 text-center">
-                                        <div class="max-w-sm mx-auto">
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                class="h-16 w-16 mx-auto text-blue-400 mb-4" fill="none"
-                                                viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                            </svg>
-                                            <h3 class="text-xl font-semibold text-blue-800 mb-2">
-                                                Aún no tienes series para ver pronto
-                                            </h3>
-                                            <p class="text-blue-600">
-                                                Explora el catálogo y guarda las series que quieres ver próximamente.
-                                            </p>
-                                        </div>
-                                    </div>
-                            ) : (
-                                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                        {seriesVerPronto.map((item) => (
-                                                <div class="relative">
-                                                    <CardSerie
-                                                            id={item.id.toString()}
-                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                            name={item.name}
-                                                            vote_average={item.vote_average}
-                                                            overview={item.overview}
-                                                            first_air_date={item.first_air_date}
-                                                            seasons={item.seasons}
-                                                            last_episode_to_air={item.last_episode_to_air}
-                                                            next_episode_to_air={item.next_episode_to_air}
-                                                            status={item.status}
-                                                    />
-                                                    <form method="POST" class="inline">
-                                                        <input type="hidden" name="deleteId" value={item.id}/>
-                                                        <input type="hidden" name="deleteType" value="serie"/>
-                                                        <input type="hidden" name="filter" value={filter}/>
-                                                        <button
-                                                                type="submit"
-                                                                class="absolute top-10 right-2 z-20 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-700 shadow-md"
-                                                                aria-label="Eliminar serie">
-                                                            ×
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                        ))}
-                                    </div>
-                            )}
-                        </section>
-                )}
+            {/* Películas */}
+            {(showMovies || showAll) && (
+                <section id="movies-section" class="scroll-mt-20">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                        Películas
+                        <span class="text-sm font-normal text-gray-400">({peliculasVerPronto.length})</span>
+                    </h2>
 
-                {/* Películas Ver Pronto */}
-                {(showMovies || showAll) && (
-                        <section class="mb-8">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-red-50 rounded-lg px-4 py-3 border-l-4 border-red-500">
-                                <span class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                                    </svg>
-                                    Películas para ver Pronto
-                                </span>
-                                <span class="text-sm text-red-600 bg-red-100 rounded-full px-3 py-1 font-bold">
-                                    {peliculasVerPronto.length}
-                                    </span>
-                            </h3>
-
-                            {peliculasVerPronto.length === 0 ? (
-                                    <div class="empty-state bg-gradient-to-br from-red-50 to-indigo-50 border-2 border-dashed border-red-200 rounded-xl p-8 text-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-red-400 mb-4"
-                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                        </svg>
-                                        <h3 class="text-xl font-semibold text-red-800 mb-2">
-                                            Aún no tienes películas para ver pronto
-                                        </h3>
-                                        <p class="text-red-600">
-                                            Explora el catálogo y guarda las películas que quieres ver próximamente.
-                                        </p>
-                                    </div>
-                            ) : (
-                                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                        {peliculasVerPronto.map((item) => (
-                                                <div class="relative">
-                                                    <CardMovie
-                                                            id={item.id.toString()}
-                                                            img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                            title={item.title}
-                                                            vote_average={item.vote_average}
-                                                            overview={item.overview}
-                                                            release_date={item.release_date}
-                                                    />
-                                                    <form method="POST" class="inline">
-                                                        <input type="hidden" name="deleteId" value={item.id}/>
-                                                        <input type="hidden" name="deleteType" value="pelicula"/>
-                                                        <input type="hidden" name="filter" value={filter}/>
-                                                        <button
-                                                                type="submit"
-                                                                class="absolute top-2 right-2 z-20 bg-red-600 text-white rounded-full w-7 h-7 flex items-center justify-center hover:bg-red-700 shadow-md"
-                                                                aria-label="Eliminar película">
-                                                            ×
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                        ))}
-                                    </div>
-                            )}
-                        </section>
-                )}
-            </div>
+                    {peliculasVerPronto.length === 0 && (
+                        <div class="text-center py-10 text-gray-400">
+                            <p>No tienes películas para ver pronto</p>
+                        </div>
+                    )}
+                    {peliculasVerPronto.length > 0 && (
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {peliculasVerPronto.map((item) => (
+                                <div class="flex flex-col h-full">
+                                    <CardMovie
+                                        id={item.id.toString()}
+                                        img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                        title={item.title}
+                                        vote_average={item.vote_average}
+                                        overview={item.overview}
+                                        release_date={item.release_date}
+                                        genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                    />
+                                    <form method="POST" class="mt-1.5">
+                                        <input type="hidden" name="deleteId" value={item.id}/>
+                                        <input type="hidden" name="deleteType" value="pelicula"/>
+                                        <button type="submit"
+                                            class="w-full py-1.5 text-xs font-medium text-red-500 hover:text-white hover:bg-red-500 border border-red-200 rounded-lg transition-all"
+                                            aria-label="Eliminar película">
+                                            Eliminar
+                                        </button>
+                                    </form>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </section>
+            )}
         </div>
-    </div>
+    </section>
 </Layout>

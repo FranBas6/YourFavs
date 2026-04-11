@@ -53,14 +53,41 @@ try {
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
 
+// Extraer géneros disponibles de la colección
+const genreSet = new Set<string>();
+[...seriesFavoritas, ...peliculasFavoritas].forEach((item: any) => {
+    const genres = item.genres || item.genre_ids?.map((id: number) => ({ name: getGenreName(id) })) || [];
+    genres.forEach((g: any) => { if (g.name) genreSet.add(g.name); });
+});
+const availableGenres = Array.from(genreSet).sort();
+
+// Filtrar por búsqueda y género
+const searchLower = searchQuery.toLowerCase();
+let filteredSeries = seriesFavoritas;
+let filteredMovies = peliculasFavoritas;
+
+if (searchQuery) {
+    filteredSeries = filteredSeries.filter((s: any) => s.name?.toLowerCase().includes(searchLower));
+    filteredMovies = filteredMovies.filter((m: any) => m.title?.toLowerCase().includes(searchLower));
+}
+
+if (genreFilter) {
+    const matchesGenre = (item: any) => {
+        const genres = item.genres || item.genre_ids?.map((id: number) => ({ name: getGenreName(id) })) || [];
+        return genres.some((g: any) => g.name === genreFilter);
+    };
+    filteredSeries = filteredSeries.filter(matchesGenre);
+    filteredMovies = filteredMovies.filter(matchesGenre);
+}
+
 const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
 const moviesItemsToShow = moviesPage * ITEMS_PER_PAGE;
 
-const seriesPaginadas = seriesFavoritas.slice(0, seriesItemsToShow);
-const peliculasPaginadas = peliculasFavoritas.slice(0, moviesItemsToShow);
+const seriesPaginadas = filteredSeries.slice(0, seriesItemsToShow);
+const peliculasPaginadas = filteredMovies.slice(0, moviesItemsToShow);
 
-const hasMoreSeries = seriesFavoritas.length > seriesItemsToShow;
-const hasMoreMovies = peliculasFavoritas.length > moviesItemsToShow;
+const hasMoreSeries = filteredSeries.length > seriesItemsToShow;
+const hasMoreMovies = filteredMovies.length > moviesItemsToShow;
 
 const pageUrl = Astro.url;
 
@@ -72,203 +99,131 @@ const stats = calculateStats({
 });
 ---
 <Layout title="Favoritos">
-    {errorMessage && (
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
-                <strong>Error:</strong> {errorMessage}
+    <section class="px-1 sm:py-8">
+        {errorMessage && (
+            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
+                {errorMessage}
             </div>
-        </div>
-    )}
-    <div class="favorites-container max-w-7xl mx-auto px-4 py-6 space-y-6">
-        <!-- Checkbox oculto para controlar el desplegable -->
-        <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>
+        )}
 
-        <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} />
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Favoritos</h1>
+            <p class="text-gray-500 text-base">Tu colección de películas y series favoritas</p>
+        </header>
 
-        <PersonalNav currentPage="/personal/favoritos" />
-
-        <!-- Contenedor principal de contenido -->
-        <div class="content-sections space-y-12">
-            {/* SECCIÓN DE FAVORITOS */}
-            <div class="favorites-section animate-fadeIn">
-                <div class="section-header flex items-center gap-4 mb-6">
-                    <div class="flex-grow h-0.5 bg-gradient-to-r from-yellow-300 to-yellow-500"></div>
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-yellow-500"
-                            viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                        </svg>
-                        Contenido Favorito
-                    </h2>
-                    <div class="flex-grow h-0.5 bg-gradient-to-r from-yellow-500 to-yellow-300 mb-10"></div>
-                </div>
-
-                <StatsPanel stats={stats} />
-
-                {/* Series Favoritas */}
-                {(showSeries || showAll) && (
-                        <section id="series-section" class="mb-8 scroll-mt-24">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-blue-50 rounded-lg px-4 py-3 border-l-4 border-blue-500">
-                                <span class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                    </svg>
-                                Series Favoritas
-                                </span>
-                                <span class="text-sm text-blue-600 bg-blue-100 rounded-full px-3 py-1 font-bold">
-                                    {seriesPaginadas.length}
-                                    {searchQuery || genreFilter ? ` de ${seriesData.length}` : ` de ${seriesData.length}`}
-                                </span>
-                            </h3>
-
-                            {seriesPaginadas.length === 0 ? (
-                                    <div class="empty-state bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-xl p-8 text-center">
-                                        <div class="max-w-sm mx-auto">
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                class="h-16 w-16 mx-auto text-blue-400 mb-4" fill="none"
-                                                viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                            </svg>
-                                            <h3 class="text-xl font-semibold text-blue-800 mb-2">
-                                                {searchQuery || genreFilter ? 'No se encontraron series' : '¡Comienza tu colección!'}
-                                            </h3>
-                                            <p class="text-blue-600">
-                                                {searchQuery || genreFilter ?
-                                                    'Intenta ajustar los filtros de búsqueda.' :
-                                                    'Explora nuestro catálogo y marca tus series favoritas.'
-                                                }
-                                            </p>
-                                        </div>
-                                    </div>
-                            ) : (
-                                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                        {seriesPaginadas.map((item, index) => {
-                                            // Calcular el número de favorito considerando la paginación
-                                            const favoriteNumber = index + 1;
-                                            return (
-                                                <CardSerie
-                                                        id={item.id.toString()}
-                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                        name={item.name}
-                                                        vote_average={item.vote_average}
-                                                        overview={item.overview}
-                                                        first_air_date={item.first_air_date}
-                                                        seasons={item.seasons}
-                                                        last_episode_to_air={item.last_episode_to_air}
-                                                        next_episode_to_air={item.next_episode_to_air}
-                                                        genres={item.genre_ids?.map((id: number) => ({
-                                                            id,
-                                                            name: getGenreName(id)
-                                                        }))}
-                                                        status={item.status}
-                                                        favoriteNumber={favoriteNumber}
-                                                />
-                                            );
-                                        })}
-                                    </div>
-                            )}
-                            {hasMoreSeries && (
-                                <div class="flex justify-center mt-8">
-                                    <a 
-                                        href={buildUrl(pageUrl, {
-                                            filter: filter,
-                                            search: searchQuery,
-                                            genre: genreFilter,
-                                            seriesPage: Math.ceil(seriesData.length / ITEMS_PER_PAGE).toString(),
-                                            moviesPage: moviesPage.toString()
-                                        }) + '#series-section'}
-                                        class="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                        </svg>
-                                        Mostrar todas las series restantes ({seriesData.length - seriesItemsToShow})
-                                    </a>
-                                </div>
-                            )}
-                        </section>
-                )}
-
-                {/* Películas Favoritas */}
-                {(showMovies || showAll) && (
-                        <section id="movies-section" class="mb-8 scroll-mt-24">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-red-50 rounded-lg px-4 py-3 border-l-4 border-red-500">
-                                <span class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-600" fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                                    </svg>
-                                    Películas Favoritas
-                                </span>
-                                <span class="text-sm text-red-600 bg-red-100 rounded-full px-3 py-1 font-bold">
-                                    {peliculasPaginadas.length}
-                                    {searchQuery || genreFilter ? ` de ${moviesData.length}` : ` de ${moviesData.length}`}
-                                </span>
-                            </h3>
-
-                            {peliculasPaginadas.length === 0 ? (
-                                    <div class="empty-state bg-gradient-to-br from-red-50 to-indigo-50 border-2 border-dashed border-red-200 rounded-xl p-8 text-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-red-400 mb-4"
-                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                        </svg>
-                                        <h3 class="text-xl font-semibold text-red-800 mb-2">
-                                            {searchQuery || genreFilter ? 'No se encontraron películas' : '¡Comienza tu colección!'}
-                                        </h3>
-                                        <p class="text-red-600">
-                                            {searchQuery || genreFilter ?
-                                                'Intenta ajustar los filtros de búsqueda.' :
-                                                'Explora nuestro catálogo y marca tus películas favoritas.'
-                                            }
-                                        </p>
-                                    </div>
-                            ) : (
-                                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                        {peliculasPaginadas.map((item) => (
-                                                <CardMovie
-                                                        id={item.id.toString()}
-                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                        title={item.title}
-                                                        vote_average={item.vote_average}
-                                                        overview={item.overview}
-                                                        release_date={item.release_date}
-                                                        genres={item.genre_ids?.map((id: number) => ({
-                                                            id,
-                                                            name: getGenreName(id)
-                                                        }))}
-                                                />
-                                        ))}
-                                    </div>
-                            )}
-                            {hasMoreMovies && (
-                                <div class="flex justify-center mt-8">
-                                    <a 
-                                        href={buildUrl(pageUrl, {
-                                            filter: filter,
-                                            search: searchQuery,
-                                            genre: genreFilter,
-                                            seriesPage: seriesPage.toString(),
-                                            moviesPage: Math.ceil(moviesData.length / ITEMS_PER_PAGE).toString()
-                                        }) + '#movies-section'}
-                                        class="px-8 py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl hover:from-red-700 hover:to-pink-700 transition-all font-semibold flex items-center gap-2 shadow-lg hover:scale-105"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                                        </svg>
-                                        Mostrar todas las películas restantes ({moviesData.length - moviesItemsToShow})
-                                    </a>
-                                </div>
-                            )}
-                        </section>
-                )}
+        <div class="flex items-start gap-3 mb-6">
+            <div class="flex-1 min-w-0">
+                <PersonalNav currentPage="/personal/favoritos" />
             </div>
+            <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} availableGenres={availableGenres} />
         </div>
-    </div>
+        <StatsPanel stats={stats} />
+
+        <div class="space-y-10">
+            {/* Series */}
+            {(showSeries || showAll) && (
+                <section id="series-section" class="scroll-mt-20">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                            Series
+                            <span class="text-sm font-normal text-gray-400">({filteredSeries.length})</span>
+                        </h2>
+                    </div>
+
+                    {seriesPaginadas.length === 0 && (
+                        <div class="text-center py-10 text-gray-400">
+                            <p>Aún no tienes series en esta colección</p>
+                        </div>
+                    )}
+                    {seriesPaginadas.length > 0 && (
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {seriesPaginadas.map((item) => {
+                                const realPos = seriesFavoritas.findIndex((s: any) => s.id === item.id) + 1;
+                                return (
+                                <CardSerie
+                                    id={item.id.toString()}
+                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                    name={item.name}
+                                    vote_average={item.vote_average}
+                                    overview={item.overview}
+                                    first_air_date={item.first_air_date}
+                                    seasons={item.seasons}
+                                    last_episode_to_air={item.last_episode_to_air}
+                                    next_episode_to_air={item.next_episode_to_air}
+                                    genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                    status={item.status}
+                                    favoriteNumber={realPos}
+                                />);
+                            })}
+                        </div>
+                    )}
+                    {hasMoreSeries && (
+                        <div class="flex justify-center mt-6">
+                            <a href={buildUrl(pageUrl, {
+                                    filter: filter, search: searchQuery, genre: genreFilter,
+                                    seriesPage: Math.ceil(filteredSeries.length / ITEMS_PER_PAGE).toString(),
+                                    moviesPage: moviesPage.toString()
+                                }) + '#series-section'}
+                               class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all">
+                                Mostrar {filteredSeries.length - seriesItemsToShow} series más
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </a>
+                        </div>
+                    )}
+                </section>
+            )}
+
+            {/* Películas */}
+            {(showMovies || showAll) && (
+                <section id="movies-section" class="scroll-mt-20">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                            Películas
+                            <span class="text-sm font-normal text-gray-400">({filteredMovies.length})</span>
+                        </h2>
+                    </div>
+
+                    {peliculasPaginadas.length === 0 && (
+                        <div class="text-center py-10 text-gray-400">
+                            <p>Aún no tienes películas en esta colección</p>
+                        </div>
+                    )}
+                    {peliculasPaginadas.length > 0 && (
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {peliculasPaginadas.map((item) => (
+                                <CardMovie
+                                    id={item.id.toString()}
+                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                    title={item.title}
+                                    vote_average={item.vote_average}
+                                    overview={item.overview}
+                                    release_date={item.release_date}
+                                    genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                />
+                            ))}
+                        </div>
+                    )}
+                    {hasMoreMovies && (
+                        <div class="flex justify-center mt-6">
+                            <a href={buildUrl(pageUrl, {
+                                    filter: filter, search: searchQuery, genre: genreFilter,
+                                    seriesPage: seriesPage.toString(),
+                                    moviesPage: Math.ceil(filteredMovies.length / ITEMS_PER_PAGE).toString()
+                                }) + '#movies-section'}
+                               class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all">
+                                Mostrar {filteredMovies.length - moviesItemsToShow} películas más
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </a>
+                        </div>
+                    )}
+                </section>
+            )}
+        </div>
+    </section>
 </Layout>

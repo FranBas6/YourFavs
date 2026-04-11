@@ -99,8 +99,9 @@ interface RecommendedMovie {
     overview: string;
     release_date: string;
     popularity?: number;
-    score?: number; // Puntuación personalizada para ordenar recomendaciones
+    score?: number;
     genres: number[];
+    sourceTitle?: string; // Título de la película favorita que generó esta recomendación
 }
 
 // Helper para obtener documentos de una colección ordenados por fecha
@@ -165,7 +166,7 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
             ...verPronto.map(m => m.id),
         ]);
 
-        // Obtener recomendaciones en lotes de 5 para respetar rate limits de TMDB
+        // Obtener recomendaciones con source title
         const allRecommendationsArrays = await processBatch(
             favoritas,
             (movie) => fetchRecommendationsForMovie(movie.id, 2.0),
@@ -191,7 +192,15 @@ export const getRecommendedMovies = async (limit: number = 20): Promise<Recommen
 
 const fetchRecommendationsForMovie = async (movieId: string, weight: number = 1.0): Promise<RecommendedMovie[]> => {
     try {
-        const results = await tmdbFetchList<any>(`/movie/${movieId}/recommendations`);
+        const { tmdbFetch } = await import('../../API/shared/tmdbClient');
+
+        // Fetch source title + recomendaciones en paralelo
+        const [sourceDetail, results] = await Promise.all([
+            tmdbFetch<any>(`/movie/${movieId}`).catch(() => null),
+            tmdbFetchList<any>(`/movie/${movieId}/recommendations`),
+        ]);
+
+        const sourceTitle = sourceDetail?.title || '';
 
         return results.map((item: any) => ({
             id: item.id.toString(),
@@ -203,6 +212,7 @@ const fetchRecommendationsForMovie = async (movieId: string, weight: number = 1.
             popularity: item.popularity,
             genres: item.genre_ids || [],
             score: (item.vote_average * 0.5 + item.popularity * 0.2) * weight,
+            sourceTitle,
         }));
     } catch (error) {
         console.error(`Error al obtener recomendaciones para película ${movieId}:`, error);

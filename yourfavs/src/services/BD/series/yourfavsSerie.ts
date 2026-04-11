@@ -296,6 +296,7 @@ interface RecommendedSeries {
         name: string
     }[];
     status?: string;
+    sourceTitle?: string;
 }
 
 export type {SeriesFavs, SeriesInterface};
@@ -438,7 +439,14 @@ export const getRecommendedSeries = async (limit: number = 20): Promise<Recommen
 
 const fetchRecommendationsForSeries = async (seriesId: string, weight: number = 1.0): Promise<RecommendedSeries[]> => {
     try {
-        const results = await tmdbFetchList<any>(`/tv/${seriesId}/recommendations`);
+        const { tmdbFetch } = await import('../../API/shared/tmdbClient');
+
+        const [sourceDetail, results] = await Promise.all([
+            tmdbFetch<any>(`/tv/${seriesId}`).catch(() => null),
+            tmdbFetchList<any>(`/tv/${seriesId}/recommendations`),
+        ]);
+
+        const sourceTitle = sourceDetail?.name || '';
 
         return results.map((item: any) => ({
             id: item.id.toString(),
@@ -449,6 +457,7 @@ const fetchRecommendationsForSeries = async (seriesId: string, weight: number = 
             first_air_date: item.first_air_date,
             popularity: item.popularity,
             score: (item.vote_average * 0.5 + item.popularity * 0.2) * weight,
+            sourceTitle,
         }));
     } catch (error) {
         console.error(`Error al obtener recomendaciones para serie ${seriesId}:`, error);

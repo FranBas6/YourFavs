@@ -3,31 +3,39 @@ import Layout from "../../layouts/Layout.astro"
 import { getActorsFav } from "../../services/BD/actors/yourfavsActor";
 import { getActorDetailsById, getMoviesAndSeriesByActorId } from "../../services/API/Actors/InfoActor";
 import { calculateAge, processProductions } from "../../utils/constants/helpers/actor-helpers";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
-import '../../styles/pages/personal/actores.css';
 
-let actorsWithDetails: any[] = [];
+interface ActorDetail {
+    id: string;
+    position: number;
+    details: any;
+    age: number | null;
+    totalMovies: number;
+    totalSeries: number;
+    releasedMovies: any[];
+    releasedSeries: any[];
+    upcomingMovies: any[];
+    upcomingSeries: any[];
+}
+
+let actorsWithDetails: ActorDetail[] = [];
 let errorMessage = "";
 
 try {
-    // 🔹 Obtener IDs y posiciones desde Firebase
     const actorsFav = await getActorsFav();
 
-    // 🔹 Obtener detalles actualizados desde TMDB para cada actor
-    // Optimización: Limitar a 6 producciones por categoría para mejorar rendimiento
-    actorsWithDetails = await Promise.all(
+    const rawResults = await Promise.all(
         actorsFav.map(async (fav) => {
             try {
-                // Obtener datos actualizados del actor desde TMDB
-                const actorDetails = await getActorDetailsById({ id: fav.id });
+                const [actorDetails, { movies, series }] = await Promise.all([
+                    getActorDetailsById({ id: fav.id }),
+                    getMoviesAndSeriesByActorId({ id: fav.id }),
+                ]);
                 if (!actorDetails) return null;
 
-                // Obtener películas y series del actor en una sola llamada optimizada
-                const { movies, series } = await getMoviesAndSeriesByActorId({ id: fav.id });
-
-                // Procesar películas y series usando función auxiliar
                 const { released: releasedMovies, upcoming: upcomingMovies } = processProductions(movies, 'release_date', 9);
-                const { released: releasedSeries, upcoming: upcomingSeries } = processProductions(series, 'first_air_date',9);
+                const { released: releasedSeries, upcoming: upcomingSeries } = processProductions(series, 'first_air_date', 9);
 
                 return {
                     id: fav.id,
@@ -39,337 +47,175 @@ try {
                     releasedMovies,
                     releasedSeries,
                     upcomingMovies,
-                    upcomingSeries
+                    upcomingSeries,
                 };
-            } catch (error) {
-                console.error(`Error al obtener detalles del actor ${fav.id}:`, error);
+            } catch {
                 return null;
             }
         })
     );
 
     // Filtrar nulos (actores no encontrados en TMDB)
-    actorsWithDetails = actorsWithDetails.filter(actor => actor !== null);
+    actorsWithDetails = rawResults.filter((actor): actor is ActorDetail => actor !== null);
 } catch (error) {
     console.error("Error al cargar actores favoritos:", error);
-    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+    errorMessage = error instanceof Error ? error.message : "Error desconocido";
 }
-
-const actors = actorsWithDetails;
 ---
 <Layout title="Actores Favoritos">
-    {errorMessage && (
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
-                <strong>Error:</strong> {errorMessage}
+    <section class="px-1 sm:py-8">
+        {errorMessage && (
+            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
+                {errorMessage}
             </div>
-        </div>
-    )}
-    <div class="favorites-container max-w-7xl mx-auto px-4 py-6 space-y-6">
+        )}
 
-        <PersonalNav currentPage="/personal/actores" />
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Actores Favoritos</h1>
+            <p class="text-gray-500 text-base">{actorsWithDetails.length} actores en tu colección</p>
+        </header>
 
-        <div class="section-header flex items-center gap-4 mb-6">
-            <div class="flex-grow h-0.5 bg-gradient-to-r from-red-300 to-red-500"></div>
-            <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-red-500"
-                    viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"
-                        clip-rule="evenodd"/>
-                </svg>
-                Actores
-            </h2>
-            <div class="flex-grow h-0.5 bg-gradient-to-r from-red-500 to-red-300"></div>
+        <div class="mb-4">
+            <PersonalNav currentPage="/personal/actores" />
         </div>
 
-        <!-- Contenedor de actores -->
-        <div class="actors-list space-y-4">
-            {actors.length === 0 ? (
-                <div class="text-center py-12">
-                    <p class="text-gray-500 text-lg">No tienes actores favoritos aún.</p>
-                    <p class="text-gray-400 text-sm mt-2">Busca actores y añádelos a tu lista.</p>
-                </div>
-            ) : (
-                actors.map((actor, index) => {
-                    const actorId = `actor-${actor.id}`;
-                    const imageUrlSmall = actor.details.imagen 
-                        ? `https://image.tmdb.org/t/p/w185${actor.details.imagen}`
-                        : '/placeholder-actor.png';
-                    const imageUrlLarge = actor.details.imagen 
-                        ? `https://image.tmdb.org/t/p/w500${actor.details.imagen}`
-                        : '/placeholder-actor.png';
-                    
-                    return (
-                        <div class="actor-card bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-200">
-                            <input type="checkbox" id={actorId} class="actor-toggle hidden" />
-                            
-                            {/* Header del actor - siempre visible */}
-                            <label for={actorId} class="actor-header cursor-pointer flex items-center gap-4 p-4 hover:bg-white/50 transition-colors">
-                                <div class="actor-image-container flex-shrink-0">
-                                    <img 
-                                        src={imageUrlSmall} 
-                                        alt={actor.details.nombre}
-                                        class="w-16 h-16 rounded-full object-cover border-2 border-red-400 shadow-md"
-                                        loading="lazy"
-                                        decoding="async"
-                                    />
-                                </div>
-                                
-                                <div class="flex-grow">
-                                    <h3 class="text-xl font-bold text-gray-800 mb-1">{actor.details.nombre}</h3>
-                                    <div class="flex flex-wrap gap-2 items-center text-sm">
-                                        {actor.age && (
-                                            <span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
-                                                {actor.age} años
-                                            </span>
-                                        )}
-                                        {actor.details.conocidoPor && (
-                                            <span class="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
-                                                {actor.details.conocidoPor}
-                                            </span>
-                                        )}
-                                        <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
-                                            🎬 {actor.totalMovies + actor.totalSeries} producciones
-                                        </span>
-                                        {actor.details.popularidad && (
-                                            <span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
-                                                ⭐ {actor.details.popularidad.toFixed(1)}
-                                            </span>
-                                        )}
-                                        <span class="ml-auto text-gray-400 text-xs">#{actor.position}</span>
-                                    </div>
-                                </div>
-                                
-                                {/* Icono para expandir/contraer */}
-                                <div class="flex-shrink-0">
-                                    <svg class="chevron-icon w-6 h-6 text-red-500 transition-transform duration-300" 
-                                         xmlns="http://www.w3.org/2000/svg" 
-                                         fill="none" 
-                                         viewBox="0 0 24 24" 
-                                         stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                    </svg>
-                                </div>
-                            </label>
-                            
-                            {/* Contenido expandible */}
-                            <div class="actor-content">
-                                <div class="p-4 pt-0 border-t border-gray-200 bg-white/30">
-                                    {/* Imagen grande del actor cuando se expande - solo carga cuando está expandido */}
-                                    <div class="actor-expanded-image flex justify-center py-4">
-                                        <img 
-                                            src={imageUrlLarge} 
-                                            alt={actor.details.nombre}
-                                            class="w-48 h-48 rounded-full object-cover border-4 border-red-400 shadow-2xl"
-                                            loading="lazy"
-                                            decoding="async"
-                                        />
-                                    </div>
+        {actorsWithDetails.length === 0 && (
+            <div class="text-center py-16 text-gray-400">
+                <p class="mb-1">No tienes actores favoritos</p>
+                <p class="text-xs">Busca actores y añádelos desde su perfil</p>
+            </div>
+        )}
 
-                                    <div class="space-y-6 mt-4">
-                                        {/* Próximas producciones */}
-                                        {(actor.upcomingMovies.length > 0 || actor.upcomingSeries.length > 0) && (
-                                            <div>
-                                                <h4 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
-                                                    </svg>
-                                                    Próximas producciones
-                                                </h4>
-                                                <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-green-300 scrollbar-track-gray-100">
-                                                    {actor.upcomingMovies.map((movie: any) => {
-                                                        const posterUrl = movie.poster_path 
-                                                            ? `https://image.tmdb.org/t/p/w185${movie.poster_path}`
-                                                            : '/placeholder-movie.png';
-                                                        return (
-                                                            <a href={`/movie/${movie.id}`} 
-                                                               class="production-card flex-shrink-0 group w-28">
-                                                                <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                                                                    <img 
-                                                                        src={posterUrl} 
-                                                                        alt={movie.title}
-                                                                        class="w-full h-40 object-cover"
-                                                                        loading="lazy"
-                                                                        decoding="async"
-                                                                    />
-                                                                    <div class="absolute top-1 left-1 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded">
-                                                                        Próximo
-                                                                    </div>
-                                                                    {movie.vote_average > 0 && (
-                                                                        <div class="absolute top-1 right-1 bg-black/70 text-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                                                            ⭐ {movie.vote_average.toFixed(1)}
-                                                                        </div>
-                                                                    )}
-                                                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                                                </div>
-                                                                <div class="mt-2 h-12 overflow-hidden">
-                                                                    <p class="text-xs text-gray-700 font-medium line-clamp-2 group-hover:text-green-600 transition-colors leading-tight">
-                                                                        {movie.title}
-                                                                    </p>
-                                                                </div>
-                                                                <p class="text-xs text-green-600 font-semibold mt-1">
-                                                                    {movie.release_date ? new Date(movie.release_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                                                                </p>
-                                                            </a>
-                                                        );
-                                                    })}
-                                                    {actor.upcomingSeries.map((serie: any) => {
-                                                        const posterUrl = serie.poster_path 
-                                                            ? `https://image.tmdb.org/t/p/w185${serie.poster_path}`
-                                                            : '/placeholder-serie.png';
-                                                        return (
-                                                            <a href={`/serie/${serie.id}`} 
-                                                               class="production-card flex-shrink-0 group w-28">
-                                                                <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                                                                    <img 
-                                                                        src={posterUrl} 
-                                                                        alt={serie.name}
-                                                                        class="w-full h-40 object-cover"
-                                                                        loading="lazy"
-                                                                        decoding="async"
-                                                                    />
-                                                                    <div class="absolute top-1 left-1 bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded">
-                                                                        Próximo
-                                                                    </div>
-                                                                    {serie.vote_average > 0 && (
-                                                                        <div class="absolute top-1 right-1 bg-black/70 text-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                                                            ⭐ {serie.vote_average.toFixed(1)}
-                                                                        </div>
-                                                                    )}
-                                                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                                                </div>
-                                                                <div class="mt-2 h-12 overflow-hidden">
-                                                                    <p class="text-xs text-gray-700 font-medium line-clamp-2 group-hover:text-green-600 transition-colors leading-tight">
-                                                                        {serie.name}
-                                                                    </p>
-                                                                </div>
-                                                                <p class="text-xs text-green-600 font-semibold mt-1">
-                                                                    {serie.first_air_date ? new Date(serie.first_air_date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
-                                                                </p>
-                                                            </a>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {/* Películas estrenadas */}
-                                        <div>
-                                            <h4 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-purple-500" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path fill-rule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm3 2h6v4H7V5zm8 8v2h1v-2h-1zm-2-2H7v4h6v-4zm2 0h1V9h-1v2zm1-4V5h-1v2h1zM5 5v2H4V5h1zm0 4H4v2h1V9zm-1 4h1v2H4v-2z" clip-rule="evenodd" />
-                                                </svg>
-                                                Películas
-                                            </h4>
-                                            {actor.releasedMovies.length > 0 ? (
-                                                <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-purple-300 scrollbar-track-gray-100">
-                                                    {actor.releasedMovies.map((movie: any) => {
-                                                        const posterUrl = movie.poster_path 
-                                                            ? `https://image.tmdb.org/t/p/w185${movie.poster_path}`
-                                                            : '/placeholder-movie.png';
-                                                        return (
-                                                            <a href={`/movie/${movie.id}`} 
-                                                               class="production-card flex-shrink-0 group w-28">
-                                                                <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                                                                    <img 
-                                                                        src={posterUrl} 
-                                                                        alt={movie.title}
-                                                                        class="w-full h-40 object-cover"
-                                                                        loading="lazy"
-                                                                        decoding="async"
-                                                                    />
-                                                                    {movie.vote_average > 0 && (
-                                                                        <div class="absolute top-1 right-1 bg-black/70 text-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                                                            ⭐ {movie.vote_average.toFixed(1)}
-                                                                        </div>
-                                                                    )}
-                                                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                                                </div>
-                                                                <div class="mt-2 h-12 overflow-hidden">
-                                                                    <p class="text-xs text-gray-700 font-medium line-clamp-2 group-hover:text-purple-600 transition-colors leading-tight">
-                                                                        {movie.title}
-                                                                    </p>
-                                                                </div>
-                                                                <p class="text-xs text-gray-400 mt-1">
-                                                                    {movie.release_date ? new Date(movie.release_date).getFullYear() : '—'}
-                                                                </p>
-                                                            </a>
-                                                        );
-                                                    })}
-                                                </div>
-                                            ) : (
-                                                <p class="text-gray-400 text-sm italic">No hay películas recientes</p>
-                                            )}
-                                        </div>
-                                        
-                                        {/* Series estrenadas */}
-                                        <div>
-                                            <h4 class="font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-pink-500" viewBox="0 0 20 20" fill="currentColor">
-                                                    <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                                                </svg>
-                                                Series
-                                            </h4>
-                                            {actor.releasedSeries.length > 0 ? (
-                                                <div class="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-pink-300 scrollbar-track-gray-100">
-                                                    {actor.releasedSeries.map((serie: any) => {
-                                                        const posterUrl = serie.poster_path 
-                                                            ? `https://image.tmdb.org/t/p/w185${serie.poster_path}`
-                                                            : '/placeholder-serie.png';
-                                                        return (
-                                                            <a href={`/serie/${serie.id}`} 
-                                                               class="production-card flex-shrink-0 group w-28">
-                                                                <div class="relative w-full rounded-lg overflow-hidden shadow-md group-hover:shadow-xl transition-all duration-300 group-hover:scale-105">
-                                                                    <img 
-                                                                        src={posterUrl} 
-                                                                        alt={serie.name}
-                                                                        class="w-full h-40 object-cover"
-                                                                        loading="lazy"
-                                                                        decoding="async"
-                                                                    />
-                                                                    {serie.vote_average > 0 && (
-                                                                        <div class="absolute top-1 right-1 bg-black/70 text-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                                                            ⭐ {serie.vote_average.toFixed(1)}
-                                                                        </div>
-                                                                    )}
-                                                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                                                                </div>
-                                                                <div class="mt-2 h-12 overflow-hidden">
-                                                                    <p class="text-xs text-gray-700 font-medium line-clamp-2 group-hover:text-pink-600 transition-colors leading-tight">
-                                                                        {serie.name}
-                                                                    </p>
-                                                                </div>
-                                                                <p class="text-xs text-gray-400 mt-1">
-                                                                    {serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : '—'}
-                                                                </p>
-                                                            </a>
-                                                        );
-                                                    })}
-                                                </div>
-                                            ) : (
-                                                <p class="text-gray-400 text-sm italic">No hay series recientes</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Botón para ver perfil completo */}
-                                    <div class="mt-4 text-center">
-                                        <a href={`/actor/${actor.id}`} 
-                                           class="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-lg hover:from-red-600 hover:to-pink-600 transition-all shadow-md hover:shadow-lg font-medium">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
-                                            </svg>
-                                            Ver perfil completo
-                                        </a>
-                                    </div>
-                                </div>
+        <div class="space-y-3">
+            {actorsWithDetails.map((actor) => (
+                <details class="group bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                    <summary class="flex items-center gap-4 p-4 cursor-pointer">
+                        <img
+                            src={actor.details.imagen ? posterUrl(actor.details.imagen, 'w185') : '/placeholder-actor.png'}
+                            alt={actor.details.nombre}
+                            class="w-14 h-14 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
+                            loading="lazy"
+                        />
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <h3 class="text-base font-semibold text-gray-900 truncate">{actor.details.nombre}</h3>
+                                <span class="text-xs text-gray-400 flex-shrink-0">#{actor.position}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 text-xs">
+                                {actor.age && (
+                                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{actor.age} años</span>
+                                )}
+                                <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full">{actor.totalMovies + actor.totalSeries} producciones</span>
+                                {actor.details.popularidad && (
+                                    <span class="px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full">⭐ {actor.details.popularidad.toFixed(1)}</span>
+                                )}
                             </div>
                         </div>
-                    );
-                })
-            )}
+                        <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </summary>
+
+                    <div class="px-4 pb-4 border-t border-gray-100 space-y-5 pt-4">
+                        <!-- Foto grande -->
+                        <div class="flex justify-center">
+                            <img
+                                src={actor.details.imagen ? posterUrl(actor.details.imagen) : '/placeholder-actor.png'}
+                                alt={actor.details.nombre}
+                                class="w-36 h-36 rounded-full object-cover border-4 border-gray-100 shadow-lg"
+                                loading="lazy"
+                            />
+                        </div>
+
+                        <!-- Próximas producciones -->
+                        {(actor.upcomingMovies.length > 0 || actor.upcomingSeries.length > 0) && (
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                                    <span class="w-1 h-4 bg-green-500 rounded-full"></span>
+                                    Próximamente
+                                </h4>
+                                <div class="flex gap-2.5 overflow-x-auto pb-2">
+                                    {[...actor.upcomingMovies, ...actor.upcomingSeries].map((prod) => (
+                                        <a href={prod.title ? `/movie/${prod.id}` : `/serie/${prod.id}`}
+                                           class="flex-shrink-0 w-24 group/prod">
+                                            <div class="relative rounded-lg overflow-hidden shadow-sm group-hover/prod:shadow-md transition-shadow">
+                                                <img src={posterUrl(prod.poster_path, 'w185') || '/placeholder.jpg'}
+                                                     alt={prod.title || prod.name}
+                                                     class="w-full h-36 object-cover"/>
+                                                <span class="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 bg-green-500 text-white rounded">Próximo</span>
+                                            </div>
+                                            <p class="mt-1 text-xs text-gray-600 line-clamp-2 leading-tight">{prod.title || prod.name}</p>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <!-- Películas -->
+                        {actor.releasedMovies.length > 0 && (
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                                    <span class="w-1 h-4 bg-red-500 rounded-full"></span>
+                                    Películas ({actor.releasedMovies.length})
+                                </h4>
+                                <div class="flex gap-2.5 overflow-x-auto pb-2">
+                                    {actor.releasedMovies.map((movie) => (
+                                        <a href={`/movie/${movie.id}`} class="flex-shrink-0 w-24 group/prod">
+                                            <div class="relative rounded-lg overflow-hidden shadow-sm group-hover/prod:shadow-md transition-shadow">
+                                                <img src={posterUrl(movie.poster_path, 'w185') || '/placeholder.jpg'}
+                                                     alt={movie.title}
+                                                     class="w-full h-36 object-cover"/>
+                                                {movie.vote_average > 0 && (
+                                                    <span class="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 bg-black/60 text-yellow-400 rounded">⭐ {movie.vote_average.toFixed(1)}</span>
+                                                )}
+                                            </div>
+                                            <p class="mt-1 text-xs text-gray-600 line-clamp-2 leading-tight">{movie.title}</p>
+                                            <p class="text-[10px] text-gray-400">{movie.release_date ? new Date(movie.release_date).getFullYear() : ''}</p>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <!-- Series -->
+                        {actor.releasedSeries.length > 0 && (
+                            <div>
+                                <h4 class="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1.5">
+                                    <span class="w-1 h-4 bg-blue-500 rounded-full"></span>
+                                    Series ({actor.releasedSeries.length})
+                                </h4>
+                                <div class="flex gap-2.5 overflow-x-auto pb-2">
+                                    {actor.releasedSeries.map((serie) => (
+                                        <a href={`/serie/${serie.id}`} class="flex-shrink-0 w-24 group/prod">
+                                            <div class="relative rounded-lg overflow-hidden shadow-sm group-hover/prod:shadow-md transition-shadow">
+                                                <img src={posterUrl(serie.poster_path, 'w185') || '/placeholder.jpg'}
+                                                     alt={serie.name}
+                                                     class="w-full h-36 object-cover"/>
+                                                {serie.vote_average > 0 && (
+                                                    <span class="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 bg-black/60 text-yellow-400 rounded">⭐ {serie.vote_average.toFixed(1)}</span>
+                                                )}
+                                            </div>
+                                            <p class="mt-1 text-xs text-gray-600 line-clamp-2 leading-tight">{serie.name}</p>
+                                            <p class="text-[10px] text-gray-400">{serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : ''}</p>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <!-- Ver perfil -->
+                        <div class="text-center pt-2">
+                            <a href={`/actor/${actor.id}`}
+                               class="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-all">
+                                Ver perfil completo
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                                </svg>
+                            </a>
+                        </div>
+                    </div>
+                </details>
+            ))}
         </div>
-    </div>
+    </section>
 </Layout>

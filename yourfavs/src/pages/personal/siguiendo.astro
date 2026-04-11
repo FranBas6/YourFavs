@@ -4,6 +4,8 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getSeriesSiguiendo} from "../../services/BD/series/yourfavsSerie";
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
+import {buildUrl} from "../../utils/buildUrl";
+import {posterUrl} from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import '../../styles/pages/personal/personal.css';
 
@@ -11,10 +13,8 @@ let seriesSiguiendo: any[] = [];
 let errorMessage = "";
 
 try {
-    // 🔹 Obtener IDs desde Firebase
     const seriesSiguiendoIds = (await getSeriesSiguiendo()).map(s => s.id);
 
-    // 🔹 Obtener detalles desde TMDB
     seriesSiguiendo = await Promise.all(seriesSiguiendoIds.map(id => fetchSerieDetails(id)));
 
     seriesSiguiendo.sort((a, b) => {
@@ -31,109 +31,98 @@ try {
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
 
-const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
-const genreFilter = Astro.url.searchParams.get("genre") || "";
+const seriesPage = parseInt(Astro.url.searchParams.get("seriesPage") || "1");
+const ITEMS_PER_PAGE = 20;
 
-const showSeries = filter === "series" || filter === "todos";
-const showAll = filter === "todos";
+// Filtrar por búsqueda
+const searchLower = searchQuery.toLowerCase();
+let filteredSeries = seriesSiguiendo;
+
+if (searchQuery) {
+    filteredSeries = filteredSeries.filter((s: any) => s.name?.toLowerCase().includes(searchLower));
+}
+
+const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
+const seriesPaginadas = filteredSeries.slice(0, seriesItemsToShow);
+const hasMoreSeries = filteredSeries.length > seriesItemsToShow;
+
+const pageUrl = Astro.url;
 ---
 <Layout title="Siguiendo">
-    {errorMessage && (
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="bg-red-500/10 border border-red-500 text-red-500 px-4 py-3 rounded">
-                <strong>Error:</strong> {errorMessage}
+    <section class="px-1 sm:py-8">
+        {errorMessage && (
+            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
+                {errorMessage}
             </div>
+        )}
+
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Siguiendo</h1>
+            <p class="text-gray-500 text-base">Series que estás siguiendo</p>
+        </header>
+
+        <div class="mb-6">
+            <PersonalNav currentPage="/personal/siguiendo" />
         </div>
-    )}
-    <div class="favorites-container max-w-7xl mx-auto px-4 py-1 space-y-6">
-        <!-- Checkbox oculto para controlar el desplegable -->
-        <input type="checkbox" id="search-toggle" class="search-toggle hidden"/>
 
-        <PersonalNav currentPage="/personal/siguiendo" />
+        {searchQuery && (
+            <div class="mb-4 text-sm text-gray-500">
+                Buscando: <span class="font-medium text-gray-700">"{searchQuery}"</span>
+                <a href={pageUrl.pathname} class="ml-2 text-blue-500 hover:underline">Limpiar</a>
+            </div>
+        )}
 
-        <!-- Contenedor principal de contenido -->
-        <div class="content-sections space-y-12">
-            {/* SECCIÓN DE SIGUIENDO (después de PENDIENTES y antes de VISTOS) */}
-            <div class="favorites-section animate-fadeIn">
-                <div class="section-header flex items-center gap-4 mb-6">
-                    <div class="flex-grow h-0.5 bg-gradient-to-r from-purple-300 to-purple-500"></div>
-                    <h2 class="text-2xl font-bold text-gray-800 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 mr-2 text-purple-500"
-                            viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd"
-                                d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                clip-rule="evenodd"/>
-                        </svg>
-                        Series en Seguimiento
+        <div class="space-y-10">
+            {/* Series */}
+            <section id="series-section" class="scroll-mt-20">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                        Series
+                        <span class="text-sm font-normal text-gray-400">({filteredSeries.length})</span>
                     </h2>
-                    <div class="flex-grow h-0.5 bg-gradient-to-r from-purple-500 to-purple-300"></div>
                 </div>
 
-                {/* Series Siguiendo (solo se muestra si se filtran series o todos) */}
-                {(showSeries || showAll) && (
-                        <section class="mb-8">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex justify-between items-center bg-blue-50 rounded-lg px-4 py-3 border-l-4 border-blue-500">
-                                <span class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-600" fill="none"
-                                        viewBox="0 0 24 24"
-                                        stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                    </svg>
-                                Series Siguiendo
-                                </span>
-                                <span class="text-sm text-blue-600 bg-blue-100 rounded-full px-3 py-1 font-bold">
-                                    {seriesSiguiendo.length}
-                                    {searchQuery || genreFilter ? ` de ${seriesSiguiendo.length}` : ''}
-                                </span>
-                            </h3>
-
-                            {seriesSiguiendo.length === 0 ? (
-                                    <div class="empty-state bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-xl p-8 text-center">
-                                        <div class="max-w-sm mx-auto">
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                class="h-16 w-16 mx-auto text-blue-400 mb-4" fill="none"
-                                                viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                                            </svg>
-                                            <h3 class="text-xl font-semibold text-blue-800 mb-2">
-                                                {searchQuery || genreFilter ? 'No se encontraron series' : '¡Comienza tu colección!'}
-                                            </h3>
-                                            <p class="text-blue-600">
-                                                {searchQuery || genreFilter ?
-                                                    'Intenta ajustar los filtros de búsqueda.' :
-                                                    'Explora nuestro catálogo y marca tus series siguiendo.'
-                                                }
-                                            </p>
-                                        </div>
-                                    </div>
-                            ) : (
-                                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                        {seriesSiguiendo.map((item) => (
-                                                <CardSerie
-                                                        id={item.id.toString()}
-                                                        img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                        name={item.name}
-                                                        vote_average={item.vote_average}
-                                                        overview={item.overview}
-                                                        first_air_date={item.first_air_date}
-                                                        seasons={item.seasons}
-                                                        last_episode_to_air={item.last_episode_to_air}
-                                                        next_episode_to_air={item.next_episode_to_air}
-                                                        genres={item.genre_ids?.map((id: number) => ({
-                                                            id,
-                                                            name: getGenreName(id)
-                                                        }))}
-                                                        status={item.status}
-                                                />
-                                        ))}
-                                    </div>
-                            )}
-                        </section>
+                {seriesPaginadas.length === 0 && (
+                    <div class="text-center py-10 text-gray-400">
+                        <p>Aún no tienes series en esta colección</p>
+                    </div>
                 )}
-            </div>
+                {seriesPaginadas.length > 0 && (
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                        {seriesPaginadas.map((item) => (
+                            <CardSerie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                name={item.name}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                first_air_date={item.first_air_date}
+                                seasons={item.seasons}
+                                last_episode_to_air={item.last_episode_to_air}
+                                next_episode_to_air={item.next_episode_to_air}
+                                genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                status={item.status}
+                            />
+                        ))}
+                    </div>
+                )}
+                {hasMoreSeries && (
+                    <div class="flex justify-center mt-6">
+                        <a href={buildUrl(pageUrl, {
+                                search: searchQuery,
+                                seriesPage: Math.ceil(filteredSeries.length / ITEMS_PER_PAGE).toString()
+                            }) + '#series-section'}
+                           class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all">
+                            Mostrar {filteredSeries.length - seriesItemsToShow} series más
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </a>
+                    </div>
+                )}
+            </section>
         </div>
-    </div>
+    </section>
 </Layout>
