@@ -16,20 +16,9 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const action = String(formData.get('action'));
     const listType = String(formData.get('list_type'));
 
-    let genres = [];
-    try {
-        genres = JSON.parse(String(formData.get('genres')) || '[]');
-    } catch { /* ignore */ }
-
     const movieDataBase = {
         id: movieId,
-        poster_path: String(formData.get('poster_path') || ''),
-        title: String(formData.get('title') || 'Sin nombre'),
-        vote_average: Number(formData.get('vote_average') || 0),
-        overview: String(formData.get('overview') || 'Sin descripción'),
         added_at: new Date(),
-        genres: genres,
-        release_date: String(formData.get('release_date') || ''),
     };
 
     // Buscar opinión existente en cualquier colección

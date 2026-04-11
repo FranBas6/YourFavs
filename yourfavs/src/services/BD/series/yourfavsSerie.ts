@@ -52,22 +52,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
 
     if (action === 'add' && !serieExiste) {
-        const genres = JSON.parse(String(formData.get('genres') || '[]'));
-        const seasons = JSON.parse(String(formData.get('seasons') || '[]'));
-        const lastEpisodeToAir = JSON.parse(String(formData.get('last_episode_to_air') || 'null'));
-        const nextEpisodeToAir = JSON.parse(String(formData.get('next_episode_to_air') || 'null'));
-
         const baseEntry: Record<string, any> = {
             id: serieId,
-            name: String(formData.get('name') || 'Sin nombre'),
-            poster_path: String(formData.get('poster_path') || ''),
-            vote_average: Number(formData.get('vote_average') || 0),
-            overview: String(formData.get('overview') || 'Sin descripción'),
             added_at: new Date(),
-            genres, first_air_date: String(formData.get('first_air_date') || ''),
-            status: String(formData.get('status') || ''),
-            seasons, last_episode_to_air: lastEpisodeToAir, next_episode_to_air: nextEpisodeToAir,
-            position: 0,
         };
 
         // Buscar opinión existente

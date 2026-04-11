@@ -193,7 +193,7 @@ function mapMovieDetail(data: any): Movie {
         adult: data.adult,
         backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
         genre_ids: data.genres?.map((g: any) => g.id) || [],
-        id: data.id.toString(),
+        id: data.id,
         original_language: data.original_language,
         overview: data.overview,
         popularity: data.popularity,

@@ -16,7 +16,7 @@ export type Movie = {
     adult: boolean;
     backdrop_path: string;
     genre_ids: number[];  // Ahora 'genres' es un array de objetos
-    id: string;
+    id: number;
     original_language: string;
     overview: string;
     popularity: number;
