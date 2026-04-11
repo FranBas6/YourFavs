@@ -6,9 +6,11 @@ import type {Movie} from "../types/ApiMovie"
 import type {Serie} from "../types/ApiSerie";
 import {getLatestMovies, getMostPopularMovies, getTopRatedMovies, getMoviesByCategory} from "../services/API/Movies/tmdbMovies";
 import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCategory} from "../services/API/Series/tmdbSeries";
+import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {fetchAllPlatforms} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
+import {posterUrl, backdropUrl} from "../services/API/shared/tmdbClient";
 import '../styles/pages/index.css';
 
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
@@ -18,8 +20,10 @@ const randomIndex = Math.floor(Math.random() * allCategories.length);
 const randomCategorySlug = allCategories[randomIndex].slug;
 const randomCategoryName = allCategories[randomIndex].name;
 
-// Todas las llamadas TMDB en paralelo (antes eran 8 secuenciales + 1 paralela)
+// Todas las llamadas TMDB en paralelo (11 calls)
 const [
+    trendingMovies,
+    trendingSeries,
     latestMovies,
     latestSeries,
     popularMovies,
@@ -30,6 +34,8 @@ const [
     categoriesMovies,
     categoriesSeries,
 ] = await Promise.all([
+    getTrending<Movie>('movie', 'week'),
+    getTrending<Serie>('tv', 'week'),
     getLatestMovies({page: pageStr}),
     getLatestSeries({page: pageStr}),
     getMostPopularMovies({page: pageStr}),
@@ -43,6 +49,9 @@ const [
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
 
+// Película destacada para el hero (la más trending de la semana)
+const heroMovie = trendingMovies[0] || null;
+
 const randomCategory = {
     slug: randomCategorySlug,
     name: randomCategoryName,
@@ -51,6 +60,14 @@ const randomCategory = {
 };
 
 const sections = [
+    {
+        title: "TENDENCIAS DE LA SEMANA",
+        movies: trendingMovies,
+        series: trendingSeries,
+        link: "/catalogo/tendencias",
+        priority: 'high',
+        icon: '📈'
+    },
     {
         title: "ÚLTIMOS LANZAMIENTOS",
         movies: latestMovies,
@@ -103,20 +120,42 @@ const sections = [
 ---
 <Layout title="YourFavs">     
     <main class="main-container">
-        <!-- Hero Section mejorado -->
-        <div class="hero-section">
-            <div class="hero-content">
-                <h1 class="hero-title text-coral-red">
-                    <span class="hero-icon">🎬</span>
-                    CATÁLOGO PRINCIPAL
-                </h1>
-                <div class="hero-divider"></div>
-                <p class="hero-description">
-                    Descubre miles de películas y series de las mejores plataformas.
-                    <strong>Tu entretenimiento favorito</strong> en un solo lugar.
-                </p>
+        <!-- Hero con película trending destacada -->
+        {heroMovie ? (
+            <div class="hero-backdrop" style={`background-image: url(${backdropUrl(heroMovie.backdrop_path, 'w1280')})`}>
+                <div class="hero-backdrop-overlay">
+                    <div class="hero-backdrop-content">
+                        <span class="hero-trending-badge">📈 Trending esta semana</span>
+                        <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
+                        <div class="hero-backdrop-meta">
+                            <span class="hero-backdrop-rating">⭐ {heroMovie.vote_average?.toFixed(1)}</span>
+                            <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
+                        </div>
+                        <p class="hero-backdrop-overview">{heroMovie.overview}</p>
+                        <a href={`/movie/${heroMovie.id}`} class="hero-backdrop-cta">
+                            Ver detalles
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
             </div>
-        </div>
+        ) : (
+            <div class="hero-section">
+                <div class="hero-content">
+                    <h1 class="hero-title text-coral-red">
+                        <span class="hero-icon">🎬</span>
+                        CATÁLOGO PRINCIPAL
+                    </h1>
+                    <div class="hero-divider"></div>
+                    <p class="hero-description">
+                        Descubre miles de películas y series de las mejores plataformas.
+                        <strong>Tu entretenimiento favorito</strong> en un solo lugar.
+                    </p>
+                </div>
+            </div>
+        )}
 
         <!-- Contenido principal -->
         <div class="content-wrapper">
@@ -160,7 +199,7 @@ const sections = [
                                                         <div class="card-container">
                                                             <CardMovie
                                                                     id={item.id.toString()}
-                                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                                                     title={item.title}
                                                                     vote_average={item.vote_average}
                                                                     overview={item.overview}
@@ -195,7 +234,7 @@ const sections = [
                                                         <div class="card-container">
                                                             <CardSerie
                                                                     id={item.id.toString()}
-                                                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                                                     name={item.name}
                                                                     vote_average={item.vote_average}
                                                                     overview={item.overview}

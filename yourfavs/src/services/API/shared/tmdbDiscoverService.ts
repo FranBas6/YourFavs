@@ -58,6 +58,16 @@ export async function getTopRated<T extends { vote_average: number; vote_count?:
 }
 
 /**
+ * Obtener contenido trending de la semana
+ */
+export async function getTrending<T>(
+    mediaType: MediaType,
+    timeWindow: 'day' | 'week' = 'week'
+): Promise<T[]> {
+    return tmdbFetchList<T>(`/trending/${mediaType}/${timeWindow}`);
+}
+
+/**
  * Buscar contenido por título
  */
 export async function searchByTitle<T extends { popularity: number }>(

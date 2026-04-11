@@ -1,0 +1,103 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import CardMovie from "../../components/Cards/CardMovie.astro";
+import CardSerie from "../../components/Cards/CardSerie.astro";
+import {getTrending} from "../../services/API/shared/tmdbDiscoverService";
+import {getGenreName} from "../../utils/constants/genres";
+import {posterUrl} from "../../services/API/shared/tmdbClient";
+import FilterBar from "../../components/FilterBar.astro";
+import type {Movie} from "../../types/ApiMovie";
+import type {Serie} from "../../types/ApiSerie";
+import '../../styles/pages/catalogo/shared.css';
+import '../../styles/pages/catalogo/card-animations.css';
+
+const urlParams = new URL(Astro.request.url).searchParams;
+const type = urlParams.get('type') || 'all';
+const timeWindow = urlParams.get('time') === 'day' ? 'day' : 'week';
+
+const [trendingMovies, trendingSeries] = await Promise.all([
+    getTrending<Movie>('movie', timeWindow),
+    getTrending<Serie>('tv', timeWindow),
+]);
+---
+<Layout title="Tendencias">
+    <div class="px-1 sm:py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Tendencias</h1>
+            <p class="text-gray-500 text-base mb-4">Lo más trending {timeWindow === 'day' ? 'de hoy' : 'de la semana'} en películas y series</p>
+
+            <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mx-auto sm:mx-0">
+                <a href={`?time=week&type=${type}`}
+                   class={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${timeWindow === 'week' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
+                    Esta semana
+                </a>
+                <a href={`?time=day&type=${type}`}
+                   class={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${timeWindow === 'day' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
+                    Hoy
+                </a>
+            </div>
+        </header>
+
+        <FilterBar currentType={type} buildUrl={(t) => `?time=${timeWindow}&type=${t}`} />
+
+        <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
+            <span><strong class="text-gray-900">{trendingMovies.length + trendingSeries.length}</strong> títulos en tendencia</span>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                En tiempo real
+            </div>
+        </div>
+
+        {(type === 'all' || type === 'movies') && trendingMovies.length > 0 && (
+            <div class="mb-12" id="peliculas">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                    Películas Trending
+                </h2>
+
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                    {trendingMovies.map((item) => (
+                        <div class="card-wrapper group">
+                            <CardMovie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                title={item.title}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                release_date={item.release_date}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {(type === 'all' || type === 'series') && trendingSeries.length > 0 && (
+            <div class="mb-12" id="series">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                    Series Trending
+                </h2>
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                    {trendingSeries.map((item) => (
+                        <div class="card-wrapper group">
+                            <CardSerie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                name={item.name}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                first_air_date={item.first_air_date}
+                                seasons={item.seasons}
+                                last_episode_to_air={item.last_episode_to_air}
+                                next_episode_to_air={item.next_episode_to_air}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
+</Layout>

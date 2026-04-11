@@ -6,47 +6,47 @@ interface Props {
 }
 
 const { page, totalPages, buildUrl } = Astro.props;
+const isFirst = page === 1;
+const isLast = page === totalPages;
 ---
 <nav aria-label="Paginación" class="mt-12">
-    <!-- Navegación móvil -->
-    <div class="flex sm:hidden items-center justify-between bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+    <!-- Mobile -->
+    <div class="flex sm:hidden items-center justify-between gap-3">
         <a href={buildUrl(Math.max(1, page - 1))}
-           class={`pagination-btn-mobile ${page === 1 ? 'disabled' : ''}`}
-           aria-disabled={page === 1}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+           class={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+               ${isFirst ? 'opacity-40 pointer-events-none bg-gray-100 text-gray-400' : 'bg-white text-gray-700 shadow-sm border border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-md active:scale-95'}`}
+           aria-disabled={isFirst}>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
             </svg>
             Anterior
         </a>
 
-        <div class="flex items-center gap-2 px-4">
-            <span class="text-sm text-gray-600">Página</span>
-            <span class="px-3 py-1 bg-coral-red text-white rounded-lg font-semibold text-sm">{page}</span>
-            <span class="text-sm text-gray-600">/{totalPages}</span>
-        </div>
+        <span class="text-sm text-gray-500">
+            <span class="font-semibold text-gray-900">{page}</span> / {totalPages}
+        </span>
 
         <a href={buildUrl(Math.min(totalPages, page + 1))}
-           class={`pagination-btn-mobile ${page === totalPages ? 'disabled' : ''}`}
-           aria-disabled={page === totalPages}>
+           class={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+               ${isLast ? 'opacity-40 pointer-events-none bg-gray-100 text-gray-400' : 'bg-white text-gray-700 shadow-sm border border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-md active:scale-95'}`}
+           aria-disabled={isLast}>
             Siguiente
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
             </svg>
         </a>
     </div>
 
-    <!-- Navegación escritorio -->
+    <!-- Desktop -->
     <div class="hidden sm:flex justify-center">
-        <div class="inline-flex items-center bg-white rounded-xl p-2 shadow-sm border border-gray-100">
-            <!-- Botón anterior -->
+        <div class="inline-flex items-center gap-1 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100">
+            <!-- Anterior -->
             <a href={buildUrl(Math.max(1, page - 1))}
-               class={`pagination-btn ${page === 1 ? 'disabled' : ''}`}
-               aria-disabled={page === 1}>
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+               class={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all
+                   ${isFirst ? 'opacity-40 pointer-events-none text-gray-400' : 'text-gray-600 hover:bg-red-50 hover:text-red-600 active:scale-95'}`}
+               aria-disabled={isFirst}>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
                 </svg>
                 Anterior
             </a>
@@ -54,40 +54,40 @@ const { page, totalPages, buildUrl } = Astro.props;
             <!-- Primera página -->
             {page > 2 && (
                 <>
-                    <a href={buildUrl(1)} class="pagination-number">1</a>
-                    {page > 3 && <span class="px-2 text-gray-400">...</span>}
+                    <a href={buildUrl(1)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">1</a>
+                    {page > 3 && <span class="w-9 h-9 flex items-center justify-center text-gray-300 text-sm">···</span>}
                 </>
             )}
 
-            <!-- Página anterior -->
+            <!-- Anterior -->
             {page > 1 && (
-                <a href={buildUrl(page - 1)} class="pagination-number">{page - 1}</a>
+                <a href={buildUrl(page - 1)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">{page - 1}</a>
             )}
 
-            <!-- Página actual -->
-            <span class="pagination-number active">{page}</span>
+            <!-- Actual -->
+            <span class="w-9 h-9 flex items-center justify-center rounded-lg text-sm font-semibold bg-red-500 text-white shadow-sm shadow-red-200" aria-current="page">{page}</span>
 
-            <!-- Página siguiente -->
+            <!-- Siguiente -->
             {page < totalPages && (
-                <a href={buildUrl(page + 1)} class="pagination-number">{page + 1}</a>
+                <a href={buildUrl(page + 1)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">{page + 1}</a>
             )}
 
             <!-- Última página -->
             {page < totalPages - 1 && (
                 <>
-                    {page < totalPages - 2 && <span class="px-2 text-gray-400">...</span>}
-                    <a href={buildUrl(totalPages)} class="pagination-number">{totalPages}</a>
+                    {page < totalPages - 2 && <span class="w-9 h-9 flex items-center justify-center text-gray-300 text-sm">···</span>}
+                    <a href={buildUrl(totalPages)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">{totalPages}</a>
                 </>
             )}
 
-            <!-- Botón siguiente -->
+            <!-- Siguiente -->
             <a href={buildUrl(Math.min(totalPages, page + 1))}
-               class={`pagination-btn ${page === totalPages ? 'disabled' : ''}`}
-               aria-disabled={page === totalPages}>
+               class={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all
+                   ${isLast ? 'opacity-40 pointer-events-none text-gray-400' : 'text-gray-600 hover:bg-red-50 hover:text-red-600 active:scale-95'}`}
+               aria-disabled={isLast}>
                 Siguiente
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                     stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                 </svg>
             </a>
         </div>

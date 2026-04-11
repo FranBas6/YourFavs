@@ -5,11 +5,11 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import {getGenreName} from "../../utils/constants/genres";
+import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {platformList, fetchAllPlatforms, fetchPlatformBySlug} from "../../utils/constants/platforms";
 import FilterBar from "../../components/FilterBar.astro";
 import Pagination from "../../components/Pagination.astro";
 import '../../styles/pages/catalogo/shared.css';
-import '../../styles/pages/catalogo/plataformas.css';
 
 const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const page = Number(urlParams.get('page')) || 1;
@@ -24,7 +24,6 @@ if (platformParam === 'all') {
     const allPlatforms = await fetchAllPlatforms(pageStr);
     const allMovies = allPlatforms.flatMap(p => p.movies);
     const allSeries = allPlatforms.flatMap(p => p.series);
-    // Eliminar duplicados por ID
     movies = allMovies.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
     series = allSeries.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
 } else {
@@ -34,188 +33,131 @@ if (platformParam === 'all') {
 }
 
 const totalPages = 190;
+const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p => p.slug === platformParam)?.name || platformParam;
 ---
 <Layout title="Plataformas">
     <section class="px-1 sm:py-8">
-        <!-- Header mejorado -->
-        <header class="text-center mb-6">
-            <div class="inline-flex items-center gap-3 mb-4">
-                <h1 class="text-coral-red font-bold text-4xl md:text-5xl lg:text-6xl text-center mb-2">
-                    PLATAFORMAS
-                </h1>
-            </div>
-            <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
-            <p class="text-gray-600 text-lg max-w-xl mx-auto leading-relaxed">
-                Explora las películas y series disponibles según tu plataforma preferida
-            </p>
-            <div class="w-20 h-1 bg-gradient-to-r from-coral-red to-coral-red-light mx-auto rounded-full mt-4"></div>
+        <header class="mb-6">
+            <p class="text-sm text-gray-400 mb-1">Plataforma</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{activePlatform}</h1>
         </header>
 
-        <!-- Filtro de Plataformas -->
-        <section class="mb-8">
-            <h3 class="text-xl font-semibold text-gray-700 mb-4">Filtrar por plataforma</h3>
-            <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8 gap-4">
+        <!-- Plataformas: desplegable en móvil, pills en desktop -->
+        <details class="mb-6 sm:hidden group">
+            <summary class="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer text-sm font-medium text-gray-700">
+                Cambiar plataforma
+                <svg class="w-4 h-4 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </summary>
+            <div class="flex flex-wrap gap-2 mt-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
                 <a href={`?page=1&type=${type}&platform=all`}
-                class={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all shadow-sm hover:shadow-md hover:scale-105 ${
-                    platformParam === 'all'
-                        ? 'bg-ice-blue text-white border-ice-blue'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                }`}>
-                    <span class="text-sm font-medium">Todas</span>
+                   class={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border
+                       ${platformParam === 'all'
+                           ? 'bg-blue-600 text-white border-blue-600'
+                           : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>
+                    Todas
                 </a>
-
                 {platformList.map((platform) => (
-                        <a href={`?page=1&type=${type}&platform=${platform.slug}`}
-                        class={`flex flex-col items-center justify-center p-4 rounded-xl border transition-all shadow-sm hover:shadow-md hover:scale-105 ${
-                            platformParam === platform.slug
-                                ? 'bg-ice-blue text-white border-ice-blue'
-                                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                        }`}>
-                            <img src={platform.logo} alt={platform.name} class="w-10 h-10 mb-2 object-contain"/>
-                            <span class="text-xs font-medium text-center">{platform.name}</span>
-                        </a>
+                    <a href={`?page=1&type=${type}&platform=${platform.slug}`}
+                       class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border
+                           ${platformParam === platform.slug
+                               ? 'bg-blue-600 text-white border-blue-600'
+                               : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>
+                        <img src={platform.logo} alt="" class="w-4 h-4 object-contain rounded" aria-hidden="true"/>
+                        {platform.name}
+                    </a>
                 ))}
             </div>
-        </section>
+        </details>
+        <div class="hidden sm:flex flex-wrap gap-2 mb-6">
+            <a href={`?page=1&type=${type}&platform=all`}
+               class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
+                   ${platformParam === 'all'
+                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                       : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm'}`}>
+                Todas
+            </a>
+            {platformList.map((platform) => (
+                <a href={`?page=1&type=${type}&platform=${platform.slug}`}
+                   class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
+                       ${platformParam === platform.slug
+                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                           : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm'}`}>
+                    <img src={platform.logo} alt="" class="w-5 h-5 object-contain rounded" aria-hidden="true"/>
+                    {platform.name}
+                </a>
+            ))}
+        </div>
 
         <FilterBar currentType={type} buildUrl={(t) => `?page=1&type=${t}&platform=${platformParam}`} />
 
-        <!-- Información de paginación superior mejorada y más responsive -->
-        <div class="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 md:p-6 mb-8 shadow-sm border border-gray-100">
-            <div class="flex flex-col gap-6 md:gap-4 md:flex-row md:items-center md:justify-between">
-
-                <!-- Info de página -->
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-10 h-10 bg-coral-red/10 rounded-xl shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-coral-red" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    <div class="text-sm">
-                        <div class="font-semibold text-gray-900">
-                            Página <span class="text-coral-red">{page}</span> de <span
-                                class="text-coral-red">{totalPages}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stats adicionales -->
-                <div class="flex flex-wrap justify-start md:justify-end items-center gap-x-4 gap-y-2 text-sm">
-                    <div class="flex items-center gap-2 text-gray-600">
-                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span>Actualizado hoy</span>
-                    </div>
-
-                    <div class="flex items-center gap-2 text-gray-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                        </svg>
-                        <span>Plataformas</span>
-                    </div>
-                </div>
+        <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
+            <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages} · <strong class="text-gray-700">{activePlatform}</strong></span>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                Actualizado hoy
             </div>
         </div>
 
-        <!-- Título de plataforma seleccionada y criterio de ordenación -->
-        <section class="mb-6 text-center">
-            <h2 class="text-2xl font-bold text-gray-800">
-                <span>
-            Mostrando {
-                    type === 'all'
-                        ? ' contenido'
-                        : type === 'movies'
-                            ? 'películas'
-                            : 'series'
-                } de {
-                    platformParam === 'all'
-                        ? 'todas las plataformas'
-                        : platformList.find(p => p.slug === platformParam)?.name
-                }
-        </span>
-            </h2>
-        </section>
-
-        <!-- Sección de Películas -->
+        <!-- Películas -->
         {(type === 'all' || type === 'movies') && movies.length > 0 && (
-                <div class="mb-12" id="peliculas">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-gradient-to-br bg-coral-red rounded-xl flex items-center justify-center shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                            </svg>
+            <div class="mb-12" id="peliculas">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                    Películas
+                </h2>
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                    {movies.map((item) => (
+                        <div class="card-wrapper group">
+                            <CardMovie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                title={item.title}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                release_date={item.release_date}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                            />
                         </div>
-                        <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Películas</h2>
-                        <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
-                    </div>
-
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
-                        {
-                            movies.map((item) => (
-                                    <div class="card-wrapper group">
-                                        <CardMovie
-                                                id={item.id.toString()}
-                                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                title={item.title}
-                                                vote_average={item.vote_average}
-                                                overview={item.overview}
-                                                release_date={item.release_date}
-                                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                        />
-                                    </div>
-                            ))
-                        }
-                    </div>
+                    ))}
                 </div>
+            </div>
         )}
 
-        <!-- Sección de Series -->
+        <!-- Series -->
         {(type === 'all' || type === 'series') && series.length > 0 && (
-                <div class="mb-12" id="series">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
+            <div class="mb-12" id="series">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                    Series
+                </h2>
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                    {series.map((item) => (
+                        <div class="card-wrapper group">
+                            <CardSerie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                name={item.name}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                first_air_date={item.first_air_date}
+                                seasons={item.seasons}
+                                last_episode_to_air={item.last_episode_to_air}
+                                next_episode_to_air={item.next_episode_to_air}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                            />
                         </div>
-                        <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Series</h2>
-                        <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
-                    </div>
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
-                        {
-                            series.map((item) => (
-                                    <div class="card-wrapper group">
-                                        <CardSerie
-                                                id={item.id.toString()}
-                                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                                name={item.name}
-                                                vote_average={item.vote_average}
-                                                overview={item.overview}
-                                                first_air_date={item.first_air_date}
-                                                seasons={item.seasons}
-                                                last_episode_to_air={item.last_episode_to_air}
-                                                next_episode_to_air={item.next_episode_to_air}
-                                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                        />
-                                    </div>
-                            ))
-                        }
-                    </div>
+                    ))}
                 </div>
+            </div>
         )}
 
-        <!-- Mensaje cuando no hay resultados -->
         {movies.length === 0 && series.length === 0 && (
-                <div class="text-center py-12">
-                    <h3 class="text-2xl font-medium mb-2 text-gray-700">No se encontraron resultados</h3>
-                    <p class="text-gray-600">Intenta con otra plataforma o página</p>
-                </div>
+            <div class="text-center py-12">
+                <h3 class="text-xl font-medium text-gray-700 mb-2">No se encontraron resultados</h3>
+                <p class="text-gray-500">Intenta con otra plataforma o página</p>
+            </div>
         )}
 
         <Pagination page={page} totalPages={totalPages} buildUrl={(p) => `?page=${p}&type=${type}&platform=${platformParam}`} />

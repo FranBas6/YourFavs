@@ -3,6 +3,7 @@ import Layout from "../../layouts/Layout.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getTopRatedSeries} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
+import {posterUrl} from "../../services/API/shared/tmdbClient";
 import Pagination from "../../components/Pagination.astro";
 import '../../styles/pages/catalogo/shared.css';
 
@@ -15,60 +16,16 @@ const endIndex = Math.min(page * 20, totalPages * 20);
 ---
 <Layout title="Top Series">
     <section class="px-1 sm:py-8">
-        <!-- Header mejorado -->
-        <header class="text-center mb-8">
-            <div class="inline-flex items-center gap-3 mb-6">
-                <div class="text-left mb-4">
-                    <h1 class="text-coral-red font-bold text-3xl md:text-4xl lg:text-5xl leading-tight mb-2">
-                        TOP SERIES
-                    </h1>
-                    <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
-                </div>
-            </div>
-
-            <p class="text-gray-700 text-base md:text-lg max-w-2xl mx-auto leading-relaxed mb-6">
-                Descubre las series mejor valoradas por la crítica y el público mundial.
-                <span class="text-coral-red font-medium">Solo lo mejor de las series</span>
-            </p>
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Top Series</h1>
+            <p class="text-gray-500 text-base">Las series mejor valoradas por la crítica y el público</p>
         </header>
 
-        <!-- Información de paginación superior mejorada -->
-        <div class="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 md:p-6 mb-8 shadow-sm border border-gray-100">
-            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <!-- Info de página -->
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-10 h-10 bg-coral-red/10 rounded-xl">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-coral-red" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <div class="text-sm font-semibold text-gray-900">
-                            Página <span class="text-coral-red">{page}</span> de <span
-                                class="text-coral-red">{totalPages}</span>
-                        </div>
-                        <div class="text-xs text-gray-500">
-                            Mostrando {startIndex}-{endIndex} de {totalPages * 20} series
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Stats adicionales -->
-                <div class="flex items-center gap-4 text-sm">
-                    <div class="flex items-center gap-2 text-gray-600">
-                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span>Actualizado hoy</span>
-                    </div>
-                    <div class="flex items-center gap-2 text-gray-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                        </svg>
-                        <span>Mejor valoradas</span>
-                    </div>
-                </div>
+        <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
+            <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                Actualizado hoy
             </div>
         </div>
 
@@ -79,7 +36,7 @@ const endIndex = Math.min(page * 20, totalPages * 20);
                         <div class="card-wrapper group">
                             <CardSerie
                                     id={item.id.toString()}
-                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                     name={item.name}
                                     vote_average={item.vote_average}
                                     overview={item.overview}

@@ -142,12 +142,13 @@ img {
 /* Botón flotante para volver arriba */
 .back-to-top-container {
     position: fixed;
-    bottom: 1rem;
-    right: 1rem;
+    bottom: 1.25rem;
+    right: 1.25rem;
     z-index: 50;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(8px);
+    transform: translateY(1rem);
+    transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .back-to-top-container.is-visible {
@@ -160,30 +161,32 @@ img {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
-    background: var(--coral-red);
+    width: 40px;
+    height: 40px;
+    background: rgba(15, 23, 42, 0.85);
     color: white;
-    border-radius: 50%;
-    box-shadow: var(--shadow-large);
-    transition: var(--transition-smooth);
+    border-radius: 0.75rem;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     text-decoration: none;
-    opacity: 0.9;
+    transition: all 0.2s ease;
 }
 
 .back-to-top svg {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
 }
 
 .back-to-top:hover {
-    transform: translateY(-4px) scale(1.1);
-    opacity: 1;
-    box-shadow: 0 20px 40px -10px rgba(230, 57, 70, 0.4);
+    transform: translateY(-2px);
+    background: rgba(15, 23, 42, 0.95);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
-.back-to-top:focus {
-    outline: none;
+.back-to-top:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
 }
 
 @media (min-width: 768px) {
@@ -193,13 +196,13 @@ img {
     }
 
     .back-to-top {
-        width: 56px;
-        height: 56px;
+        width: 44px;
+        height: 44px;
     }
 
     .back-to-top svg {
-        width: 24px;
-        height: 24px;
+        width: 20px;
+        height: 20px;
     }
 }
 

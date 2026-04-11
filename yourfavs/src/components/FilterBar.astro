@@ -5,35 +5,26 @@ interface Props {
 }
 
 const { currentType, buildUrl } = Astro.props;
+
+const filters = [
+    { key: 'all', label: 'Todo', icon: 'M4 6h16M4 10h16M4 14h16M4 18h16' },
+    { key: 'movies', label: 'Películas', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z' },
+    { key: 'series', label: 'Series', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+];
 ---
-<div class="flex justify-center sticky top-5 z-40 mb-8">
-    <div class="inline-flex bg-white/95 backdrop-blur-md rounded-2xl p-2 shadow-lg border border-gray-200">
-        <a href={buildUrl('all')}
-           class={`filter-btn ${currentType === 'all' ? 'active' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M19 11H5m14-4H3m16 8H7m10 4H5"/>
-            </svg>
-            Todo
-        </a>
-        <a href={buildUrl('movies')}
-           class={`filter-btn ${currentType === 'movies' ? 'active' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-            </svg>
-            Películas
-        </a>
-        <a href={buildUrl('series')}
-           class={`filter-btn ${currentType === 'series' ? 'active' : ''}`}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
-                 stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-            </svg>
-            Series
-        </a>
+<div class="flex justify-center sticky top-4 z-40 mb-8">
+    <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1 shadow-sm">
+        {filters.map(f => (
+            <a href={buildUrl(f.key)}
+               class={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                   ${currentType === f.key
+                       ? 'bg-red-500 text-white shadow-md shadow-red-200'
+                       : 'text-gray-500 hover:text-gray-900 hover:bg-white hover:shadow-sm'}`}>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d={f.icon}/>
+                </svg>
+                {f.label}
+            </a>
+        ))}
     </div>
 </div>

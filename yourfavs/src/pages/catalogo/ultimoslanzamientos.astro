@@ -5,6 +5,7 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getLatestMovies} from "../../services/API/Movies/tmdbMovies";
 import {getLatestSeries} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
+import {posterUrl} from "../../services/API/shared/tmdbClient";
 import FilterBar from "../../components/FilterBar.astro";
 import Pagination from "../../components/Pagination.astro";
 import '../../styles/pages/catalogo/shared.css';
@@ -23,79 +24,28 @@ const totalPages = 150;
 ---
 <Layout title="Últimos Lanzamientos">
     <section class="px-1 sm:py-8">
-        <!-- Header mejorado -->
-        <header class="text-center mb-12">
-            <div class="inline-flex items-center gap-3 mb-4">
-                <h1 class="text-coral-red font-bold text-4xl md:text-5xl lg:text-6xl text-center mb-2">
-                    ÚLTIMOS LANZAMIENTOS
-                </h1>
-            </div>
-            <div class="w-24 h-1 bg-coral-red mx-auto rounded-full mb-4"></div>
-            <p class="text-gray-600 text-lg max-w-xl mx-auto leading-relaxed">
-                Descubre las películas y series más recientes del momento
-            </p>
-            <div class="w-20 h-1 bg-gradient-to-r from-coral-red to-coral-red-light mx-auto rounded-full mt-4"></div>
+        <header class="mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Últimos Lanzamientos</h1>
+            <p class="text-gray-500 text-base">Las películas y series más recientes del momento</p>
         </header>
 
         <FilterBar currentType={type} buildUrl={(t) => `?page=1&type=${t}`} />
 
-        <!-- Información de paginación superior mejorada y más responsive -->
-        <div class="bg-gradient-to-r from-white to-gray-50 rounded-2xl p-4 md:p-6 mb-8 shadow-sm border border-gray-100">
-            <div class="flex flex-col gap-6 md:gap-4 md:flex-row md:items-center md:justify-between">
-
-                <!-- Info de página -->
-                <div class="flex items-center gap-3">
-                    <div class="flex items-center justify-center w-10 h-10 bg-coral-red/10 rounded-xl shrink-0">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-coral-red" fill="none"
-                            viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                    </div>
-                    <div class="text-sm">
-                        <div class="font-semibold text-gray-900">
-                            Página <span class="text-coral-red">{page}</span> de <span
-                                class="text-coral-red">{totalPages}</span>
-                        </div>
-                        <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm text-gray-500">
-                            <span>Mostrando contenido {type === 'all' ? 'completo' : type === 'movies' ? 'de películas' : 'de series'}</span>
-                        </div>
-                    </div>
-                </div>
-
-
-                <!-- Stats adicionales -->
-                <div class="flex flex-wrap justify-start md:justify-end items-center gap-x-4 gap-y-2 text-sm">
-                    <div class="flex items-center gap-2 text-gray-600">
-                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                        <span>Actualizado hoy</span>
-                    </div>
-
-                    <div class="flex items-center gap-2 text-gray-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                        </svg>
-                        <span>Últimos lanzamientos</span>
-                    </div>
-                </div>
+        <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
+            <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-green-400 rounded-full"></span>
+                Actualizado hoy
             </div>
         </div>
 
         <!-- Sección de Películas -->
         {(type === 'all' || type === 'movies') && (
                 <div class="mb-12" id="peliculas">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-gradient-to-br bg-coral-red rounded-xl flex items-center justify-center shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                            </svg>
-                        </div>
-                        <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Películas</h2>
-                        <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
-                    </div>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                        Películas
+                    </h2>
 
                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                         {
@@ -103,7 +53,7 @@ const totalPages = 150;
                                     <div class="card-wrapper group">
                                         <CardMovie
                                                 id={item.id.toString()}
-                                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                                 title={item.title}
                                                 vote_average={item.vote_average}
                                                 overview={item.overview}
@@ -120,24 +70,17 @@ const totalPages = 150;
         <!-- Sección de Series -->
         {(type === 'all' || type === 'series') && (
                 <div class="mb-12" id="series">
-                    <div class="flex items-center gap-3 mb-6">
-                        <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-md">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none"
-                                viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                            </svg>
-                        </div>
-                        <h2 class="text-2xl md:text-3xl font-bold text-gray-800">Series</h2>
-                        <div class="flex-1 h-px bg-gradient-to-r from-gray-300 to-transparent"></div>
-                    </div>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                        Series
+                    </h2>
                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                         {
                             latestSeries.map((item) => (
                                     <div class="card-wrapper group">
                                         <CardSerie
                                                 id={item.id.toString()}
-                                                img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
+                                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                                 name={item.name}
                                                 vote_average={item.vote_average}
                                                 overview={item.overview}
