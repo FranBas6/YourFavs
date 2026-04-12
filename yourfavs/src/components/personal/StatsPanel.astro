@@ -15,6 +15,10 @@ interface Props {
             notaPromedio: number;
             latestAdded: { id: string; name: string; poster_path?: string; added_at: any }[];
         };
+        watched?: {
+            totalEpisodes: number;
+            topSerie: { name: string; watched: number } | null;
+        };
         movies: {
             total: number;
             añoMasAntiguo: number;
@@ -116,6 +120,12 @@ const opinions = stats.general.opinionStats;
                     <div class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="font-medium">{stats.series.episodiosTotal}</span></div>
                     <div class="flex justify-between"><span class="text-gray-500">Nota media</span><span class="font-medium text-yellow-600">{stats.series.notaPromedio}</span></div>
                     <div class="flex justify-between"><span class="text-gray-500">Años</span><span class="font-medium">{stats.series.añoMasAntiguo}-{stats.series.añoMasReciente}</span></div>
+                    {stats.watched && stats.watched.totalEpisodes > 0 && (
+                        <div class="flex justify-between"><span class="text-gray-500">Eps. vistos</span><span class="font-medium text-green-600">{stats.watched.totalEpisodes}</span></div>
+                    )}
+                    {stats.watched?.topSerie && (
+                        <div class="flex justify-between col-span-2"><span class="text-gray-500">Más vista</span><span class="font-medium text-green-600 truncate ml-2">{stats.watched.topSerie.name} ({stats.watched.topSerie.watched})</span></div>
+                    )}
                 </div>
                 {stats.series.latestAdded.length > 0 && (
                     <div class="pt-2 border-t border-gray-100">

@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro"
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getSerieFav} from "../../services/BD/series/yourfavsSerie";
+import {getSerieFav, getWatchedProgressBatch} from "../../services/BD/series/yourfavsSerie";
 import {getMovieFav} from "../../services/BD/movies/yourfavsMovie";
 import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
@@ -53,6 +53,9 @@ try {
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
 
+// Progreso de episodios vistos para las series
+const watchedMap = await getWatchedProgressBatch(seriesFavoritas.map((s: any) => String(s.id)));
+
 // Extraer géneros disponibles de la colección
 const genreSet = new Set<string>();
 [...seriesFavoritas, ...peliculasFavoritas].forEach((item: any) => {
@@ -97,6 +100,18 @@ const stats = calculateStats({
     seriesDetails: seriesFavoritas,
     moviesDetails: peliculasFavoritas,
 });
+
+// Watched stats
+const watchedEntries = Object.entries(watchedMap) as [string, { watched: number }][];
+const totalWatchedEpisodes = watchedEntries.reduce((sum, [, v]) => sum + v.watched, 0);
+const topWatchedEntry = watchedEntries.length > 0
+    ? watchedEntries.sort((a, b) => b[1].watched - a[1].watched)[0]
+    : null;
+const topSerieName = topWatchedEntry ? seriesFavoritas.find((s: any) => String(s.id) === topWatchedEntry[0])?.name : null;
+(stats as any).watched = {
+    totalEpisodes: totalWatchedEpisodes,
+    topSerie: topSerieName && topWatchedEntry ? { name: topSerieName, watched: topWatchedEntry[1].watched } : null,
+};
 ---
 <Layout title="Favoritos">
     <section class="px-1 sm:py-8">
@@ -154,6 +169,7 @@ const stats = calculateStats({
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                     status={item.status}
                                     favoriteNumber={realPos}
+                                    watchedEpisodes={watchedMap[String(item.id)]?.watched}
                                 />);
                             })}
                         </div>

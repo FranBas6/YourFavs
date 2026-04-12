@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro"
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getRecommendedSeries} from "../../services/BD/series/yourfavsSerie";
+import {getRecommendedSeries, getWatchedProgressBatch} from "../../services/BD/series/yourfavsSerie";
 import {getRecommendedMovies} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
@@ -23,6 +23,8 @@ try {
     console.error("Error al cargar recomendaciones:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
+
+const watchedMap = await getWatchedProgressBatch(seriesRecomendadas.map((s: any) => String(s.id)));
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
@@ -93,6 +95,7 @@ const totalRecs = seriesRecomendadas.length + peliculasRecomendadas.length;
                                     last_episode_to_air={item.last_episode_to_air}
                                     next_episode_to_air={item.next_episode_to_air}
                                     status={item.status}
+                                    watchedEpisodes={watchedMap[String(item.id)]?.watched}
                                 />
                             ))}
                         </div>

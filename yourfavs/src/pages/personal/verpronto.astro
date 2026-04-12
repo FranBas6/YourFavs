@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro"
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getSeriesVerPronto} from "../../services/BD/series/yourfavsSerie";
+import {getSeriesVerPronto, getWatchedProgressBatch} from "../../services/BD/series/yourfavsSerie";
 import {getMoviesVerPronto} from "../../services/BD/movies/yourfavsMovie";
 import {handleVerProntoAction} from "../../services/BD/actions/handleVerProntoAction";
 import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
@@ -48,6 +48,8 @@ try {
     console.error("Error al cargar contenido para ver pronto:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
+
+const watchedMap = await getWatchedProgressBatch(seriesVerPronto.map((s: any) => String(s.id)));
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
@@ -145,6 +147,7 @@ const hasContent = hasSeries || hasMovies;
                                         next_episode_to_air={item.next_episode_to_air}
                                         genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                         status={item.status}
+                                        watchedEpisodes={watchedMap[String(item.id)]?.watched}
                                     />
                                     <form method="POST" class="mt-1.5">
                                         <input type="hidden" name="deleteId" value={item.id}/>

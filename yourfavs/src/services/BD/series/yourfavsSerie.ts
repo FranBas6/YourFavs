@@ -580,5 +580,19 @@ export async function unmarkSeasonWatched(serieId: string, season: number): Prom
     });
 }
 
+export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number }>> {
+    if (serieIds.length === 0) return {};
+    const results = await Promise.all(
+        serieIds.map(id => getWatchedProgress(id))
+    );
+    const map: Record<string, { watched: number }> = {};
+    for (let i = 0; i < serieIds.length; i++) {
+        if (results[i] && results[i]!.watched_episodes.length > 0) {
+            map[serieIds[i]] = { watched: results[i]!.watched_episodes.length };
+        }
+    }
+    return map;
+}
+
 // Exportar db para que pueda ser utilizada por otros módulos si es necesario
 export {db};

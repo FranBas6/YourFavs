@@ -1,7 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro"
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getSeriesSiguiendo} from "../../services/BD/series/yourfavsSerie";
+import {getSeriesSiguiendo, getWatchedProgressBatch} from "../../services/BD/series/yourfavsSerie";
 import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
@@ -30,6 +30,8 @@ try {
     console.error("Error al cargar series que sigues:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
+
+const watchedMap = await getWatchedProgressBatch(seriesSiguiendo.map((s: any) => String(s.id)));
 
 const searchQuery = Astro.url.searchParams.get("search") || "";
 const seriesPage = parseInt(Astro.url.searchParams.get("seriesPage") || "1");
@@ -104,6 +106,7 @@ const pageUrl = Astro.url;
                                 next_episode_to_air={item.next_episode_to_air}
                                 genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                 status={item.status}
+                                watchedEpisodes={watchedMap[String(item.id)]?.watched}
                             />
                         ))}
                     </div>
