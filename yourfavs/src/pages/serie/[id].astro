@@ -6,7 +6,8 @@ import {
 } from "../../utils/constants/helpers/media-helpers";
 import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
 import type { GuestStar } from "../../types/Media";
-import {handleSerieFavAction} from "../../services/BD/series/yourfavsSerie";
+import {handleSerieFavAction, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched} from "../../services/BD/series/yourfavsSerie";
+import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/pages/serie/serie.css';
 import {
     getSeriesById, getSeriesCast, getSeriesDirectorsAndRoles,
@@ -14,6 +15,7 @@ import {
     fetchAllSeriesPosters, getSerieRecommendationsOrSimilar, getSeriesAdditionalInfo,
     getSeriesVideos
 } from "../../services/API/Series/InfoSeries";
+import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
 import {initializeApp} from "firebase/app";
 import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
@@ -30,6 +32,27 @@ if (!id) {
 if (Astro.request.method === 'POST') {
     try {
         const formData = await Astro.request.formData();
+        const actionType = String(formData.get('actionType') || '');
+
+        // Watched episodes
+        if (actionType === 'watched_episode') {
+            const season = Number(formData.get('season'));
+            const episode = Number(formData.get('episode'));
+            await toggleWatchedEpisode(id, season, episode);
+            return Astro.redirect(`/serie/${id}`);
+        }
+        if (actionType === 'watched_season') {
+            const season = Number(formData.get('season'));
+            const episodeNumbers = String(formData.get('episodes')).split(',').map(Number);
+            const action = String(formData.get('action'));
+            if (action === 'mark') {
+                await markSeasonWatched(id, season, episodeNumbers);
+            } else {
+                await unmarkSeasonWatched(id, season);
+            }
+            return Astro.redirect(`/serie/${id}`);
+        }
+
         const redirectUrl = await handleSerieFavAction(formData);
         return Astro.redirect(redirectUrl);
     } catch (error) {
@@ -91,14 +114,24 @@ const docRefLiked = doc(db, 'LikedSeries', clientData.id);
 const docRefVerPronto = doc(db, 'SeriesVerPronto', clientData.id);
 
 // Obtener los documentos en paralelo para mejor rendimiento
-const [docSnapFavs, docSnapPendientes, docSnapVistas, docSnapSiguiendo, docSnapLiked, docSnapVerPronto] = await Promise.all([
+const [docSnapFavs, docSnapPendientes, docSnapVistas, docSnapSiguiendo, docSnapLiked, docSnapVerPronto, watchedProgress] = await Promise.all([
     getDoc(docRefFavs),
     getDoc(docRefPendientes),
     getDoc(docRefVistas),
     getDoc(docRefSiguiendo),
     getDoc(docRefLiked),
-    getDoc(docRefVerPronto)
+    getDoc(docRefVerPronto),
+    getWatchedProgress(clientData.id),
 ]);
+
+// Set de episodios vistos para lookup rápido
+const watchedSet = new Set<string>();
+if (watchedProgress?.watched_episodes) {
+    for (const ep of watchedProgress.watched_episodes) {
+        watchedSet.add(`${ep.season}-${ep.episode}`);
+    }
+}
+const totalWatchedEpisodes = watchedSet.size;
 
 // Comprobar si existen los documentos
 const existingInFavs = docSnapFavs.exists();
@@ -144,7 +177,7 @@ const providerElements = item?.providers?.map((provider) => {
     const hasLogo = !!provider.logo_path;
     return {
         name: provider.provider_name,
-        logo: hasLogo ? `https://image.tmdb.org/t/p/w200${provider.logo_path}` : null,
+        logo: hasLogo ? posterUrl(provider.logo_path, 'w200') : null,
         link,
         type: provider.type || 'flatrate'
     };
@@ -184,7 +217,6 @@ const specialSeasonsCount = specialSeasons.length;
 import type {PosterImage} from '../../services/API/Series/InfoSeries';
 
 // Segundo bloque de datos — todo en paralelo
-const apiKey = import.meta.env.TMDB_API_KEY;
 const tmdbId = item?.id;
 
 const [
@@ -193,18 +225,30 @@ const [
     externalIds,
     additionalInfo,
     allVideos,
+    reviewsData,
 ] = await Promise.all([
     id ? fetchAllSeriesPosters(id).catch(() => []) : Promise.resolve([]),
     tmdbId ? getSerieRecommendationsOrSimilar(tmdbId) : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
-    tmdbId ? fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/external_ids?api_key=${apiKey}`).then(r => r.json()).catch(() => ({})) : Promise.resolve({}),
+    tmdbId ? tmdbFetch<any>(`/tv/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
     id ? getSeriesAdditionalInfo(id) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null }),
     id ? getSeriesVideos(id) : Promise.resolve([]),
+    tmdbId ? tmdbFetch<{ results: any[] }>(`/tv/${tmdbId}/reviews`).catch(() => ({ results: [] })) : Promise.resolve({ results: [] }),
 ]);
 
 const posters: PosterImage[] = allPosters.slice(0, 40);
 const seriesRecommendations = seriesRecommendationsData.success ? seriesRecommendationsData.recommendations : [];
 const seriesRecommendationType = seriesRecommendationsData.type || 'recommendations';
 const imdbId = externalIds.imdb_id;
+const serieSocialLinks = {
+    facebook: externalIds.facebook_id ? `https://facebook.com/${externalIds.facebook_id}` : null,
+    instagram: externalIds.instagram_id ? `https://instagram.com/${externalIds.instagram_id}` : null,
+    twitter: externalIds.twitter_id ? `https://twitter.com/${externalIds.twitter_id}` : null,
+};
+const hasSocialLinks = Object.values(serieSocialLinks).some(v => v);
+const serieKeywords: { id: number; name: string }[] = additionalInfo.keywords || [];
+const serieNetworks: { id: number; name: string; logo_path: string | null }[] = additionalInfo.networks || [];
+const reviews = (reviewsData.results || []).filter((r: any) => r.content && r.content.length > 50).slice(0, 5);
+const productionCountries: string[] = item?.origin_country || [];
 
 // Categorizar videos
 const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
@@ -214,1175 +258,581 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
 ---
 <Layout title={`${title}`}>
     <article class="bg-gray-50">
-        <!-- Hero Mejorado -->
-        <div class="relative w-full h-auto bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? `https://image.tmdb.org/t/p/original${item.backdrop_path}` : '/assets/background.svg'})`}>
-            <!-- Overlay adaptativo -->
-            <div class="absolute inset-0" style={`background: ${item?.backdrop_path ? 'linear-gradient(180deg, rgba(0,0,0,0.7) 100%, rgba(30,30,30,0.5) 100%)' : 'linear-gradient(180deg, #1e293b 0%, #334155 100%)'}`}></div>
-            
-            <!-- Breadcrumbs - Posicionado arriba a la izquierda -->
-            <nav class="relative z-10 pt-6 px-4 max-w-7xl mx-auto hero-breadcrumbs" aria-label="Breadcrumb">
-                <ol class="flex items-center space-x-2 text-sm">
-                    <li>
-                        <a href="/" class="text-white/80 hover:text-white transition-colors flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                            </svg>
-                            Inicio
-                        </a>
-                    </li>
-                    <li class="text-white/60">/</li>
-                    <li>
-                        <a href="/catalogo/topseries" class="text-white/80 hover:text-white transition-colors">Series</a>
-                    </li>
-                    <li class="text-white/60">/</li>
-                    <li class="text-white font-medium truncate max-w-xs" title={item?.name}>
-                        {item?.name}
-                    </li>
-                </ol>
-            </nav>
+        <!-- Hero inmersivo -->
+        <div class="relative w-full min-h-[70vh] bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}>
+            <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/70 to-gray-900/40"></div>
 
-            <div class="relative flex flex-col items-center justify-center px-4 py-12 text-center max-w-4xl mx-auto">
+            <div class="relative z-10 max-w-6xl mx-auto px-4 pt-8 pb-16 flex flex-col justify-end min-h-[70vh]">
+                <nav class="absolute top-6 left-4 right-4" aria-label="Breadcrumb">
+                    <ol class="flex items-center space-x-2 text-sm">
+                        <li><a href="/" class="text-white/70 hover:text-white transition-colors">Inicio</a></li>
+                        <li class="text-white/40">/</li>
+                        <li><a href="/catalogo/topseries" class="text-white/70 hover:text-white transition-colors">Series</a></li>
+                        <li class="text-white/40">/</li>
+                        <li class="text-white/90 font-medium truncate max-w-xs">{item?.name}</li>
+                    </ol>
+                </nav>
 
-                <!-- Título -->
-                <h1 class="text-4xl md:text-5xl font-bold text-white mb-4 drop-shadow-lg flex items-center gap-3 justify-center flex-wrap">
-                    <span>{item?.name}</span>
-                </h1>
-
-                <!-- Favoritos -->
-                {isInFavorites && existingInFavs && (
-                    <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium mt-2 mb-2">
-                        Favorito #{docSnapFavs.data().position}
+                <div class="flex flex-col md:flex-row items-end gap-8">
+                    <div class="hidden md:block flex-shrink-0 w-56 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
+                        <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
                     </div>
-                )}
-
-                <!-- Info básica + Rating circular + Ver tráiler -->
-                <div class="flex flex-wrap items-center justify-center gap-4 text-white mb-4">
-                    <span class="bg-blue-600 px-3 py-1 rounded-full text-sm font-medium">
-                        {status ? ((statusMap as any)[status] || status) : ''}
-                    </span>
-                    <!-- Chip de rating circular con tooltip -->
-                    {item?.vote_average && (
-                        <div class="relative flex items-center justify-center group" tabindex="0">
-                            <svg class="w-10 h-10 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
-                                <path class="text-gray-700" stroke="currentColor" stroke-width="3" fill="none" d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"/>
-                                <path class="text-yellow-400" stroke="currentColor" stroke-width="3" fill="none"
-                                      stroke-linecap="round"
-                                      stroke-dasharray={`${Math.min(100, Math.round((item.vote_average || 0) * 10))}, 100`}
-                                      d="M18 2 a 16 16 0 1 1 0 32 a 16 16 0 1 1 0 -32"/>
-                            </svg>
-                            <span class="absolute text-sm font-semibold">{item.vote_average.toFixed(1)}</span>
-                            <!-- Tooltip votos -->
-                            {item.vote_count && (
-                                <span class="absolute left-12 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs rounded px-2 py-1 shadow-lg opacity-0 group-hover:opacity-100 group-focus:opacity-100 transition-opacity duration-200 z-10">
-                                    {item.vote_count} votos
-                                </span>
+                    <div class="flex-1 text-white">
+                        <h1 class="text-4xl md:text-5xl font-bold mb-3 leading-tight">{item?.name}</h1>
+                        {additionalInfo.tagline && (
+                            <p class="text-white/60 italic text-lg mb-4">"{additionalInfo.tagline}"</p>
+                        )}
+                        <div class="flex flex-wrap items-center gap-3 mb-4">
+                            <span class="text-yellow-400 text-lg font-bold">{item?.vote_average?.toFixed(1)} {getRatingStars(item?.vote_average)}</span>
+                            <span class={`px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'Returning Series' ? 'bg-green-500/80' : status === 'Ended' ? 'bg-gray-500/80' : status === 'Canceled' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
+                                {status ? ((statusMap as any)[status] || status) : ''}
+                            </span>
+                            <span class="text-white/70">{yearsActive}</span>
+                            <span class="text-white/70">{regularSeasonsCount} temporadas</span>
+                            <span class="text-white/70">{totalRegularEpisodes} episodios</span>
+                            {item?.availableInSpain && (
+                                <span title="Disponible en España"><svg viewBox="0 0 750 500" class="w-8 h-5 rounded"><rect width="750" height="500" fill="#AA151B"/><rect width="750" height="250" y="125" fill="#F1BF00"/></svg></span>
                             )}
                         </div>
-                    )}
-                    <span>{yearsActive}</span>
-                    {item?.availableInSpain && (
-                        <span class="inline-flex items-center justify-center shadow-lg" title="Disponible en España">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 750 500" class="w-10 h-7 rounded">
-                                <rect width="750" height="500" fill="#AA151B"/>
-                                <rect width="750" height="250" y="125" fill="#F1BF00"/>
-                            </svg>
-                        </span>
-                    )}
-                </div>
-
-                <!-- Géneros -->
-                {item?.genres && (
-                    <div class="flex flex-wrap justify-center gap-2 mb-6">
-                        {item.genres.map((genre) => (
-                            <span class="bg-gray-800 bg-opacity-80 px-3 py-1 rounded-full text-xs text-white">
-                                {genre.name}
-                            </span>
-                        ))}
-                    </div>
-                )}
-
-                <!-- 🚀 Sinopsis integrada con truncado sin JS -->
-                <div class="bg-black bg-opacity-50 rounded-xl p-4 mb-6 max-w-2xl">
-                    <h2 class="text-lg font-semibold text-white mb-2">Sinopsis</h2>
-                    <input type="checkbox" id="toggle-sinopsis" class="peer hidden" />
-                    <p class="text-gray-200 text-sm md:text-base leading-relaxed max-h-24 overflow-hidden peer-checked:max-h-[1000px] transition-all">
-                        {item?.overview || "No hay sinopsis disponible."}
-                    </p>
-                    {item?.overview && item.overview.length > 250 && (
-                        <label for="toggle-sinopsis" class="mt-2 inline-block cursor-pointer text-blue-400 hover:text-blue-300 font-medium text-sm peer-checked:before:content-['Mostrar_menos'] before:content-['Mostrar_más']"></label>
-                    )}
-                </div>
-
-                <!-- Botón de Me gusta -->
-                <form method="POST" class="mt-2">
-                    <input type="hidden" name="id" value={item?.id}/>
-                    <input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/>
-                    <input type="hidden" name="actionType" value="liked"/>
-                    <button type="submit" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-all flex items-center gap-2 mx-auto" aria-live="polite">
-                        {isInLiked ? (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
-                                </svg>
-                                Ya me gusta
-                            </>
-                        ) : (
-                            <>
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="none" stroke="currentColor">
-                                    <path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/>
-                                </svg>
-                                Me gusta
-                            </>
+                        {item?.genres && (
+                            <div class="flex flex-wrap gap-2 mb-5">
+                                {item.genres.map((genre) => (
+                                    <span class="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-xs rounded-full border border-white/20">{genre.name}</span>
+                                ))}
+                            </div>
                         )}
-                    </button>
-                </form>
+                        {item?.overview && (
+                            <details class="max-w-2xl group">
+                                <summary class="cursor-pointer">
+                                    <p class="text-white/80 text-sm md:text-base leading-relaxed line-clamp-3 group-open:line-clamp-none">{item.overview}</p>
+                                    <span class="inline-block mt-1 text-xs text-white/50 group-open:hidden">Pulsa para leer más</span>
+                                </summary>
+                            </details>
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- Action bar -->
+        <div class="bg-white border-b border-gray-200 shadow-sm">
+            <!-- Desktop -->
+            <div class="hidden md:flex max-w-6xl mx-auto px-4 py-2 items-center gap-2">
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="favs"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600 hover:bg-red-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+                        {isInFavorites ? 'En Favoritos' : 'Favoritos'}
+                    </button>
+                </form>
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="siguiendo"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInSiguiendo ? 'bg-blue-500 text-white' : 'border border-blue-200 text-blue-600 hover:bg-blue-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        {isInSiguiendo ? 'Siguiendo' : 'Seguir'}
+                    </button>
+                </form>
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="verPronto"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600 hover:bg-purple-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+                        {isInVerPronto ? 'Ver Pronto' : 'Ver Pronto'}
+                    </button>
+                </form>
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="pendientes"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                        {isInPendientes ? 'Pendiente' : 'Pendiente'}
+                    </button>
+                </form>
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="vistas"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600 hover:bg-green-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                        {isInVistas ? 'Vista' : 'Vista'}
+                    </button>
+                </form>
+                <div class="ml-auto flex items-center gap-2">
+                    <form method="POST">
+                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="liked"/>
+                        <button type="submit" class={`p-1.5 rounded-full transition-colors ${isInLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}>
+                            <svg class="w-5 h-5" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+                        </button>
+                    </form>
+                    {imdbId && (
+                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-bold bg-yellow-400 text-gray-900 rounded hover:bg-yellow-300 transition-colors">IMDb</a>
+                    )}
+                    {(item?.homepage || trailerUrl) && (
+                        <a href={item?.homepage || trailerUrl} target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">Ver ahora</a>
+                    )}
+                </div>
+            </div>
+            <!-- Mobile -->
+            <div class="md:hidden max-w-6xl mx-auto px-4 py-3 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="favs"/>
+                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600'}`}>
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+                            {isInFavorites ? 'Favoritos' : 'Favoritos'}
+                        </button>
+                    </form>
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="siguiendo"/>
+                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInSiguiendo ? 'bg-blue-500 text-white' : 'border border-blue-200 text-blue-600'}`}>
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            {isInSiguiendo ? 'Siguiendo' : 'Seguir'}
+                        </button>
+                    </form>
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="pendientes"/>
+                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600'}`}>
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
+                            {isInPendientes ? 'Pendiente' : 'Pendiente'}
+                        </button>
+                    </form>
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="vistas"/>
+                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600'}`}>
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            {isInVistas ? 'Vista' : 'Vista'}
+                        </button>
+                    </form>
+                </div>
+                <div class="flex gap-2">
+                    <form method="POST" class="flex-1"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="liked"/>
+                        <button type="submit" class={`w-full px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInLiked ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-gray-200 text-gray-500'}`}>
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
+                            {isInLiked ? 'Me gusta' : 'Me gusta'}
+                        </button>
+                    </form>
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="verPronto"/>
+                        <button type="submit" class={`px-4 py-2 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600'}`}>Ver Pronto</button>
+                    </form>
+                    {imdbId && (
+                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-4 py-2 text-xs font-bold bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors flex items-center">IMDb</a>
+                    )}
+                </div>
+            </div>
+        </div>
+
+        <!-- Layout 2 columnas -->
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="flex flex-col md:flex-row gap-8">
-                <!-- Columna Izquierda: Poster y Acciones -->
-                <div class="md:w-1/3 flex flex-col items-center">
-                    <div class="w-64 h-auto rounded-xl overflow-hidden shadow-2xl mb-8 group">
-                        <img
-                                class="w-full h-auto transform group-hover:scale-105 transition-all duration-500 filter group-hover:brightness-110"
-                                src={`https://image.tmdb.org/t/p/w500${item?.poster_path}`}
-                                alt={item?.name}
-                        />
+
+                <!-- Sidebar izquierda -->
+                <div class="md:w-1/3 space-y-4">
+                    <div class="md:hidden w-56 mx-auto rounded-xl overflow-hidden shadow-xl">
+                        <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
                     </div>
 
-                    <!-- Panel de Acciones con Grid Mejorado -->
-                    <div class="w-full max-w-sm space-y-4">
-
-                        <!-- Sección Principal: Favoritos y Ver Pronto -->
-                        <div class="bg-gradient-to-br from-blue-50 to-purple-50 p-4 rounded-xl shadow-lg border border-blue-100">
-                            <h3 class="text-sm font-semibold text-gray-700 mb-3 text-center uppercase tracking-wide">
-                                Principales</h3>
-                            <div class="grid grid-cols-1 gap-3">
-
-                                <!-- Formulario para Favoritos -->
-                                <form method="POST" class="w-full">
-                                    <input type="hidden" name="id" value={item?.id}/>
-                                    <input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/>
-                                    <input type="hidden" name="actionType" value="favs"/>
-
-                                    {!isInFavorites && (
-                                            <div class="mb-3">
-                                                <label for="custom-position"
-                                                       class="block text-xs font-medium text-gray-600 mb-1">
-                                                    Posición en favoritos (opcional)
-                                                </label>
-                                                <input
-                                                        type="number"
-                                                        id="custom-position"
-                                                        name="custom_position"
-                                                        min="1"
-                                                        class="w-full px-3 py-2 text-sm border text-gray-600 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
-                                                        placeholder="Ej: 1 para el inicio"
-                                                />
-                                            </div>
-                                    )}
-
-                                    <button
-                                            type="submit"
-                                            class={`w-full px-4 py-3 text-sm font-medium rounded-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98] ${
-                                                isInFavorites
-                                                    ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-red-200'
-                                                    : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-blue-200'
-                                            }`}
-                                            aria-live="polite"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
-                                             fill="currentColor">
-                                            <path fill-rule="evenodd"
-                                                  d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
-                                                  clip-rule="evenodd"/>
-                                        </svg>
-                                        {isInFavorites ? 'Quitar de Favoritos' : 'Añadir a Favoritos'}
-                                    </button>
-                                </form>
-
-                                {isInFavorites && (
-                                    <form method="POST" class="w-full mt-2">
-                                        <input type="hidden" name="id" value={item?.id}/>
-                                        <input type="hidden" name="action" value="update"/>
-                                        <input type="hidden" name="actionType" value="favs"/>
-                                        <div class="mb-3">
-                                            <label for="update-position" class="block text-xs font-medium text-gray-600 mb-1">
-                                                Actualizar posición en favoritos
-                                            </label>
-                                            <div class="flex gap-2">
-                                                <input
-                                                        type="number"
-                                                        id="update-position"
-                                                        name="custom_position"
-                                                        min="1"
-                                                        class="w-full px-3 py-2 text-sm border text-gray-600 border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all"
-                                                        placeholder="Nuevo número"
-                                                />
-                                                <button
-                                                        type="submit"
-                                                        class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-colors"
-                                                >
-                                                    Actualizar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </form>
-                                )}
-
-                                <!-- Formulario para Ver Pronto -->
-                                <form method="POST" class="w-full">
-                                    <input type="hidden" name="id" value={item?.id}/>
-                                    <input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/>
-                                    <input type="hidden" name="actionType" value="verpronto"/>
-
-                                    <button
-                                            type="submit"
-                                            class={`w-full px-4 py-3 text-sm font-medium rounded-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98] ${
-                                                isInVerPronto
-                                                    ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white shadow-orange-200'
-                                                    : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-purple-200'
-                                            }`}
-                                            aria-live="polite"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                             stroke-linejoin="round">
-                                            {isInVerPronto ? (
-                                                    <>
-                                                        <path d="M18 6 6 18"/>
-                                                        <path d="m6 6 12 12"/>
-                                                    </>
-                                            ) : (
-                                                    <>
-                                                        <path d="M12 2v4"/>
-                                                        <path d="m16.2 7.8 2.9-2.9"/>
-                                                        <path d="M18 12h4"/>
-                                                        <path d="m16.2 16.2 2.9 2.9"/>
-                                                        <path d="M12 18v4"/>
-                                                        <path d="m4.9 19.1 2.9-2.9"/>
-                                                        <path d="M2 12h4"/>
-                                                        <path d="m4.9 4.9 2.9 2.9"/>
-                                                    </>
-                                            )}
-                                        </svg>
-                                        {isInVerPronto ? 'Quitar de Ver Pronto' : 'Ver Pronto'}
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- Sección Estados: Pendientes, Siguiendo, Vistas -->
-                        <div class="bg-gradient-to-br from-green-50 to-blue-50 p-4 rounded-xl shadow-lg border border-green-100">
-                            <h3 class="text-sm font-semibold text-gray-700 mb-3 text-center uppercase tracking-wide">
-                                Estado de Visualización</h3>
-                            <div class="grid grid-cols-1 gap-3">
-
-                                <!-- Formulario para Series Pendientes -->
-                                <form method="POST" class="w-full">
-                                    <input type="hidden" name="id" value={item?.id}/>
-                                    <input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/>
-                                    <input type="hidden" name="actionType" value="pendientes"/>
-
-                                    <button
-                                            type="submit"
-                                            class={`w-full px-4 py-2.5 text-sm font-medium rounded-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98] ${
-                                                isInPendientes
-                                                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-orange-200'
-                                                    : 'bg-gradient-to-r from-yellow-400 to-yellow-500 hover:from-yellow-500 hover:to-yellow-600 text-white shadow-yellow-200'
-                                            }`}
-                                            aria-live="polite"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
-                                             fill="currentColor">
-                                            <path fill-rule="evenodd"
-                                                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
-                                                  clip-rule="evenodd"/>
-                                        </svg>
-                                        {isInPendientes ? 'Quitar de Pendientes' : 'Marcar Pendiente'}
-                                    </button>
-                                </form>
-
-                                <!-- Formulario para Series Siguiendo -->
-                                <form method="POST" class="w-full">
-                                    <input type="hidden" name="id" value={item?.id}/>
-                                    <input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/>
-                                    <input type="hidden" name="actionType" value="siguiendo"/>
-
-                                    <button
-                                            type="submit"
-                                            class={`w-full px-4 py-2.5 text-sm font-medium rounded-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98] ${
-                                                isInSiguiendo
-                                                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white shadow-purple-200'
-                                                    : 'bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 text-white shadow-indigo-200'
-                                            }`}
-                                            aria-live="polite"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24"
-                                             fill="none" stroke="currentColor" stroke-linecap="round"
-                                             stroke-linejoin="round" width="24" height="24" stroke-width="2">
-                                            {isInSiguiendo ? (
-                                                    <>
-                                                        <path d="M10.585 10.587a2 2 0 0 0 2.829 2.828"></path>
-                                                        <path d="M16.681 16.673a8.717 8.717 0 0 1 -4.681 1.327c-3.6 0 -6.6 -2 -9 -6c1.272 -2.12 2.712 -3.678 4.32 -4.674m2.86 -1.146a9.055 9.055 0 0 1 1.82 -.18c3.6 0 6.6 2 9 6c-.666 1.11 -1.379 2.067 -2.138 2.87"></path>
-                                                        <path d="M3 3l18 18"></path>
-                                                    </>
-                                            ) : (
-                                                    <>
-                                                        <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0"></path>
-                                                        <path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6"></path>
-                                                    </>
-                                            )}
-                                        </svg>
-                                        {isInSiguiendo ? 'Dejar de Seguir' : 'Marcar Siguiendo'}
-                                    </button>
-                                </form>
-
-                                <!-- Formulario para Series Vistas -->
-                                <form method="POST" class="w-full">
-                                    <input type="hidden" name="id" value={item?.id}/>
-                                    <input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/>
-                                    <input type="hidden" name="actionType" value="vistas"/>
-
-                                    <button
-                                            type="submit"
-                                            class={`w-full px-4 py-2.5 text-sm font-medium rounded-lg shadow-md transition-all duration-300 flex items-center justify-center gap-2 transform hover:scale-[1.02] active:scale-[0.98] ${
-                                                isInVistas
-                                                    ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-red-200'
-                                                    : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-green-200'
-                                            }`}
-                                            aria-live="polite"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20"
-                                             fill="currentColor">
-                                            {isInVistas ? (
-                                                    <path fill-rule="evenodd"
-                                                          d="M10 18a8 8 0 100-16 8 8 0 000 16zm-4.707-5.293a1 1 0 001.414 0L10 9.414l3.293 3.293a1 1 0 001.414-1.414l-4-4a1 1 0 00-1.414 0l-4 4a1 1 0 000 1.414z"
-                                                          clip-rule="evenodd"/>
-                                            ) : (
-                                                    <path fill-rule="evenodd"
-                                                          d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                                                          clip-rule="evenodd"/>
-                                            )}
-                                        </svg>
-                                        {isInVistas ? 'Quitar de Vistas' : 'Marcar como Vista'}
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-
-                        <!-- Contenedor para ambos botones -->
-                        <div class="w-full mt-6 space-y-4">
-
-                            <!-- Botón Ver Ahora Original -->
-                            {(item?.homepage || trailerUrl) && (
-                                    <a
-                                            href={item?.homepage || trailerUrl}
-                                            class="group relative w-full px-6 py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-purple-300 transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden transform hover:scale-105 active:scale-95"
-                                            target="_blank"
-                                            rel="noopener"
-                                    >
-                                        <!-- Efecto de brillo animado -->
-                                        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
-
-                                        <!-- Icono de play con animación -->
-                                        <div class="relative z-10 flex items-center justify-center w-8 h-8 bg-white/20 rounded-full group-hover:bg-white/30 transition-all duration-300">
-                                            <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    class="h-5 w-5 transform group-hover:scale-110 transition-transform duration-300"
-                                                    fill="currentColor"
-                                                    viewBox="0 0 24 24"
-                                            >
-                                                <path d="M8 5v14l11-7z"/>
-                                            </svg>
-                                        </div>
-
-                                        <!-- Texto con efecto -->
-                                        <span class="relative z-10 group-hover:tracking-wider transition-all duration-300">
-                Ver ahora
-            </span>
-
-                                        <!-- Icono de enlace externo -->
-                                        <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                class="h-4 w-4 relative z-10 opacity-75 group-hover:opacity-100 transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-300"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                        >
-                                            <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                            />
-                                        </svg>
-
-                                        <!-- Partículas decorativas -->
-                                        <div class="absolute top-1 left-4 w-1 h-1 bg-white/40 rounded-full animate-pulse"></div>
-                                        <div
-                                                class="absolute bottom-2 right-6 w-1 h-1 bg-white/40 rounded-full animate-pulse"
-                                                style="animation-delay: 0.5s;"
-                                        ></div>
-                                        <div
-                                                class="absolute top-3 right-12 w-0.5 h-0.5 bg-white/30 rounded-full animate-pulse"
-                                                style="animation-delay: 1s;"
-                                        ></div>
-                                    </a>
+                    <!-- Info -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
+                        <ul class="space-y-2.5 text-sm sm:text-base">
+                            <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class={`font-medium ${status === 'Returning Series' ? 'text-green-600' : status === 'Canceled' ? 'text-red-600' : 'text-gray-800'}`}>{status ? ((statusMap as any)[status] || status) : ''}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Emisión</span><span class="text-gray-800 font-medium">{yearsActive}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Temporadas</span><span class="text-gray-800 font-medium">{regularSeasonsCount}{hasSpecialSeasons ? ` + ${specialSeasonsCount} especiales` : ''}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="text-gray-800 font-medium">{totalRegularEpisodes}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
+                            {item?.original_name && item.original_name !== item.name && (
+                                <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_name}</span></li>
                             )}
-
-                            <!-- Nuevo Botón para IMDB Reviews -->
-                            {imdbId && (
-                                    <a
-                                            href={`https://www.imdb.com/title/${imdbId}/reviews`}
-                                            class="group relative w-full px-6 py-4 bg-gradient-to-r from-yellow-500 via-orange-500 to-red-600 text-white font-semibold text-lg rounded-xl shadow-lg hover:shadow-2xl focus:outline-none focus:ring-4 focus:ring-yellow-300 transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden transform hover:scale-105 active:scale-95"
-                                            target="_blank"
-                                            rel="noopener"
-                                    >
-                                        <!-- Efecto de brillo animado -->
-                                        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
-
-                                        <!-- Icono de IMDB/críticas -->
-                                        <div class="relative z-10 flex items-center justify-center w-8 h-8 bg-white/20 rounded-full group-hover:bg-white/30 transition-all duration-300">
-                                            <svg
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    class="h-5 w-5 transform group-hover:scale-110 transition-transform duration-300"
-                                                    fill="currentColor"
-                                                    viewBox="0 0 24 24"
-                                            >
-                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                            </svg>
-                                        </div>
-
-                                        <!-- Texto con efecto -->
-                                        <span class="relative z-10 group-hover:tracking-wider transition-all duration-300">
-                                            Ver críticas en IMDB
-                                        </span>
-
-                                        <!-- Icono de enlace externo -->
-                                        <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                class="h-4 w-4 relative z-10 opacity-75 group-hover:opacity-100 transform group-hover:translate-x-1 group-hover:-translate-y-1 transition-all duration-300"
-                                                fill="none"
-                                                viewBox="0 0 24 24"
-                                                stroke="currentColor"
-                                                stroke-width="2"
-                                        >
-                                            <path
-                                                    stroke-linecap="round"
-                                                    stroke-linejoin="round"
-                                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                            />
-                                        </svg>
-
-                                        <!-- Partículas decorativas -->
-                                        <div class="absolute top-1 left-4 w-1 h-1 bg-white/40 rounded-full animate-pulse"></div>
-                                        <div
-                                                class="absolute bottom-2 right-6 w-1 h-1 bg-white/40 rounded-full animate-pulse"
-                                                style="animation-delay: 0.5s;"
-                                        ></div>
-                                        <div
-                                                class="absolute top-3 right-12 w-0.5 h-0.5 bg-white/30 rounded-full animate-pulse"
-                                                style="animation-delay: 1s;"
-                                        ></div>
-                                    </a>
+                            {productionCountries.length > 0 && (
+                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">País</span><span class="text-gray-800 font-medium text-right">{productionCountries.join(', ')}</span></li>
                             )}
-
-                            <!-- Textos descriptivos -->
-                            <div class="flex justify-between text-center text-xs text-gray-500 opacity-75">
-                                {(item?.homepage || trailerUrl) && (
-                                        <p class="flex-1">
-                                            {item?.homepage ? 'Sitio oficial' : 'Ver tráiler'}
-                                        </p>
-                                )}
-                                {imdbId && (
-                                        <p class="flex-1">Reseñas y críticas</p>
-                                )}
-                            </div>
-                        </div>
+                        </ul>
                     </div>
 
-                    <!-- Info Cards -->
-                    <div class="mt-8 w-full space-y-4">
-                        <div class="bg-white p-4 rounded-lg shadow-md">
-                            <h3 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Información
-                            </h3>
-                            <ul class="space-y-2">
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        Estado:
-                                    </span>
-                                    <span class="font-medium text-gray-800">{status ? ((statusMap as any)[status] || status) : 'No disponible'}</span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        Estreno:
-                                    </span>
-                                    <span class="font-medium text-gray-800">{formatDate(item?.first_air_date)}</span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                        </svg>
-                                        Finalización:
-                                    </span>
-                                    <span class="font-medium text-gray-800">
-                                        {item?.last_episode_to_air ? formatDate(item.last_episode_to_air.air_date) : "No disponible"}
-                                    </span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                        </svg>
-                                        Valoración:
-                                    </span>
-                                    <span class="font-medium text-gray-800">{item?.vote_average?.toFixed(1)}
-                                        <span class="text-sm text-gray-500 ml-1">({item?.vote_count} votos)</span></span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                                        </svg>
-                                        Popularidad:
-                                    </span>
-                                    <span class="font-medium text-gray-800">{item?.popularity?.toFixed(1)}</span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-                                        </svg>
-                                        Temporadas:
-                                    </span>
-                                    <span class="font-medium text-gray-800">
-                                        {regularSeasonsCount}
-                                        {hasSpecialSeasons &&
-                                                <span class="text-blue-600 text-sm ml-1">(+ {specialSeasonsCount}
-                                                    Especiales)</span>
-                                        }
-                                    </span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                        </svg>
-                                        Episodios:
-                                    </span>
-                                    <span class="font-medium text-gray-800">
-                                        {totalRegularEpisodes}
-                                        {hasSpecialSeasons &&
-                                                <span class="text-blue-600 text-sm ml-1">
-                                                    (+ {totalSpecialEpisodes} especiales)
-                                                </span>
-                                        }
-                                    </span>
-                                </li>
-                                {additionalInfo.episode_run_time && additionalInfo.episode_run_time.length > 0 && (
-                                    <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                        <span class="text-gray-600 flex items-center gap-2">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            Duración promedio:
-                                        </span>
-                                        <span class="font-medium text-gray-800">
-                                            {additionalInfo.episode_run_time[0]} min
-                                        </span>
-                                    </li>
-                                )}
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                                        </svg>
-                                        Idioma original:
-                                    </span>
-                                    <span class="font-medium text-gray-800">{getLanguageDisplayName(item?.original_language || '')}</span>
-                                </li>
-                                <li class="flex justify-between items-center py-1 border-b border-gray-100 last:border-0">
-                                    <span class="text-gray-600 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        País:
-                                    </span>
-                                    <span class="font-medium text-gray-800">{item?.origin_country?.join(", ") || "No disponible"}</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <!-- Clasificación por Edades -->
-                        {additionalInfo.content_ratings && additionalInfo.content_ratings.length > 0 && (() => {
-                            const rating = getContentRating(additionalInfo.content_ratings);
-                            return rating ? (
-                                <div class="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg shadow-md border-l-4 border-orange-500">
-                                    <h3 class="text-lg font-bold text-orange-700 mb-2 flex items-center gap-2">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                        Clasificación
-                                    </h3>
-                                    <p class="text-gray-800 font-semibold text-lg">{rating.text}</p>
-                                </div>
-                            ) : null;
-                        })()}
-
-                        <!-- Idiomas Disponibles -->
-                        {additionalInfo.languages && additionalInfo.languages.length > 0 && (
-                            <div class="bg-white p-4 rounded-lg shadow-md">
-                                <h3 class="text-lg font-bold text-blue-600 mb-3 flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                                    </svg>
-                                    Idiomas Disponibles
-                                </h3>
-                                <div class="flex flex-wrap gap-2">
-                                    {additionalInfo.languages.map((lang: any) => (
-                                        <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
-                                            {getLanguageDisplayName(lang.iso_639_1 || lang)}
-                                        </span>
-                                    ))}
-                                </div>
+                    <!-- Clasificación -->
+                    {additionalInfo.content_ratings && additionalInfo.content_ratings.length > 0 && (() => {
+                        const rating = getContentRating(additionalInfo.content_ratings);
+                        return rating ? (
+                            <div class="bg-white rounded-xl border border-gray-200 p-4">
+                                <h3 class="text-base font-semibold text-gray-800 mb-2">Clasificación</h3>
+                                <p class="text-sm font-medium text-gray-700">{rating.text}</p>
                             </div>
-                        )}
+                        ) : null;
+                    })()}
 
-    
-
-                        <!-- Opinión personal -->
-                        {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
-                            <div class="bg-white p-4 rounded-lg shadow-md">
-                                <h3 class="text-lg font-bold text-blue-600 mb-3">Tu opinión</h3>
-                                {opinionFromAny ? (
-                                    <div class="space-y-3">
-                                        <blockquote class="relative p-4 bg-blue-50 border border-blue-200 rounded-lg text-gray-800">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400 absolute -top-2 -left-2 bg-white rounded-full" viewBox="0 0 20 20" fill="currentColor">
-                                                <path d="M7.667 10.667H4.333A2.333 2.333 0 012 8.333V5a2.333 2.333 0 012.333-2.333H6a2.333 2.333 0 012.333 2.333v.667A2.333 2.333 0 016 8.333H4.333v2.334h3.334zM15.667 10.667h-3.334A2.333 2.333 0 0110 8.333V5a2.333 2.333 0 012.333-2.333H14a2.333 2.333 0 012.333 2.333v.667A2.333 2.333 0 0114 8.333h-1.667v2.334h3.334z" />
-                                            </svg>
-                                            <p class="whitespace-pre-wrap">{opinionFromAny}</p>
-                                        </blockquote>
-                                        <div class="flex items-center gap-2 justify-end">
-                                            <details>
-                                                <summary class="px-3 py-1.5 text-sm rounded-md bg-blue-600 hover:bg-blue-700 text-white cursor-pointer">Actualizar opinión</summary>
-                                                <div class="mt-3">
-                                                    <form method="POST" class="space-y-3">
-                                                        <input type="hidden" name="id" value={item?.id} />
-                                                        <input type="hidden" name="action" value="save_opinion" />
-                                                        <textarea name="opinion" rows="4" class="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400">{opinionFromAny}</textarea>
-                                                        <div class="flex items-center justify-between">
-                                                            <p class="text-xs text-gray-500">Se actualizará en todas tus listas</p>
-                                                            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow">Guardar</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </details>
-                                            <form method="POST">
-                                                <input type="hidden" name="id" value={item?.id} />
-                                                <input type="hidden" name="action" value="delete_opinion" />
-                                                <button type="submit" class="px-3 py-1.5 text-sm rounded-md bg-red-600 hover:bg-red-700 text-white">Eliminar opinión</button>
-                                            </form>
+                    <!-- Dónde ver -->
+                    {providerElements.length > 0 && (
+                        <div class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-base font-semibold text-gray-800 mb-3">Dónde ver</h3>
+                            <div class="space-y-3">
+                                {providersByType.flatrate && (
+                                    <div>
+                                        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Suscripción</p>
+                                        <div class="space-y-1.5">
+                                            {providersByType.flatrate.map((p) => (
+                                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
+                                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
+                                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
+                                                </a>
+                                            ))}
                                         </div>
                                     </div>
-                                ) : (
-                                    <form method="POST" class="space-y-3">
-                                        <input type="hidden" name="id" value={item?.id} />
-                                        <input type="hidden" name="action" value="save_opinion" />
-                                        <textarea name="opinion" rows="4" class="w-full p-3 border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400" placeholder="Escribe aquí tu opinión..."></textarea>
-                                        <div class="flex items-center justify-between">
-                                            <p class="text-xs text-gray-500">Se guardará en todas tus listas donde esté esta serie</p>
-                                            <button type="submit" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow">Guardar opinión</button>
+                                )}
+                                {providersByType.rent && (
+                                    <div>
+                                        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Alquiler</p>
+                                        <div class="space-y-1.5">
+                                            {providersByType.rent.map((p) => (
+                                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
+                                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
+                                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
+                                                </a>
+                                            ))}
                                         </div>
-                                    </form>
+                                    </div>
                                 )}
                             </div>
-                        )}
+                        </div>
+                    )}
 
-                        <!-- Redes de Transmisión -->
-                        {additionalInfo.networks && additionalInfo.networks.length > 0 && (
-                            <div class="bg-white p-4 rounded-lg shadow-md">
-                                <h3 class="text-lg font-bold text-blue-600 mb-3">Redes de Transmisión</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {additionalInfo.networks.map((network: any) => (
-                                        <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                                            {network.logo_path && (
-                                                <img
-                                                    src={`https://image.tmdb.org/t/p/w92${network.logo_path}`}
-                                                    alt={network.name}
-                                                    class="w-12 h-8 object-contain flex-shrink-0"
-                                                    loading="lazy"
-                                                />
-                                            )}
-                                            <div class="min-w-0 flex-1">
-                                                <p class="font-medium text-gray-800 truncate">{network.name}</p>
-                                                {network.origin_country && (
-                                                    <p class="text-sm text-gray-500">{network.origin_country}</p>
-                                                )}
-                                            </div>
-                                        </div>
+                    <!-- Opinión -->
+                    {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
+                        <div class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-base font-semibold text-gray-800 mb-3">Tu opinión</h3>
+                            {opinionFromAny ? (
+                                <div class="space-y-3">
+                                    <blockquote class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">{opinionFromAny}</blockquote>
+                                    <div class="flex items-center gap-2 justify-end">
+                                        <details>
+                                            <summary class="px-3 py-1.5 text-xs rounded-lg bg-gray-900 hover:bg-gray-800 text-white cursor-pointer">Actualizar</summary>
+                                            <form method="POST" class="mt-3 space-y-2">
+                                                <input type="hidden" name="id" value={item?.id} />
+                                                <input type="hidden" name="action" value="save_opinion" />
+                                                <input type="hidden" name="actionType" value="opinion" />
+                                                <textarea name="opinion" rows="3" class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400">{opinionFromAny}</textarea>
+                                                <button type="submit" class="w-full px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar</button>
+                                            </form>
+                                        </details>
+                                        <form method="POST">
+                                            <input type="hidden" name="id" value={item?.id} />
+                                            <input type="hidden" name="action" value="delete_opinion" />
+                                            <input type="hidden" name="actionType" value="opinion" />
+                                            <button type="submit" class="px-3 py-1.5 text-xs rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">Eliminar</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            ) : (
+                                <form method="POST" class="space-y-2">
+                                    <input type="hidden" name="id" value={item?.id} />
+                                    <input type="hidden" name="action" value="save_opinion" />
+                                    <input type="hidden" name="actionType" value="opinion" />
+                                    <textarea name="opinion" rows="3" class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" placeholder="Escribe tu opinión..."></textarea>
+                                    <button type="submit" class="w-full px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar opinión</button>
+                                </form>
+                            )}
+                        </div>
+                    )}
+
+                    <!-- Keywords: desplegable en mobile, visible en desktop -->
+                    {serieKeywords.length > 0 && (
+                        <>
+                            <details class="bg-white rounded-xl border border-gray-200 sm:hidden">
+                                <summary class="p-4 cursor-pointer flex items-center justify-between">
+                                    <h3 class="text-base font-semibold text-gray-800">Tags ({serieKeywords.length})</h3>
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </summary>
+                                <div class="px-4 pb-4 flex flex-wrap gap-1.5">
+                                    {serieKeywords.map((kw) => (
+                                        <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">{kw.name}</span>
+                                    ))}
+                                </div>
+                            </details>
+                            <div class="hidden sm:block bg-white rounded-xl border border-gray-200 p-4">
+                                <h3 class="text-base font-semibold text-gray-800 mb-2">Tags</h3>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {serieKeywords.map((kw) => (
+                                        <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">{kw.name}</span>
                                     ))}
                                 </div>
                             </div>
-                        )}
+                        </>
+                    )}
 
-                        <!-- Eslogan/Tagline -->
-                        {additionalInfo.tagline && (
-                            <div class="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg shadow-md border-l-4 border-blue-500">
-                                <h3 class="text-lg font-bold text-blue-600 mb-2">Eslogan</h3>
-                                <p class="text-gray-700 italic text-lg">"{additionalInfo.tagline}"</p>
+                    <!-- Social -->
+                    {(hasSocialLinks || imdbId) && (
+                        <div class="flex flex-wrap gap-2">
+                            {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100">IMDb</a>}
+                            {serieSocialLinks.facebook && <a href={serieSocialLinks.facebook} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">Facebook</a>}
+                            {serieSocialLinks.instagram && <a href={serieSocialLinks.instagram} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100">Instagram</a>}
+                            {serieSocialLinks.twitter && <a href={serieSocialLinks.twitter} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100">Twitter</a>}
+                        </div>
+                    )}
+
+                    <!-- Redes de transmisión -->
+                    {serieNetworks.length > 0 && (
+                        <div class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-base font-semibold text-gray-800 mb-3">Cadenas</h3>
+                            <div class="space-y-2">
+                                {serieNetworks.map((network) => (
+                                    <div class="flex items-center gap-3">
+                                        {network.logo_path && <img src={posterUrl(network.logo_path, 'w92')} alt={network.name} class="w-10 h-6 object-contain" loading="lazy" />}
+                                        <span class="text-sm text-gray-700">{network.name}</span>
+                                    </div>
+                                ))}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
 
-                <!-- Columna Derecha: Detalles -->
-                <div class="md:w-2/3">
+                <!-- Columna derecha -->
+                <div class="md:w-2/3 space-y-8">
+
                     <!-- Trailer -->
                     {trailerUrl && (
-                            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                                <h2 class="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
-                                    Trailer
-                                </h2>
-                                <div class="aspect-video w-full">
-                                    <iframe
-                                            class="w-full h-full rounded"
-                                            src={formatTrailerUrl(trailerUrl)}
-                                            frameborder="0"
-                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                            allowfullscreen
-                                    ></iframe>
-                                </div>
+                        <section>
+                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Trailer</h2>
+                            <div class="aspect-video rounded-xl overflow-hidden shadow-lg">
+                                <iframe src={formatTrailerUrl(trailerUrl)} class="w-full h-full" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
                             </div>
+                        </section>
                     )}
 
-                    <!-- Videos Adicionales -->
+                    <!-- Videos extras -->
                     {(clips.length > 0 || behindScenes.length > 0 || teasers.length > 0) && (
-                        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4 flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                </svg>
-                                Videos Adicionales
-                            </h2>
-                            
-                            <div class="space-y-6">
-                                {/* Clips */}
-                                {clips.length > 0 && (
+                        <details class="bg-white rounded-xl border border-gray-200">
+                            <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
+                                <span>Videos extras ({clips.length + behindScenes.length + teasers.length})</span>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </summary>
+                            <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {[...clips.slice(0, 4), ...behindScenes.slice(0, 4), ...teasers.slice(0, 4)].map((video) => (
                                     <div>
-                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Clips</h3>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {clips.slice(0, 4).map((video: any) => (
-                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
-                                                    <div class="aspect-video">
-                                                        <iframe
-                                                            class="w-full h-full"
-                                                            src={`https://www.youtube.com/embed/${video.key}`}
-                                                            frameborder="0"
-                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                            allowfullscreen
-                                                        ></iframe>
-                                                    </div>
-                                                    <div class="p-3">
-                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                        <p class="text-xs text-gray-500 mb-1 truncate">{video.name}</p>
+                                        <div class="aspect-video rounded-lg overflow-hidden">
+                                            <iframe src={formatTrailerUrl(video.key)} class="w-full h-full" allowfullscreen></iframe>
                                         </div>
                                     </div>
-                                )}
-
-                                {/* Behind the Scenes */}
-                                {behindScenes.length > 0 && (
-                                    <div>
-                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Detrás de Cámaras</h3>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {behindScenes.slice(0, 4).map((video: any) => (
-                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
-                                                    <div class="aspect-video">
-                                                        <iframe
-                                                            class="w-full h-full"
-                                                            src={`https://www.youtube.com/embed/${video.key}`}
-                                                            frameborder="0"
-                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                            allowfullscreen
-                                                        ></iframe>
-                                                    </div>
-                                                    <div class="p-3">
-                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Teasers */}
-                                {teasers.length > 0 && (
-                                    <div>
-                                        <h3 class="text-lg font-semibold text-gray-700 mb-3">Avances</h3>
-                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {teasers.slice(0, 4).map((video: any) => (
-                                                <div class="bg-gray-50 rounded-lg overflow-hidden">
-                                                    <div class="aspect-video">
-                                                        <iframe
-                                                            class="w-full h-full"
-                                                            src={`https://www.youtube.com/embed/${video.key}`}
-                                                            frameborder="0"
-                                                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                                            allowfullscreen
-                                                        ></iframe>
-                                                    </div>
-                                                    <div class="p-3">
-                                                        <p class="text-sm font-medium text-gray-800">{video.name}</p>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                ))}
                             </div>
-                        </div>
+                        </details>
                     )}
 
-                    <!-- Próximo Episodio Destacado -->
+                    <!-- Próximo Episodio -->
                     {item?.next_episode_to_air && (
-                        <div class="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg shadow-md mb-8 border-l-4 border-green-500">
-                            <div class="flex items-start gap-4">
-                                <div class="flex-shrink-0">
-                                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </div>
-                                </div>
-                                <div class="flex-grow">
-                                    <h2 class="text-2xl font-bold text-green-800 mb-2 flex items-center gap-2">
-                                        Próximo Episodio
-                                    </h2>
-                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
-                                        {item.next_episode_to_air.name}
-                                    </h3>
-                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                                        <span class="flex items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-                                            </svg>
-                                            Temporada {item.next_episode_to_air.season_number}, Episodio {item.next_episode_to_air.episode_number}
-                                        </span>
-                                        <span class="flex items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            {formatDate(item.next_episode_to_air.air_date)}
-                                        </span>
-                                    </div>
-                                    {item.next_episode_to_air.overview && (
-                                        <p class="text-gray-700 leading-relaxed">
-                                            {item.next_episode_to_air.overview}
-                                        </p>
-                                    )}
-                                </div>
+                        <section class="bg-white rounded-xl border-2 border-green-200 p-5">
+                            <h2 class="text-lg font-semibold text-green-700 mb-3 flex items-center gap-2">
+                                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                Próximo Episodio
+                            </h2>
+                            <h3 class="text-base font-medium text-gray-800 mb-2">{item.next_episode_to_air.name}</h3>
+                            <div class="flex flex-wrap gap-3 text-sm text-gray-600 mb-2">
+                                <span>T{item.next_episode_to_air.season_number} E{item.next_episode_to_air.episode_number}</span>
+                                <span>{formatDate(item.next_episode_to_air.air_date)}</span>
                             </div>
-                        </div>
+                            {item.next_episode_to_air.overview && (
+                                <details class="text-sm text-gray-600 group">
+                                    <summary class="cursor-pointer">
+                                        <p class="leading-relaxed line-clamp-3 sm:line-clamp-none group-open:line-clamp-none inline">{item.next_episode_to_air.overview}</p>
+                                    </summary>
+                                </details>
+                            )}
+                        </section>
                     )}
 
-                    <!-- Último Episodio Emitido Destacado -->
+                    <!-- Último Episodio -->
                     {item?.last_episode_to_air && (
-                        <div class="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow-md mb-8 border-l-4 border-blue-500">
+                        <section class="bg-white rounded-xl border border-gray-200 p-5">
                             <div class="flex items-start gap-4">
-                                <div class="flex-shrink-0">
-                                    {item.last_episode_to_air.still_path ? (
-                                        <img 
-                                            src={`https://image.tmdb.org/t/p/w300${item.last_episode_to_air.still_path}`}
-                                            alt={item.last_episode_to_air.name}
-                                            class="w-24 h-16 object-cover rounded-lg shadow-md"
-                                            loading="lazy"
-                                        />
-                                    ) : (
-                                        <div class="w-24 h-16 bg-blue-200 rounded-lg flex items-center justify-center">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                        </div>
-                                    )}
-                                </div>
-                                <div class="flex-grow">
-                                    <h2 class="text-2xl font-bold text-blue-800 mb-2 flex items-center gap-2">
-                                        Último Episodio Emitido
-                                    </h2>
-                                    <h3 class="text-xl font-semibold text-gray-800 mb-2">
-                                        {item.last_episode_to_air.name}
-                                    </h3>
-                                    <div class="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
-                                        <span class="flex items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-                                            </svg>
-                                            Temporada {item.last_episode_to_air.season_number}, Episodio {item.last_episode_to_air.episode_number}
-                                        </span>
-                                        <span class="flex items-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            {formatDate(item.last_episode_to_air.air_date)}
-                                        </span>
-                                        {item.last_episode_to_air.vote_average > 0 && (
-                                            <span class="flex items-center gap-1">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
-                                                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                                </svg>
-                                                {item.last_episode_to_air.vote_average.toFixed(1)}
-                                            </span>
-                                        )}
+                                {item.last_episode_to_air.still_path && (
+                                    <img src={posterUrl(item.last_episode_to_air.still_path, 'w300')} alt={item.last_episode_to_air.name} class="w-32 h-20 object-cover rounded-lg flex-shrink-0 hidden sm:block" loading="lazy" />
+                                )}
+                                <div>
+                                    <h2 class="text-lg font-semibold text-gray-800 mb-1">Último Episodio</h2>
+                                    <h3 class="text-base font-medium text-gray-700 mb-2">{item.last_episode_to_air.name}</h3>
+                                    <div class="flex flex-wrap gap-3 text-sm text-gray-500 mb-2">
+                                        <span>T{item.last_episode_to_air.season_number} E{item.last_episode_to_air.episode_number}</span>
+                                        <span>{formatDate(item.last_episode_to_air.air_date)}</span>
+                                        {item.last_episode_to_air.vote_average > 0 && <span class="text-yellow-600">{item.last_episode_to_air.vote_average.toFixed(1)}</span>}
                                     </div>
                                     {item.last_episode_to_air.overview && (
-                                        <p class="text-gray-700 leading-relaxed">
-                                            {item.last_episode_to_air.overview}
-                                        </p>
+                                        <details class="text-sm text-gray-600 group">
+                                            <summary class="cursor-pointer">
+                                                <p class="leading-relaxed line-clamp-2 sm:line-clamp-none group-open:line-clamp-none inline">{item.last_episode_to_air.overview}</p>
+                                            </summary>
+                                        </details>
                                     )}
                                 </div>
                             </div>
-                        </div>
+                        </section>
                     )}
 
-                    <!-- Temporadas con acordeón mejorado para episodios -->
-                    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                        <div class="flex items-center justify-between mb-6">
-                            <h2 class="text-2xl font-bold text-blue-600">Temporadas y Episodios</h2>
-                            <div class="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
-                                {regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios
-                                {hasSpecialSeasons && ` • ${specialSeasonsCount} especiales`}
+
+                    <!-- Temporadas con acordeón -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                            <h2 class="text-xl font-semibold text-gray-800">Temporadas y Episodios</h2>
+                            <div class="flex items-center gap-3">
+                                {totalWatchedEpisodes > 0 && (
+                                    <span class="text-sm font-medium text-green-600 bg-green-50 px-3 py-1 rounded-full">
+                                        {totalWatchedEpisodes}/{totalRegularEpisodes} vistos ({Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)}%)
+                                    </span>
+                                )}
+                                <span class="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
+                                    {regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios
+                                    {hasSpecialSeasons && ` • ${specialSeasonsCount} especiales`}
+                                </span>
                             </div>
                         </div>
-                        
-                        <div class="space-y-6">
+                        {/* Barra de progreso global */}
+                        {totalWatchedEpisodes > 0 && (
+                            <div class="w-full bg-gray-200 rounded-full h-2 mb-6">
+                                <div class="bg-green-500 h-2 rounded-full transition-all" style={`width: ${Math.min(100, Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100))}%`}></div>
+                            </div>
+                        )}
+                        <div class="space-y-4">
                             {sortedSeasons.map((season) => {
                                 const seasonEpisodes = allSeasonEpisodes[season.season_number] || [];
                                 const stats = getSeasonStats(seasonEpisodes);
-                                
+                                const seasonWatched = seasonEpisodes.filter((ep) => watchedSet.has(`${season.season_number}-${ep.episode_number}`)).length;
+                                const seasonTotal = seasonEpisodes.length;
+                                const isSeasonComplete = seasonTotal > 0 && seasonWatched === seasonTotal;
                                 return (
-                                    <details
-                                            class={`border rounded-xl overflow-hidden transition-all duration-300 hover:shadow-md ${season.season_number === 0 ? 'border-purple-200 bg-gradient-to-r from-purple-50 to-pink-50' : 'border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50'}`}>
-                                        <summary
-                                                class={`cursor-pointer transition-all duration-300 p-6 ${season.season_number === 0 ? 'bg-purple-50 hover:bg-purple-100' : 'bg-blue-50 hover:bg-blue-100'}`}>
-                                            <div class="flex flex-col lg:flex-row gap-6 items-start">
-                                                <div class="lg:w-1/4 w-full max-w-[250px] mx-auto lg:mx-0 season-poster">
+                                    <details class={`border rounded-xl overflow-hidden transition-all hover:shadow-md ${season.season_number === 0 ? 'border-purple-200 bg-purple-50/50' : 'border-blue-200 bg-blue-50/50'}`}>
+                                        <summary class={`cursor-pointer p-5 ${season.season_number === 0 ? 'hover:bg-purple-100/50' : 'hover:bg-blue-100/50'}`}>
+                                            <div class="flex flex-col lg:flex-row gap-5 items-start">
+                                                <div class="w-full max-w-[220px] mx-auto lg:mx-0 lg:w-1/4 flex-shrink-0">
                                                     <img
-                                                            src={`https://image.tmdb.org/t/p/w400${season.poster_path || item?.poster_path}`}
-                                                            alt={season.season_number === 0 ? "Episodios Especiales" : `Temporada ${season.season_number}`}
-                                                            loading="lazy"
-                                                            class="w-full h-auto rounded-lg shadow-lg transform hover:scale-105 transition-transform duration-300"
+                                                        src={posterUrl(season.poster_path || item?.poster_path, 'w400')}
+                                                        alt={season.season_number === 0 ? "Episodios Especiales" : `Temporada ${season.season_number}`}
+                                                        loading="lazy"
+                                                        class="w-full rounded-lg shadow-lg"
                                                     />
                                                 </div>
                                                 <div class="lg:w-3/4 w-full">
                                                     <div class="flex items-center justify-between mb-3">
-                                                        <h3 class={`text-2xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
-                                                            {season.season_number === 0 ? (
-                                                                    <span class="flex items-center gap-2">
-                                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                                                                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                                                        </svg>
-                                                                        Episodios Especiales
-                                                                    </span>
-                                                            ) : (
-                                                                `Temporada ${season.season_number}`
-                                                            )}
+                                                        <h3 class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
+                                                            {season.season_number === 0 ? 'Episodios Especiales' : `Temporada ${season.season_number}`}
                                                         </h3>
-                                                        <svg xmlns="http://www.w3.org/2000/svg" 
-                                                             class={`h-6 w-6 transition-transform duration-300 ${season.season_number === 0 ? 'text-purple-600' : 'text-blue-600'}`} 
-                                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                                                        </svg>
+                                                        <svg class={`w-5 h-5 ${season.season_number === 0 ? 'text-purple-500' : 'text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                                     </div>
-                                                    
-                                                    <!-- Estadísticas mejoradas de la temporada -->
-                                                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 season-stats">
-                                                        <div class={`text-center p-3 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
-                                                                {stats.totalEpisodes}
-                                                            </div>
+                                                    <div class="grid grid-cols-3 gap-3 mb-3">
+                                                        <div class={`text-center p-2.5 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>{stats.totalEpisodes}</div>
                                                             <div class="text-xs text-gray-600">Episodios</div>
                                                         </div>
-                                                        
-                                                        <div class={`text-center p-3 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
-                                                                {stats.averageRating !== "0.0" ? `⭐${stats.averageRating}` : "N/A"}
-                                                            </div>
+                                                        <div class={`text-center p-2.5 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>{stats.averageRating !== "0.0" ? `${stats.averageRating}` : "N/A"}</div>
                                                             <div class="text-xs text-gray-600">Rating</div>
                                                         </div>
-                                                        
-                                                        <div class={`text-center p-3 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                                                            <div class={`text-sm font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
-                                                                {stats.averageRuntime !== "No disponible" ? stats.averageRuntime : "N/A"}
-                                                            </div>
+                                                        <div class={`text-center p-2.5 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                                                            <div class={`text-base font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>{stats.averageRuntime !== "No disponible" ? stats.averageRuntime : "N/A"}</div>
                                                             <div class="text-xs text-gray-600">Duración</div>
                                                         </div>
                                                     </div>
-
-                                                    <div class="flex items-center gap-4 text-sm text-gray-600 mb-3">
-                                                        {season.air_date && (
-                                                                <span class="flex items-center gap-1">
-                                                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                                                                    </svg>
-                                                                    Estreno: {formatDate(season.air_date)}
-                                                                </span>
+                                                    <!-- Stats extra -->
+                                                    <div class="flex flex-wrap gap-2 mb-3 text-xs">
+                                                        {stats.totalWatchtime && (
+                                                            <span class={`px-2 py-0.5 rounded-full ${season.season_number === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                Total: {stats.totalWatchtime}
+                                                            </span>
+                                                        )}
+                                                        {stats.bestEpisode && (
+                                                            <span class={`px-2 py-0.5 rounded-full ${season.season_number === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                Mejor: E{stats.bestEpisode.episode_number} ({stats.bestEpisode.vote_average.toFixed(1)})
+                                                            </span>
+                                                        )}
+                                                        {stats.dateRange && (
+                                                            <span class={`px-2 py-0.5 rounded-full ${season.season_number === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                                {stats.dateRange}
+                                                            </span>
                                                         )}
                                                     </div>
-                                                    
-                                                    <p class="text-sm text-gray-700 season-overview leading-relaxed">
-                                                        {season.overview || (season.season_number === 0 ? "Episodios especiales, documentales, detrás de cámaras y contenido adicional de la serie." : "No hay descripción disponible para esta temporada.")}
-                                                    </p>
+
+                                                    {/* Progreso de temporada */}
+                                                    {seasonTotal > 0 && (
+                                                        <div class="flex items-center gap-3 mb-3" data-season-progress={season.season_number} data-season-total={seasonTotal}>
+                                                            <div class="flex-1 bg-gray-200 rounded-full h-1.5">
+                                                                <div class={`h-1.5 rounded-full transition-all duration-300 ${season.season_number === 0 ? 'bg-purple-500' : 'bg-green-500'}`} data-season-bar={season.season_number} style={`width: ${Math.round(seasonWatched / seasonTotal * 100)}%`}></div>
+                                                            </div>
+                                                            <span class="text-xs text-gray-500 flex-shrink-0" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>
+                                                        </div>
+                                                    )}
+
+                                                    <p class="text-sm text-gray-600 leading-relaxed">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
                                                 </div>
                                             </div>
                                         </summary>
-
-                                        <!-- Lista de episodios para cada temporada -->
-                                        <div class="bg-white p-4">
-                                            <div class="space-y-3">
-                                                {allSeasonEpisodes[season.season_number]?.map((episode) => (
-                                                        <details
-                                                                class={`border-b pb-3 last:border-0 group ${season.season_number === 0 ? 'border-purple-200' : 'border-gray-200'}`}>
-                                                            <summary
-                                                                    class={`cursor-pointer py-2 flex items-center justify-between rounded-lg px-3 transition-colors ${season.season_number === 0 ? 'hover:bg-purple-50' : 'hover:bg-blue-50'}`}>
-                                                                <div class="flex items-center gap-3 w-full">
-                                                            <span class={`font-bold px-2 py-1 rounded text-sm text-center flex-shrink-0 ${season.season_number === 0 ? 'bg-purple-100 text-purple-800 min-w-[40px]' : 'bg-blue-100 text-blue-800 w-8'}`}>
+                                        <div class="bg-white p-4 space-y-2">
+                                            {/* Botón marcar/desmarcar temporada */}
+                                            {seasonTotal > 0 && (
+                                                <form method="POST" class="mb-3">
+                                                    <input type="hidden" name="actionType" value="watched_season" />
+                                                    <input type="hidden" name="season" value={season.season_number} />
+                                                    <input type="hidden" name="episodes" value={seasonEpisodes.map((ep) => ep.episode_number).join(',')} />
+                                                    <input type="hidden" name="action" value={isSeasonComplete ? 'unmark' : 'mark'} />
+                                                    <button type="submit" class={`w-full py-2 text-xs font-medium rounded-lg transition-colors ${isSeasonComplete ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
+                                                        {isSeasonComplete ? 'Desmarcar temporada completa' : `Marcar toda la temporada como vista (${seasonTotal} episodios)`}
+                                                    </button>
+                                                </form>
+                                            )}
+                                            {seasonEpisodes.map((episode) => {
+                                                const isWatched = watchedSet.has(`${season.season_number}-${episode.episode_number}`);
+                                                return (
+                                                <div>
+                                                    <details class={`border-b pb-2 last:border-0 group ${season.season_number === 0 ? 'border-purple-100' : 'border-gray-100'}`}>
+                                                        <summary class={`cursor-pointer py-2 px-2 sm:px-3 rounded-lg flex items-center gap-2 sm:gap-3 ${season.season_number === 0 ? 'hover:bg-purple-50' : 'hover:bg-blue-50'} ${isWatched ? 'opacity-60' : ''}`}>
+                                                            <span class={`font-bold px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${season.season_number === 0 ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                                                                 {season.season_number === 0 ? `E${episode.episode_number}` : episode.episode_number}
                                                             </span>
-                                                                    <div class="flex-grow">
-                                                                        <h5 class="font-medium text-gray-800 text-base">{episode.name}</h5>
-                                                                        <div class="text-xs text-gray-500 flex items-center gap-2 mt-1">
-                                                <span class="flex items-center gap-1">
-                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                         class="h-3 w-3" fill="none"
-                                                         viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path stroke-linecap="round"
-                                                              stroke-linejoin="round"
-                                                              stroke-width="2"
-                                                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                    </svg>
-                                                    {formatDate(episode.air_date)}
-                                                </span>
-                                                                            {episode.runtime && (
-                                                                                    <span class="flex items-center gap-1">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                             class="h-3 w-3" fill="none"
-                                                             viewBox="0 0 24 24"
-                                                             stroke="currentColor">
-                                                            <path stroke-linecap="round"
-                                                                  stroke-linejoin="round"
-                                                                  stroke-width="2"
-                                                                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                                                        </svg>
-                                                                                        {formatRuntime(episode.runtime)}
-                                                    </span>
-                                                                            )}
-                                                                            {episode.vote_average > 0 && (
-                                                                                    <span class="flex items-center gap-1">
-                                                        <svg xmlns="http://www.w3.org/2000/svg"
-                                                             class="h-3 w-3 text-yellow-500"
-                                                             fill="currentColor"
-                                                             viewBox="0 0 24 24">
-                                                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
-                                                        </svg>
-                                                                                        {episode.vote_average.toFixed(1)}
-                                                    </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                    <svg xmlns="http://www.w3.org/2000/svg"
-                                                                         class={`h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity ${season.season_number === 0 ? 'text-purple-500' : 'text-blue-500'}`}
-                                                                         fill="none" viewBox="0 0 24 24"
-                                                                         stroke="currentColor">
-                                                                        <path stroke-linecap="round"
-                                                                              stroke-linejoin="round" stroke-width="2"
-                                                                              d="M9 5l7 7-7 7"/>
-                                                                    </svg>
-                                                                </div>
-                                                            </summary>
-
-                                                            <div class={`mt-2 px-3 py-2 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'}`}>
-                                                                {episode.still_path && (
-                                                                        <div class="w-full max-w-md mx-auto mb-3">
-                                                                            <img
-                                                                                    src={`https://image.tmdb.org/t/p/w500${episode.still_path}`}
-                                                                                    alt={episode.name}
-                                                                                    loading="lazy"
-                                                                                    class="rounded-lg shadow-md w-full h-auto object-cover"
-                                                                            />
-                                                                        </div>
-                                                                )}
-
-                                                                <div class="text-sm text-gray-700 mb-3">
-                                                                    {episode.overview || (season.season_number === 0
-                                                                        ? "No hay descripción disponible para este episodio especial."
-                                                                        : "No hay descripción disponible para este episodio.")}
-                                                                </div>
-
-                                                                {episode.guest_stars && episode.guest_stars.length > 0 && (
-                                                                        <div class="mt-3">
-                                                                            <h6 class={`text-sm font-semibold mb-2 ${season.season_number === 0 ? 'text-purple-700' : 'text-blue-700'}`}>
-                                                                                Estrellas invitadas:
-                                                                            </h6>
-                                                                            <ul class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                                                {episode.guest_stars.map((star: GuestStar) => (
-                                                                                        <li class="flex items-center text-xs text-gray-600">
-                                                                                            {star.profile_path && (
-                                                                                                    <a href={`/actor/${star.id}`}
-                                                                                                       class="shrink-0">
-                                                                                                        <img
-                                                                                                                src={`https://image.tmdb.org/t/p/w45${star.profile_path}`}
-                                                                                                                alt={star.name}
-                                                                                                                class="w-12 h-12 rounded-full mr-2 object-cover border border-gray-200"
-                                                                                                                loading="lazy"
-                                                                                                        />
-                                                                                                    </a>
-                                                                                            )}
-                                                                                            <div>
-                                                                                                <a
-                                                                                                        href={`/actor/${star.id}`}
-                                                                                                        class={`text-gray-800 font-semibold hover:underline transition duration-300 ${season.season_number === 0 ? 'hover:text-purple-600' : 'hover:text-blue-600'}`}
-                                                                                                >
-                                                                                                    {star.name}
-                                                                                                </a>
-                                                                                                <span class="block text-gray-500">{star.character}</span>
-                                                                                            </div>
-                                                                                        </li>
-                                                                                ))}
-                                                                            </ul>
-                                                                        </div>
-                                                                )}
+                                                            <div class="flex-1 min-w-0">
+                                                                <p class="font-medium text-gray-800 text-sm truncate group-open:whitespace-normal group-open:overflow-visible">{episode.name}</p>
+                                                                <p class="text-xs text-gray-500 mt-0.5 truncate">
+                                                                    {formatDate(episode.air_date)}{episode.runtime ? `  ·  ${formatRuntime(episode.runtime)}` : ''}
+                                                                    {episode.vote_average > 0 && <span class="text-yellow-600">  ·  {episode.vote_average.toFixed(1)}</span>}
+                                                                </p>
                                                             </div>
-                                                        </details>
-                                                ))}
+                                                            <form method="POST" data-season={season.season_number} class="flex-shrink-0" onclick="event.stopPropagation()">
+                                                                <input type="hidden" name="actionType" value="watched_episode" />
+                                                                <input type="hidden" name="season" value={season.season_number} />
+                                                                <input type="hidden" name="episode" value={episode.episode_number} />
+                                                                <button type="submit" class={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md transition-all duration-200 whitespace-nowrap ${isWatched ? 'bg-green-500 text-white hover:bg-green-600' : 'border border-gray-300 text-gray-400 hover:border-green-400 hover:text-green-600'}`}>
+                                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                                                    </svg>
+                                                                    <span class="hidden sm:inline">{isWatched ? 'Visto' : 'Visto'}</span>
+                                                                </button>
+                                                            </form>
+                                                        </summary>
+                                                        <div class={`mt-2 mx-3 p-4 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'}`}>
+                                                            {/* Imagen */}
+                                                            {episode.still_path && (
+                                                                <div class="flex justify-center mb-3">
+                                                                    <img src={posterUrl(episode.still_path, 'w500')} alt={episode.name} loading="lazy" class="rounded-lg shadow-md w-full max-w-md" />
+                                                                </div>
+                                                            )}
 
-                                                {(!allSeasonEpisodes[season.season_number] || allSeasonEpisodes[season.season_number].length === 0) && (
-                                                        <p class="text-gray-500 italic text-center p-4">
-                                                            {season.season_number === 0 ?
-                                                                "No hay información de episodios especiales disponible." :
-                                                                "No hay información de episodios disponible para esta temporada."
-                                                            }
-                                                        </p>
-                                                )}
-                                            </div>
+                                                            {/* Sinopsis */}
+                                                            <p class="text-sm text-gray-700 leading-relaxed mb-3">{episode.overview || "No hay descripción disponible."}</p>
+
+                                                            {/* Estrellas invitadas */}
+                                                            {episode.guest_stars && episode.guest_stars.length > 0 && (
+                                                                <div>
+                                                                    <p class={`text-sm font-semibold mb-2 ${season.season_number === 0 ? 'text-purple-700' : 'text-blue-700'}`}>Estrellas invitadas:</p>
+                                                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                        {episode.guest_stars.map((star: GuestStar) => (
+                                                                            <a href={`/actor/${star.id}`} class="flex items-center gap-3 text-sm">
+                                                                                {star.profile_path && <img src={posterUrl(star.profile_path, 'w185')} alt={star.name} class="w-11 h-11 rounded-full object-cover flex-shrink-0" loading="lazy" />}
+                                                                                <div>
+                                                                                    <span class="text-gray-800 font-medium hover:text-blue-600">{star.name}</span>
+                                                                                    <span class="block text-xs text-gray-500">{star.character}</span>
+                                                                                </div>
+                                                                            </a>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </details>
+                                                </div>
+                                                );
+                                            })}
+                                            {(!seasonEpisodes || seasonEpisodes.length === 0) && (
+                                                <p class="text-gray-500 italic text-center p-4 text-sm">No hay información de episodios disponible.</p>
+                                            )}
                                         </div>
                                     </details>
                                 );
@@ -1391,328 +841,153 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                     </div>
 
                     <!-- Pósters -->
-                    <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                        <h2 class="text-2xl font-bold text-blue-600 mb-4">Pósters</h2>
-
-                        {posters && posters.length > 0 ? (
-                                <div class="carousel-container relative max-w-full overflow-hidden">
-                                    <div class="carousel-track flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-                                        {posters.slice(0, 40).map((poster, index) => (
-                                                <>
-                                                    <div class="carousel-slide flex-shrink-0 w-48">
-                                                        <a href={`#poster-${index}`}>
-                                                            <img
-                                                                    src={poster.file_path}
-                                                                    alt={`Póster ${poster.vote_average.toFixed(1)}/10`}
-                                                                    loading="lazy"
-                                                                    class="rounded-lg shadow-md w-full h-64 object-cover"
-                                                            />
-                                                        </a>
-                                                    </div>
-
-                                                    {/* Modal de imagen */}
-                                                    <div id={`poster-${index}`} class="modal">
-                                                        <a href="#" class="modal-close">&times;</a>
-                                                        <img src={poster.file_path}
-                                                             alt={`Póster ${poster.vote_average.toFixed(1)}/10`}/>
-                                                    </div>
-                                                </>
-                                        ))}
-                                    </div>
-                                </div>
-                        ) : (
-                                <p class="text-gray-600 text-center">No se encontraron pósters para esta serie</p>
-                        )}
-                    </div>
-
-                    <!-- Reparto y Equipo -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                        {/* Reparto */}
-                        <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Reparto Principal</h2>
-                            <div class="text-gray-600">
-                                {cast?.length > 0 ? (
-                                        <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                            {cast.map((actor) => (
-                                                    <li class="border-b border-gray-100 pb-3 last:border-0">
-                                                        <div class="flex gap-4 items-start">
-                                                            {actor.profile_path ? (
-                                                                    <a href={`/actor/${actor.id}`} class="shrink-0">
-                                                                        <img
-                                                                                src={`https://image.tmdb.org/t/p/w92${actor.profile_path}`}
-                                                                                alt={actor.name}
-                                                                                loading="lazy"
-                                                                                class="w-16 h-16 rounded-full object-cover border border-gray-300 shadow-sm hover:brightness-110 transition"
-                                                                        />
-                                                                    </a>
-                                                            ) : (
-                                                                    <div class="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-400 text-xs border border-gray-300">
-                                                                        ?
-                                                                    </div>
-                                                            )}
-
-                                                            <div class="flex flex-col">
-                                                                <a
-                                                                        href={`/actor/${actor.id}`}
-                                                                        class="text-gray-800 font-semibold hover:text-blue-600 hover:underline transition duration-300"
-                                                                >
-                                                                    {actor.name}
-                                                                </a>
-                                                                {actor.character && (
-                                                                        <span class="text-sm text-gray-500 mt-1">{actor.character}</span>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </li>
-                                            ))}
-                                        </ul>
-                                ) : (
-                                        <p class="text-gray-500">Información no disponible</p>
-                                )}
+                    {posters && posters.length > 0 && (
+                        <details class="bg-white rounded-xl border border-gray-200">
+                            <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
+                                <span>Pósters ({posters.length})</span>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </summary>
+                            <div class="px-5 pb-5 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                                {posters.map((poster, index) => (
+                                    <a href={`#poster-${index}`} class="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity">
+                                        <img src={poster.file_path} alt={`Póster ${index + 1}`} loading="lazy" class="w-full aspect-[2/3] object-cover" />
+                                    </a>
+                                ))}
                             </div>
-                        </div>
+                        </details>
+                    )}
 
-                        <!-- Equipo -->
-                        <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Equipo de Producción</h2>
-                            <div class="text-gray-600">
-                                {directors?.length > 0 ? (
-                                <ul class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                    {directors.map((member) => (
-                                    <li class="p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:shadow-sm transition">
-                                        <a
-                                        href={`/team/${member.name}`}
-                                        class="block text-gray-900 font-semibold hover:text-blue-600 transition"
-                                        >
-                                        {member.name}
-                                        </a>
-                                        <p class="text-sm text-gray-500">{member.job}</p>
-                                    </li>
-                                    ))}
-                                </ul>
-                                ) : (
-                                <p class="text-gray-500">Información no disponible</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Plataformas y Productoras en dos columnas -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Plataformas -->
-                        {providerElements.length > 0 && (
-                                <div class="bg-white p-6 rounded-lg shadow-md">
-                                    <h2 class="text-2xl font-bold text-blue-600 mb-4">Disponible en</h2>
-                                    <div class="space-y-4">
-                                        {providersByType.flatrate && providersByType.flatrate.length > 0 && (
-                                            <div>
-                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Incluido con suscripción</h3>
-                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                                    {providersByType.flatrate.map((provider) => (
-                                                        <div class="flex flex-col items-center">
-                                                            {provider.logo ? (
-                                                                provider.link ? (
-                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
-                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
-                                                                    </a>
-                                                                ) : (
-                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
-                                                                )
-                                                            ) : (
-                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
-                                                                    <span class="text-xs text-gray-500">Sin logo</span>
-                                                                </div>
-                                                            )}
-                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
-                                                        </div>
-                                                    ))}
-                                                </div>
+                    <!-- Reparto -->
+                    {cast.length > 0 && (
+                        <section>
+                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Reparto Principal</h2>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                {cast.slice(0, 12).map((actor) => (
+                                    <a href={`/actor/${actor.id}`} class="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                                        {actor.profile_path ? (
+                                            <img src={posterUrl(actor.profile_path, 'w185')} alt={actor.name} class="w-14 h-14 rounded-full object-cover flex-shrink-0" loading="lazy" />
+                                        ) : (
+                                            <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                                                <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
                                             </div>
                                         )}
-                                        {providersByType.rent && providersByType.rent.length > 0 && (
-                                            <div>
-                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Alquiler</h3>
-                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                                    {providersByType.rent.map((provider) => (
-                                                        <div class="flex flex-col items-center">
-                                                            {provider.logo ? (
-                                                                provider.link ? (
-                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
-                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
-                                                                    </a>
-                                                                ) : (
-                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
-                                                                )
-                                                            ) : (
-                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
-                                                                    <span class="text-xs text-gray-500">Sin logo</span>
-                                                                </div>
-                                                            )}
-                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                        {providersByType.buy && providersByType.buy.length > 0 && (
-                                            <div>
-                                                <h3 class="text-sm font-semibold text-gray-700 mb-2">Compra</h3>
-                                                <div class="grid grid-cols-3 sm:grid-cols-3 gap-4">
-                                                    {providersByType.buy.map((provider) => (
-                                                        <div class="flex flex-col items-center">
-                                                            {provider.logo ? (
-                                                                provider.link ? (
-                                                                    <a href={provider.link} target="_blank" rel="noopener noreferrer">
-                                                                        <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
-                                                                    </a>
-                                                                ) : (
-                                                                    <img src={provider.logo} alt={provider.name} loading="lazy" class="w-16 h-16 object-contain rounded-md mb-2 hover:scale-105 transition-all" />
-                                                                )
-                                                            ) : (
-                                                                <div class="w-16 h-16 bg-gray-200 rounded-md flex items-center justify-center mb-2">
-                                                                    <span class="text-xs text-gray-500">Sin logo</span>
-                                                                </div>
-                                                            )}
-                                                            <p class="text-xs text-center text-gray-600">{provider.name}</p>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                        )}
-
-                        <!-- Productoras -->
-                        {item?.production_companies && item.production_companies.length > 0 && (
-                        <div class="bg-white p-6 rounded-lg shadow-md">
-                            <h2 class="text-2xl font-bold text-blue-600 mb-4">Productoras</h2>
-
-                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-6">
-                            {item.production_companies.map((company) => (
-                                <a
-                                href={`/productora/${company.name}`}
-                                class="flex flex-col items-center group"
-                                >
-                                {company?.logo_path ? (
-                                    <img
-                                    src={`https://image.tmdb.org/t/p/w200${company.logo_path}`}
-                                    alt={company.name}
-                                    loading="lazy"
-                                    class="w-20 h-20 object-contain rounded-md mb-2 transition-transform duration-200 group-hover:scale-110"
-                                    />
-                                ) : (
-                                    <div class="w-20 h-20 bg-gray-200 rounded-md flex items-center justify-center mb-2 group-hover:bg-gray-300 transition-colors">
-                                    <span class="text-xs text-gray-500">Sin logo</span>
-                                    </div>
-                                )}
-
-                                <p class="text-sm text-center text-gray-600 group-hover:text-blue-600 font-medium transition-colors">
-                                    {company.name}
-                                </p>
-                                </a>
-                            ))}
-                            </div>
-                        </div>
-                        )}
-                    </div>
-
-                    <!-- SERIES Recomendaciones -->
-                    {seriesRecommendations && seriesRecommendations.length > 0 && (
-                            <div class="bg-white p-6 rounded-lg shadow-md mb-8">
-                                <div class="flex items-center justify-between mb-6">
-                                    <h2 class="text-2xl font-bold text-blue-600">
-                                        {seriesRecommendationType === 'similar' ? 'Series Similares' : 'Series Recomendadas'}
-                                    </h2>
-                                </div>
-
-                                    <!-- Carousel de recomendaciones con scroll horizontal -->
-                                    <div class="recommendations-carousel relative overflow-hidden">
-                                        <!-- Contenedor de series -->
-                                        <div class="recommendations-container flex gap-4 overflow-x-auto pb-4 px-2 scroll-smooth">
-                                            {seriesRecommendations.map((serie, index) => (
-                                                    <div class={`recommendation-card flex-shrink-0 w-48 group animate-fade-in-up`}
-                                                         style={`animation-delay: ${(index % 6 + 1) * 0.1}s`}>
-                                                        <a href={`/serie/${serie.id}`} class="block">
-                                                            <div class="relative overflow-hidden rounded-lg shadow-md hover:shadow-xl transition-all duration-300 group-hover:-translate-y-2">
-                                                                <!-- Imagen de la serie -->
-                                                                <div class="relative aspect-[2/3] overflow-hidden">
-                                                                    <img
-                                                                            src={serie.poster_path}
-                                                                            alt={serie.name}
-                                                                            loading="lazy"
-                                                                            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                                                    />
-
-                                                                    <!-- Overlay con gradiente -->
-                                                                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                                                                    <!-- Rating badge -->
-                                                                    <div class="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">
-                                                                        ⭐ {serie.vote_average.toFixed(1)}
-                                                                    </div>
-
-                                                                    <!-- Botón de play overlay -->
-                                                                    <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                                        <div class="bg-white/90 rounded-full p-3 shadow-lg transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                                                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                                                 class="h-6 w-6 text-blue-600"
-                                                                                 fill="currentColor"
-                                                                                 viewBox="0 0 24 24">
-                                                                                <path d="M8 5v14l11-7z"/>
-                                                                            </svg>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-
-                                                                <!-- Información de la película -->
-                                                                <div class="p-4 bg-white h-32 flex flex-col justify-between">
-                                                                    <div>
-                                                                        <h3 class="font-semibold text-gray-800 text-sm line-clamp-2 group-hover:text-blue-600 transition-colors duration-300">
-                                                                            {serie.name}
-                                                                        </h3>
-                                                                    </div>
-
-                                                                    <div class="mt-auto">
-                                                                        <div class="flex items-center justify-between">
-                                                                            <span class="text-xs text-gray-500">
-                                                                                {serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : 'Próximamente'}
-                                                                                </span>
-                                                                            <div class="flex items-center gap-1">
-                                                                                <svg xmlns="http://www.w3.org/2000/svg"
-                                                                                     class="h-3 w-3 text-yellow-400"
-                                                                                     fill="currentColor"
-                                                                                     viewBox="0 0 20 20">
-                                                                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                                                                                </svg>
-                                                                                <span class="text-xs text-gray-600 font-medium">
-                                                                                    {serie.vote_average.toFixed(1)}
-                                                                                </span>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        <!-- Sinopsis corta - ahora siempre visible pero con altura fija -->
-                                                                        <div class="mt-2 h-9 overflow-hidden">
-                                                                            {serie.overview && (
-                                                                                    <p class="text-xs text-gray-600 line-clamp-3 opacity-70 group-hover:opacity-100 transition-opacity duration-300">
-                                                                                        {serie.overview.slice(0, 100)}...
-                                                                                    </p>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </a>
-                                                    </div>
-                                            ))}
+                                        <div class="min-w-0">
+                                            <p class="text-sm sm:text-base font-medium text-gray-800 truncate">{actor.name}</p>
+                                            {actor.character && <p class="text-xs sm:text-sm text-gray-500 truncate">{actor.character}</p>}
                                         </div>
-                                    </div>
+                                    </a>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <!-- Equipo -->
+                    {directors.length > 0 && (
+                        <section>
+                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Equipo de Producción</h2>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {directors.map((member) => (
+                                    <a href={`/team/${encodeURIComponent(member.name)}`} class="p-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                                        <p class="text-sm font-medium text-gray-800">{member.name}</p>
+                                        <p class="text-xs text-gray-500">{member.job}</p>
+                                    </a>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <!-- Productoras -->
+                    {item?.production_companies && item.production_companies.length > 0 && (
+                        <section>
+                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Productoras</h2>
+                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                {item.production_companies.map((company) => (
+                                    <a href={`/productora/${encodeURIComponent(company.name)}?companyId=${company.id}`} class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                                        {company.logo_path ? (
+                                            <img src={posterUrl(company.logo_path, 'w200')} alt={company.name} class="h-10 object-contain" loading="lazy" />
+                                        ) : (
+                                            <div class="h-10 flex items-center"><span class="text-xs text-gray-400">{company.name}</span></div>
+                                        )}
+                                        <span class="text-xs text-gray-600 text-center truncate w-full">{company.name}</span>
+                                    </a>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    <!-- Recomendaciones -->
+                    {seriesRecommendations.length > 0 && (
+                        <section>
+                            <h2 class="text-xl font-semibold text-gray-800 mb-4">
+                                {seriesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Series similares'}
+                            </h2>
+                            <div class="recommendations-carousel">
+                                <div class="recommendations-container flex gap-5 overflow-x-auto pb-4">
+                                    {seriesRecommendations.slice(0, 20).map((serie, index) => (
+                                        <a href={`/serie/${serie.id}`} class="recommendation-card flex-shrink-0 w-40 animate-fade-in-up" style={`animation-delay: ${index * 0.05}s`}>
+                                            <div class="relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
+                                                <img src={serie.poster_path || '/placeholder.jpg'} alt={serie.name} loading="lazy" class="w-full aspect-[2/3] object-cover transition-transform duration-300 hover:scale-105" />
+                                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
+                                                    <p class="text-white text-xs line-clamp-3 leading-relaxed">{serie.overview}</p>
+                                                </div>
+                                                {serie.vote_average > 0 && (
+                                                    <span class="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 bg-black/70 text-yellow-400 rounded-lg backdrop-blur-sm">{serie.vote_average.toFixed(1)}</span>
+                                                )}
+                                            </div>
+                                            <p class="mt-2 text-sm font-medium text-gray-800 line-clamp-2">{serie.name}</p>
+                                            <p class="text-xs text-gray-400">{serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : ''}</p>
+                                        </a>
+                                    ))}
                                 </div>
-                        )}
-                    </div>
+                            </div>
+                        </section>
+                    )}
+
+                    <!-- Reviews TMDB -->
+                    {reviews.length > 0 && (
+                        <details class="bg-white rounded-xl border border-gray-200">
+                            <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
+                                <span>Opiniones de la comunidad ({reviews.length})</span>
+                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            </summary>
+                            <div class="px-5 pb-5 space-y-4">
+                                {reviews.map((review) => (
+                                    <div class="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <span class="text-sm font-medium text-gray-800">{review.author}</span>
+                                            {review.author_details?.rating && (
+                                                <span class="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded">{review.author_details.rating}/10</span>
+                                            )}
+                                            <span class="text-xs text-gray-400">{review.created_at ? new Date(review.created_at).toLocaleDateString('es-ES') : ''}</span>
+                                        </div>
+                                        <p class="text-sm text-gray-600 line-clamp-4 leading-relaxed">{review.content}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </details>
+                    )}
                 </div>
             </div>
         </div>
+
+        <!-- Lightbox pósters -->
+        {posters.map((poster, index) => (
+            <div id={`poster-${index}`} class="lightbox fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
+                <a href="#_" class="absolute inset-0" aria-label="Cerrar"></a>
+                <img src={poster.file_path} alt={`Póster ${index + 1}`} class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
+                <a href="#_" class="absolute top-4 right-4 text-white/80 hover:text-white text-3xl font-light leading-none z-10" aria-label="Cerrar">&times;</a>
+                {index > 0 && (
+                    <a href={`#poster-${index - 1}`} class="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10" aria-label="Anterior">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </a>
+                )}
+                {index < posters.length - 1 && (
+                    <a href={`#poster-${index + 1}`} class="absolute right-14 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10" aria-label="Siguiente">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                )}
+            </div>
+        ))}
     </article>
 </Layout>
 

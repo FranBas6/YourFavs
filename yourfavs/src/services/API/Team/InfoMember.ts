@@ -8,8 +8,9 @@ export async function getMoviesAndSeriesByMemberName(
 ): Promise<{
     success: boolean;
     memberInfo?: any;
-    movies: Movie[];
-    series: any[];
+    socialLinks?: any;
+    movies: (Movie & { role?: string })[];
+    series: (any & { role?: string })[];
     error?: string;
 }> {
     try {
@@ -24,11 +25,11 @@ export async function getMoviesAndSeriesByMemberName(
 
         const memberId = searchData.results[0].id;
 
-        // 2. Info + créditos en paralelo
-        const [memberInfo, movieCreditsData, tvCreditsData] = await Promise.all([
+        // 2. Info + créditos combinados + redes en paralelo
+        const [memberInfo, creditsData, socialLinks] = await Promise.all([
             tmdbFetch<any>(`/person/${memberId}`).catch(() => null),
-            tmdbFetch<{ crew: any[] }>(`/person/${memberId}/movie_credits`),
-            tmdbFetch<{ crew: any[] }>(`/person/${memberId}/tv_credits`).catch(() => ({ crew: [] })),
+            tmdbFetch<{ cast: any[]; crew: any[] }>(`/person/${memberId}/combined_credits`),
+            tmdbFetch<any>(`/person/${memberId}/external_ids`).catch(() => null),
         ]);
 
         const calculateScore = (item: any, type: 'movie' | 'tv'): number => {
@@ -40,20 +41,32 @@ export async function getMoviesAndSeriesByMemberName(
             return item.vote_average || 0;
         };
 
+        // Solo crew (equipo técnico) — los actores tienen su propia vista en /actor/
+        const dedupeCrewCredits = (crew: any[]) => {
+            const map = new Map<string, any>();
+            for (const item of crew) {
+                const key = `${item.media_type}-${item.id}`;
+                if (!map.has(key)) {
+                    map.set(key, { ...item, role: item.job || '' });
+                }
+            }
+            return Array.from(map.values());
+        };
+
+        const allCredits = dedupeCrewCredits(creditsData.crew || []);
+
         const filterSortDedupe = (items: any[], type: 'movie' | 'tv') => {
-            const seen = new Set<number>();
             return items
                 .filter((item: any) => {
+                    if (item.media_type !== type) return false;
                     if (!item.poster_path || item.vote_average <= 0 || item.vote_count <= 5) return false;
                     if (excludeId && item.id === excludeId) return false;
-                    if (seen.has(item.id)) return false;
-                    seen.add(item.id);
                     return true;
                 })
                 .sort((a: any, b: any) => calculateScore(b, type) - calculateScore(a, type));
         };
 
-        const movies: Movie[] = filterSortDedupe(movieCreditsData.crew || [], 'movie').map((movie: any) => ({
+        const movies = filterSortDedupe(allCredits, 'movie').map((movie: any) => ({
             adult: movie.adult,
             backdrop_path: backdropUrl(movie.backdrop_path),
             genre_ids: movie.genre_ids,
@@ -68,9 +81,10 @@ export async function getMoviesAndSeriesByMemberName(
             original_title: movie.original_title,
             release_date: movie.release_date,
             video: movie.video,
+            role: movie.role || '',
         }));
 
-        const series = filterSortDedupe(tvCreditsData.crew || [], 'tv').map((serie: any) => ({
+        const series = filterSortDedupe(allCredits, 'tv').map((serie: any) => ({
             adult: serie.adult,
             backdrop_path: backdropUrl(serie.backdrop_path),
             genre_ids: serie.genre_ids,
@@ -85,9 +99,20 @@ export async function getMoviesAndSeriesByMemberName(
             vote_average: serie.vote_average,
             vote_count: serie.vote_count,
             origin_country: serie.origin_country,
+            role: serie.role || '',
         }));
 
-        return { success: true, memberInfo, movies, series };
+        // Formatear redes sociales
+        const formattedSocial = socialLinks ? {
+            imdb: socialLinks.imdb_id ? `https://www.imdb.com/name/${socialLinks.imdb_id}` : null,
+            twitter: socialLinks.twitter_id ? `https://twitter.com/${socialLinks.twitter_id}` : null,
+            instagram: socialLinks.instagram_id ? `https://instagram.com/${socialLinks.instagram_id}` : null,
+            facebook: socialLinks.facebook_id ? `https://facebook.com/${socialLinks.facebook_id}` : null,
+            tiktok: socialLinks.tiktok_id ? `https://www.tiktok.com/@${socialLinks.tiktok_id}` : null,
+            youtube: socialLinks.youtube_id ? `https://www.youtube.com/${socialLinks.youtube_id}` : null,
+        } : null;
+
+        return { success: true, memberInfo, socialLinks: formattedSocial, movies, series };
     } catch (error) {
         console.error("Error al obtener información del miembro:", error);
         return { success: false, movies: [], series: [], error: error instanceof Error ? error.message : "Error desconocido" };

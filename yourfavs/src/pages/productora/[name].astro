@@ -3,12 +3,13 @@ import Layout from "../../layouts/Layout.astro";
 import { getMoviesAndSeriesByCompanyName } from "../../services/API/Productora/InfoProductora";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getGenreName} from "../../utils/constants/genres";
-import '../../styles/pages/productora/productora.css';
+import { getGenreName } from "../../utils/constants/genres";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
 
 const { name } = Astro.params;
 const { searchParams } = Astro.url;
 const sortBy = searchParams.get('sort') || 'quality';
+const companyIdParam = searchParams.get('companyId');
 
 if (!name) {
     throw new Error("Nombre de la productora no encontrado en la URL");
@@ -20,246 +21,166 @@ const {
     movies,
     series,
     error
-} = await getMoviesAndSeriesByCompanyName(name, sortBy);
+} = await getMoviesAndSeriesByCompanyName(
+    name,
+    sortBy,
+    undefined,
+    companyIdParam ? parseInt(companyIdParam, 10) : undefined
+);
 
 if (!success) {
     throw new Error(error || "Error al obtener información de la productora");
 }
 
 const totalWorks = movies.length + series.length;
+const sortUrl = (sort: string) => companyIdParam ? `?sort=${sort}&companyId=${companyIdParam}` : `?sort=${sort}`;
 ---
 <Layout title={`${name}`}>
-    <div class="container mx-auto px-4 py-8">
-        <nav class="floating-nav">
-            <!-- Botón flecha para móviles -->
-            <input type="checkbox" id="nav-toggle2" class="nav-toggle2" />
-            <label for="nav-toggle2" class="nav-arrow-btn">
-                <svg class="arrow-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path class="arrow-path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                </svg>
-                <span class="nav-count total-count">{totalWorks}</span>
-            </label>
-            
-            <!-- Menú desplegable horizontal -->
-            <div class="nav-menu">
-                <a href="#peliculas" class="nav-btn nav-btn-movies">
-                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                    </svg>
-                    <span class="nav-text">Películas</span>
-                    <span class="nav-count">{movies.length}</span>
-                </a>
-                <a href="#series" class="nav-btn nav-btn-series">
-                    <svg class="nav-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                    </svg>
-                    <span class="nav-text">Series</span>
-                    <span class="nav-count">{series.length}</span>
-                </a>
-            </div>
-        </nav>
+    <section class="px-1 sm:py-8">
+        <!-- Header -->
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">{name}</h1>
+            <p class="text-gray-500 text-base">Productora · {totalWorks} producciones</p>
+        </header>
 
-        <!-- Header de la productora -->
-        <div class="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-8 mb-10 text-white shadow-lg">
-            <div class="flex flex-col md:flex-row items-center gap-6">
+        <!-- Info card -->
+        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
                 {companyInfo?.logo_path && (
-                <div class="w-36 h-36 bg-white flex items-center justify-center p-4 rounded-lg shadow">
-                    <img 
-                        src={`https://image.tmdb.org/t/p/w300${companyInfo.logo_path}`} 
-                        alt={name}
-                        class="max-w-full max-h-full object-contain"
-                    />
-                </div>
-
+                    <div class="w-28 h-28 bg-gray-50 flex items-center justify-center p-3 rounded-xl border border-gray-100 flex-shrink-0">
+                        <img
+                            src={posterUrl(companyInfo.logo_path, 'w300')}
+                            alt={name}
+                            class="max-w-full max-h-full object-contain"
+                            loading="lazy"
+                        />
+                    </div>
                 )}
-                <div class="text-center md:text-left">
-                    <h1 class="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-yellow-300 to-pink-400 mb-3">
-                        {name}
-                    </h1>
-                    <p class="text-lg md:text-xl font-medium text-indigo-200">Productora Cinematográfica</p>
-                    
-                    <div class="mt-4 space-y-2 text-indigo-100 text-sm md:text-base">
+                <div class="flex-1 text-center sm:text-left">
+                    <div class="flex flex-wrap justify-center sm:justify-start gap-1.5 text-xs sm:text-sm mb-3">
                         {companyInfo?.headquarters && (
-                            <p>
-                                <span class="font-semibold">Sede:</span> {companyInfo.headquarters}
-                            </p>
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{companyInfo.headquarters}</span>
                         )}
                         {companyInfo?.origin_country && (
-                            <p>
-                                <span class="font-semibold">País:</span> {companyInfo.origin_country}
-                            </p>
+                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{companyInfo.origin_country}</span>
                         )}
-                        <p>
-                            <span class="font-semibold">Producciones encontradas:</span> {totalWorks}
-                            ({movies.length} películas, {series.length} series)
-                        </p>
+                        <span class="px-2 py-0.5 bg-red-50 text-red-600 rounded-full">{movies.length} películas</span>
+                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{series.length} series</span>
+                        {companyInfo?.parent_company && (
+                            <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full">
+                                Parte de {companyInfo.parent_company.name}
+                            </span>
+                        )}
                     </div>
+
+                    {/* Descripción */}
+                    {companyInfo?.description && (
+                        <details class="text-sm">
+                            <summary class="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">
+                                Acerca de la productora
+                            </summary>
+                            <p class="mt-2 text-gray-600 leading-relaxed">{companyInfo.description}</p>
+                        </details>
+                    )}
                 </div>
             </div>
+        </div>
 
-            {companyInfo?.description && (
-                <div class="mt-8 bg-white/10 backdrop-blur-sm p-4 rounded-lg">
-                    <h3 class="text-lg font-semibold mb-2">Acerca de la Productora</h3>
-
-                    <input type="checkbox" id="toggleDescription" class="peer hidden" />
-
-                    <p class="text-indigo-50 leading-relaxed line-clamp-5 peer-checked:line-clamp-none transition-all">
-                        {companyInfo.description}
-                    </p>
-
-                    <label 
-                        for="toggleDescription" 
-                        class="mt-3 inline-block text-sm font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer"
-                    >
-                        Mostrar
-                    </label>
-                </div>
+        <!-- Navegación rápida -->
+        <div class="flex flex-wrap gap-2 mb-4">
+            {movies.length > 0 && (
+                <a href="#peliculas" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
+                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                    Películas ({movies.length})
+                </a>
+            )}
+            {series.length > 0 && (
+                <a href="#series" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
+                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                    Series ({series.length})
+                </a>
             )}
         </div>
 
-        <!-- Controles de ordenación -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <!-- Título -->
-            <h2 class="text-xl sm:text-2xl font-bold text-gray-800 text-center sm:text-left">
-                PRODUCCIONES ({totalWorks})
-            </h2>
-
-            <!-- Botones -->
-            <div class="flex flex-wrap justify-center sm:justify-end gap-3">
-                <a 
-                    href="?sort=quality"
-                    class={`px-4 py-2 rounded-full font-medium transition-all ${
-                        sortBy === 'quality'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                >
+        <!-- Ordenación -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+            <h2 class="text-lg font-semibold text-gray-800">Producciones ({totalWorks})</h2>
+            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
+                <a href={sortUrl('quality')}
+                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'quality' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
                     Mejor Valoradas
                 </a>
-                <a 
-                    href="?sort=popularity"
-                    class={`px-4 py-2 rounded-full font-medium transition-all ${
-                        sortBy === 'popularity'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                >
+                <a href={sortUrl('popularity')}
+                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'popularity' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
                     Más Populares
                 </a>
-                <a 
-                    href="?sort=date"
-                    class={`px-4 py-2 rounded-full font-medium transition-all ${
-                        sortBy === 'date'
-                            ? 'bg-indigo-600 text-white shadow-md'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                    }`}
-                >
+                <a href={sortUrl('date')}
+                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'date' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
                     Más Recientes
                 </a>
             </div>
         </div>
 
-        <!-- Sección de Películas -->
-        <section id="peliculas" class="mb-16 content-section scroll-mt-24">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
-                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                    </svg>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800">
-                    PELÍCULAS <span class="text-gray-500">({movies.length})</span>
-                </h2>
-                <div class="flex-grow h-0.5 bg-gradient-to-r from-indigo-500/80 to-transparent"></div>
-            </div>
+        <div class="space-y-10">
+            <!-- Películas -->
+            <section id="peliculas" class="scroll-mt-20">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                    Películas
+                    <span class="text-sm font-normal text-gray-400">({movies.length})</span>
+                </h3>
 
-            {movies.length === 0 ? (
-                <div class="empty-state">
-                    <div class="empty-state-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                                  d="M7 4v16M17 4v16M3 8h18M3 16h18"/>
-                        </svg>
+                {movies.length === 0 && (
+                    <div class="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
+                        <p class="text-gray-400">No se encontraron películas</p>
                     </div>
-                    <h3 class="empty-state-title">No se encontraron películas</h3>
-                    <p class="empty-state-description">{name} no tiene películas registradas en nuestra base de datos.</p>
-                </div>
-            ) : (
-                <div class="content-grid">
-                    {
-                        movies.map((item) => (
-                            <div class="card-wrapper">
-                                <CardMovie
-                                    id={item.id.toString()}
-                                    img={item.poster_path || "/placeholder.jpg"}
-                                    title={item.title}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    release_date={item.release_date}
-                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                />
-                            </div>
-                        ))
-                    }
-                </div>
-            )}
-        </section>
-
-        <!-- Sección de Series -->
-        <section id="series" class="mb-16 content-section scroll-mt-24">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="p-3 rounded-full bg-indigo-100 text-indigo-600">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24"
-                         stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                    </svg>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-800">
-                    SERIES <span class="text-gray-500">({series.length})</span>
-                </h2>
-                <div class="flex-grow h-0.5 bg-gradient-to-r from-indigo-500/80 to-transparent"></div>
-            </div>
-
-            {series.length === 0 ? (
-                <div class="empty-state">
-                    <div class="empty-state-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" fill="none" viewBox="0 0 24 24"
-                             stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1"
-                                  d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-                        </svg>
+                )}
+                {movies.length > 0 && (
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                        {movies.map((item) => (
+                            <CardMovie
+                                id={item.id.toString()}
+                                img={item.poster_path || "/placeholder.jpg"}
+                                title={item.title}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                release_date={item.release_date}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                            />
+                        ))}
                     </div>
-                    <h3 class="empty-state-title">No se encontraron series</h3>
-                    <p class="empty-state-description">{name} no tiene series registradas en nuestra base de datos.</p>
-                </div>
-            ) : (
-                <div class="content-grid">
-                    {
-                        series.map((item) => (
-                            <div class="card-wrapper">
-                                <CardSerie
-                                    id={item.id.toString()}
-                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
-                                    name={item.name}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    first_air_date={item.first_air_date}
-                                    seasons={item.seasons}
-                                    last_episode_to_air={item.last_episode_to_air}
-                                    next_episode_to_air={item.next_episode_to_air}
-                                    genres={item.genre_ids?.map((id: number) => ({id, name: getGenreName(id)}))}
-                                    character={item.character}
-                                />
-                            </div>
-                        ))
-                    }
-                </div>
-            )}
-        </section>
-    </div>
+                )}
+            </section>
+
+            <!-- Series -->
+            <section id="series" class="scroll-mt-20">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                    Series
+                    <span class="text-sm font-normal text-gray-400">({series.length})</span>
+                </h3>
+
+                {series.length === 0 && (
+                    <div class="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
+                        <p class="text-gray-400">No se encontraron series</p>
+                    </div>
+                )}
+                {series.length > 0 && (
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                        {series.map((item) => (
+                            <CardSerie
+                                id={item.id.toString()}
+                                img={item.poster_path || "/placeholder.jpg"}
+                                name={item.name}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                first_air_date={item.first_air_date}
+                                genres={item.genre_ids?.map((id: number) => ({id, name: getGenreName(id)}))}
+                            />
+                        ))}
+                    </div>
+                )}
+            </section>
+        </div>
+    </section>
 </Layout>

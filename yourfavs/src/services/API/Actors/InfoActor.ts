@@ -95,6 +95,36 @@ export interface ActorImage {
     width: number;
 }
 
+export interface TaggedImage {
+    file_path: string;
+    media: {
+        id: number;
+        title?: string;
+        name?: string;
+        poster_path?: string;
+    } | null;
+    media_type: string;
+}
+
+export const fetchTaggedImages = async (actorId: number | string): Promise<TaggedImage[]> => {
+    const numericId = typeof actorId === 'string' ? parseInt(actorId, 10) : actorId;
+    try {
+        const data = await tmdbFetch<{ results: any[] }>(`/person/${numericId}/tagged_images`, {
+            page: '1',
+        });
+        return (data.results || [])
+            .filter((img: any) => img.file_path && img.aspect_ratio > 1)
+            .slice(0, 20)
+            .map((img: any) => ({
+                file_path: originalUrl(img.file_path),
+                media: img.media ? { id: img.media.id, title: img.media.title, name: img.media.name, poster_path: img.media.poster_path } : null,
+                media_type: img.media_type || '',
+            }));
+    } catch {
+        return [];
+    }
+};
+
 export const fetchActorImages = async (
     actorId: number | string,
     language: string = "es-ES"

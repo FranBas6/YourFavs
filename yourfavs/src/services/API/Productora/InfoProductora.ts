@@ -4,7 +4,8 @@ import { tmdbFetch, posterUrl, backdropUrl } from '../shared/tmdbClient';
 export async function getMoviesAndSeriesByCompanyName(
     companyName: string,
     sortBy: string = "quality",
-    excludeId?: number
+    excludeId?: number,
+    knownCompanyId?: number
 ): Promise<{
     success: boolean;
     companyInfo?: any;
@@ -13,22 +14,27 @@ export async function getMoviesAndSeriesByCompanyName(
     error?: string;
 }> {
     try {
-        // 1. Buscar el ID de la productora
-        const searchData = await tmdbFetch<{ results: any[] }>('/search/company', {
-            query: encodeURIComponent(companyName),
-        });
+        // 1. Usar ID directo si lo tenemos, si no buscar por nombre
+        let companyId = knownCompanyId;
 
-        if (!searchData.results.length) {
-            return { success: false, movies: [], series: [], error: `No se encontró la productora "${companyName}"` };
+        if (!companyId) {
+            const searchData = await tmdbFetch<{ results: any[] }>('/search/company', {
+                query: encodeURIComponent(companyName),
+            });
+
+            if (!searchData.results.length) {
+                return { success: false, movies: [], series: [], error: `No se encontró la productora "${companyName}"` };
+            }
+
+            companyId = searchData.results[0].id;
         }
 
-        const companyId = searchData.results[0].id;
-
         // 2. Info de la productora + películas + series en paralelo
+        const resolvedId = companyId as number;
         const [companyInfo, moviesData, seriesData] = await Promise.all([
-            tmdbFetch<any>(`/company/${companyId}`).catch(() => null),
-            fetchAllPages(companyId, 'movie', 10),
-            fetchAllPages(companyId, 'tv', 10),
+            tmdbFetch<any>(`/company/${resolvedId}`).catch(() => null),
+            fetchAllPages(resolvedId, 'movie', 10),
+            fetchAllPages(resolvedId, 'tv', 10),
         ]);
 
         const calculateScore = (item: any, type: "movie" | "tv"): number => {
@@ -42,7 +48,7 @@ export async function getMoviesAndSeriesByCompanyName(
 
         const filterAndSort = (items: any[], type: "movie" | "tv") =>
             items
-                .filter((item: any) => item.poster_path && item.vote_average > 0 && item.vote_count > 5 && (!excludeId || item.id !== excludeId))
+                .filter((item: any) => item.poster_path && item.vote_average > 0 && item.vote_count > 1 && (!excludeId || item.id !== excludeId))
                 .sort((a: any, b: any) => calculateScore(b, type) - calculateScore(a, type));
 
         const movies: Movie[] = filterAndSort(moviesData, "movie").map((movie: any) => ({

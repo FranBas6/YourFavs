@@ -480,5 +480,105 @@ const removeDuplicatesAndCalculateScores = (recommendations: RecommendedSeries[]
     return Array.from(uniqueMap.values());
 };
 
+// === Watched Episodes ===
+
+interface WatchedEpisode {
+    season: number;
+    episode: number;
+    watched_at: string;
+}
+
+interface WatchedProgress {
+    id: string;
+    watched_episodes: WatchedEpisode[];
+    last_watched: WatchedEpisode | null;
+}
+
+export type { WatchedProgress, WatchedEpisode };
+
+export async function getWatchedProgress(serieId: string): Promise<WatchedProgress | null> {
+    try {
+        const snap = await getDoc(doc(db, 'WatchedEpisodes', serieId));
+        if (!snap.exists()) return null;
+        return snap.data() as WatchedProgress;
+    } catch (error) {
+        console.error('Error al obtener progreso:', error);
+        return null;
+    }
+}
+
+export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
+    const ref = doc(db, 'WatchedEpisodes', serieId);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) {
+        // Primer episodio marcado — crear documento
+        const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
+        await setDoc(ref, {
+            id: serieId,
+            watched_episodes: [ep],
+            last_watched: ep,
+        });
+        return;
+    }
+
+    const data = snap.data() as WatchedProgress;
+    const episodes = data.watched_episodes || [];
+    const idx = episodes.findIndex(e => e.season === season && e.episode === episode);
+
+    if (idx >= 0) {
+        // Ya visto — quitar
+        episodes.splice(idx, 1);
+        await updateDoc(ref, {
+            watched_episodes: episodes,
+            last_watched: episodes.length > 0 ? episodes[episodes.length - 1] : null,
+        });
+    } else {
+        // No visto — añadir
+        const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
+        episodes.push(ep);
+        await updateDoc(ref, {
+            watched_episodes: episodes,
+            last_watched: ep,
+        });
+    }
+}
+
+export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
+    const ref = doc(db, 'WatchedEpisodes', serieId);
+    const snap = await getDoc(ref);
+    const now = new Date().toISOString();
+
+    const newEpisodes: WatchedEpisode[] = episodeNumbers.map(ep => ({ season, episode: ep, watched_at: now }));
+
+    if (!snap.exists()) {
+        const last = newEpisodes[newEpisodes.length - 1];
+        await setDoc(ref, { id: serieId, watched_episodes: newEpisodes, last_watched: last });
+        return;
+    }
+
+    const data = snap.data() as WatchedProgress;
+    // Quitar episodios de esta temporada que ya estén y reemplazar con todos
+    const otherEpisodes = (data.watched_episodes || []).filter(e => e.season !== season);
+    const allEpisodes = [...otherEpisodes, ...newEpisodes];
+    await updateDoc(ref, {
+        watched_episodes: allEpisodes,
+        last_watched: allEpisodes[allEpisodes.length - 1],
+    });
+}
+
+export async function unmarkSeasonWatched(serieId: string, season: number): Promise<void> {
+    const ref = doc(db, 'WatchedEpisodes', serieId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const data = snap.data() as WatchedProgress;
+    const remaining = (data.watched_episodes || []).filter(e => e.season !== season);
+    await updateDoc(ref, {
+        watched_episodes: remaining,
+        last_watched: remaining.length > 0 ? remaining[remaining.length - 1] : null,
+    });
+}
+
 // Exportar db para que pueda ser utilizada por otros módulos si es necesario
 export {db};
