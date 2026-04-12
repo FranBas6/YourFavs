@@ -74,10 +74,11 @@ if (searchQuery) {
     filteredMovies = filteredMovies.filter((m: any) => m.title?.toLowerCase().includes(searchLower));
 }
 
-if (genreFilter) {
+const activeGenres = genreFilter ? genreFilter.split(',').filter(Boolean) : [];
+if (activeGenres.length > 0) {
     const matchesGenre = (item: any) => {
         const genres = item.genres || item.genre_ids?.map((id: number) => ({ name: getGenreName(id) })) || [];
-        return genres.some((g: any) => g.name === genreFilter);
+        return activeGenres.some((ag: string) => genres.some((g: any) => g.name === ag));
     };
     filteredSeries = filteredSeries.filter(matchesGenre);
     filteredMovies = filteredMovies.filter(matchesGenre);

@@ -36,7 +36,7 @@ const isTrending = vote_average >= 8.0;
 
 // Calcular info de temporadas/episodios
 const totalSeasons = seasons?.filter((s: any) => s.season_number > 0).length || 0;
-const totalEpisodes = seasons?.reduce((sum: number, s: any) => sum + (s.episode_count || 0), 0) || 0;
+const totalEpisodes = seasons?.filter((s: any) => s.season_number > 0).reduce((sum: number, s: any) => sum + (s.episode_count || 0), 0) || 0;
 const isMiniSerie = totalSeasons === 1;
 
 // Periodo de emisión

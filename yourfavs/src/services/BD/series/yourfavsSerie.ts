@@ -580,6 +580,19 @@ export async function unmarkSeasonWatched(serieId: string, season: number): Prom
     });
 }
 
+export async function markAllWatched(serieId: string, allEpisodes: { season: number; episode: number }[]): Promise<void> {
+    const ref = doc(db, 'WatchedEpisodes', serieId);
+    const now = new Date().toISOString();
+    const episodes: WatchedEpisode[] = allEpisodes.map(e => ({ season: e.season, episode: e.episode, watched_at: now }));
+    const last = episodes[episodes.length - 1];
+    await setDoc(ref, { id: serieId, watched_episodes: episodes, last_watched: last });
+}
+
+export async function unmarkAllWatched(serieId: string): Promise<void> {
+    const ref = doc(db, 'WatchedEpisodes', serieId);
+    await deleteDoc(ref);
+}
+
 export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number }>> {
     if (serieIds.length === 0) return {};
     const results = await Promise.all(

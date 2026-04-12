@@ -17,8 +17,17 @@ const typeFilters = [
     { key: 'peliculas', label: 'Películas', icon: 'M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z' },
 ];
 
-const hasActiveFilters = searchQuery || genreFilter || filter !== 'todos';
-const activeCount = [searchQuery ? 1 : 0, genreFilter ? 1 : 0, filter !== 'todos' ? 1 : 0].reduce((a, b) => a + b, 0);
+// Soporte multi-género: "Acción,Drama" → ["Acción", "Drama"]
+const activeGenres = genreFilter ? genreFilter.split(',').filter(Boolean) : [];
+const toggleGenre = (genre: string) => {
+    if (activeGenres.includes(genre)) {
+        return activeGenres.filter(g => g !== genre).join(',');
+    }
+    return [...activeGenres, genre].join(',');
+};
+
+const hasActiveFilters = searchQuery || activeGenres.length > 0 || filter !== 'todos';
+const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + (filter !== 'todos' ? 1 : 0);
 ---
 <details class="group relative" open={hasActiveFilters ? true : undefined}>
     <summary class="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-all text-sm font-medium text-gray-600 whitespace-nowrap">
@@ -65,22 +74,22 @@ const activeCount = [searchQuery ? 1 : 0, genreFilter ? 1 : 0, filter !== 'todos
             />
         </form>
 
-        <!-- Géneros -->
+        <!-- Géneros (multi-selección) -->
         {availableGenres.length > 0 && (
             <div>
-                <p class="text-xs text-gray-400 mb-2">Género</p>
+                <p class="text-xs text-gray-400 mb-2">Géneros {activeGenres.length > 0 && `(${activeGenres.length})`}</p>
                 <div class="flex flex-wrap gap-1.5">
                     <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: '' })}
                        class={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border
-                           ${!genreFilter
+                           ${activeGenres.length === 0
                                ? 'bg-gray-800 text-white border-gray-800'
                                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
                         Todos
                     </a>
                     {availableGenres.map(genre => (
-                        <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre })}
+                        <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: toggleGenre(genre) })}
                            class={`px-2.5 py-1 rounded-full text-xs font-medium transition-all border
-                               ${genreFilter === genre
+                               ${activeGenres.includes(genre)
                                    ? 'bg-gray-800 text-white border-gray-800'
                                    : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
                             {genre}

@@ -6,7 +6,7 @@ import {
 } from "../../utils/constants/helpers/media-helpers";
 import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
 import type { GuestStar } from "../../types/Media";
-import {handleSerieFavAction, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched} from "../../services/BD/series/yourfavsSerie";
+import {handleSerieFavAction, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/BD/series/yourfavsSerie";
 import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/pages/serie/serie.css';
 import {
@@ -39,6 +39,20 @@ if (Astro.request.method === 'POST') {
             const season = Number(formData.get('season'));
             const episode = Number(formData.get('episode'));
             await toggleWatchedEpisode(id, season, episode);
+            return Astro.redirect(`/serie/${id}`);
+        }
+        if (actionType === 'watched_all') {
+            const allEpisodesStr = String(formData.get('allEpisodes'));
+            const action = String(formData.get('action'));
+            if (action === 'mark') {
+                const episodes = allEpisodesStr.split(';').map(e => {
+                    const [s, ep] = e.split('-').map(Number);
+                    return { season: s, episode: ep };
+                });
+                await markAllWatched(id, episodes);
+            } else {
+                await unmarkAllWatched(id);
+            }
             return Astro.redirect(`/serie/${id}`);
         }
         if (actionType === 'watched_season') {
@@ -132,6 +146,20 @@ if (watchedProgress?.watched_episodes) {
     }
 }
 const totalWatchedEpisodes = watchedSet.size;
+
+// Todos los episodios regulares para "marcar todo"
+const allRegularEpisodesFlat: { season: number; episode: number }[] = [];
+if (item?.seasons) {
+    for (const season of item.seasons) {
+        if (season.season_number === 0) continue;
+        const eps = allSeasonEpisodes[season.season_number] || [];
+        for (const ep of eps) {
+            allRegularEpisodesFlat.push({ season: season.season_number, episode: ep.episode_number });
+        }
+    }
+}
+const allEpisodesStr = allRegularEpisodesFlat.map(e => `${e.season}-${e.episode}`).join(';');
+const isAllWatched = allRegularEpisodesFlat.length > 0 && totalWatchedEpisodes >= allRegularEpisodesFlat.length;
 
 // Comprobar si existen los documentos
 const existingInFavs = docSnapFavs.exists();
@@ -663,19 +691,24 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
 
                     <!-- Temporadas con acordeón -->
                     <div class="bg-white rounded-xl border border-gray-200 p-5">
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                        <div class="flex items-center justify-between gap-3 mb-2">
                             <h2 class="text-xl font-semibold text-gray-800">Temporadas y Episodios</h2>
-                            <div class="flex items-center gap-3">
-                                {totalWatchedEpisodes > 0 && (
-                                    <span class="text-sm font-medium text-green-600 bg-green-50 px-3 py-1 rounded-full">
-                                        {totalWatchedEpisodes}/{totalRegularEpisodes} vistos ({Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)}%)
-                                    </span>
-                                )}
-                                <span class="text-sm text-gray-500 bg-gray-50 px-3 py-1 rounded-full">
-                                    {regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios
-                                    {hasSpecialSeasons && ` • ${specialSeasonsCount} especiales`}
-                                </span>
-                            </div>
+                            {allRegularEpisodesFlat.length > 0 && (
+                                <form method="POST" class="flex-shrink-0">
+                                    <input type="hidden" name="actionType" value="watched_all" />
+                                    <input type="hidden" name="allEpisodes" value={allEpisodesStr} />
+                                    <input type="hidden" name="action" value={isAllWatched ? 'unmark' : 'mark'} />
+                                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${isAllWatched ? 'bg-green-500 text-white hover:bg-green-600' : 'border border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-600'}`}>
+                                        {isAllWatched ? 'Desmarcar todo' : 'Marcar todo'}
+                                    </button>
+                                </form>
+                            )}
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 mb-4">
+                            <span class="text-sm text-gray-500">{regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios{hasSpecialSeasons ? ` • ${specialSeasonsCount} especiales` : ''}</span>
+                            {totalWatchedEpisodes > 0 && (
+                                <span class="text-sm font-medium text-green-600">• {totalWatchedEpisodes}/{totalRegularEpisodes} vistos ({Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)}%)</span>
+                            )}
                         </div>
                         {/* Barra de progreso global */}
                         {totalWatchedEpisodes > 0 && (
@@ -752,7 +785,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                                         </div>
                                                     )}
 
-                                                    <p class="text-sm text-gray-600 leading-relaxed">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
+                                                    <p class="text-sm text-gray-600 leading-relaxed season-overview">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
                                                 </div>
                                             </div>
                                         </summary>
