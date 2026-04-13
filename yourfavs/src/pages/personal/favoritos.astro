@@ -10,6 +10,8 @@ import {getGenreName} from "../../utils/constants/genres";
 import {processBatch} from "../../utils/processBatch";
 import {calculateStats} from "../../utils/calculateStats";
 import {buildUrl} from "../../utils/buildUrl";
+import {tmdbFetch} from "../../services/API/shared/tmdbClient";
+import {mapAndDeduplicateProviders} from "../../services/API/shared/tmdbInfoService";
 import StatsPanel from "../../components/personal/StatsPanel.astro";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import PersonalFilter from "../../components/personal/PersonalFilter.astro";
@@ -26,6 +28,7 @@ let moviesData: any[] = [];
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const searchQuery = Astro.url.searchParams.get("search") || "";
 const genreFilter = Astro.url.searchParams.get("genre") || "";
+const platformFilter = Astro.url.searchParams.get("platforms") || "";
 const showSeries = filter === "series" || filter === "todos";
 const showMovies = filter === "peliculas" || filter === "todos";
 const showAll = filter === "todos";
@@ -84,6 +87,35 @@ if (activeGenres.length > 0) {
     filteredMovies = filteredMovies.filter(matchesGenre);
 }
 
+// Filtrar por plataforma (solo si hay filtro activo, para evitar API calls innecesarias)
+const activePlatformIds = platformFilter ? platformFilter.split(',').map(Number).filter(Boolean) : [];
+if (activePlatformIds.length > 0) {
+    const [seriesProviders, movieProviders] = await Promise.all([
+        processBatch(filteredSeries.map((s: any) => s.id), async (id: number) => {
+            try {
+                const data = await tmdbFetch<{ results: any }>(`/tv/${id}/watch/providers`, {});
+                return { id, providers: mapAndDeduplicateProviders(data.results?.ES || {}) };
+            } catch { return { id, providers: [] }; }
+        }, 10),
+        processBatch(filteredMovies.map((m: any) => m.id), async (id: number) => {
+            try {
+                const data = await tmdbFetch<{ results: any }>(`/movie/${id}/watch/providers`, {});
+                return { id, providers: mapAndDeduplicateProviders(data.results?.ES || {}) };
+            } catch { return { id, providers: [] }; }
+        }, 10)
+    ]);
+    const seriesProvMap = new Map(seriesProviders.map((p: any) => [p.id, p.providers]));
+    const movieProvMap = new Map(movieProviders.map((p: any) => [p.id, p.providers]));
+    filteredSeries = filteredSeries.filter((s: any) => {
+        const provs = seriesProvMap.get(s.id) || [];
+        return provs.some((p: any) => activePlatformIds.includes(p.provider_id));
+    });
+    filteredMovies = filteredMovies.filter((m: any) => {
+        const provs = movieProvMap.get(m.id) || [];
+        return provs.some((p: any) => activePlatformIds.includes(p.provider_id));
+    });
+}
+
 const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
 const moviesItemsToShow = moviesPage * ITEMS_PER_PAGE;
 
@@ -131,7 +163,7 @@ const topSerieName = topWatchedEntry ? seriesFavoritas.find((s: any) => String(s
             <div class="flex-1 min-w-0">
                 <PersonalNav currentPage="/personal/favoritos" />
             </div>
-            <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} availableGenres={availableGenres} />
+            <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} />
         </div>
         <StatsPanel stats={stats} />
 
@@ -143,12 +175,12 @@ const topSerieName = topWatchedEntry ? seriesFavoritas.find((s: any) => String(s
                         <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
                             <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
                             Series
-                            <span class="text-sm font-normal text-gray-400">({filteredSeries.length})</span>
+                            <span class="text-sm font-normal text-gray-4000">({filteredSeries.length})</span>
                         </h2>
                     </div>
 
                     {seriesPaginadas.length === 0 && (
-                        <div class="text-center py-10 text-gray-400">
+                        <div class="text-center py-10 text-gray-4000">
                             <p>Aún no tienes series en esta colección</p>
                         </div>
                     )}
@@ -178,7 +210,7 @@ const topSerieName = topWatchedEntry ? seriesFavoritas.find((s: any) => String(s
                     {hasMoreSeries && (
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter,
+                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
                                     seriesPage: Math.ceil(filteredSeries.length / ITEMS_PER_PAGE).toString(),
                                     moviesPage: moviesPage.toString()
                                 }) + '#series-section'}
@@ -200,12 +232,12 @@ const topSerieName = topWatchedEntry ? seriesFavoritas.find((s: any) => String(s
                         <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
                             <span class="w-1 h-6 bg-red-500 rounded-full"></span>
                             Películas
-                            <span class="text-sm font-normal text-gray-400">({filteredMovies.length})</span>
+                            <span class="text-sm font-normal text-gray-4000">({filteredMovies.length})</span>
                         </h2>
                     </div>
 
                     {peliculasPaginadas.length === 0 && (
-                        <div class="text-center py-10 text-gray-400">
+                        <div class="text-center py-10 text-gray-4000">
                             <p>Aún no tienes películas en esta colección</p>
                         </div>
                     )}
@@ -227,7 +259,7 @@ const topSerieName = topWatchedEntry ? seriesFavoritas.find((s: any) => String(s
                     {hasMoreMovies && (
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter,
+                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
                                     seriesPage: seriesPage.toString(),
                                     moviesPage: Math.ceil(filteredMovies.length / ITEMS_PER_PAGE).toString()
                                 }) + '#movies-section'}

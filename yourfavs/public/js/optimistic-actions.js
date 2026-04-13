@@ -105,6 +105,58 @@ function handleWatchedSeasonForm(form) {
     });
 }
 
+function handleNotificationForm(form) {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        if (!btn || btn.classList.contains('is-submitting')) return;
+        btn.classList.add('is-submitting');
+        var formData = new FormData(form);
+        var action = formData.get('action');
+
+        // Toggle visual
+        if (action === 'add') {
+            btn.classList.remove('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
+            btn.classList.add('bg-amber-500', 'text-white', 'hover:bg-amber-600');
+        } else {
+            btn.classList.remove('bg-amber-500', 'text-white', 'hover:bg-amber-600');
+            btn.classList.add('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
+        }
+
+        var actionInput = form.querySelector('input[name="action"]');
+        if (actionInput) actionInput.value = (action === 'add') ? 'remove' : 'add';
+
+        fetch(window.location.pathname, { method: 'POST', body: formData })
+            .then(function (res) {
+                if (res.ok || res.redirected) {
+                    showToast(action === 'add' ? 'Notificación activada' : 'Notificación desactivada', 'success');
+                } else { throw new Error(); }
+            })
+            .catch(function () { showToast('Error al guardar', 'error'); })
+            .finally(function () { btn.classList.remove('is-submitting'); });
+    });
+}
+
+function handleWatchedAllForm(form) {
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        if (!btn || btn.classList.contains('is-submitting')) return;
+        btn.classList.add('is-submitting');
+        var formData = new FormData(form);
+        var action = formData.get('action');
+        fetch(window.location.pathname, { method: 'POST', body: formData })
+            .then(function (res) {
+                if (res.ok || res.redirected) {
+                    showToast(action === 'mark' ? 'Toda la serie marcada como vista' : 'Serie desmarcada', 'success');
+                    setTimeout(function () { window.location.reload(); }, 500);
+                } else { throw new Error(); }
+            })
+            .catch(function () { showToast('Error al guardar', 'error'); })
+            .finally(function () { btn.classList.remove('is-submitting'); });
+    });
+}
+
 function initOptimisticActions() {
     document.querySelectorAll('form[method="POST"]').forEach(function (form) {
         if (form.querySelector('textarea') || form.dataset.optimistic) return;
@@ -117,6 +169,14 @@ function initOptimisticActions() {
         }
         if (actionType && actionType.value === 'watched_season') {
             handleWatchedSeasonForm(form);
+            return;
+        }
+        if (actionType && actionType.value === 'watched_all') {
+            handleWatchedAllForm(form);
+            return;
+        }
+        if (actionType && actionType.value === 'notification') {
+            handleNotificationForm(form);
             return;
         }
 

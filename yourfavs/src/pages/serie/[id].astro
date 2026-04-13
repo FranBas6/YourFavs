@@ -19,6 +19,8 @@ import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmd
 import {initializeApp} from "firebase/app";
 import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
+import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
+import NotificationBell from "../../components/personal/NotificationBell.astro";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -63,6 +65,17 @@ if (Astro.request.method === 'POST') {
                 await markSeasonWatched(id, season, episodeNumbers);
             } else {
                 await unmarkSeasonWatched(id, season);
+            }
+            return Astro.redirect(`/serie/${id}`);
+        }
+
+        if (actionType === 'notification') {
+            const action = String(formData.get('action'));
+            const tmdbId = String(formData.get('tmdb_id'));
+            if (action === 'add') {
+                await addNotificationSub('tv', tmdbId);
+            } else {
+                await removeNotificationSub('tv', tmdbId);
             }
             return Astro.redirect(`/serie/${id}`);
         }
@@ -175,6 +188,10 @@ const isInPendientes = existingInPendientes;
 const isInVistas = existingInVistas;
 const isInSiguiendo = existingInSiguiendo;
 const isInLiked = existingInLiked;
+
+// Verificar suscripción de notificación
+const notifSub = await getNotificationSub('tv', id);
+const isNotifSubscribed = !!notifSub;
 const isInVerPronto = existingInVerPronto;
 
 // Resolver opinión actual si existe en cualquier colección
@@ -382,9 +399,10 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                     </button>
                 </form>
                 <div class="ml-auto flex items-center gap-2">
+                    <NotificationBell mediaType="tv" tmdbId={id} isSubscribed={isNotifSubscribed} />
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="liked"/>
-                        <button type="submit" class={`p-1.5 rounded-full transition-colors ${isInLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}>
+                        <button type="submit" class={`p-1.5 rounded-full transition-colors ${isInLiked ? 'text-red-500' : 'text-gray-4000 hover:text-red-400'}`}>
                             <svg class="w-5 h-5" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
                         </button>
                     </form>
@@ -425,6 +443,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                     </form>
                 </div>
                 <div class="flex gap-2">
+                    <NotificationBell mediaType="tv" tmdbId={id} isSubscribed={isNotifSubscribed} />
                     <form method="POST" class="flex-1"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="liked"/>
                         <button type="submit" class={`w-full px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInLiked ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-gray-200 text-gray-500'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
@@ -459,7 +478,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                             <li class="flex justify-between"><span class="text-gray-500">Emisión</span><span class="text-gray-800 font-medium">{yearsActive}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Temporadas</span><span class="text-gray-800 font-medium">{regularSeasonsCount}{hasSpecialSeasons ? ` + ${specialSeasonsCount} especiales` : ''}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="text-gray-800 font-medium">{totalRegularEpisodes}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-4000 text-xs">({item?.vote_count})</span></span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
                             {item?.original_name && item.original_name !== item.name && (
@@ -489,7 +508,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                             <div class="space-y-3">
                                 {providersByType.flatrate && (
                                     <div>
-                                        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Suscripción</p>
+                                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">Suscripción</p>
                                         <div class="space-y-1.5">
                                             {providersByType.flatrate.map((p) => (
                                                 <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
@@ -502,7 +521,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                 )}
                                 {providersByType.rent && (
                                     <div>
-                                        <p class="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Alquiler</p>
+                                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">Alquiler</p>
                                         <div class="space-y-1.5">
                                             {providersByType.rent.map((p) => (
                                                 <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
@@ -561,7 +580,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                             <details class="bg-white rounded-xl border border-gray-200 sm:hidden">
                                 <summary class="p-4 cursor-pointer flex items-center justify-between">
                                     <h3 class="text-base font-semibold text-gray-800">Tags ({serieKeywords.length})</h3>
-                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                    <svg class="w-4 h-4 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                 </summary>
                                 <div class="px-4 pb-4 flex flex-wrap gap-1.5">
                                     {serieKeywords.map((kw) => (
@@ -624,7 +643,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                         <details class="bg-white rounded-xl border border-gray-200">
                             <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
                                 <span>Videos extras ({clips.length + behindScenes.length + teasers.length})</span>
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </summary>
                             <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {[...clips.slice(0, 4), ...behindScenes.slice(0, 4), ...teasers.slice(0, 4)].map((video) => (
@@ -822,7 +841,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                                                 <input type="hidden" name="actionType" value="watched_episode" />
                                                                 <input type="hidden" name="season" value={season.season_number} />
                                                                 <input type="hidden" name="episode" value={episode.episode_number} />
-                                                                <button type="submit" class={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md transition-all duration-200 whitespace-nowrap ${isWatched ? 'bg-green-500 text-white hover:bg-green-600' : 'border border-gray-300 text-gray-400 hover:border-green-400 hover:text-green-600'}`}>
+                                                                <button type="submit" class={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md transition-all duration-200 whitespace-nowrap ${isWatched ? 'bg-green-500 text-white hover:bg-green-600' : 'border border-gray-300 text-gray-4000 hover:border-green-400 hover:text-green-600'}`}>
                                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                                     </svg>
@@ -878,7 +897,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                         <details class="bg-white rounded-xl border border-gray-200">
                             <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
                                 <span>Pósters ({posters.length})</span>
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </summary>
                             <div class="px-5 pb-5 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                                 {posters.map((poster, index) => (
@@ -901,7 +920,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                             <img src={posterUrl(actor.profile_path, 'w185')} alt={actor.name} class="w-14 h-14 rounded-full object-cover flex-shrink-0" loading="lazy" />
                                         ) : (
                                             <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                                <svg class="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                                                <svg class="w-6 h-6 text-gray-4000" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
                                             </div>
                                         )}
                                         <div class="min-w-0">
@@ -939,7 +958,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                         {company.logo_path ? (
                                             <img src={posterUrl(company.logo_path, 'w200')} alt={company.name} class="h-10 object-contain" loading="lazy" />
                                         ) : (
-                                            <div class="h-10 flex items-center"><span class="text-xs text-gray-400">{company.name}</span></div>
+                                            <div class="h-10 flex items-center"><span class="text-xs text-gray-4000">{company.name}</span></div>
                                         )}
                                         <span class="text-xs text-gray-600 text-center truncate w-full">{company.name}</span>
                                     </a>
@@ -968,7 +987,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                                 )}
                                             </div>
                                             <p class="mt-2 text-sm font-medium text-gray-800 line-clamp-2">{serie.name}</p>
-                                            <p class="text-xs text-gray-400">{serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : ''}</p>
+                                            <p class="text-xs text-gray-4000">{serie.first_air_date ? new Date(serie.first_air_date).getFullYear() : ''}</p>
                                         </a>
                                     ))}
                                 </div>
@@ -981,20 +1000,23 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                         <details class="bg-white rounded-xl border border-gray-200">
                             <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
                                 <span>Opiniones de la comunidad ({reviews.length})</span>
-                                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </summary>
                             <div class="px-5 pb-5 space-y-4">
                                 {reviews.map((review) => (
-                                    <div class="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                                        <div class="flex items-center gap-2 mb-2">
-                                            <span class="text-sm font-medium text-gray-800">{review.author}</span>
-                                            {review.author_details?.rating && (
-                                                <span class="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded">{review.author_details.rating}/10</span>
-                                            )}
-                                            <span class="text-xs text-gray-400">{review.created_at ? new Date(review.created_at).toLocaleDateString('es-ES') : ''}</span>
-                                        </div>
-                                        <p class="text-sm text-gray-600 line-clamp-4 leading-relaxed">{review.content}</p>
-                                    </div>
+                                    <details class="border-b border-gray-100 pb-4 last:border-0 last:pb-0 group">
+                                        <summary class="cursor-pointer list-none">
+                                            <div class="flex items-center gap-2 mb-2">
+                                                <span class="text-sm font-medium text-gray-800">{review.author}</span>
+                                                {review.author_details?.rating && (
+                                                    <span class="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded">{review.author_details.rating}/10</span>
+                                                )}
+                                                <span class="text-xs text-gray-4000">{review.created_at ? new Date(review.created_at).toLocaleDateString('es-ES') : ''}</span>
+                                            </div>
+                                            <p class="text-sm text-gray-600 line-clamp-4 group-open:line-clamp-none leading-relaxed">{review.content}</p>
+                                            <span class="text-xs text-blue-500 mt-1 inline-block group-open:hidden">Leer más...</span>
+                                        </summary>
+                                    </details>
                                 ))}
                             </div>
                         </details>

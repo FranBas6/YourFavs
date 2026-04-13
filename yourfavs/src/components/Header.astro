@@ -57,6 +57,35 @@ function isActive(href: string): boolean {
                 </button>
             </form>
 
+            <!-- Calendario desktop: dropdown -->
+            <button class="header-calendar-btn" id="calendar-toggle-btn" aria-label="Abrir calendario de estrenos" title="Calendario de estrenos">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </button>
+            <div class="header-calendar-dropdown" id="calendar-dropdown" style="display:none;">
+                <div class="calendar-dropdown-header">
+                    <button id="cal-prev" class="cal-nav-btn" aria-label="Mes anterior">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span id="cal-month-title" class="cal-month-title"></span>
+                    <button id="cal-next" class="cal-nav-btn" aria-label="Mes siguiente">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+                <div class="cal-weekdays">
+                    <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                </div>
+                <div id="cal-grid" class="cal-grid"></div>
+                <div id="cal-day-detail" class="cal-day-detail" style="display:none;"></div>
+                <div id="cal-notifications" class="cal-notifications">
+                    <p class="cal-notif-title">Tus notificaciones</p>
+                    <div id="cal-notif-list" class="cal-notif-list">
+                        <p class="cal-notif-empty">Cargando...</p>
+                    </div>
+                </div>
+            </div>
+
             <button class="theme-toggle" aria-label="Cambiar tema">
                 <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                     <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
@@ -110,6 +139,14 @@ function isActive(href: string): boolean {
         ))}
     </nav>
 
+    <!-- Calendario mobile: link a página -->
+    <a href="/personal/calendario" class="mobile-nav-link" style="margin-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 0.75rem;">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+        Calendario
+    </a>
+
     <!-- Theme toggle mobile -->
     <div class="mobile-panel-footer">
         <button class="theme-toggle mobile-theme-toggle" aria-label="Cambiar tema">
@@ -150,5 +187,159 @@ function isActive(href: string): boolean {
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && panel.classList.contains('is-open')) closeMenu();
     });
+})();
+
+// Calendar dropdown
+(function () {
+    var calBtn = document.getElementById('calendar-toggle-btn');
+    var calDrop = document.getElementById('calendar-dropdown');
+    var calGrid = document.getElementById('cal-grid');
+    var calTitle = document.getElementById('cal-month-title');
+    var calPrev = document.getElementById('cal-prev');
+    var calNext = document.getElementById('cal-next');
+    var calDayDetail = document.getElementById('cal-day-detail');
+    var calNotifList = document.getElementById('cal-notif-list');
+    if (!calBtn || !calDrop) return;
+
+    var months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var now = new Date();
+    var curYear = now.getFullYear();
+    var curMonth = now.getMonth() + 1;
+    var calData = null;
+    var isOpen = false;
+
+    function toggle() {
+        isOpen = !isOpen;
+        calDrop.style.display = isOpen ? 'block' : 'none';
+        if (isOpen && !calData) loadMonth(curYear, curMonth);
+    }
+
+    calBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        toggle();
+    });
+
+    document.addEventListener('click', function (e) {
+        if (isOpen && !calDrop.contains(e.target) && e.target !== calBtn) {
+            isOpen = false;
+            calDrop.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && isOpen) { isOpen = false; calDrop.style.display = 'none'; }
+    });
+
+    calPrev.addEventListener('click', function () {
+        curMonth--; if (curMonth < 1) { curMonth = 12; curYear--; }
+        loadMonth(curYear, curMonth);
+    });
+    calNext.addEventListener('click', function () {
+        curMonth++; if (curMonth > 12) { curMonth = 1; curYear++; }
+        loadMonth(curYear, curMonth);
+    });
+
+    function loadMonth(y, m) {
+        calTitle.textContent = months[m - 1] + ' ' + y;
+        calGrid.innerHTML = '<p style="text-align:center;padding:1rem;color:#9CA3AF;font-size:12px;">Cargando...</p>';
+        calDayDetail.style.display = 'none';
+
+        var ym = y + '-' + String(m).padStart(2, '0');
+        fetch('/api/calendar/' + ym)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                calData = data;
+                renderGrid(data);
+                renderNotifications(data);
+            })
+            .catch(function () {
+                calGrid.innerHTML = '<p style="text-align:center;padding:1rem;color:#EF4444;font-size:12px;">Error al cargar</p>';
+            });
+    }
+
+    function renderGrid(data) {
+        var daysInMonth = new Date(data.year, data.month, 0).getDate();
+        var firstDay = (new Date(data.year, data.month - 1, 1).getDay() + 6) % 7;
+        var eventsMap = {};
+        (data.days || []).forEach(function (d) { eventsMap[d.date] = d.events; });
+
+        var html = '';
+        for (var i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-empty"></div>';
+
+        for (var d = 1; d <= daysInMonth; d++) {
+            var dateStr = data.year + '-' + String(data.month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            var events = eventsMap[dateStr] || [];
+            var isToday = dateStr === data.today;
+            var cls = 'cal-cell' + (isToday ? ' cal-today' : '') + (events.length ? ' cal-has-events' : '');
+            html += '<div class="' + cls + '" data-date="' + dateStr + '">';
+            html += '<span class="cal-day-num">' + d + '</span>';
+            if (events.length) {
+                html += '<div class="cal-dots">';
+                var hasMovie = events.some(function (e) { return e.media_type === 'movie'; });
+                var hasSerie = events.some(function (e) { return e.event_type === 'episode'; });
+                var hasSeason = events.some(function (e) { return e.event_type === 'season_premiere'; });
+                if (hasMovie) html += '<span class="cal-dot cal-dot-movie"></span>';
+                if (hasSerie) html += '<span class="cal-dot cal-dot-serie"></span>';
+                if (hasSeason) html += '<span class="cal-dot cal-dot-season"></span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        calGrid.innerHTML = html;
+
+        // Day click handler
+        calGrid.querySelectorAll('.cal-has-events').forEach(function (cell) {
+            cell.addEventListener('click', function () {
+                var date = cell.getAttribute('data-date');
+                var events = eventsMap[date] || [];
+                showDayDetail(date, events);
+            });
+        });
+    }
+
+    function showDayDetail(date, events) {
+        var d = new Date(date + 'T12:00:00');
+        var dayName = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+        var html = '<div class="cal-detail-header"><span>' + dayName + '</span><button id="cal-detail-close" class="cal-detail-close">&times;</button></div>';
+        events.forEach(function (ev) {
+            var typeClass = ev.media_type === 'movie' ? 'cal-ev-movie' : (ev.event_type === 'season_premiere' ? 'cal-ev-season' : 'cal-ev-serie');
+            var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
+            html += '<a href="' + link + '" class="cal-event ' + typeClass + '">';
+            if (ev.poster_path) html += '<img src="' + ev.poster_path + '" alt="" class="cal-ev-poster"/>';
+            html += '<div class="cal-ev-info"><span class="cal-ev-title">' + ev.title + '</span><span class="cal-ev-label">' + ev.label + '</span></div></a>';
+        });
+        calDayDetail.innerHTML = html;
+        calDayDetail.style.display = 'block';
+        document.getElementById('cal-detail-close').addEventListener('click', function () { calDayDetail.style.display = 'none'; });
+    }
+
+    function renderNotifications(data) {
+        var subs = [];
+        (data.days || []).forEach(function (d) {
+            d.events.forEach(function (ev) {
+                if (ev.is_subscribed) subs.push({ date: d.date, event: ev });
+            });
+        });
+        if (subs.length === 0) {
+            calNotifList.innerHTML = '<p class="cal-notif-empty">No hay notificaciones este mes</p>';
+            return;
+        }
+        var html = '';
+        subs.forEach(function (s) {
+            var link = s.event.media_type === 'movie' ? '/movie/' + s.event.tmdb_id : '/serie/' + s.event.tmdb_id;
+            var dateLabel = new Date(s.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            html += '<a href="' + link + '" class="cal-notif-item">';
+            if (s.event.poster_path) {
+                html += '<img src="' + s.event.poster_path + '" alt="" class="cal-notif-poster"/>';
+            } else {
+                html += '<div class="cal-notif-poster-empty">?</div>';
+            }
+            html += '<div class="cal-notif-body">';
+            html += '<div class="cal-notif-top"><span class="cal-notif-name">' + s.event.title + '</span><span class="cal-notif-date">' + dateLabel + '</span></div>';
+            html += '<span class="cal-notif-label">' + s.event.label + '</span>';
+            html += '</div></a>';
+        });
+        calNotifList.innerHTML = html;
+    }
 })();
 </script>

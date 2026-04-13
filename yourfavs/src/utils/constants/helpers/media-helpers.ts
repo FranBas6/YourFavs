@@ -136,7 +136,12 @@ export function formatTrailerUrl(url: string): string {
         videoId = url.split('youtu.be/')[1].split('?')[0];
     }
 
-    return videoId ? `https://www.youtube.com/embed/${videoId}` : url;
+    if (videoId) return `https://www.youtube.com/embed/${videoId}`;
+    // Bare YouTube video ID (e.g. "dQw4w9WgXcQ" from TMDB video.key)
+    if (/^[\w-]+$/.test(url) && !url.includes('/') && !url.includes('.')) {
+        return `https://www.youtube.com/embed/${url}`;
+    }
+    return url;
 }
 
 export const providerLinks: Record<string, string> = {

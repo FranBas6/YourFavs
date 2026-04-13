@@ -1,0 +1,270 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import { getCalendarData } from "../../services/API/Calendar/calendarService";
+import type { CalendarEvent } from "../../services/API/Calendar/calendarService";
+
+const now = new Date();
+const year = parseInt(Astro.url.searchParams.get("year") || String(now.getFullYear()));
+const month = parseInt(Astro.url.searchParams.get("month") || String(now.getMonth() + 1));
+
+let calendarData;
+let errorMessage = "";
+
+try {
+    calendarData = await getCalendarData(year, month);
+} catch (error) {
+    console.error("Error al cargar calendario:", error);
+    errorMessage = error instanceof Error ? error.message : "Error al cargar el calendario";
+}
+
+const today = calendarData?.today || new Date().toISOString().slice(0, 10);
+const daysInMonth = new Date(year, month, 0).getDate();
+const firstDayOfWeek = (new Date(year, month - 1, 1).getDay() + 6) % 7; // Lunes=0
+
+// Crear grid del calendario
+const calendarCells: { day: number | null; date: string; events: CalendarEvent[] }[] = [];
+
+// Celdas vacías antes del primer día
+for (let i = 0; i < firstDayOfWeek; i++) {
+    calendarCells.push({ day: null, date: '', events: [] });
+}
+
+// Días del mes
+const eventsMap = new Map<string, CalendarEvent[]>();
+if (calendarData?.days) {
+    for (const d of calendarData.days) {
+        eventsMap.set(d.date, d.events);
+    }
+}
+
+for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    calendarCells.push({
+        day: d,
+        date: dateStr,
+        events: eventsMap.get(dateStr) || [],
+    });
+}
+
+// Navegación meses
+const prevMonth = month === 1 ? 12 : month - 1;
+const prevYear = month === 1 ? year - 1 : year;
+const nextMonth = month === 12 ? 1 : month + 1;
+const nextYear = month === 12 ? year + 1 : year;
+
+const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+
+// Solo eventos suscritos (notificaciones del usuario)
+const subscribedEvents = calendarData?.days?.flatMap(d =>
+    d.events.filter(e => e.is_subscribed).map(e => ({ ...e, date: d.date }))
+) || [];
+---
+<Layout title="Calendario de Estrenos">
+    <section class="px-1 sm:py-8">
+        {errorMessage && (
+            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
+                {errorMessage}
+            </div>
+        )}
+
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Calendario</h1>
+            <p class="text-gray-500 text-base">Estrenos de películas y episodios de tus series</p>
+        </header>
+
+        <!-- Calendario -->
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
+            <!-- Header del mes -->
+            <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
+                <a href={`/personal/calendario?year=${prevYear}&month=${prevMonth}`}
+                   class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <h2 class="text-lg sm:text-xl font-semibold text-gray-800">
+                    {monthNames[month - 1]} {year}
+                </h2>
+                <a href={`/personal/calendario?year=${nextYear}&month=${nextMonth}`}
+                   class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+
+            <!-- Días de la semana -->
+            <div class="grid grid-cols-7 border-b border-gray-100">
+                {dayNames.map(day => (
+                    <div class="py-2 text-center text-xs font-medium text-gray-4000 uppercase tracking-wider">
+                        {day}
+                    </div>
+                ))}
+            </div>
+
+            <!-- Grid del calendario -->
+            <div class="grid grid-cols-7">
+                {calendarCells.map((cell) => {
+                    const isToday = cell.date === today;
+                    const hasEvents = cell.events.length > 0;
+                    const hasMovies = cell.events.some(e => e.media_type === 'movie');
+                    const hasSeries = cell.events.some(e => e.media_type === 'tv');
+                    const hasSeasonPremiere = cell.events.some(e => e.event_type === 'season_premiere');
+
+                    return (
+                        <div class={`min-h-[3rem] sm:min-h-[5rem] lg:min-h-[6rem] border-b border-r border-gray-50 p-1 sm:p-2 relative
+                            ${!cell.day ? 'bg-gray-50/50' : ''}
+                            ${isToday ? 'bg-blue-50/50 ring-2 ring-inset ring-blue-400' : ''}
+                            ${hasEvents && cell.day ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
+                            data-date={cell.date}
+                            data-events={hasEvents ? JSON.stringify(cell.events) : undefined}>
+                            {cell.day && (
+                                <>
+                                    <span class={`text-xs sm:text-sm font-medium ${isToday ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                                        {cell.day}
+                                    </span>
+
+                                    {/* Dots indicadores */}
+                                    {hasEvents && (
+                                        <div class="flex gap-0.5 mt-0.5 sm:mt-1 flex-wrap">
+                                            {hasMovies && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500" title="Película"></span>}
+                                            {hasSeries && !hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500" title="Episodio"></span>}
+                                            {hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-purple-500" title="Temporada completa"></span>}
+                                        </div>
+                                    )}
+
+                                    {/* Títulos en desktop */}
+                                    <div class="hidden lg:block mt-1 space-y-0.5 overflow-hidden">
+                                        {cell.events.slice(0, 2).map(event => (
+                                            <div class={`text-[10px] leading-tight truncate px-1 py-0.5 rounded
+                                                ${event.media_type === 'movie' ? 'bg-red-50 text-red-700' : ''}
+                                                ${event.event_type === 'season_premiere' ? 'bg-purple-50 text-purple-700' : ''}
+                                                ${event.event_type === 'episode' ? 'bg-blue-50 text-blue-700' : ''}`}>
+                                                {event.title}
+                                            </div>
+                                        ))}
+                                        {cell.events.length > 2 && (
+                                            <span class="text-[10px] text-gray-4000">+{cell.events.length - 2} más</span>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+
+            <!-- Leyenda -->
+            <div class="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-red-500"></span> Películas
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> Episodios
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> Temporada completa
+                </span>
+            </div>
+        </div>
+
+        <!-- Detalle del día seleccionado -->
+        <div id="day-detail-panel" class="mb-6" style="display:none;">
+            <div class="flex items-center justify-between mb-3">
+                <h2 id="day-detail-title" class="text-lg font-semibold text-gray-800"></h2>
+                <button id="day-detail-close" class="text-gray-4000 hover:text-red-500 transition-colors text-xl leading-none">&times;</button>
+            </div>
+            <div id="day-detail-list" class="space-y-2"></div>
+        </div>
+
+        <!-- Tus notificaciones -->
+        <div>
+            <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2 mb-4">
+                <span class="w-1 h-6 bg-amber-500 rounded-full"></span>
+                Tus notificaciones
+                <span class="text-sm font-normal text-gray-4000">({subscribedEvents.length})</span>
+            </h2>
+
+            {subscribedEvents.length === 0 && (
+                <div class="text-center py-10 text-gray-4000">
+                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                    <p>No tienes notificaciones activas</p>
+                    <p class="text-sm mt-1">Activa la campana en películas o series para recibir avisos de estrenos</p>
+                </div>
+            )}
+
+            <div class="space-y-2">
+                {subscribedEvents.map(event => (
+                    <a href={`/${event.media_type === 'movie' ? 'movie' : 'serie'}/${event.tmdb_id}`}
+                       class="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
+                        {event.poster_path ? (
+                            <img src={event.poster_path} alt={event.title} class="w-12 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy"/>
+                        ) : (
+                            <div class="w-12 h-16 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-gray-4000 text-xs">?</div>
+                        )}
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">{event.title}</p>
+                                <span class="text-xs text-gray-4000 whitespace-nowrap">
+                                    {new Date(event.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                </span>
+                            </div>
+                            <span class={`inline-flex items-center gap-1 text-xs mt-0.5
+                                ${event.media_type === 'movie' ? 'text-red-500' : ''}
+                                ${event.event_type === 'season_premiere' ? 'text-purple-500' : ''}
+                                ${event.event_type === 'episode' ? 'text-blue-500' : ''}`}>
+                                {event.label}
+                            </span>
+                        </div>
+                    </a>
+                ))}
+            </div>
+        </div>
+    </section>
+</Layout>
+
+<script is:inline>
+(function () {
+    var panel = document.getElementById('day-detail-panel');
+    var title = document.getElementById('day-detail-title');
+    var list = document.getElementById('day-detail-list');
+    var closeBtn = document.getElementById('day-detail-close');
+    if (!panel || !title || !list || !closeBtn) return;
+
+    closeBtn.addEventListener('click', function () { panel.style.display = 'none'; });
+
+    document.querySelectorAll('[data-events]').forEach(function (cell) {
+        cell.addEventListener('click', function () {
+            var date = cell.getAttribute('data-date');
+            var events = JSON.parse(cell.getAttribute('data-events') || '[]');
+            if (!events.length) return;
+
+            var d = new Date(date + 'T12:00:00');
+            title.textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+
+            var html = '';
+            events.forEach(function (ev) {
+                var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
+                var colorClass = ev.media_type === 'movie' ? 'text-red-500' : (ev.event_type === 'season_premiere' ? 'text-purple-500' : 'text-blue-500');
+                var borderClass = ev.media_type === 'movie' ? 'border-red-100' : (ev.event_type === 'season_premiere' ? 'border-purple-100' : 'border-blue-100');
+                html += '<a href="' + link + '" class="flex items-center gap-3 p-3 bg-white rounded-xl border ' + borderClass + ' shadow-sm hover:shadow-md transition-all">';
+                if (ev.poster_path) {
+                    html += '<img src="' + ev.poster_path + '" alt="" class="w-12 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy"/>';
+                } else {
+                    html += '<div class="w-12 h-16 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-gray-4000 text-xs">?</div>';
+                }
+                html += '<div class="min-w-0 flex-1">';
+                html += '<p class="text-sm font-semibold text-gray-800">' + ev.title + '</p>';
+                html += '<span class="text-xs ' + colorClass + '">' + ev.label + '</span>';
+                html += '</div></a>';
+            });
+            list.innerHTML = html;
+            panel.style.display = 'block';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    });
+})();
+</script>
