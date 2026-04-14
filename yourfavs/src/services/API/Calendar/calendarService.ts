@@ -165,47 +165,81 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
     }
 
     // 2. Series — siguiendo, suscritas y populares
+    // Set de IDs que son seguidas o suscritas (para estas hacemos fetch de temporada completa)
+    const personalSerieIds = new Set([...followedSeriesIds, ...serieNotifIds]);
+
     for (const serie of seriesDetails) {
         if (!serie) continue;
         const serieIdStr = String(serie.id);
         const isFollowing = followedSeriesIds.includes(serieIdStr);
         const isSub = notifSet.has(`tv_${serieIdStr}`);
+        const isPersonal = personalSerieIds.has(serieIdStr);
 
         const nextEp = serie.next_episode_to_air;
-        if (nextEp && isInMonth(nextEp.air_date, year, month)) {
-            let eventType: CalendarEvent['event_type'] = 'episode';
-            let label = `T${nextEp.season_number} E${nextEp.episode_number}`;
-            if (nextEp.name) label += ` - ${nextEp.name}`;
+        const lastEp = serie.last_episode_to_air;
 
-            // Detectar temporada completa
-            if (nextEp.episode_number === 1) {
-                try {
-                    const seasonData = await tmdbFetch<any>(`/tv/${serie.id}/season/${nextEp.season_number}`);
-                    const episodes = seasonData.episodes || [];
-                    const sameDate = episodes.filter((ep: any) => ep.air_date === nextEp.air_date);
-                    if (sameDate.length > 1 && sameDate.length === episodes.length) {
-                        eventType = 'season_premiere';
-                        label = `Temporada ${nextEp.season_number} completa (${episodes.length} eps)`;
-                    } else if (sameDate.length > 1) {
-                        label = `T${nextEp.season_number} - ${sameDate.length} episodios`;
+        // Determinar temporada actual (la que tiene episodios en emisión)
+        const currentSeasonNum = nextEp?.season_number || lastEp?.season_number;
+
+        // Para series seguidas/suscritas: fetch temporada completa para obtener TODOS los episodios del mes
+        if (isPersonal && currentSeasonNum) {
+            try {
+                const seasonData = await tmdbFetch<any>(`/tv/${serie.id}/season/${currentSeasonNum}`);
+                const episodes = seasonData.episodes || [];
+                const monthEpisodes = episodes.filter((ep: any) => ep.air_date && isInMonth(ep.air_date, year, month));
+
+                if (monthEpisodes.length > 0) {
+                    // Detectar temporada completa: todos los episodios el mismo día
+                    const firstDate = monthEpisodes[0].air_date;
+                    const allSameDate = monthEpisodes.length > 1 && monthEpisodes.every((ep: any) => ep.air_date === firstDate);
+
+                    if (allSameDate && monthEpisodes.length === episodes.length) {
+                        // Temporada completa de golpe
+                        addEvent(firstDate, {
+                            tmdb_id: serieIdStr,
+                            media_type: 'tv',
+                            title: serie.name,
+                            poster_path: posterUrl(serie.poster_path),
+                            event_type: 'season_premiere',
+                            label: `Temporada ${currentSeasonNum} completa (${episodes.length} eps)`,
+                            is_subscribed: isSub,
+                            is_following: isFollowing,
+                        });
+                    } else {
+                        // Episodios individuales (semanal u otro patrón)
+                        for (const ep of monthEpisodes) {
+                            addEvent(ep.air_date, {
+                                tmdb_id: serieIdStr,
+                                media_type: 'tv',
+                                title: serie.name,
+                                poster_path: posterUrl(serie.poster_path),
+                                event_type: 'episode',
+                                label: `T${ep.season_number} E${ep.episode_number}${ep.name ? ' - ' + ep.name : ''}`,
+                                is_subscribed: isSub,
+                                is_following: isFollowing,
+                            });
+                        }
                     }
-                } catch {}
-            }
+                    continue; // Ya procesamos todos los episodios, saltar al siguiente serie
+                }
+            } catch {}
+        }
 
+        // Para series populares (no personales) o si el fetch de temporada falló:
+        // solo mostrar next_episode_to_air y/o last_episode_to_air
+        if (nextEp && isInMonth(nextEp.air_date, year, month)) {
             addEvent(nextEp.air_date, {
                 tmdb_id: serieIdStr,
                 media_type: 'tv',
                 title: serie.name,
                 poster_path: posterUrl(serie.poster_path),
-                event_type: eventType,
-                label,
+                event_type: 'episode',
+                label: `T${nextEp.season_number} E${nextEp.episode_number}${nextEp.name ? ' - ' + nextEp.name : ''}`,
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });
         }
 
-        // last_episode_to_air del mes actual
-        const lastEp = serie.last_episode_to_air;
         if (lastEp && isInMonth(lastEp.air_date, year, month)) {
             addEvent(lastEp.air_date, {
                 tmdb_id: serieIdStr,
