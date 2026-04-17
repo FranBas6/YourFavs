@@ -1,0 +1,140 @@
+/* Estilos compartidos entre páginas de detalle: movie, serie, actor */
+
+.transition-all {
+    transition: all 0.3s ease-in-out;
+}
+
+.text-yellow-400 {
+    color: #fbbf24;
+}
+
+img.hover\:scale-105:hover {
+    transform: scale(1.05);
+}
+
+.text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.rating-stars {
+    letter-spacing: 1px;
+}
+
+/* Lightbox CSS puro (:target) */
+.lightbox {
+    display: none;
+}
+
+.lightbox:target {
+    display: flex;
+}
+
+/* Carrusel de recomendaciones */
+.recommendations-carousel {
+    position: relative;
+}
+
+.recommendations-carousel::before,
+.recommendations-carousel::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 30px;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.recommendations-container {
+    scroll-snap-type: x mandatory;
+}
+
+.recommendations-container:hover {
+    cursor: grab;
+}
+
+.recommendations-container:active {
+    cursor: grabbing;
+}
+
+.recommendation-card {
+    transition: transform 0.3s ease;
+    scroll-snap-align: start;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-8px);
+}
+
+/* Animación de aparición */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in-up {
+    animation: fadeInUp 0.5s ease forwards;
+    opacity: 0;
+}
+
+/* Truncado de texto */
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .recommendation-card {
+        width: 140px;
+    }
+
+    .recommendations-carousel::before,
+    .recommendations-carousel::after {
+        width: 20px;
+    }
+
+    .recommendations-container {
+        padding-left: 4px;
+        padding-right: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .recommendation-card {
+        width: 120px;
+    }
+
+    .recommendations-carousel {
+        padding: 0;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-fade-in-up {
+        animation: none;
+        opacity: 1;
+    }
+
+    .recommendation-card,
+    .recommendation-card img,
+    .recommendation-card > a > div,
+    .recommendation-card .bg-white\/90 {
+        transition: none;
+    }
+}

@@ -1,8 +1,6 @@
 var LIST_NAMES = {
-    // Movies usan list_type
     favorites: 'Favoritos', pendientes: 'Pendientes', vistas: 'Vistas',
     verPronto: 'Ver Pronto', liked: 'Me gusta', siguiendo: 'Siguiendo',
-    // Series usan actionType con valores diferentes
     favs: 'Favoritos', verpronto: 'Ver Pronto'
 };
 
@@ -34,126 +32,151 @@ function showToast(message, type) {
     }, 2500);
 }
 
-function handleWatchedEpisodeForm(form) {
+/**
+ * Handler genérico de POST optimista.
+ * options:
+ *   successMsg: string | function(formData) — mensaje de toast en éxito
+ *   errorMsg: string — por defecto 'Error al guardar'
+ *   reload: bool — recargar la página tras éxito
+ *   reloadDelay: number — ms antes del reload (default 500)
+ *   onBeforeSubmit(form, btn, formData) — cambios visuales optimistas
+ *   onError(form, btn, formData) — rollback si el fetch falla
+ */
+function submitOptimistic(form, options) {
     form.addEventListener('submit', function (e) {
         e.preventDefault();
         var btn = form.querySelector('button[type="submit"]');
         if (!btn || btn.classList.contains('is-submitting')) return;
-        btn.classList.add('is-submitting');
-
         var formData = new FormData(form);
-        var isWatched = btn.classList.contains('bg-green-500');
-
-        // Toggle visual
-        if (isWatched) {
-            btn.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
-            btn.classList.add('border', 'border-gray-300', 'text-gray-500', 'hover:border-green-400', 'hover:text-green-600');
-            var txt = btn.querySelector('span, .btn-text');
-            if (!txt) { btn.childNodes.forEach(function(n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Marcar visto'; }); }
-        } else {
-            btn.classList.remove('border', 'border-gray-300', 'text-gray-500', 'hover:border-green-400', 'hover:text-green-600');
-            btn.classList.add('bg-green-500', 'text-white', 'hover:bg-green-600');
-            btn.childNodes.forEach(function(n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Visto'; });
-        }
-
-        // Actualizar barra de progreso de la temporada
-        var seasonNum = formData.get('season');
-        var bar = document.querySelector('[data-season-bar="' + seasonNum + '"]');
-        var count = document.querySelector('[data-season-count="' + seasonNum + '"]');
-        var progressDiv = document.querySelector('[data-season-progress="' + seasonNum + '"]');
-        if (bar && count && progressDiv) {
-            var total = parseInt(progressDiv.getAttribute('data-season-total') || '0');
-            var parts = count.textContent.split('/');
-            var current = parseInt(parts[0]) + (isWatched ? -1 : 1);
-            current = Math.max(0, Math.min(total, current));
-            count.textContent = current + '/' + total;
-            bar.style.width = Math.round(current / total * 100) + '%';
-        }
+        btn.classList.add('is-submitting');
+        if (options.onBeforeSubmit) options.onBeforeSubmit(form, btn, formData);
 
         fetch(window.location.pathname, { method: 'POST', body: formData })
             .then(function (res) {
-                if (res.ok || res.redirected) {
-                    var ep = 'T' + seasonNum + ' E' + formData.get('episode');
-                    showToast(isWatched ? ep + ' desmarcado' : ep + ' visto', 'success');
-                } else { throw new Error(); }
+                if (!res.ok && !res.redirected) throw new Error();
+                var msg = typeof options.successMsg === 'function' ? options.successMsg(formData) : options.successMsg;
+                if (msg) showToast(msg, 'success');
+                if (options.reload) {
+                    setTimeout(function () { window.location.reload(); }, options.reloadDelay || 500);
+                }
             })
-            .catch(function () { showToast('Error al guardar', 'error'); })
+            .catch(function () {
+                if (options.onError) options.onError(form, btn, formData);
+                showToast(options.errorMsg || 'Error al guardar', 'error');
+            })
             .finally(function () { btn.classList.remove('is-submitting'); });
+    });
+}
+
+function handleWatchedEpisodeForm(form) {
+    submitOptimistic(form, {
+        onBeforeSubmit: function (_f, btn, formData) {
+            var isWatched = btn.classList.contains('bg-green-500');
+            btn.dataset.wasWatched = isWatched ? '1' : '0';
+
+            if (isWatched) {
+                btn.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
+                btn.classList.add('border', 'border-gray-300', 'text-gray-500', 'hover:border-green-400', 'hover:text-green-600');
+                btn.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Marcar visto'; });
+            } else {
+                btn.classList.remove('border', 'border-gray-300', 'text-gray-500', 'hover:border-green-400', 'hover:text-green-600');
+                btn.classList.add('bg-green-500', 'text-white', 'hover:bg-green-600');
+                btn.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Visto'; });
+            }
+
+            var seasonNum = formData.get('season');
+            var bar = document.querySelector('[data-season-bar="' + seasonNum + '"]');
+            var count = document.querySelector('[data-season-count="' + seasonNum + '"]');
+            var progressDiv = document.querySelector('[data-season-progress="' + seasonNum + '"]');
+            if (bar && count && progressDiv) {
+                var total = parseInt(progressDiv.getAttribute('data-season-total') || '0');
+                var parts = count.textContent.split('/');
+                var current = parseInt(parts[0]) + (isWatched ? -1 : 1);
+                current = Math.max(0, Math.min(total, current));
+                count.textContent = current + '/' + total;
+                bar.style.width = Math.round(current / total * 100) + '%';
+            }
+        },
+        successMsg: function (formData) {
+            // Reconstruye el mensaje usando el flag guardado antes del toggle
+            var ep = 'T' + formData.get('season') + ' E' + formData.get('episode');
+            var wasWatched = form.querySelector('button[type="submit"]').dataset.wasWatched === '1';
+            return wasWatched ? ep + ' desmarcado' : ep + ' visto';
+        }
     });
 }
 
 function handleWatchedSeasonForm(form) {
-    form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var btn = form.querySelector('button[type="submit"]');
-        if (!btn || btn.classList.contains('is-submitting')) return;
-        btn.classList.add('is-submitting');
-
-        var formData = new FormData(form);
-
-        fetch(window.location.pathname, { method: 'POST', body: formData })
-            .then(function (res) {
-                if (res.ok || res.redirected) {
-                    var season = formData.get('season');
-                    var action = formData.get('action');
-                    showToast(action === 'mark' ? 'Temporada ' + season + ' marcada' : 'Temporada ' + season + ' desmarcada', 'success');
-                    setTimeout(function () { window.location.reload(); }, 500);
-                } else { throw new Error(); }
-            })
-            .catch(function () { showToast('Error al guardar', 'error'); })
-            .finally(function () { btn.classList.remove('is-submitting'); });
-    });
-}
-
-function handleNotificationForm(form) {
-    form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var btn = form.querySelector('button[type="submit"]');
-        if (!btn || btn.classList.contains('is-submitting')) return;
-        btn.classList.add('is-submitting');
-        var formData = new FormData(form);
-        var action = formData.get('action');
-
-        // Toggle visual
-        if (action === 'add') {
-            btn.classList.remove('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
-            btn.classList.add('bg-amber-500', 'text-white', 'hover:bg-amber-600');
-        } else {
-            btn.classList.remove('bg-amber-500', 'text-white', 'hover:bg-amber-600');
-            btn.classList.add('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
-        }
-
-        var actionInput = form.querySelector('input[name="action"]');
-        if (actionInput) actionInput.value = (action === 'add') ? 'remove' : 'add';
-
-        fetch(window.location.pathname, { method: 'POST', body: formData })
-            .then(function (res) {
-                if (res.ok || res.redirected) {
-                    showToast(action === 'add' ? 'Notificación activada' : 'Notificación desactivada', 'success');
-                } else { throw new Error(); }
-            })
-            .catch(function () { showToast('Error al guardar', 'error'); })
-            .finally(function () { btn.classList.remove('is-submitting'); });
+    submitOptimistic(form, {
+        successMsg: function (formData) {
+            var action = formData.get('action');
+            return action === 'mark' ? 'Temporada ' + formData.get('season') + ' marcada' : 'Temporada ' + formData.get('season') + ' desmarcada';
+        },
+        reload: true
     });
 }
 
 function handleWatchedAllForm(form) {
-    form.addEventListener('submit', function (e) {
-        e.preventDefault();
-        var btn = form.querySelector('button[type="submit"]');
-        if (!btn || btn.classList.contains('is-submitting')) return;
-        btn.classList.add('is-submitting');
-        var formData = new FormData(form);
-        var action = formData.get('action');
-        fetch(window.location.pathname, { method: 'POST', body: formData })
-            .then(function (res) {
-                if (res.ok || res.redirected) {
-                    showToast(action === 'mark' ? 'Toda la serie marcada como vista' : 'Serie desmarcada', 'success');
-                    setTimeout(function () { window.location.reload(); }, 500);
-                } else { throw new Error(); }
-            })
-            .catch(function () { showToast('Error al guardar', 'error'); })
-            .finally(function () { btn.classList.remove('is-submitting'); });
+    submitOptimistic(form, {
+        successMsg: function (formData) {
+            return formData.get('action') === 'mark' ? 'Toda la serie marcada como vista' : 'Serie desmarcada';
+        },
+        reload: true
+    });
+}
+
+function handleNotificationForm(form) {
+    submitOptimistic(form, {
+        onBeforeSubmit: function (f, btn, formData) {
+            var action = formData.get('action');
+            if (action === 'add') {
+                btn.classList.remove('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
+                btn.classList.add('bg-amber-500', 'text-white', 'hover:bg-amber-600');
+            } else {
+                btn.classList.remove('bg-amber-500', 'text-white', 'hover:bg-amber-600');
+                btn.classList.add('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
+            }
+            var actionInput = f.querySelector('input[name="action"]');
+            if (actionInput) actionInput.value = (action === 'add') ? 'remove' : 'add';
+        },
+        successMsg: function (formData) {
+            return formData.get('action') === 'add' ? 'Notificación activada' : 'Notificación desactivada';
+        }
+    });
+}
+
+function handleGenericFavAction(form) {
+    var state = { textNode: null, originalText: '', action: '', actionInput: null };
+    submitOptimistic(form, {
+        onBeforeSubmit: function (f, btn, formData) {
+            state.action = formData.get('action');
+            var walker = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT, null);
+            while (walker.nextNode()) {
+                var trimmed = walker.currentNode.textContent.trim();
+                if (trimmed && TEXT_TOGGLES[trimmed]) {
+                    state.textNode = walker.currentNode;
+                    break;
+                }
+            }
+            state.originalText = state.textNode ? state.textNode.textContent.trim() : '';
+            if (state.textNode && TEXT_TOGGLES[state.originalText]) {
+                state.textNode.textContent = ' ' + TEXT_TOGGLES[state.originalText] + ' ';
+            }
+            state.actionInput = f.querySelector('input[name="action"]');
+            if (state.actionInput) state.actionInput.value = (state.action === 'add') ? 'remove' : 'add';
+        },
+        successMsg: function (formData) {
+            var listType = formData.get('list_type') || formData.get('actionType');
+            var name = LIST_NAMES[listType] || listType;
+            return (state.action === 'add') ? 'Añadido a ' + name : 'Quitado de ' + name;
+        },
+        errorMsg: 'Error al procesar la acción',
+        reload: true,
+        reloadDelay: 300,
+        onError: function () {
+            if (state.textNode) state.textNode.textContent = ' ' + state.originalText + ' ';
+            if (state.actionInput) state.actionInput.value = state.action;
+        }
     });
 }
 
@@ -163,76 +186,14 @@ function initOptimisticActions() {
         form.dataset.optimistic = 'true';
 
         var actionType = form.querySelector('input[name="actionType"]');
-        if (actionType && actionType.value === 'watched_episode') {
-            handleWatchedEpisodeForm(form);
-            return;
-        }
-        if (actionType && actionType.value === 'watched_season') {
-            handleWatchedSeasonForm(form);
-            return;
-        }
-        if (actionType && actionType.value === 'watched_all') {
-            handleWatchedAllForm(form);
-            return;
-        }
-        if (actionType && actionType.value === 'notification') {
-            handleNotificationForm(form);
-            return;
-        }
+        var val = actionType ? actionType.value : '';
 
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            var btn = form.querySelector('button[type="submit"]');
-            if (!btn || btn.classList.contains('is-submitting')) return;
+        if (val === 'watched_episode') return handleWatchedEpisodeForm(form);
+        if (val === 'watched_season') return handleWatchedSeasonForm(form);
+        if (val === 'watched_all') return handleWatchedAllForm(form);
+        if (val === 'notification') return handleNotificationForm(form);
 
-            var formData = new FormData(form);
-            var action = formData.get('action');
-            // Movies usan list_type, Series usan actionType
-            var listType = formData.get('list_type') || formData.get('actionType');
-
-            btn.classList.add('is-submitting');
-
-            // Toggle del texto del botón
-            var textNode = null;
-            var walker = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT, null);
-            while (walker.nextNode()) {
-                var trimmed = walker.currentNode.textContent.trim();
-                if (trimmed && TEXT_TOGGLES[trimmed]) {
-                    textNode = walker.currentNode;
-                    break;
-                }
-            }
-
-            var originalText = textNode ? textNode.textContent.trim() : '';
-            if (textNode && TEXT_TOGGLES[originalText]) {
-                textNode.textContent = ' ' + TEXT_TOGGLES[originalText] + ' ';
-            }
-
-            // Toggle del input action
-            var actionInput = form.querySelector('input[name="action"]');
-            if (actionInput) actionInput.value = (action === 'add') ? 'remove' : 'add';
-
-            fetch(window.location.pathname, {
-                method: 'POST',
-                body: formData
-            }).then(function (res) {
-                if (res.ok || res.redirected) {
-                    var name = LIST_NAMES[listType] || listType;
-                    var msg = (action === 'add') ? 'Añadido a ' + name : 'Quitado de ' + name;
-                    showToast(msg, 'success');
-                    // Reload suave para actualizar secciones condicionales (opinión, etc.)
-                    setTimeout(function () { window.location.reload(); }, 300);
-                } else {
-                    throw new Error('Error del servidor');
-                }
-            }).catch(function () {
-                if (textNode) textNode.textContent = ' ' + originalText + ' ';
-                if (actionInput) actionInput.value = action;
-                showToast('Error al procesar la acción', 'error');
-            }).finally(function () {
-                btn.classList.remove('is-submitting');
-            });
-        });
+        handleGenericFavAction(form);
     });
 }
 
