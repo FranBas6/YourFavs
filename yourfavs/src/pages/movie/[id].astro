@@ -68,6 +68,7 @@ if (id) {
         getMovieDirectorsAndRoles(id),
         getMovieTrailer(id),
     ]);
+    if (!item) return Astro.redirect('/404');
     title = item?.title || title;
 }
 
@@ -212,7 +213,12 @@ const clips = allVideos.filter((v: any) => v.type === 'Clip');
 const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
 ---
-<Layout title={`${title}`}>
+<Layout
+    title={`${title}`}
+    description={item?.overview || undefined}
+    ogImage={item?.poster_path || item?.backdrop_path || undefined}
+    ogType="video.movie"
+>
     <article class="bg-gray-50">
         <!-- Hero inmersivo -->
         <div class="relative w-full min-h-[70vh] bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}>

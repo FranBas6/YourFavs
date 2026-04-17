@@ -20,25 +20,25 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     // Guardar opinión en todas las colecciones
     if (action === 'save_opinion' || actionType === 'opinion') {
         const opinionText = String(formData.get('opinion') || '').trim();
-        for (const col of SERIE_COLLECTIONS) {
-            const ref = doc(db, col, serieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { opinion: opinionText });
-            }
-        }
+        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
+        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        await Promise.all(
+            snaps
+                .filter(snap => snap.exists())
+                .map(snap => updateDoc(snap.ref, { opinion: opinionText }))
+        );
         return `/serie/${serieId}`;
     }
 
     // Eliminar opinión
     if (action === 'delete_opinion') {
-        for (const col of SERIE_COLLECTIONS) {
-            const ref = doc(db, col, serieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { opinion: deleteField() });
-            }
-        }
+        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
+        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        await Promise.all(
+            snaps
+                .filter(snap => snap.exists())
+                .map(snap => updateDoc(snap.ref, { opinion: deleteField() }))
+        );
         return `/serie/${serieId}`;
     }
 
@@ -57,15 +57,12 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             added_at: new Date(),
         };
 
-        // Buscar opinión existente
-        let existingOpinion = '';
-        for (const col of SERIE_COLLECTIONS) {
-            const checkSnap = await getDoc(doc(db, col, serieId));
-            if (checkSnap.exists() && checkSnap.data()?.opinion) {
-                existingOpinion = checkSnap.data()?.opinion;
-                break;
-            }
-        }
+        // Buscar opinión existente (lectura paralela)
+        const opinionSnaps = await Promise.all(
+            SERIE_COLLECTIONS.map(col => getDoc(doc(db, col, serieId)))
+        );
+        const foundOpinion = opinionSnaps.find(s => s.exists() && s.data()?.opinion);
+        const existingOpinion: string = foundOpinion?.data()?.opinion || '';
 
         const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
         const newEntry = opinionForSeries ? { ...baseEntry, opinion: opinionForSeries } : baseEntry;

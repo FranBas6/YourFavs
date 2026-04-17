@@ -71,22 +71,24 @@ export const getSeriesCast = async (tvId: string): Promise<CastMember[]> => {
         const totalSeasons = seriesData.number_of_seasons;
         const allCast = new Map<number, CastMember>();
 
-        for (let season = 1; season <= totalSeasons; season++) {
-            try {
-                const data = await tmdbFetch<{ cast?: any[] }>(`/tv/${tvId}/season/${season}/credits`);
-                data.cast?.forEach((actor: any) => {
-                    if (!allCast.has(actor.id)) {
-                        allCast.set(actor.id, {
-                            id: actor.id,
-                            name: actor.name,
-                            character: actor.character || '',
-                            profile_path: actor.profile_path || null,
-                        });
-                    }
-                });
-            } catch {
-                // Si falla una temporada, continuar con las demás
-            }
+        const seasonNumbers = Array.from({ length: totalSeasons }, (_, i) => i + 1);
+        const results = await Promise.all(
+            seasonNumbers.map(season =>
+                tmdbFetch<{ cast?: any[] }>(`/tv/${tvId}/season/${season}/credits`).catch(() => ({ cast: [] as any[] }))
+            )
+        );
+
+        for (const data of results) {
+            data.cast?.forEach((actor: any) => {
+                if (!allCast.has(actor.id)) {
+                    allCast.set(actor.id, {
+                        id: actor.id,
+                        name: actor.name,
+                        character: actor.character || '',
+                        profile_path: actor.profile_path || null,
+                    });
+                }
+            });
         }
 
         return Array.from(allCast.values());

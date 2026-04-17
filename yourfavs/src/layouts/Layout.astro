@@ -9,9 +9,16 @@ import "@fontsource/poppins/700.css";
 interface Props {
     title: string;
     description?: string;
+    ogImage?: string;
+    ogType?: string;
 }
 
-const {title, description = "Tu plataforma favorita para descubrir películas y series"} = Astro.props;
+const {
+    title,
+    description = "Tu plataforma favorita para descubrir películas y series",
+    ogImage = "/og-image.png",
+    ogType = "website",
+} = Astro.props;
 ---
 <!DOCTYPE html>
 <html lang="es">
@@ -24,10 +31,11 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
     <meta name="theme-color" content="#3B82F6"/>
     <link rel="canonical" href={Astro.url.href}/>
     <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
-    <meta property="og:image" content="/og-image.png"/>
+    <meta property="og:image" content={ogImage}/>
     <meta name="twitter:card" content="summary_large_image"/>
     <meta name="twitter:title" content={title}/>
     <meta name="twitter:description" content={description}/>
+    <meta name="twitter:image" content={ogImage}/>
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F4F6"/>
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B1220"/>
     <script is:inline>
@@ -42,7 +50,7 @@ const {title, description = "Tu plataforma favorita para descubrir películas y 
     </script>
     <meta property="og:title" content={title}/>
     <meta property="og:description" content={description}/>
-    <meta property="og:type" content="website"/>
+    <meta property="og:type" content={ogType}/>
     <title>{title}</title>
 </head>
 <body id="top" class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins">
