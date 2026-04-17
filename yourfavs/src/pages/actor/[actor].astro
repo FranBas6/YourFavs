@@ -94,6 +94,19 @@ const allYears = [...movieDates, ...seriesDates].filter(y => y > 1900);
 const careerStart = allYears.length > 0 ? Math.min(...allYears) : null;
 const careerEnd = allYears.length > 0 ? Math.max(...allYears) : null;
 const careerYears = careerStart && careerEnd ? careerEnd - careerStart : null;
+
+// JSON-LD structured data (schema.org Person)
+const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": actorInfo.nombre,
+    "jobTitle": actorInfo.conocidoPor || "Actor",
+    ...(actorInfo.imagen && { image: actorInfo.imagen }),
+    ...(actorInfo.fechaNacimiento && { birthDate: actorInfo.fechaNacimiento }),
+    ...(actorInfo.fechaFallecimiento && { deathDate: actorInfo.fechaFallecimiento }),
+    ...(actorInfo.lugarNacimiento && { birthPlace: actorInfo.lugarNacimiento }),
+    ...(actorInfo.biografia && { description: String(actorInfo.biografia).slice(0, 500) }),
+};
 ---
 <Layout
     title={`${actorInfo.nombre}`}
@@ -101,6 +114,7 @@ const careerYears = careerStart && careerEnd ? careerEnd - careerStart : null;
     ogImage={actorInfo.imagen || undefined}
     ogType="profile"
 >
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <section class="px-1 sm:py-8">
         <!-- Header -->
         <header class="mb-6">

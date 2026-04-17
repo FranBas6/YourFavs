@@ -77,7 +77,7 @@ function isActive(href: string): boolean {
                     <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
                 </div>
                 <div id="cal-grid" class="cal-grid"></div>
-                <div id="cal-day-detail" class="cal-day-detail" style="display:none;"></div>
+                <div id="cal-day-detail" class="cal-day-detail" style="display:none;" role="dialog" aria-modal="true" aria-label="Detalle del día" tabindex="-1"></div>
                 <div id="cal-notifications" class="cal-notifications">
                     <p class="cal-notif-title">Tus notificaciones</p>
                     <div id="cal-notif-list" class="cal-notif-list">
@@ -292,26 +292,58 @@ function isActive(href: string): boolean {
             cell.addEventListener('click', function () {
                 var date = cell.getAttribute('data-date');
                 var events = eventsMap[date] || [];
-                showDayDetail(date, events);
+                showDayDetail(date, events, cell);
             });
         });
     }
 
-    function showDayDetail(date, events) {
+    var dayDetailReturnFocus = null;
+
+    function escapeAttr(s) {
+        return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function clearSelectedDay() {
+        if (!calGrid) return;
+        calGrid.querySelectorAll('.cal-selected').forEach(function (c) { c.classList.remove('cal-selected'); });
+    }
+
+    function closeDayDetail() {
+        calDayDetail.style.display = 'none';
+        clearSelectedDay();
+        if (dayDetailReturnFocus && typeof dayDetailReturnFocus.focus === 'function') {
+            dayDetailReturnFocus.focus();
+            dayDetailReturnFocus = null;
+        }
+    }
+
+    function showDayDetail(date, events, triggerEl) {
+        dayDetailReturnFocus = triggerEl || document.activeElement;
+        clearSelectedDay();
+        if (triggerEl && triggerEl.classList) triggerEl.classList.add('cal-selected');
         var d = new Date(date + 'T12:00:00');
         var dayName = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-        var html = '<div class="cal-detail-header"><span>' + dayName + '</span><button id="cal-detail-close" class="cal-detail-close">&times;</button></div>';
+        var html = '<div class="cal-detail-header"><span>' + dayName + '</span><button id="cal-detail-close" class="cal-detail-close" aria-label="Cerrar detalle del día">&times;</button></div>';
         events.forEach(function (ev) {
             var typeClass = ev.media_type === 'movie' ? 'cal-ev-movie' : (ev.event_type === 'season_premiere' ? 'cal-ev-season' : 'cal-ev-serie');
             var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
             html += '<a href="' + link + '" class="cal-event ' + typeClass + '">';
-            if (ev.poster_path) html += '<img src="' + ev.poster_path + '" alt="" class="cal-ev-poster"/>';
-            html += '<div class="cal-ev-info"><span class="cal-ev-title">' + ev.title + '</span><span class="cal-ev-label">' + ev.label + '</span></div></a>';
+            if (ev.poster_path) html += '<img src="' + ev.poster_path + '" alt="' + escapeAttr(ev.title) + '" class="cal-ev-poster"/>';
+            html += '<div class="cal-ev-info"><span class="cal-ev-title">' + escapeAttr(ev.title) + '</span><span class="cal-ev-label">' + escapeAttr(ev.label) + '</span></div></a>';
         });
         calDayDetail.innerHTML = html;
         calDayDetail.style.display = 'block';
-        document.getElementById('cal-detail-close').addEventListener('click', function () { calDayDetail.style.display = 'none'; });
+        var closeBtn = document.getElementById('cal-detail-close');
+        closeBtn.addEventListener('click', closeDayDetail);
+        closeBtn.focus();
     }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && calDayDetail && calDayDetail.style.display === 'block') {
+            e.stopPropagation();
+            closeDayDetail();
+        }
+    });
 
     function renderNotifications(data) {
         var subs = [];

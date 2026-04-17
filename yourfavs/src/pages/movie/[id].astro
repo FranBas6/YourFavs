@@ -212,6 +212,28 @@ const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
 const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
+
+// JSON-LD structured data (schema.org Movie)
+const jsonLd = item ? {
+    "@context": "https://schema.org",
+    "@type": "Movie",
+    "name": item.title,
+    ...(item.poster_path && { image: item.poster_path }),
+    ...(item.release_date && { datePublished: item.release_date }),
+    ...(item.overview && { description: item.overview }),
+    ...(item.genres?.length && { genre: item.genres.map((g: any) => g.name) }),
+    ...(directors?.find((d: any) => d.job === 'Director') && {
+        director: { "@type": "Person", name: directors.find((d: any) => d.job === 'Director')!.name }
+    }),
+    ...(item.vote_count > 0 && {
+        aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: item.vote_average,
+            bestRating: 10,
+            ratingCount: item.vote_count,
+        }
+    }),
+} : null;
 ---
 <Layout
     title={`${title}`}
@@ -219,6 +241,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
     ogImage={item?.poster_path || item?.backdrop_path || undefined}
     ogType="video.movie"
 >
+    {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
     <article class="bg-gray-50">
         <!-- Hero inmersivo -->
         <div class="relative w-full min-h-[70vh] bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}>
@@ -325,28 +348,28 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                 <div class="grid grid-cols-2 gap-2">
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="favorites"/>
-                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600'}`}>
+                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
                             {isInFavorites ? 'En Favoritos' : 'Favoritos'}
                         </button>
                     </form>
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="verPronto"/>
-                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600'}`}>
+                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
                             {isInVerPronto ? 'Ver Pronto' : 'Ver Pronto'}
                         </button>
                     </form>
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="pendientes"/>
-                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600'}`}>
+                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
                             {isInPendientes ? 'Pendiente' : 'Pendiente'}
                         </button>
                     </form>
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="vistas"/>
-                        <button type="submit" class={`w-full px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600'}`}>
+                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                             {isInVistas ? 'Vista' : 'Vista'}
                         </button>
@@ -356,16 +379,16 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                     {isUnreleased && <NotificationBell mediaType="movie" tmdbId={id} isSubscribed={isNotifSubscribed} />}
                     <form method="POST" class="flex-1">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="liked"/>
-                        <button type="submit" class={`w-full px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInLiked ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-gray-200 text-gray-500'}`}>
+                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInLiked ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-gray-200 text-gray-500'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
                             {isInLiked ? 'Me gusta' : 'Me gusta'}
                         </button>
                     </form>
                     {imdbId && (
-                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-4 py-2 text-xs font-bold bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors flex items-center">IMDb</a>
+                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="min-h-[44px] px-4 py-2 text-xs font-bold bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors flex items-center">IMDb</a>
                     )}
                     {(item?.homepage || trailerUrl) && (
-                        <a href={item?.homepage || trailerUrl} target="_blank" rel="noopener" class="px-4 py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center">Ver ahora</a>
+                        <a href={item?.homepage || trailerUrl} target="_blank" rel="noopener" class="min-h-[44px] px-4 py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center">Ver ahora</a>
                     )}
                 </div>
             </div>
@@ -489,18 +512,18 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                     <blockquote class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">{opinionFromAny}</blockquote>
                                     <div class="flex items-center gap-2 justify-end">
                                         <details>
-                                            <summary class="px-3 py-1.5 text-xs rounded-lg bg-gray-900 hover:bg-gray-800 text-white cursor-pointer">Actualizar</summary>
+                                            <summary class="min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 text-xs rounded-lg bg-gray-900 hover:bg-gray-800 text-white cursor-pointer inline-flex items-center">Actualizar</summary>
                                             <form method="POST" class="mt-3 space-y-2">
                                                 <input type="hidden" name="id" value={item?.id} />
                                                 <input type="hidden" name="action" value="save_opinion" />
                                                 <textarea name="opinion" rows="3" class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400">{opinionFromAny}</textarea>
-                                                <button type="submit" class="w-full px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar</button>
+                                                <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar</button>
                                             </form>
                                         </details>
                                         <form method="POST">
                                             <input type="hidden" name="id" value={item?.id} />
                                             <input type="hidden" name="action" value="delete_opinion" />
-                                            <button type="submit" class="px-3 py-1.5 text-xs rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">Eliminar</button>
+                                            <button type="submit" class="min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 text-xs rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">Eliminar</button>
                                         </form>
                                     </div>
                                 </div>
@@ -509,7 +532,7 @@ const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
                                     <input type="hidden" name="id" value={item?.id} />
                                     <input type="hidden" name="action" value="save_opinion" />
                                     <textarea name="opinion" rows="3" class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" placeholder="Escribe tu opinión..."></textarea>
-                                    <button type="submit" class="w-full px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar opinión</button>
+                                    <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar opinión</button>
                                 </form>
                             )}
                         </div>
