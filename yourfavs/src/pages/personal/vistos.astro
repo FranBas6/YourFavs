@@ -1,150 +1,32 @@
 ---
-import Layout from "../../layouts/Layout.astro"
+import Layout from '../../layouts/Layout.astro';
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {
-    getSeriesVistas,
-    getWatchedProgressBatch,
-} from "../../services/BD/series/yourfavsSerie";
+import {getSeriesVistas} from "../../services/BD/series/yourfavsSerie";
 import {getMoviesVistas} from "../../services/BD/movies/yourfavsMovie";
-import {fetchMovieDetails} from "../../services/API/Movies/tmdbMovies";
-import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
-import {processBatch} from "../../utils/processBatch";
-import {calculateStats} from "../../utils/calculateStats";
 import {buildUrl} from "../../utils/buildUrl";
-import {posterUrl, tmdbFetch} from "../../services/API/shared/tmdbClient";
-import {mapAndDeduplicateProviders} from "../../services/API/shared/tmdbInfoService";
+import {fetchPersonalPageData} from "../../utils/personalPageHelper";
 import StatsPanel from "../../components/personal/StatsPanel.astro";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import '../../styles/pages/personal/personal.css';
 
-let seriesVistas: any[] = [];
-let peliculasVistas: any[] = [];
-let errorMessage = "";
+const data = await fetchPersonalPageData(
+    { getSeries: getSeriesVistas, getMovies: getMoviesVistas },
+    Astro.url
+);
 
-let seriesData: any[] = [];
-let moviesData: any[] = [];
-
-const filter = Astro.url.searchParams.get("filter") || "todos";
-const searchQuery = Astro.url.searchParams.get("search") || "";
-const genreFilter = Astro.url.searchParams.get("genre") || "";
-const platformFilter = Astro.url.searchParams.get("platforms") || "";
-const showSeries = filter === "series" || filter === "todos";
-const showMovies = filter === "peliculas" || filter === "todos";
-const showAll = filter === "todos";
-
-const seriesPage = parseInt(Astro.url.searchParams.get("seriesPage") || "1");
-const moviesPage = parseInt(Astro.url.searchParams.get("moviesPage") || "1");
-const ITEMS_PER_PAGE = 20;
-
-try {
-    [seriesData, moviesData] = await Promise.all([
-        getSeriesVistas(),
-        getMoviesVistas()
-    ]);
-
-    const [seriesResults, moviesResults] = await Promise.all([
-        processBatch(seriesData.map(s => s.id), (id) => fetchSerieDetails(id), 10),
-        processBatch(moviesData.map(p => p.id), (id) => fetchMovieDetails(id), 10)
-    ]);
-
-    seriesVistas = seriesResults.filter(s => s !== null);
-    peliculasVistas = moviesResults.filter(m => m !== null);
-} catch (error) {
-    console.error("Error al cargar contenido visto:", error);
-    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
-}
-
-const watchedMap = await getWatchedProgressBatch(seriesVistas.map((s: any) => String(s.id)));
-
-// Extraer géneros disponibles de la colección
-const genreSet = new Set<string>();
-[...seriesVistas, ...peliculasVistas].forEach((item: any) => {
-    const genres = item.genres || item.genre_ids?.map((id: number) => ({ name: getGenreName(id) })) || [];
-    genres.forEach((g: any) => { if (g.name) genreSet.add(g.name); });
-});
-const availableGenres = Array.from(genreSet).sort();
-
-// Filtrar por búsqueda y género
-const searchLower = searchQuery.toLowerCase();
-let filteredSeries = seriesVistas;
-let filteredMovies = peliculasVistas;
-
-if (searchQuery) {
-    filteredSeries = filteredSeries.filter((s: any) => s.name?.toLowerCase().includes(searchLower));
-    filteredMovies = filteredMovies.filter((m: any) => m.title?.toLowerCase().includes(searchLower));
-}
-
-const activeGenres = genreFilter ? genreFilter.split(',').filter(Boolean) : [];
-if (activeGenres.length > 0) {
-    const matchesGenre = (item: any) => {
-        const genres = item.genres || item.genre_ids?.map((id: number) => ({ name: getGenreName(id) })) || [];
-        return activeGenres.some((ag: string) => genres.some((g: any) => g.name === ag));
-    };
-    filteredSeries = filteredSeries.filter(matchesGenre);
-    filteredMovies = filteredMovies.filter(matchesGenre);
-}
-
-// Filtrar por plataforma (solo si hay filtro activo)
-const activePlatformIds = platformFilter ? platformFilter.split(',').map(Number).filter(Boolean) : [];
-if (activePlatformIds.length > 0) {
-    const [seriesProviders, movieProviders] = await Promise.all([
-        processBatch(filteredSeries.map((s: any) => s.id), async (id: number) => {
-            try {
-                const data = await tmdbFetch<{ results: any }>(`/tv/${id}/watch/providers`, {});
-                return { id, providers: mapAndDeduplicateProviders(data.results?.ES || {}) };
-            } catch { return { id, providers: [] }; }
-        }, 10),
-        processBatch(filteredMovies.map((m: any) => m.id), async (id: number) => {
-            try {
-                const data = await tmdbFetch<{ results: any }>(`/movie/${id}/watch/providers`, {});
-                return { id, providers: mapAndDeduplicateProviders(data.results?.ES || {}) };
-            } catch { return { id, providers: [] }; }
-        }, 10)
-    ]);
-    const seriesProvMap = new Map(seriesProviders.map((p: any) => [p.id, p.providers]));
-    const movieProvMap = new Map(movieProviders.map((p: any) => [p.id, p.providers]));
-    filteredSeries = filteredSeries.filter((s: any) => {
-        const provs = seriesProvMap.get(s.id) || [];
-        return provs.some((p: any) => activePlatformIds.includes(p.provider_id));
-    });
-    filteredMovies = filteredMovies.filter((m: any) => {
-        const provs = movieProvMap.get(m.id) || [];
-        return provs.some((p: any) => activePlatformIds.includes(p.provider_id));
-    });
-}
-
-const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
-const moviesItemsToShow = moviesPage * ITEMS_PER_PAGE;
-
-const seriesPaginadas = filteredSeries.slice(0, seriesItemsToShow);
-const peliculasPaginadas = filteredMovies.slice(0, moviesItemsToShow);
-
-const hasMoreSeries = filteredSeries.length > seriesItemsToShow;
-const hasMoreMovies = filteredMovies.length > moviesItemsToShow;
-
-const pageUrl = Astro.url;
-
-const stats = calculateStats({
-    seriesData,
-    moviesData,
-    seriesDetails: seriesVistas,
-    moviesDetails: peliculasVistas,
-});
-
-// Watched stats
-const watchedEntries = Object.entries(watchedMap) as [string, { watched: number }][];
-const totalWatchedEpisodes = watchedEntries.reduce((sum, [, v]) => sum + v.watched, 0);
-const topWatchedEntry = watchedEntries.length > 0
-    ? watchedEntries.sort((a, b) => b[1].watched - a[1].watched)[0]
-    : null;
-const topSerieName = topWatchedEntry ? seriesVistas.find((s: any) => String(s.id) === topWatchedEntry[0])?.name : null;
-(stats as any).watched = {
-    totalEpisodes: totalWatchedEpisodes,
-    topSerie: topSerieName && topWatchedEntry ? { name: topSerieName, watched: topWatchedEntry[1].watched } : null,
-};
+const {
+    filter, searchQuery, genreFilter, platformFilter,
+    showSeries, showMovies, showAll,
+    seriesPage, moviesPage, pageUrl, itemsPerPage,
+    filteredSeries, filteredMovies,
+    seriesPaginadas, peliculasPaginadas,
+    hasMoreSeries, hasMoreMovies,
+    seriesItemsToShow, moviesItemsToShow,
+    availableGenres, stats, watchedMap, errorMessage,
+} = data;
 ---
 <Layout title="Vistos">
     <section class="px-1 sm:py-8">
@@ -187,10 +69,10 @@ const topSerieName = topWatchedEntry ? seriesVistas.find((s: any) => String(s.id
                     )}
                     {seriesPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {seriesPaginadas.map((item) => (
+                            {seriesPaginadas.map((item: any) => (
                                 <CardSerie
                                     id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
                                     name={item.name}
                                     vote_average={item.vote_average}
                                     overview={item.overview}
@@ -209,7 +91,7 @@ const topSerieName = topWatchedEntry ? seriesVistas.find((s: any) => String(s.id
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
                                     filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
-                                    seriesPage: Math.ceil(filteredSeries.length / ITEMS_PER_PAGE).toString(),
+                                    seriesPage: Math.ceil(filteredSeries.length / itemsPerPage).toString(),
                                     moviesPage: moviesPage.toString()
                                 }) + '#series-section'}
                                class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all">
@@ -242,10 +124,10 @@ const topSerieName = topWatchedEntry ? seriesVistas.find((s: any) => String(s.id
                     )}
                     {peliculasPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {peliculasPaginadas.map((item) => (
+                            {peliculasPaginadas.map((item: any) => (
                                 <CardMovie
                                     id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                    img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
                                     title={item.title}
                                     vote_average={item.vote_average}
                                     overview={item.overview}
@@ -260,7 +142,7 @@ const topSerieName = topWatchedEntry ? seriesVistas.find((s: any) => String(s.id
                             <a href={buildUrl(pageUrl, {
                                     filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
                                     seriesPage: seriesPage.toString(),
-                                    moviesPage: Math.ceil(filteredMovies.length / ITEMS_PER_PAGE).toString()
+                                    moviesPage: Math.ceil(filteredMovies.length / itemsPerPage).toString()
                                 }) + '#movies-section'}
                                class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all">
                                 Mostrar {filteredMovies.length - moviesItemsToShow} películas más
