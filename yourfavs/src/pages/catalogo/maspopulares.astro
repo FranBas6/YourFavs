@@ -4,22 +4,57 @@ import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getMostPopularMovies} from "../../services/API/Movies/tmdbMovies";
 import {getMostPopularSeries} from "../../services/API/Series/tmdbSeries";
+import {discoverContent, parseAdvancedFilters, hasActiveFilters} from "../../services/API/shared/tmdbDiscoverService";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import FilterBar from "../../components/FilterBar.astro";
+import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
+import type {Movie} from "../../types/ApiMovie";
+import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/card-animations.css';
 
-// Obtener el parámetro de página desde la URL
 const urlParams = new URL(Astro.request.url).searchParams;
 const page = Number(urlParams.get('page') || 1);
 const type = urlParams.get('type') || 'all';
+const pageStr = page.toString();
 
-const popularMovies = await getMostPopularMovies({page: page.toString()});
-const popularSeries = await getMostPopularSeries({page: page.toString()});
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+
+const popularMovies = filtersActive
+    ? await discoverContent<Movie>('movie', filters, { sort_by: 'popularity.desc', page: pageStr })
+    : await getMostPopularMovies({page: pageStr});
+
+const popularSeries = filtersActive
+    ? await discoverContent<Serie>('tv', filters, { sort_by: 'popularity.desc', page: pageStr })
+    : await getMostPopularSeries({page: pageStr});
 
 const totalPages = 250;
+
+/**
+ * Construye la URL aplicando un conjunto de cambios parciales. Preserva el resto
+ * de params existentes. Valor null en `changes` elimina la key. Resetea `page` a 1
+ * cuando cambian los filtros (pero no cuando cambia `page` en sí, que usa buildUrl
+ * dedicado para paginación).
+ */
+function buildFilterUrl(changes: Record<string, string | null>) {
+    const p = new URLSearchParams(urlParams);
+    for (const [k, v] of Object.entries(changes)) {
+        if (v === null || v === '') p.delete(k);
+        else p.set(k, v);
+    }
+    p.set('page', '1');
+    return `?${p.toString()}`;
+}
+
+function buildTypeUrl(t: string) {
+    const changes: Record<string, string | null> = { type: t };
+    if (t !== 'series') changes.status = null;
+    if (t !== 'movies') changes.runtime = null;
+    return buildFilterUrl(changes);
+}
 ---
 <Layout title="Más Populares">
     <div class="px-1 sm:py-8">
@@ -28,7 +63,9 @@ const totalPages = 250;
             <p class="text-gray-500 text-base">Las películas y series más populares del momento</p>
         </header>
 
-        <FilterBar currentType={type} buildUrl={(t) => `?page=1&type=${t}`} />
+        <FilterBar currentType={type} buildUrl={buildTypeUrl} />
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>
@@ -46,23 +83,25 @@ const totalPages = 250;
                         Películas
                     </h2>
 
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
-                        {
-                            popularMovies.map((item) => (
-                                    <div class="card-wrapper group">
-                                        <CardMovie
-                                                id={item.id.toString()}
-                                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                                title={item.title}
-                                                vote_average={item.vote_average}
-                                                overview={item.overview}
-                                                release_date={item.release_date}
-                                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                        />
-                                    </div>
-                            ))
-                        }
-                    </div>
+                    {popularMovies.length === 0 ? (
+                        <p class="text-gray-500 text-sm py-8 text-center">No hay películas que coincidan con los filtros.</p>
+                    ) : (
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                            {popularMovies.map((item) => (
+                                <div class="card-wrapper group">
+                                    <CardMovie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            title={item.title}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            release_date={item.release_date}
+                                            genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
         )}
 
@@ -73,29 +112,35 @@ const totalPages = 250;
                         <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
                         Series
                     </h2>
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
-                        {
-                            popularSeries.map((item) => (
-                                    <div class="card-wrapper group">
-                                        <CardSerie
-                                                id={item.id.toString()}
-                                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                                name={item.name}
-                                                vote_average={item.vote_average}
-                                                overview={item.overview}
-                                                first_air_date={item.first_air_date}
-                                                seasons={item.seasons}
-                                                last_episode_to_air={item.last_episode_to_air}
-                                                next_episode_to_air={item.next_episode_to_air}
-                                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                        />
-                                    </div>
-                            ))
-                        }
-                    </div>
+                    {popularSeries.length === 0 ? (
+                        <p class="text-gray-500 text-sm py-8 text-center">No hay series que coincidan con los filtros.</p>
+                    ) : (
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                            {popularSeries.map((item) => (
+                                <div class="card-wrapper group">
+                                    <CardSerie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            name={item.name}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            first_air_date={item.first_air_date}
+                                            seasons={item.seasons}
+                                            last_episode_to_air={item.last_episode_to_air}
+                                            next_episode_to_air={item.next_episode_to_air}
+                                            genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
         )}
 
-        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => `?page=${p}&type=${type}`} />
+        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => {
+            const q = new URLSearchParams(urlParams);
+            q.set('page', String(p));
+            return `?${q.toString()}`;
+        }} />
     </div>
 </Layout>

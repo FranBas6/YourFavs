@@ -1,0 +1,53 @@
+---
+import { NETWORKS } from "../services/API/shared/tmdbDiscoverService";
+
+interface Props {
+    activeNetwork?: string;
+    /** Construye la URL del link para un networkId dado (o '' para "Todas"). */
+    buildUrl: (networkId: string) => string;
+}
+
+const { activeNetwork = "", buildUrl } = Astro.props;
+
+const options = [
+    { id: '', name: 'Todas' },
+    ...NETWORKS.map((n) => ({ id: String(n.id), name: n.name })),
+];
+
+const activeOption = options.find((o) => o.id === activeNetwork) || options[0];
+
+const pillClass = (isActive: boolean) =>
+    `inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+        isActive
+            ? 'bg-blue-600 text-white border-blue-600'
+            : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+    }`;
+---
+<!-- Mobile: details con summary "Cambiar cadena" + pills desplegables -->
+<details class="mb-6 sm:hidden group">
+    <summary class="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer text-sm font-medium text-gray-700">
+        <span>Cadena: <strong class="text-gray-900">{activeOption.name}</strong></span>
+        <svg class="w-4 h-4 text-gray-4000 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+        </svg>
+    </summary>
+    <div class="flex flex-wrap gap-2 mt-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+        {options.map((o) => (
+            <a href={buildUrl(o.id)} class={pillClass(activeNetwork === o.id)}>
+                {o.name}
+            </a>
+        ))}
+    </div>
+</details>
+
+<!-- Desktop: pills planos -->
+<div class="hidden sm:block mb-6">
+    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Cadena TV</p>
+    <div class="flex flex-wrap gap-2">
+        {options.map((o) => (
+            <a href={buildUrl(o.id)} class={pillClass(activeNetwork === o.id)}>
+                {o.name}
+            </a>
+        ))}
+    </div>
+</div>

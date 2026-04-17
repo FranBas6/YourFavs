@@ -2,10 +2,12 @@
 import Layout from "../../layouts/Layout.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getTrending} from "../../services/API/shared/tmdbDiscoverService";
+import {getTrending, getTrendingPeople, parseAdvancedFilters, hasActiveFilters, applyClientFilters} from "../../services/API/shared/tmdbDiscoverService";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import FilterBar from "../../components/FilterBar.astro";
+import AdvancedFilters from "../../components/AdvancedFilters.astro";
+import CardActor from "../../components/Cards/CardActor.astro";
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
@@ -15,30 +17,53 @@ const urlParams = new URL(Astro.request.url).searchParams;
 const type = urlParams.get('type') || 'all';
 const timeWindow = urlParams.get('time') === 'day' ? 'day' : 'week';
 
-const [trendingMovies, trendingSeries] = await Promise.all([
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+
+const [rawMovies, rawSeries, trendingPeople] = await Promise.all([
     getTrending<Movie>('movie', timeWindow),
     getTrending<Serie>('tv', timeWindow),
+    getTrendingPeople(timeWindow),
 ]);
+
+// Los endpoints /trending no soportan params de discover, así que filtramos en memoria.
+// El filtro de duración (runtime) no aplica — no viene en la respuesta de trending.
+const trendingMovies = filtersActive ? applyClientFilters(rawMovies, filters, 'movie') : rawMovies;
+const trendingSeries = filtersActive ? applyClientFilters(rawSeries, filters, 'tv') : rawSeries;
+
+function buildFilterUrl(changes: Record<string, string | null>) {
+    const p = new URLSearchParams(urlParams);
+    for (const [k, v] of Object.entries(changes)) {
+        if (v === null || v === '') p.delete(k);
+        else p.set(k, v);
+    }
+    return `?${p.toString()}`;
+}
 ---
 <Layout title="Tendencias">
     <div class="px-1 sm:py-8">
         <header class="mb-8">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Tendencias</h1>
             <p class="text-gray-500 text-base mb-4">Lo más trending {timeWindow === 'day' ? 'de hoy' : 'de la semana'} en películas y series</p>
-
-            <div class="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit mx-auto sm:mx-0">
-                <a href={`?time=week&type=${type}`}
-                   class={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${timeWindow === 'week' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Esta semana
-                </a>
-                <a href={`?time=day&type=${type}`}
-                   class={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${timeWindow === 'day' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Hoy
-                </a>
-            </div>
         </header>
 
-        <FilterBar currentType={type} buildUrl={(t) => `?time=${timeWindow}&type=${t}`} />
+        <FilterBar currentType={type} buildUrl={(t) => buildFilterUrl({ type: t })} showPeople />
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} hideCoreFilters={type === 'people'}>
+            <div slot="before">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Período</p>
+                <div class="flex flex-wrap gap-2">
+                    <a href={buildFilterUrl({ time: 'week' })}
+                       class={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${timeWindow === 'week' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
+                        Esta semana
+                    </a>
+                    <a href={buildFilterUrl({ time: 'day' })}
+                       class={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${timeWindow === 'day' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
+                        Hoy
+                    </a>
+                </div>
+            </div>
+        </AdvancedFilters>
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span><strong class="text-gray-900">{trendingMovies.length + trendingSeries.length}</strong> títulos en tendencia</span>
@@ -93,6 +118,27 @@ const [trendingMovies, trendingSeries] = await Promise.all([
                                 last_episode_to_air={item.last_episode_to_air}
                                 next_episode_to_air={item.next_episode_to_air}
                                 genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                            />
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {(type === 'all' || type === 'people') && trendingPeople.length > 0 && (
+            <div class="mb-12" id="personas">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
+                    Personas en tendencia
+                </h2>
+                <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                    {trendingPeople.slice(0, 20).map((person) => (
+                        <div class="card-wrapper group">
+                            <CardActor
+                                id={person.id.toString()}
+                                nombre={person.name}
+                                imagen={person.profile_path ? `https://image.tmdb.org/t/p/w500${person.profile_path}` : "/placeholder-actor.jpg"}
+                                popularidad={person.popularity}
                             />
                         </div>
                     ))}

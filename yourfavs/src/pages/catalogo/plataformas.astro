@@ -6,8 +6,11 @@ import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
+import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
+import {PROVIDERS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams} from "../../services/API/shared/tmdbDiscoverService";
 import {platformList, fetchAllPlatforms, fetchPlatformBySlug} from "../../utils/constants/platforms";
 import FilterBar from "../../components/FilterBar.astro";
+import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
 import '../../styles/pages/catalogo/shared.css';
 
@@ -17,10 +20,43 @@ const pageStr = page.toString();
 const platformParam = urlParams.get('platform') || 'all';
 const type = urlParams.get('type') || 'all';
 
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+
+// Slug local → provider_id de TMDB
+const SLUG_TO_PROVIDER_ID: Record<string, number> = {
+    netflix: PROVIDERS.NETFLIX,
+    amazon: PROVIDERS.AMAZON,
+    disney: PROVIDERS.DISNEY,
+    hbo: PROVIDERS.HBO,
+    apple: PROVIDERS.APPLE,
+    movistar: PROVIDERS.MOVISTAR,
+    filmin: PROVIDERS.FILMIN,
+};
+
 let movies: Movie[] = [];
 let series: Serie[] = [];
 
-if (platformParam === 'all') {
+if (filtersActive) {
+    // Con filtros: discover directo combinando with_watch_providers + watch_region + filtros.
+    // Si platform === 'all', combinamos TODOS los providers con OR (pipe).
+    const providerIds = platformParam === 'all'
+        ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
+        : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
+
+    const buildParams = (mt: 'movie' | 'tv') => ({
+        page: pageStr,
+        sort_by: 'popularity.desc',
+        watch_region: 'ES',
+        with_watch_providers: providerIds,
+        ...buildDiscoverFilterParams(filters, mt),
+    });
+
+    [movies, series] = await Promise.all([
+        tmdbFetchList<Movie>('/discover/movie', buildParams('movie')),
+        tmdbFetchList<Serie>('/discover/tv', buildParams('tv')),
+    ]);
+} else if (platformParam === 'all') {
     const allPlatforms = await fetchAllPlatforms(pageStr);
     const allMovies = allPlatforms.flatMap(p => p.movies);
     const allSeries = allPlatforms.flatMap(p => p.series);
@@ -34,6 +70,30 @@ if (platformParam === 'all') {
 
 const totalPages = 190;
 const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p => p.slug === platformParam)?.name || platformParam;
+
+function buildFilterUrl(changes: Record<string, string | null>) {
+    const p = new URLSearchParams(urlParams);
+    for (const [k, v] of Object.entries(changes)) {
+        if (v === null || v === '') p.delete(k);
+        else p.set(k, v);
+    }
+    p.set('page', '1');
+    return `?${p.toString()}`;
+}
+
+function buildTypeUrl(t: string) {
+    const changes: Record<string, string | null> = { type: t };
+    if (t !== 'series') changes.status = null;
+    if (t !== 'movies') changes.runtime = null;
+    return buildFilterUrl(changes);
+}
+
+function buildPlatformUrl(slug: string) {
+    const p = new URLSearchParams(urlParams);
+    p.set('platform', slug);
+    p.set('page', '1');
+    return `?${p.toString()}`;
+}
 ---
 <Layout title="Plataformas">
     <section class="px-1 sm:py-8">
@@ -51,7 +111,7 @@ const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p =
                 </svg>
             </summary>
             <div class="flex flex-wrap gap-2 mt-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                <a href={`?page=1&type=${type}&platform=all`}
+                <a href={buildPlatformUrl('all')}
                    class={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border
                        ${platformParam === 'all'
                            ? 'bg-blue-600 text-white border-blue-600'
@@ -59,7 +119,7 @@ const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p =
                     Todas
                 </a>
                 {platformList.map((platform) => (
-                    <a href={`?page=1&type=${type}&platform=${platform.slug}`}
+                    <a href={buildPlatformUrl(platform.slug)}
                        class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border
                            ${platformParam === platform.slug
                                ? 'bg-blue-600 text-white border-blue-600'
@@ -71,7 +131,7 @@ const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p =
             </div>
         </details>
         <div class="hidden sm:flex flex-wrap gap-2 mb-6">
-            <a href={`?page=1&type=${type}&platform=all`}
+            <a href={buildPlatformUrl('all')}
                class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
                    ${platformParam === 'all'
                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
@@ -79,7 +139,7 @@ const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p =
                 Todas
             </a>
             {platformList.map((platform) => (
-                <a href={`?page=1&type=${type}&platform=${platform.slug}`}
+                <a href={buildPlatformUrl(platform.slug)}
                    class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
                        ${platformParam === platform.slug
                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
@@ -90,7 +150,9 @@ const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p =
             ))}
         </div>
 
-        <FilterBar currentType={type} buildUrl={(t) => `?page=1&type=${t}&platform=${platformParam}`} />
+        <FilterBar currentType={type} buildUrl={buildTypeUrl} />
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages} · <strong class="text-gray-700">{activePlatform}</strong></span>
@@ -156,10 +218,14 @@ const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p =
         {movies.length === 0 && series.length === 0 && (
             <div class="text-center py-12">
                 <h3 class="text-xl font-medium text-gray-700 mb-2">No se encontraron resultados</h3>
-                <p class="text-gray-500">Intenta con otra plataforma o página</p>
+                <p class="text-gray-500">Intenta con otra plataforma o ajusta los filtros</p>
             </div>
         )}
 
-        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => `?page=${p}&type=${type}&platform=${platformParam}`} />
+        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => {
+            const q = new URLSearchParams(urlParams);
+            q.set('page', String(p));
+            return `?${q.toString()}`;
+        }} />
     </section>
 </Layout>

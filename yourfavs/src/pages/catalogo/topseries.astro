@@ -2,24 +2,83 @@
 import Layout from "../../layouts/Layout.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getTopRatedSeries} from "../../services/API/Series/tmdbSeries";
+import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams} from "../../services/API/shared/tmdbDiscoverService";
+import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
+
+const NETWORK_OPTIONS = [
+    { id: '', name: 'Todas' },
+    ...NETWORKS.map((n) => ({ id: String(n.id), name: n.name })),
+];
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import Pagination from "../../components/Pagination.astro";
+import AdvancedFilters from "../../components/AdvancedFilters.astro";
+import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
 
-const page = Number(Astro.request.url.split('?page=')[1] || 1);
-const popularSeries = await getTopRatedSeries({page: page.toString()});
+const urlParams = new URL(Astro.request.url).searchParams;
+const page = Number(urlParams.get('page') || 1);
+const pageStr = page.toString();
+const networkParam = urlParams.get('network') || "";
+const networkId = networkParam ? Number(networkParam) : null;
+const activeNetwork = NETWORKS.find((n) => n.id === networkId) || null;
+
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+
+// Prioridad: si hay network O filtros avanzados, usamos /discover/tv
+// combinando ambos. Si no, usamos el endpoint top_rated por defecto.
+let popularSeries: Serie[];
+if (networkId || filtersActive) {
+    const params: Record<string, string> = {
+        page: pageStr,
+        sort_by: 'vote_average.desc',
+        'vote_count.gte': '100',
+        ...buildDiscoverFilterParams(filters, 'tv'),
+    };
+    if (networkId) params.with_networks = networkId.toString();
+    popularSeries = await tmdbFetchList<Serie>('/discover/tv', params);
+} else {
+    popularSeries = await getTopRatedSeries({page: pageStr});
+}
+
 const totalPages = 113;
 
-const startIndex = (page - 1) * 20 + 1;
-const endIndex = Math.min(page * 20, totalPages * 20);
+function buildFilterUrl(changes: Record<string, string | null>) {
+    const p = new URLSearchParams(urlParams);
+    for (const [k, v] of Object.entries(changes)) {
+        if (v === null || v === '') p.delete(k);
+        else p.set(k, v);
+    }
+    p.set('page', '1');
+    return `?${p.toString()}`;
+}
+
 ---
 <Layout title="Top Series">
     <section class="px-1 sm:py-8">
         <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Top Series</h1>
-            <p class="text-gray-500 text-base">Las series mejor valoradas por la crítica y el público</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+                {activeNetwork ? `Series de ${activeNetwork.name}` : 'Top Series'}
+            </h1>
+            <p class="text-gray-500 text-base">
+                {activeNetwork ? `Producciones originales y destacadas de ${activeNetwork.name}` : 'Las series mejor valoradas por la crítica y el público'}
+            </p>
         </header>
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} showStatus>
+            <div slot="before">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Cadena TV</p>
+                <div class="flex flex-wrap gap-2">
+                    {NETWORK_OPTIONS.map((o) => (
+                        <a href={buildFilterUrl({ network: o.id || null })}
+                           class={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${networkParam === o.id ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>
+                            {o.name}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        </AdvancedFilters>
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>
@@ -29,28 +88,33 @@ const endIndex = Math.min(page * 20, totalPages * 20);
             </div>
         </div>
 
-        <!-- Grid mejorado con loading states visuales -->
-        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
-            {
-                popularSeries.map((item) => (
-                        <div class="card-wrapper group">
-                            <CardSerie
-                                    id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                    name={item.name}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    first_air_date={item.first_air_date}
-                                    seasons={item.seasons}
-                                    last_episode_to_air={item.last_episode_to_air}
-                                    next_episode_to_air={item.next_episode_to_air}
-                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            />
-                        </div>
-                ))
-            }
-        </div>
+        {popularSeries.length === 0 ? (
+            <p class="text-gray-500 text-sm py-8 text-center">No hay series que coincidan con los filtros.</p>
+        ) : (
+            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                {popularSeries.map((item) => (
+                    <div class="card-wrapper group">
+                        <CardSerie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                name={item.name}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                first_air_date={item.first_air_date}
+                                seasons={item.seasons}
+                                last_episode_to_air={item.last_episode_to_air}
+                                next_episode_to_air={item.next_episode_to_air}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                        />
+                    </div>
+                ))}
+            </div>
+        )}
 
-        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => `?page=${p}`} />
+        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => {
+            const q = new URLSearchParams(urlParams);
+            q.set('page', String(p));
+            return `?${q.toString()}`;
+        }} />
     </section>
 </Layout>

@@ -6,6 +6,7 @@ import {
     getAdditionalInfo as sharedGetAdditionalInfo,
     getDirectorsAndRoles as sharedGetDirectorsAndRoles,
     mapAndDeduplicateProviders,
+    buildProvidersByCountry,
     getRecommendationsOrSimilar as sharedGetRecommendationsOrSimilar,
 } from '../shared/tmdbInfoService';
 
@@ -50,6 +51,7 @@ export const getMovieById = async ({ id }: { id: string }) => {
     const providersData = await tmdbFetch<{ results: any }>(`/movie/${id}/watch/providers`, {});
     const esProviders = providersData.results?.ES || {};
     movie.providers = mapAndDeduplicateProviders(esProviders);
+    movie.providersByCountry = buildProvidersByCountry(providersData.results);
 
     return movie;
 };

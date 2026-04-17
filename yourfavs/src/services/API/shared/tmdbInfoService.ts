@@ -96,6 +96,41 @@ export async function getAdditionalInfo(
 }
 
 /**
+ * Lista curada de países soportados por el selector "Dónde ver" multi-región.
+ * El primer país es el default (ES).
+ */
+export const SUPPORTED_COUNTRIES: { code: string; label: string }[] = [
+    { code: 'ES', label: 'España' },
+    { code: 'US', label: 'Estados Unidos' },
+    { code: 'MX', label: 'México' },
+    { code: 'AR', label: 'Argentina' },
+    { code: 'CO', label: 'Colombia' },
+    { code: 'CL', label: 'Chile' },
+    { code: 'GB', label: 'Reino Unido' },
+    { code: 'FR', label: 'Francia' },
+    { code: 'DE', label: 'Alemania' },
+    { code: 'IT', label: 'Italia' },
+    { code: 'BR', label: 'Brasil' },
+    { code: 'JP', label: 'Japón' },
+];
+
+/**
+ * Convierte el campo `results` (por país) de TMDB watch/providers en un
+ * diccionario ya deduplicado por país, filtrado a los países soportados.
+ */
+export function buildProvidersByCountry(rawResults: Record<string, any> | undefined) {
+    const out: Record<string, ReturnType<typeof mapAndDeduplicateProviders>> = {};
+    if (!rawResults) return out;
+    for (const { code } of SUPPORTED_COUNTRIES) {
+        const raw = rawResults[code];
+        if (raw) {
+            out[code] = mapAndDeduplicateProviders(raw);
+        }
+    }
+    return out;
+}
+
+/**
  * Mapear y deduplicar proveedores de streaming (flatrate > rent > buy)
  */
 export function mapAndDeduplicateProviders(esProviders: any) {

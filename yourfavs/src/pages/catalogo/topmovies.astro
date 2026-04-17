@@ -2,17 +2,36 @@
 import Layout from "../../layouts/Layout.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import {getTopRatedMovies} from "../../services/API/Movies/tmdbMovies";
+import {discoverContent, parseAdvancedFilters, hasActiveFilters} from "../../services/API/shared/tmdbDiscoverService";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
+import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
+import type {Movie} from "../../types/ApiMovie";
 import '../../styles/pages/catalogo/shared.css';
 
-const page = Number(Astro.request.url.split('?page=')[1] || 1);
-const popularMovies = await getTopRatedMovies({page: page.toString()});
+const urlParams = new URL(Astro.request.url).searchParams;
+const page = Number(urlParams.get('page') || 1);
+const pageStr = page.toString();
+
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+
+const popularMovies = filtersActive
+    ? await discoverContent<Movie>('movie', filters, { sort_by: 'vote_average.desc', voteCountMin: '300', page: pageStr })
+    : await getTopRatedMovies({page: pageStr});
+
 const totalPages = 500;
 
-const startIndex = (page - 1) * 20 + 1;
-const endIndex = Math.min(page * 20, totalPages * 20);
+function buildFilterUrl(changes: Record<string, string | null>) {
+    const p = new URLSearchParams(urlParams);
+    for (const [k, v] of Object.entries(changes)) {
+        if (v === null || v === '') p.delete(k);
+        else p.set(k, v);
+    }
+    p.set('page', '1');
+    return `?${p.toString()}`;
+}
 ---
 <Layout title="Top Películas">
     <section class="px-1 sm:py-8">
@@ -20,6 +39,8 @@ const endIndex = Math.min(page * 20, totalPages * 20);
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Top Películas</h1>
             <p class="text-gray-500 text-base">Las películas mejor valoradas por la crítica y el público</p>
         </header>
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>
@@ -29,25 +50,30 @@ const endIndex = Math.min(page * 20, totalPages * 20);
             </div>
         </div>
 
-        <!-- Grid mejorado con loading states visuales -->
-        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
-            {
-                popularMovies.map((item) => (
-                        <div class="card-wrapper group">
-                            <CardMovie
-                                    id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                    title={item.title}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    release_date={item.release_date}
-                                    genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            />
-                        </div>
-                ))
-            }
-        </div>
+        {popularMovies.length === 0 ? (
+            <p class="text-gray-500 text-sm py-8 text-center">No hay películas que coincidan con los filtros.</p>
+        ) : (
+            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                {popularMovies.map((item) => (
+                    <div class="card-wrapper group">
+                        <CardMovie
+                                id={item.id.toString()}
+                                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                title={item.title}
+                                vote_average={item.vote_average}
+                                overview={item.overview}
+                                release_date={item.release_date}
+                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                        />
+                    </div>
+                ))}
+            </div>
+        )}
 
-        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => `?page=${p}`} />
+        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => {
+            const q = new URLSearchParams(urlParams);
+            q.set('page', String(p));
+            return `?${q.toString()}`;
+        }} />
     </section>
 </Layout>

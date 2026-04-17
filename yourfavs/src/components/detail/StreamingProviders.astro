@@ -1,44 +1,134 @@
 ---
-interface ProviderElement {
-    name: string;
-    logo: string | null;
-    link: string | undefined;
-    type: string;
+import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { providerLinks } from "../../utils/constants/helpers/media-helpers";
+
+interface RawProvider {
+    provider_id: number;
+    provider_name: string;
+    logo_path: string;
+    type: 'flatrate' | 'rent' | 'buy';
 }
 
 interface Props {
-    providersByType: Record<string, ProviderElement[]>;
+    /** Diccionario país → lista de providers deduplicados (ver buildProvidersByCountry). */
+    providersByCountry: Record<string, RawProvider[]>;
     title?: string;
 }
 
-const { providersByType, title = "Dónde ver" } = Astro.props;
-const hasAny = Object.values(providersByType).some((arr) => arr && arr.length > 0);
+const { providersByCountry, title = "Dónde ver" } = Astro.props;
+
+const availableCountries = SUPPORTED_COUNTRIES.filter(
+    (c) => providersByCountry[c.code] && providersByCountry[c.code].length > 0
+);
 
 const TYPE_LABELS: Record<string, string> = {
     flatrate: "Suscripción",
     rent: "Alquiler",
     buy: "Compra",
 };
+
+const defaultCountry = availableCountries.some((c) => c.code === 'ES')
+    ? 'ES'
+    : availableCountries[0]?.code;
+
+/** Agrupa providers por tipo preservando el orden flatrate/rent/buy. */
+function groupByType(list: RawProvider[]) {
+    const by: Record<string, RawProvider[]> = {};
+    for (const p of list) {
+        const k = p.type || 'flatrate';
+        if (!by[k]) by[k] = [];
+        by[k].push(p);
+    }
+    return by;
+}
 ---
-{hasAny && (
-    <div class="bg-white rounded-xl border border-gray-200 p-4">
+{availableCountries.length > 0 && defaultCountry && (
+    <div class="bg-white rounded-xl border border-gray-200 p-4" data-streaming-providers>
         <h3 class="text-base font-semibold text-gray-800 mb-3">{title}</h3>
-        <div class="space-y-3">
-            {Object.entries(TYPE_LABELS).map(([key, label]) => (
-                providersByType[key] && providersByType[key].length > 0 && (
-                    <div>
-                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">{label}</p>
-                        <div class="space-y-1.5">
-                            {providersByType[key].map((p) => (
-                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
-                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
-                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
-                                </a>
-                            ))}
-                        </div>
-                    </div>
-                )
-            ))}
-        </div>
+
+        {availableCountries.length > 1 && (
+            <details class="mb-3 group" data-country-picker>
+                <summary class="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer text-sm font-medium text-gray-700">
+                    <span>País: <strong data-country-label class="text-gray-900">{availableCountries.find((c) => c.code === defaultCountry)?.label}</strong></span>
+                    <svg class="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </summary>
+                <div class="flex flex-wrap gap-1.5 mt-2 p-2 bg-white rounded-lg border border-gray-100">
+                    {availableCountries.map((c) => (
+                        <button
+                            type="button"
+                            data-country-btn={c.code}
+                            class:list={[
+                                "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                                c.code === defaultCountry
+                                    ? "bg-gray-800 text-white border-gray-800"
+                                    : "bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700",
+                            ]}
+                        >
+                            {c.label}
+                        </button>
+                    ))}
+                </div>
+            </details>
+        )}
+
+        {availableCountries.map((c) => {
+            const grouped = groupByType(providersByCountry[c.code]);
+            const hidden = c.code !== defaultCountry;
+            return (
+                <div data-country={c.code} class:list={["space-y-3", hidden && "hidden"]}>
+                    {Object.entries(TYPE_LABELS).map(([key, label]) => (
+                        grouped[key] && grouped[key].length > 0 && (
+                            <div>
+                                <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">{label}</p>
+                                <div class="space-y-1.5">
+                                    {grouped[key].map((p) => (
+                                        <a href={providerLinks[p.provider_name] || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
+                                            {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt={p.provider_name} class="w-7 h-7 rounded" />}
+                                            <span class="text-sm sm:text-base text-gray-700">{p.provider_name}</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    ))}
+                </div>
+            );
+        })}
     </div>
 )}
+
+<script is:inline>
+    (function () {
+        document.querySelectorAll('[data-streaming-providers]').forEach(function (root) {
+            var label = root.querySelector('[data-country-label]');
+            var picker = root.querySelector('[data-country-picker]');
+            root.querySelectorAll('[data-country-btn]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var code = btn.getAttribute('data-country-btn');
+                    // Toggle visibility de secciones por país
+                    root.querySelectorAll('[data-country]').forEach(function (el) {
+                        if (el.getAttribute('data-country') === code) el.classList.remove('hidden');
+                        else el.classList.add('hidden');
+                    });
+                    // Actualizar label del summary
+                    if (label) label.textContent = btn.textContent.trim();
+                    // Actualizar estilo activo de los botones
+                    root.querySelectorAll('[data-country-btn]').forEach(function (b) {
+                        var isActive = b === btn;
+                        b.classList.toggle('bg-gray-800', isActive);
+                        b.classList.toggle('text-white', isActive);
+                        b.classList.toggle('border-gray-800', isActive);
+                        b.classList.toggle('bg-white', !isActive);
+                        b.classList.toggle('text-gray-500', !isActive);
+                        b.classList.toggle('border-gray-200', !isActive);
+                    });
+                    // Cerrar el details
+                    if (picker) picker.open = false;
+                });
+            });
+        });
+    })();
+</script>

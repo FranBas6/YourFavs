@@ -7,6 +7,8 @@ import type {Serie} from "../types/ApiSerie";
 import {getLatestMovies, getMostPopularMovies, getTopRatedMovies, getMoviesByCategory} from "../services/API/Movies/tmdbMovies";
 import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCategory} from "../services/API/Series/tmdbSeries";
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
+import {getContinueWatchingData} from "../services/API/Series/continueWatching";
+import ContinueWatching from "../components/Sections/ContinueWatching.astro";
 import {fetchAllPlatforms} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
@@ -33,6 +35,7 @@ const [
     platforms,
     categoriesMovies,
     categoriesSeries,
+    continueWatching,
 ] = await Promise.all([
     getTrending<Movie>('movie', 'week'),
     getTrending<Serie>('tv', 'week'),
@@ -45,6 +48,7 @@ const [
     fetchAllPlatforms(pageStr),
     getMoviesByCategory(randomCategorySlug, pageStr),
     getSeriesByCategory(randomCategorySlug, pageStr),
+    getContinueWatchingData().catch(() => []),
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
@@ -154,6 +158,13 @@ const sections = [
                         <strong>Tu entretenimiento favorito</strong> en un solo lugar.
                     </p>
                 </div>
+            </div>
+        )}
+
+        <!-- Continuar viendo (solo si hay series con progreso pendiente) -->
+        {continueWatching.length > 0 && (
+            <div class="content-wrapper">
+                <ContinueWatching items={continueWatching} />
             </div>
         )}
 

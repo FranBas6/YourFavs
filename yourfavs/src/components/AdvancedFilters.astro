@@ -1,0 +1,163 @@
+---
+import type { AdvancedFilters } from "../services/API/shared/tmdbDiscoverService";
+
+interface Props {
+    filters: AdvancedFilters;
+    /** Construye la URL aplicando un cambio parcial (o null para eliminar una key). */
+    buildUrl: (changes: Record<string, string | null>) => string;
+    /** Si es false, no muestra el filtro de duración (solo aplica a movies). */
+    showRuntime?: boolean;
+    /** Si es true, muestra el filtro de estado de serie (solo aplica a TV). */
+    showStatus?: boolean;
+    /** Si true, oculta los grupos de filtros pero sigue renderizando slots.
+     *  Útil cuando el contexto no tiene sentido (ej: vista de actores). */
+    hideCoreFilters?: boolean;
+}
+
+const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false } = Astro.props;
+
+const DECADES = [
+    { value: '', label: 'Cualquier' },
+    { value: '2020', label: '2020s' },
+    { value: '2010', label: '2010s' },
+    { value: '2000', label: '2000s' },
+    { value: '1990', label: '90s' },
+    { value: '1980', label: '80s' },
+    { value: '1970', label: '70s' },
+    { value: '1960', label: '60s' },
+];
+
+const RATINGS = [
+    { value: '', label: 'Cualquier' },
+    { value: '7', label: '7+' },
+    { value: '8', label: '8+' },
+    { value: '9', label: '9+' },
+];
+
+const RUNTIMES = [
+    { value: '', label: 'Cualquier' },
+    { value: 'short', label: '< 90 min' },
+    { value: 'medium', label: '90–150 min' },
+    { value: 'long', label: '> 150 min' },
+];
+
+const LANGUAGES = [
+    { value: '', label: 'Cualquier' },
+    { value: 'es', label: 'Español' },
+    { value: 'en', label: 'Inglés' },
+    { value: 'ja', label: 'Japonés' },
+    { value: 'ko', label: 'Coreano' },
+    { value: 'fr', label: 'Francés' },
+    { value: 'it', label: 'Italiano' },
+    { value: 'de', label: 'Alemán' },
+    { value: 'pt', label: 'Portugués' },
+    { value: 'zh', label: 'Chino' },
+];
+
+const STATUSES = [
+    { value: '', label: 'Cualquier' },
+    { value: '0', label: 'En emisión' },
+    { value: '3', label: 'Finalizada' },
+    { value: '4', label: 'Cancelada' },
+];
+
+const activeCount = [filters.decade, filters.year, filters.rating, filters.runtime, filters.language, filters.status].filter(Boolean).length;
+const hasActive = activeCount > 0;
+
+const pillClass = (isActive: boolean) =>
+    `inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
+        isActive
+            ? 'bg-indigo-600 text-white border-indigo-600'
+            : 'bg-white text-gray-600 border-gray-200 hover:border-indigo-300 hover:text-indigo-600'
+    }`;
+---
+<div class="mb-6">
+    <details class="group" open={hasActive}>
+        <summary class="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer text-sm font-medium text-gray-700 hover:border-indigo-300 transition-colors">
+            <span class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 4h18M6 8h12M10 12h4M12 16h0"/>
+                </svg>
+                Filtros
+                {hasActive && (
+                    <span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold bg-indigo-600 text-white">
+                        {activeCount}
+                    </span>
+                )}
+            </span>
+            <svg class="w-4 h-4 text-gray-500 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </summary>
+
+        <div class="mt-2 p-4 bg-white rounded-xl border border-gray-100 shadow-sm space-y-4">
+            <slot name="before" />
+            {!hideCoreFilters && (
+                <Fragment>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Década</p>
+                        <div class="flex flex-wrap gap-2">
+                            {DECADES.map((d) => (
+                                <a href={buildUrl({ decade: d.value || null, year: null })} class={pillClass(!filters.year && (filters.decade || '') === d.value)}>
+                                    {d.label}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Nota mínima</p>
+                        <div class="flex flex-wrap gap-2">
+                            {RATINGS.map((r) => (
+                                <a href={buildUrl({ rating: r.value || null })} class={pillClass((filters.rating || '') === r.value)}>
+                                    {r.label}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                    {showRuntime && (
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Duración</p>
+                            <div class="flex flex-wrap gap-2">
+                                {RUNTIMES.map((r) => (
+                                    <a href={buildUrl({ runtime: r.value || null })} class={pillClass((filters.runtime || '') === r.value)}>
+                                        {r.label}
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <div>
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Idioma original</p>
+                        <div class="flex flex-wrap gap-2">
+                            {LANGUAGES.map((l) => (
+                                <a href={buildUrl({ language: l.value || null })} class={pillClass((filters.language || '') === l.value)}>
+                                    {l.label}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                    {showStatus && (
+                        <div>
+                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Estado de la serie</p>
+                            <div class="flex flex-wrap gap-2">
+                                {STATUSES.map((s) => (
+                                    <a href={buildUrl({ status: s.value || null })} class={pillClass((filters.status || '') === s.value)}>
+                                        {s.label}
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </Fragment>
+            )}
+            <slot name="after" />
+            {hasActive && (
+                <div class="pt-2 border-t border-gray-100">
+                    <a href={buildUrl({ decade: null, year: null, rating: null, runtime: null, language: null, status: null })} class="inline-flex items-center gap-1 text-sm text-red-600 hover:text-red-800 font-medium">
+                        ✕ Limpiar filtros
+                    </a>
+                </div>
+            )}
+        </div>
+    </details>
+</div>
