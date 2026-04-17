@@ -7,6 +7,7 @@ import {
 } from "../../utils/constants/helpers/media-helpers";
 import {formatCurrency} from "../../utils/constants/helpers/movie-helpers";
 import {handleMovieFavAction} from "../../services/BD/movies/yourfavsMovie";
+import '../../styles/shared/detail-common.css';
 import '../../styles/pages/movie/movie.css';
 import {
     getMovieById, getMovieCast, getMovieDirectorsAndRoles,
@@ -17,8 +18,17 @@ import { posterUrl, backdropUrl, originalUrl, tmdbFetch } from "../../services/A
 import {initializeApp} from "firebase/app";
 import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
+import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import NotificationBell from "../../components/personal/NotificationBell.astro";
+import CastGrid from "../../components/detail/CastGrid.astro";
+import CrewGrid from "../../components/detail/CrewGrid.astro";
+import ProductionCompanies from "../../components/detail/ProductionCompanies.astro";
+import ReviewsSection from "../../components/detail/ReviewsSection.astro";
+import LightboxGallery from "../../components/detail/LightboxGallery.astro";
+import VideoSection from "../../components/detail/VideoSection.astro";
+import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
+import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -83,48 +93,18 @@ const clientData = {
     release_date: item?.release_date || '',
 };
 
-// Verificar existencia en todas las listas incluyendo Ver Pronto
-const docRefFavs = doc(db, "MovieFavs", clientData.id);
-const docRefPendientes = doc(db, "MoviesPendientes", clientData.id);
-const docRefVistas = doc(db, "MoviesVistas", clientData.id);
-const docRefVerPronto = doc(db, "MoviesVerPronto", clientData.id);
-const docRefLiked = doc(db, "LikedMovies", clientData.id);
-
-const [docSnapFavs, docSnapPendientes, docSnapVistas, docSnapVerPronto, docSnapLiked] = await Promise.all([
-    getDoc(docRefFavs),
-    getDoc(docRefPendientes),
-    getDoc(docRefVistas),
-    getDoc(docRefVerPronto),
-    getDoc(docRefLiked)
-]);
-
-const existingFavs = docSnapFavs.exists();
-const existingPendientes = docSnapPendientes.exists();
-const existingVistas = docSnapVistas.exists();
-const existingVerPronto = docSnapVerPronto.exists();
-const existingLiked = docSnapLiked.exists();
-
-// Verificar si la película ya está en cada una de las listas
-const isInFavorites = existingFavs;
-const isInPendientes = existingPendientes;
-const isInVistas = existingVistas;
-const isInVerPronto = existingVerPronto;
-const isInLiked = existingLiked;
+// Verificar existencia en las 5 colecciones de películas (lectura paralela)
+const { exists: movieExists, opinion: opinionFromAny } = await checkMediaExistence('movie', clientData.id);
+const isInFavorites = movieExists.MovieFavs;
+const isInPendientes = movieExists.MoviesPendientes;
+const isInVistas = movieExists.MoviesVistas;
+const isInVerPronto = movieExists.MoviesVerPronto;
+const isInLiked = movieExists.LikedMovies;
 
 // Verificar suscripción de notificación (solo películas no estrenadas)
 const isUnreleased = item?.release_date ? new Date(item.release_date) > new Date() : false;
 const notifSub = isUnreleased ? await getNotificationSub('movie', id) : null;
 const isNotifSubscribed = !!notifSub;
-
-// Opinión actual desde cualquiera de las colecciones
-const opinionFromAny = (
-    (existingFavs && docSnapFavs.data()?.opinion) ||
-    (existingPendientes && docSnapPendientes.data()?.opinion) ||
-    (existingVistas && docSnapVistas.data()?.opinion) ||
-    (existingVerPronto && docSnapVerPronto.data()?.opinion) ||
-    (existingLiked && docSnapLiked.data()?.opinion) ||
-    ''
-) as string;
 
 interface ProviderElement {
     name: string;
@@ -456,52 +436,7 @@ const jsonLd = item ? {
                     })()}
 
                     <!-- Dónde ver -->
-                    {providerElements.length > 0 && (
-                        <div class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-base font-semibold text-gray-800 mb-3">Dónde ver</h3>
-                            <div class="space-y-3">
-                                {providersByType.flatrate && (
-                                    <div>
-                                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">Suscripción</p>
-                                        <div class="space-y-1.5">
-                                            {providersByType.flatrate.map((p) => (
-                                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
-                                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
-                                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                {providersByType.rent && (
-                                    <div>
-                                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">Alquiler</p>
-                                        <div class="space-y-1.5">
-                                            {providersByType.rent.map((p) => (
-                                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
-                                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
-                                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                                {providersByType.buy && (
-                                    <div>
-                                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">Compra</p>
-                                        <div class="space-y-1.5">
-                                            {providersByType.buy.map((p) => (
-                                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
-                                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
-                                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
-                                                </a>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
+                    <StreamingProviders providersByType={providersByType} />
 
                     <!-- Opinión -->
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
@@ -572,35 +507,8 @@ const jsonLd = item ? {
                 <!-- Columna derecha -->
                 <div class="md:w-2/3 space-y-8">
 
-                    <!-- Trailer -->
-                    {trailerUrl && (
-                        <section>
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Trailer</h2>
-                            <div class="aspect-video rounded-xl overflow-hidden shadow-lg">
-                                <iframe src={formatTrailerUrl(trailerUrl)} class="w-full h-full" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
-                            </div>
-                        </section>
-                    )}
-
-                    <!-- Videos extras -->
-                    {(clips.length > 0 || behindScenes.length > 0 || teasers.length > 0) && (
-                        <details class="bg-white rounded-xl border border-gray-200">
-                            <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
-                                <span>Videos extras ({clips.length + behindScenes.length + teasers.length})</span>
-                                <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </summary>
-                            <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {[...clips.slice(0, 4), ...behindScenes.slice(0, 4), ...teasers.slice(0, 4)].map((video) => (
-                                    <div>
-                                        <p class="text-xs text-gray-500 mb-1 truncate">{video.name}</p>
-                                        <div class="aspect-video rounded-lg overflow-hidden">
-                                            <iframe src={formatTrailerUrl(video.key)} class="w-full h-full" allowfullscreen></iframe>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </details>
-                    )}
+                    <!-- Trailer + Videos extras -->
+                    <VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} />
 
                     <!-- Colección/Saga -->
                     {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
@@ -630,156 +538,30 @@ const jsonLd = item ? {
                     )}
 
                     <!-- Pósters -->
-                    {posters && posters.length > 0 && (
-                        <details class="bg-white rounded-xl border border-gray-200">
-                            <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
-                                <span>Pósters ({posters.length})</span>
-                                <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </summary>
-                            <div class="px-5 pb-5 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                                {posters.map((poster, index) => (
-                                    <a href={`#poster-${index}`} class="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity">
-                                        <img src={poster.file_path} alt={`Póster ${index + 1}`} loading="lazy" class="w-full aspect-[2/3] object-cover" />
-                                    </a>
-                                ))}
-                            </div>
-                        </details>
-                    )}
+                    <LightboxGallery posters={posters} prefix="poster" />
 
                     <!-- Reparto (grid cards) -->
-                    {cast.length > 0 && (
-                        <section>
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Reparto Principal</h2>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                {cast.map((actor) => (
-                                    <a href={`/actor/${actor.id}`} class="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
-                                        {actor.profile_path ? (
-                                            <img src={posterUrl(actor.profile_path, 'w185')} alt={actor.name} class="w-14 h-14 rounded-full object-cover flex-shrink-0" loading="lazy" />
-                                        ) : (
-                                            <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                                                <svg class="w-6 h-6 text-gray-4000" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-                                            </div>
-                                        )}
-                                        <div class="min-w-0">
-                                            <p class="text-sm sm:text-base font-medium text-gray-800 truncate">{actor.name}</p>
-                                            {actor.character && <p class="text-xs sm:text-sm text-gray-500 truncate">{actor.character}</p>}
-                                        </div>
-                                    </a>
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    <CastGrid cast={cast} />
 
                     <!-- Equipo -->
-                    {directors.length > 0 && (
-                        <section>
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Equipo de Producción</h2>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {directors.map((member) => (
-                                    <a href={`/team/${encodeURIComponent(member.name)}`} class="p-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
-                                        <p class="text-sm font-medium text-gray-800">{member.name}</p>
-                                        <p class="text-xs text-gray-500">{member.job}</p>
-                                    </a>
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    <CrewGrid crew={directors} />
 
                     <!-- Productoras -->
-                    {item?.production_companies && item.production_companies.length > 0 && (
-                        <section>
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">Productoras</h2>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                {item.production_companies.map((company: ProductionCompany) => (
-                                    <a href={`/productora/${encodeURIComponent(company.name)}?companyId=${company.id}`} class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
-                                        {company.logo_path ? (
-                                            <img src={posterUrl(company.logo_path, 'w200')} alt={company.name} class="h-10 object-contain" loading="lazy" />
-                                        ) : (
-                                            <div class="h-10 flex items-center"><span class="text-xs text-gray-4000">{company.name}</span></div>
-                                        )}
-                                        <span class="text-xs text-gray-600 text-center truncate w-full">{company.name}</span>
-                                    </a>
-                                ))}
-                            </div>
-                        </section>
-                    )}
+                    <ProductionCompanies companies={item?.production_companies || []} />
 
                     <!-- Recomendaciones -->
-                    {moviesRecommendations.length > 0 && (
-                        <section>
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">
-                                {moviesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Películas similares'}
-                            </h2>
-                            <div class="recommendations-carousel">
-                                <div class="recommendations-container flex gap-5 overflow-x-auto pb-4">
-                                    {moviesRecommendations.slice(0, 20).map((movie, index) => (
-                                        <a href={`/movie/${movie.id}`} class="recommendation-card flex-shrink-0 w-40 animate-fade-in-up" style={`animation-delay: ${index * 0.05}s`}>
-                                            <div class="relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-                                                <img src={movie.poster_path || '/placeholder.jpg'} alt={movie.title} loading="lazy" class="w-full aspect-[2/3] object-cover transition-transform duration-300 hover:scale-105" />
-                                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
-                                                    <p class="text-white text-xs line-clamp-3 leading-relaxed">{movie.overview}</p>
-                                                </div>
-                                                {movie.vote_average > 0 && (
-                                                    <span class="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 bg-black/70 text-yellow-400 rounded-lg backdrop-blur-sm">{movie.vote_average.toFixed(1)}</span>
-                                                )}
-                                            </div>
-                                            <p class="mt-2 text-sm font-medium text-gray-800 line-clamp-2">{movie.title}</p>
-                                            <p class="text-xs text-gray-4000">{movie.release_date ? new Date(movie.release_date).getFullYear() : ''}</p>
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        </section>
-                    )}
+                    <RecommendationsCarousel
+                        items={moviesRecommendations}
+                        mediaType="movie"
+                        title={moviesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Películas similares'}
+                    />
 
                     <!-- Reviews de TMDB -->
-                    {reviews.length > 0 && (
-                        <details class="bg-white rounded-xl border border-gray-200">
-                            <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
-                                <span>Opiniones de la comunidad ({reviews.length})</span>
-                                <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </summary>
-                            <div class="px-5 pb-5 space-y-4">
-                                {reviews.map((review) => (
-                                    <details class="border-b border-gray-100 pb-4 last:border-0 last:pb-0 group">
-                                        <summary class="cursor-pointer list-none">
-                                            <div class="flex items-center gap-2 mb-2">
-                                                <span class="text-sm font-medium text-gray-800">{review.author}</span>
-                                                {review.author_details?.rating && (
-                                                    <span class="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded">{review.author_details.rating}/10</span>
-                                                )}
-                                                <span class="text-xs text-gray-4000">{review.created_at ? new Date(review.created_at).toLocaleDateString('es-ES') : ''}</span>
-                                            </div>
-                                            <p class="text-sm text-gray-600 line-clamp-4 group-open:line-clamp-none leading-relaxed">{review.content}</p>
-                                            <span class="text-xs text-blue-500 mt-1 inline-block group-open:hidden">Leer más...</span>
-                                        </summary>
-                                    </details>
-                                ))}
-                            </div>
-                        </details>
-                    )}
+                    <ReviewsSection reviews={reviews} />
                 </div>
             </div>
         </div>
 
-        <!-- Lightbox pósters -->
-        {posters.map((poster, index) => (
-            <div id={`poster-${index}`} class="lightbox fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
-                <a href="#_" class="absolute inset-0" aria-label="Cerrar"></a>
-                <img src={poster.file_path} alt={`Póster ${index + 1}`} class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
-                <a href="#_" class="absolute top-4 right-4 text-white/80 hover:text-white text-3xl font-light leading-none z-10" aria-label="Cerrar">&times;</a>
-                {index > 0 && (
-                    <a href={`#poster-${index - 1}`} class="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10" aria-label="Anterior">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
-                    </a>
-                )}
-                {index < posters.length - 1 && (
-                    <a href={`#poster-${index + 1}`} class="absolute right-14 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10" aria-label="Siguiente">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
-                    </a>
-                )}
-            </div>
-        ))}
     </article>
 </Layout>
 

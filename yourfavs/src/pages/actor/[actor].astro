@@ -10,6 +10,7 @@ import { getGenreName, genresMap } from "../../utils/constants/genres";
 import { sortBycriterion } from "../../utils/sorting";
 import { calculateAge } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
+import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
 import { handleActorFavAction } from "../../services/BD/actors/yourfavsActor";
 import type { ActorsFavs } from "../../services/BD/actors/yourfavsActor";
@@ -332,7 +333,7 @@ const jsonLd = {
 
         <!-- Lightbox modales (CSS :target) -->
         {posters.map((poster, index) => (
-            <div id={`img-${index}`} class="lightbox fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
+            <div id={`img-${index}`} class="lightbox fixed inset-0 items-center justify-center bg-black/80 p-4" style="z-index: 9999;">
                 <a href="#_" class="absolute inset-0" aria-label="Cerrar"></a>
                 <img src={poster.file_path} alt={`${actorInfo.nombre} - Imagen ${index + 1}`}
                      class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
@@ -376,7 +377,7 @@ const jsonLd = {
 
         <!-- Lightbox tagged images -->
         {taggedImages.map((img, index) => (
-            <div id={`tagged-${index}`} class="lightbox fixed inset-0 z-50 items-center justify-center bg-black/80 p-4">
+            <div id={`tagged-${index}`} class="lightbox fixed inset-0 items-center justify-center bg-black/80 p-4" style="z-index: 9999;">
                 <a href="#_" class="absolute inset-0" aria-label="Cerrar"></a>
                 <img src={img.file_path} alt={img.media?.title || img.media?.name || ''}
                      class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />

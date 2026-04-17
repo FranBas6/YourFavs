@@ -1,0 +1,44 @@
+---
+interface ProviderElement {
+    name: string;
+    logo: string | null;
+    link: string | undefined;
+    type: string;
+}
+
+interface Props {
+    providersByType: Record<string, ProviderElement[]>;
+    title?: string;
+}
+
+const { providersByType, title = "Dónde ver" } = Astro.props;
+const hasAny = Object.values(providersByType).some((arr) => arr && arr.length > 0);
+
+const TYPE_LABELS: Record<string, string> = {
+    flatrate: "Suscripción",
+    rent: "Alquiler",
+    buy: "Compra",
+};
+---
+{hasAny && (
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <h3 class="text-base font-semibold text-gray-800 mb-3">{title}</h3>
+        <div class="space-y-3">
+            {Object.entries(TYPE_LABELS).map(([key, label]) => (
+                providersByType[key] && providersByType[key].length > 0 && (
+                    <div>
+                        <p class="text-[10px] font-medium text-gray-4000 uppercase tracking-wide mb-1.5">{label}</p>
+                        <div class="space-y-1.5">
+                            {providersByType[key].map((p) => (
+                                <a href={p.link || '#'} target="_blank" rel="noopener" class="flex items-center gap-2 py-1 hover:bg-gray-50 rounded transition-colors">
+                                    {p.logo && <img src={p.logo} alt={p.name} class="w-7 h-7 rounded" />}
+                                    <span class="text-sm sm:text-base text-gray-700">{p.name}</span>
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                )
+            ))}
+        </div>
+    </div>
+)}

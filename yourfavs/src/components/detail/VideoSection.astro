@@ -1,0 +1,45 @@
+---
+import { formatTrailerUrl } from "../../utils/constants/helpers/media-helpers";
+
+interface Video {
+    name: string;
+    key: string;
+}
+
+interface Props {
+    trailerUrl?: string | null;
+    clips?: Video[];
+    behindScenes?: Video[];
+    teasers?: Video[];
+}
+
+const { trailerUrl, clips = [], behindScenes = [], teasers = [] } = Astro.props;
+const extrasTotal = clips.length + behindScenes.length + teasers.length;
+---
+{trailerUrl && (
+    <section>
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">Trailer</h2>
+        <div class="aspect-video rounded-xl overflow-hidden shadow-lg">
+            <iframe src={formatTrailerUrl(trailerUrl)} class="w-full h-full" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+        </div>
+    </section>
+)}
+
+{extrasTotal > 0 && (
+    <details class="bg-white rounded-xl border border-gray-200">
+        <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
+            <span>Videos extras ({extrasTotal})</span>
+            <svg class="w-5 h-5 text-gray-4000" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+        <div class="px-5 pb-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[...clips.slice(0, 4), ...behindScenes.slice(0, 4), ...teasers.slice(0, 4)].map((video) => (
+                <div>
+                    <p class="text-xs text-gray-500 mb-1 truncate">{video.name}</p>
+                    <div class="aspect-video rounded-lg overflow-hidden">
+                        <iframe src={formatTrailerUrl(video.key)} class="w-full h-full" allowfullscreen></iframe>
+                    </div>
+                </div>
+            ))}
+        </div>
+    </details>
+)}

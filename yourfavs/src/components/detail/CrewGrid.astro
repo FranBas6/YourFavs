@@ -1,0 +1,26 @@
+---
+interface CrewMember {
+    name: string;
+    job: string;
+}
+
+interface Props {
+    crew: CrewMember[];
+    title?: string;
+}
+
+const { crew, title = "Equipo de Producción" } = Astro.props;
+---
+{crew.length > 0 && (
+    <section>
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {crew.map((member) => (
+                <a href={`/team/${encodeURIComponent(member.name)}`} class="p-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                    <p class="text-sm font-medium text-gray-800">{member.name}</p>
+                    <p class="text-xs text-gray-500">{member.job}</p>
+                </a>
+            ))}
+        </div>
+    </section>
+)}

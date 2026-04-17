@@ -1,0 +1,33 @@
+---
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+
+interface Company {
+    id: number;
+    name: string;
+    logo_path?: string | null;
+}
+
+interface Props {
+    companies: Company[];
+    title?: string;
+}
+
+const { companies, title = "Productoras" } = Astro.props;
+---
+{companies && companies.length > 0 && (
+    <section>
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {companies.map((company) => (
+                <a href={`/productora/${encodeURIComponent(company.name)}?companyId=${company.id}`} class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                    {company.logo_path ? (
+                        <img src={posterUrl(company.logo_path, 'w200')} alt={company.name} class="h-10 object-contain" loading="lazy" />
+                    ) : (
+                        <div class="h-10 flex items-center"><span class="text-xs text-gray-4000">{company.name}</span></div>
+                    )}
+                    <span class="text-xs text-gray-600 text-center truncate w-full">{company.name}</span>
+                </a>
+            ))}
+        </div>
+    </section>
+)}

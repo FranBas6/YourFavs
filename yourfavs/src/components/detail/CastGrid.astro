@@ -1,0 +1,39 @@
+---
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+
+interface CastMember {
+    id: number;
+    name: string;
+    character?: string;
+    profile_path?: string | null;
+}
+
+interface Props {
+    cast: CastMember[];
+    title?: string;
+}
+
+const { cast, title = "Reparto Principal" } = Astro.props;
+---
+{cast.length > 0 && (
+    <section>
+        <h2 class="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {cast.map((actor) => (
+                <a href={`/actor/${actor.id}`} class="flex items-center gap-3 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                    {actor.profile_path ? (
+                        <img src={posterUrl(actor.profile_path, 'w185')} alt={actor.name} class="w-14 h-14 rounded-full object-cover flex-shrink-0" loading="lazy" />
+                    ) : (
+                        <div class="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-6 h-6 text-gray-4000" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                        </div>
+                    )}
+                    <div class="min-w-0">
+                        <p class="text-sm sm:text-base font-medium text-gray-800 truncate">{actor.name}</p>
+                        {actor.character && <p class="text-xs sm:text-sm text-gray-500 truncate">{actor.character}</p>}
+                    </div>
+                </a>
+            ))}
+        </div>
+    </section>
+)}
