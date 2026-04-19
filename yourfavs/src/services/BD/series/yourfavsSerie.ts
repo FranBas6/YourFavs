@@ -30,6 +30,32 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         return `/serie/${serieId}`;
     }
 
+    // Guardar rating 1-10 en todas las colecciones
+    if (action === 'save_rating' || actionType === 'rating') {
+        const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
+        if (!ratingNum) return `/serie/${serieId}`;
+        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
+        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        await Promise.all(
+            snaps
+                .filter(snap => snap.exists())
+                .map(snap => updateDoc(snap.ref, { rating: ratingNum }))
+        );
+        return `/serie/${serieId}`;
+    }
+
+    // Eliminar rating
+    if (action === 'delete_rating') {
+        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
+        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        await Promise.all(
+            snaps
+                .filter(snap => snap.exists())
+                .map(snap => updateDoc(snap.ref, { rating: deleteField() }))
+        );
+        return `/serie/${serieId}`;
+    }
+
     // Eliminar opinión
     if (action === 'delete_opinion') {
         const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));

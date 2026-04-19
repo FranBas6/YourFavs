@@ -45,9 +45,10 @@ function showToast(message, type) {
 function submitOptimistic(form, options) {
     form.addEventListener('submit', function (e) {
         e.preventDefault();
-        var btn = form.querySelector('button[type="submit"]');
+        var submitter = e.submitter || form.querySelector('button[type="submit"]');
+        var btn = submitter || form.querySelector('button[type="submit"]');
         if (!btn || btn.classList.contains('is-submitting')) return;
-        var formData = new FormData(form);
+        var formData = new FormData(form, submitter);
         btn.classList.add('is-submitting');
         if (options.onBeforeSubmit) options.onBeforeSubmit(form, btn, formData);
 
@@ -125,6 +126,19 @@ function handleWatchedAllForm(form) {
     });
 }
 
+function handleRatingForm(form) {
+    submitOptimistic(form, {
+        successMsg: function (formData) {
+            var action = formData.get('action');
+            if (action === 'delete_rating') return 'Nota eliminada';
+            var r = formData.get('rating');
+            return r ? 'Nota ' + r + '/10 guardada' : 'Nota guardada';
+        },
+        reload: true,
+        reloadDelay: 400
+    });
+}
+
 function handleNotificationForm(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (f, btn, formData) {
@@ -192,6 +206,7 @@ function initOptimisticActions() {
         if (val === 'watched_season') return handleWatchedSeasonForm(form);
         if (val === 'watched_all') return handleWatchedAllForm(form);
         if (val === 'notification') return handleNotificationForm(form);
+        if (val === 'rating') return handleRatingForm(form);
 
         handleGenericFavAction(form);
     });

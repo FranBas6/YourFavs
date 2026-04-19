@@ -1,0 +1,171 @@
+---
+import Layout from "../../layouts/Layout.astro";
+import PersonalNav from "../../components/personal/PersonalNav.astro";
+import { fetchAllActivityEvents, type ActivityEvent } from "../../services/BD/shared/activityFeed";
+import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
+import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
+import { processBatch } from "../../utils/processBatch";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+
+const url = new URL(Astro.request.url);
+const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
+const DAYS_PER_PAGE = 30;
+const DAY_MS = 24 * 3600 * 1000;
+
+const now = Date.now();
+const windowEnd = now - (page - 1) * DAYS_PER_PAGE * DAY_MS;
+const windowStart = now - page * DAYS_PER_PAGE * DAY_MS;
+
+const allEvents = await fetchAllActivityEvents();
+const windowEvents = allEvents
+    .filter(e => e.timestamp >= windowStart && e.timestamp < windowEnd)
+    .sort((a, b) => b.timestamp - a.timestamp);
+
+const hasOlder = allEvents.some(e => e.timestamp < windowStart);
+
+const uniqueItems = new Map<string, { id: string; type: 'movie' | 'serie' }>();
+for (const ev of windowEvents) {
+    const key = `${ev.type}:${ev.id}`;
+    if (!uniqueItems.has(key)) uniqueItems.set(key, { id: ev.id, type: ev.type });
+}
+
+interface Detail { key: string; title: string; poster: string | null }
+const fetchers = Array.from(uniqueItems.values());
+const details: Detail[] = await processBatch(
+    fetchers,
+    async (item: { id: string; type: 'movie' | 'serie' }): Promise<Detail> => {
+        try {
+            if (item.type === 'movie') {
+                const d = await fetchMovieDetails(item.id);
+                return { key: `movie:${item.id}`, title: d?.title || 'Sin título', poster: d?.poster_path || null };
+            }
+            const d = await fetchSerieDetails(item.id);
+            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null };
+        } catch {
+            return { key: `${item.type}:${item.id}`, title: 'Sin título', poster: null };
+        }
+    },
+    10
+);
+const detailsMap = new Map<string, Detail>(details.map(d => [d.key, d]));
+
+const todayStart = new Date();
+todayStart.setHours(0, 0, 0, 0);
+const yesterdayStart = new Date(todayStart);
+yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+
+function dayLabel(ts: number): string {
+    const d = new Date(ts);
+    const dStart = new Date(d);
+    dStart.setHours(0, 0, 0, 0);
+    if (dStart.getTime() === todayStart.getTime()) return 'Hoy';
+    if (dStart.getTime() === yesterdayStart.getTime()) return 'Ayer';
+    return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+const groups = new Map<string, ActivityEvent[]>();
+for (const ev of windowEvents) {
+    const label = dayLabel(ev.timestamp);
+    if (!groups.has(label)) groups.set(label, []);
+    groups.get(label)!.push(ev);
+}
+const groupEntries = Array.from(groups.entries());
+
+const windowLabel = page === 1
+    ? `Últimos ${DAYS_PER_PAGE} días`
+    : `Entre hace ${(page - 1) * DAYS_PER_PAGE} y ${page * DAYS_PER_PAGE} días`;
+---
+<Layout title="Actividad">
+    <section class="px-1 sm:py-8">
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Actividad</h1>
+            <p class="text-gray-500 text-base">Historial cronológico de tus colecciones</p>
+        </header>
+
+        <div class="mb-6">
+            <PersonalNav currentPage="/personal/actividad" />
+        </div>
+
+        <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
+            <span><strong class="text-gray-900">{windowLabel}</strong> · {windowEvents.length} eventos</span>
+            <div class="flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                En vivo
+            </div>
+        </div>
+
+        {windowEvents.length === 0 && (
+            <div class="text-center py-16">
+                <div class="text-5xl mb-3">📭</div>
+                <h3 class="text-lg font-medium text-gray-700 mb-2">Sin actividad en este periodo</h3>
+                <p class="text-gray-500 text-sm mb-4">{page === 1 ? 'Añade algo a tus colecciones para empezar tu historial' : 'Retrocede más en el tiempo o vuelve al principio'}</p>
+                {page === 1
+                    ? <a href="/catalogo/tendencias" class="inline-block px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-medium">Explorar tendencias</a>
+                    : <a href="/personal/actividad" class="inline-block px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium">Volver al inicio</a>
+                }
+            </div>
+        )}
+
+        {groupEntries.map(([label, events]) => (
+            <div class="mb-8">
+                <h2 class="text-base font-semibold text-gray-700 mb-3 capitalize flex items-center gap-2">
+                    <span class="w-1 h-5 bg-emerald-500 rounded-full"></span>
+                    {label}
+                    <span class="text-xs font-normal text-gray-400">({events.length})</span>
+                </h2>
+                <ul class="space-y-2">
+                    {events.map(ev => {
+                        const d = detailsMap.get(`${ev.type}:${ev.id}`);
+                        const title = d?.title || 'Título desconocido';
+                        const poster = d?.poster;
+                        const href = ev.type === 'movie' ? `/movie/${ev.id}` : `/serie/${ev.id}`;
+                        const time = new Date(ev.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                        return (
+                            <li>
+                                <a href={href} class="flex items-center gap-3 bg-white rounded-xl p-3 border border-gray-200 hover:border-gray-300 hover:shadow-sm transition">
+                                    {poster ? (
+                                        <img src={posterUrl(poster, 'w92')} alt={title} class="w-10 h-14 md:w-12 md:h-16 object-cover rounded flex-shrink-0" loading="lazy"/>
+                                    ) : (
+                                        <div class="w-10 h-14 md:w-12 md:h-16 bg-gray-100 rounded flex items-center justify-center text-xs text-gray-400 flex-shrink-0">?</div>
+                                    )}
+                                    <div class="flex-1 min-w-0">
+                                        <div class="text-sm font-semibold text-gray-900 truncate">{title}</div>
+                                        <div class="text-xs text-gray-500 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-0.5">
+                                            <span class={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide ${ev.type === 'serie' ? 'bg-blue-50 text-blue-600' : 'bg-red-50 text-red-600'}`}>
+                                                {ev.type === 'serie' ? 'Serie' : 'Película'}
+                                            </span>
+                                            <span>·</span>
+                                            <span class="text-gray-600">{ev.action}</span>
+                                            <span>·</span>
+                                            <span class="text-gray-400">{time}</span>
+                                        </div>
+                                    </div>
+                                    <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </a>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
+        ))}
+
+        <div class="flex items-center justify-between mt-8">
+            {page > 1 ? (
+                <a href={page === 2 ? '/personal/actividad' : `/personal/actividad?page=${page - 1}`}
+                   class="min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 md:px-3 md:py-1.5 bg-white rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    Más reciente
+                </a>
+            ) : <div></div>}
+            {hasOlder && (
+                <a href={`/personal/actividad?page=${page + 1}`}
+                   class="min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 md:px-3 md:py-1.5 bg-white rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    Más antiguo
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                </a>
+            )}
+        </div>
+    </section>
+</Layout>

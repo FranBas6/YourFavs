@@ -1,0 +1,151 @@
+---
+interface Props {
+    currentRating: number | null;
+    tmdbRating: number;
+    itemId: string;
+    mediaType: 'movie' | 'serie';
+}
+const { currentRating, tmdbRating, itemId, mediaType } = Astro.props;
+const isSerie = mediaType === 'serie';
+const stars = [1, 2, 3, 4, 5];
+const diff = currentRating !== null ? currentRating - tmdbRating : null;
+
+function fillState(rating: number | null, starIdx: number): 'empty' | 'half' | 'full' {
+    if (rating === null) return 'empty';
+    const right = starIdx * 2;
+    const left = starIdx * 2 - 1;
+    if (rating >= right) return 'full';
+    if (rating === left) return 'half';
+    return 'empty';
+}
+const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z";
+---
+<div class="bg-white rounded-xl border border-gray-200 p-4">
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-semibold text-gray-800">Tu nota</h3>
+        <span class="rating-label text-sm font-bold text-yellow-500" data-default-label={currentRating !== null ? `${currentRating}/10` : ''}>
+            {currentRating !== null ? `${currentRating}/10` : ''}
+        </span>
+    </div>
+
+    <form method="POST" class="rating-form" data-rating={currentRating ?? 0}>
+        <input type="hidden" name="id" value={itemId} />
+        {isSerie && <input type="hidden" name="serie_id" value={itemId} />}
+        <input type="hidden" name="action" value="save_rating" />
+        <input type="hidden" name="actionType" value="rating" />
+
+        <div class="rating-stars flex items-center gap-1" role="radiogroup" aria-label="Puntuación de 1 a 10">
+            {stars.map((starIdx) => {
+                const leftVal = starIdx * 2 - 1;
+                const rightVal = starIdx * 2;
+                const initial = fillState(currentRating, starIdx);
+                return (
+                    <span class="star-pair relative inline-block w-10 h-10 md:w-8 md:h-8" data-star={starIdx} data-fill={initial}>
+                        <svg class="star-svg star-empty absolute inset-0 w-full h-full text-gray-200 pointer-events-none" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d={STAR_PATH}/>
+                        </svg>
+                        <svg class="star-svg star-half absolute inset-0 w-full h-full text-yellow-400 pointer-events-none" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" style="clip-path: inset(0 50% 0 0);">
+                            <path d={STAR_PATH}/>
+                        </svg>
+                        <svg class="star-svg star-full absolute inset-0 w-full h-full text-yellow-400 pointer-events-none" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d={STAR_PATH}/>
+                        </svg>
+                        <button type="submit" name="rating" value={leftVal}
+                                data-val={leftVal}
+                                class="star-btn absolute left-0 top-0 w-1/2 h-full cursor-pointer bg-transparent border-0 p-0"
+                                aria-label={`Puntuar ${leftVal} de 10`}></button>
+                        <button type="submit" name="rating" value={rightVal}
+                                data-val={rightVal}
+                                class="star-btn absolute right-0 top-0 w-1/2 h-full cursor-pointer bg-transparent border-0 p-0"
+                                aria-label={`Puntuar ${rightVal} de 10`}></button>
+                    </span>
+                );
+            })}
+        </div>
+    </form>
+
+    <div class="mt-3 text-xs text-gray-500 space-y-0.5">
+        <p>TMDB: <span class="font-medium text-gray-700">{tmdbRating.toFixed(1)}/10</span></p>
+        {diff !== null && diff !== 0 && (
+            <p>
+                {diff > 0
+                    ? <><span class="text-green-600 font-medium">+{diff.toFixed(1)}</span> sobre TMDB</>
+                    : <><span class="text-red-600 font-medium">{diff.toFixed(1)}</span> bajo TMDB</>}
+            </p>
+        )}
+    </div>
+
+    {currentRating !== null && (
+        <form method="POST" class="mt-3 flex justify-end">
+            <input type="hidden" name="id" value={itemId} />
+            {isSerie && <input type="hidden" name="serie_id" value={itemId} />}
+            <input type="hidden" name="action" value="delete_rating" />
+            <input type="hidden" name="actionType" value="rating" />
+            <button type="submit" class="min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 text-xs rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">Eliminar nota</button>
+        </form>
+    )}
+</div>
+
+<style>
+    .star-svg { display: none; }
+    .star-pair[data-fill="empty"] .star-empty { display: block; }
+    .star-pair[data-fill="half"] .star-empty { display: block; }
+    .star-pair[data-fill="half"] .star-half { display: block; }
+    .star-pair[data-fill="full"] .star-full { display: block; }
+    .star-btn:hover { background-color: rgba(250, 204, 21, 0.08); }
+</style>
+
+<script>
+    function initStarRating(root: HTMLElement) {
+        if (root.dataset.starInit === '1') return;
+        root.dataset.starInit = '1';
+        const real = parseInt(root.dataset.rating || '0');
+        const pairs = root.querySelectorAll<HTMLElement>('.star-pair');
+        const btns = root.querySelectorAll<HTMLButtonElement>('.star-btn');
+        const label = root.parentElement?.querySelector<HTMLElement>('.rating-label');
+        const defaultLabel = label?.dataset.defaultLabel || '';
+
+        const paint = (rating: number) => {
+            pairs.forEach(span => {
+                const idx = parseInt(span.dataset.star || '0');
+                const right = idx * 2;
+                const left = idx * 2 - 1;
+                let fill: 'empty' | 'half' | 'full' = 'empty';
+                if (rating >= right) fill = 'full';
+                else if (rating === left) fill = 'half';
+                span.dataset.fill = fill;
+            });
+        };
+
+        btns.forEach(btn => {
+            btn.addEventListener('mouseenter', () => {
+                const v = parseInt(btn.dataset.val || '0');
+                paint(v);
+                if (label) label.textContent = `${v}/10`;
+            });
+            btn.addEventListener('focus', () => {
+                const v = parseInt(btn.dataset.val || '0');
+                paint(v);
+                if (label) label.textContent = `${v}/10`;
+            });
+        });
+        root.addEventListener('mouseleave', () => {
+            paint(real);
+            if (label) label.textContent = defaultLabel;
+        });
+        root.addEventListener('focusout', (e) => {
+            const next = e.relatedTarget as HTMLElement | null;
+            if (!next || !root.contains(next)) {
+                paint(real);
+                if (label) label.textContent = defaultLabel;
+            }
+        });
+    }
+
+    function initAllStarRatings() {
+        document.querySelectorAll<HTMLElement>('.rating-form').forEach(initStarRating);
+    }
+
+    initAllStarRatings();
+    document.addEventListener('astro:after-swap', initAllStarRatings);
+</script>

@@ -12,6 +12,8 @@ export interface MediaExistenceResult<K extends string> {
     snaps: Record<K, DocumentSnapshot>;
     /** Primera opinión encontrada en cualquier colección (para sidebar "Tu opinión"). */
     opinion: string;
+    /** Primer rating 1-10 encontrado en cualquier colección (para sidebar "Tu nota"). */
+    rating: number | null;
 }
 
 export async function checkMediaExistence(
@@ -32,14 +34,16 @@ export async function checkMediaExistence(
     const exists: Record<string, boolean> = {};
     const snapsMap: Record<string, DocumentSnapshot> = {};
     let opinion = '';
+    let rating: number | null = null;
     for (let i = 0; i < collections.length; i++) {
         const col = collections[i];
         exists[col] = snaps[i].exists();
         snapsMap[col] = snaps[i];
-        if (!opinion && snaps[i].exists()) {
+        if (snaps[i].exists()) {
             const data = snaps[i].data();
-            if (data?.opinion) opinion = data.opinion;
+            if (!opinion && data?.opinion) opinion = data.opinion;
+            if (rating === null && typeof data?.rating === 'number') rating = data.rating;
         }
     }
-    return { exists, snaps: snapsMap, opinion };
+    return { exists, snaps: snapsMap, opinion, rating };
 }

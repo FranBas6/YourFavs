@@ -34,6 +34,30 @@ interface Props {
             topDecades: [string, number][];
             topCountries?: { code: string; count: number }[];
             opinionStats?: { total: number; percentage: number };
+            ratingStats?: {
+                total: number;
+                percentage: number;
+                avgPersonal: number;
+                avgDiffVsTmdb: number;
+                best: { id: string; title: string; personal: number; tmdb: number; poster_path: string | null; type: 'serie' | 'movie' } | null;
+                worst: { id: string; title: string; personal: number; tmdb: number; poster_path: string | null; type: 'serie' | 'movie' } | null;
+                series: {
+                    total: number;
+                    percentage: number;
+                    avgPersonal: number;
+                    avgDiffVsTmdb: number;
+                    best: { id: string; title: string; personal: number; tmdb: number; poster_path: string | null; type: 'serie' | 'movie' } | null;
+                    worst: { id: string; title: string; personal: number; tmdb: number; poster_path: string | null; type: 'serie' | 'movie' } | null;
+                };
+                movies: {
+                    total: number;
+                    percentage: number;
+                    avgPersonal: number;
+                    avgDiffVsTmdb: number;
+                    best: { id: string; title: string; personal: number; tmdb: number; poster_path: string | null; type: 'serie' | 'movie' } | null;
+                    worst: { id: string; title: string; personal: number; tmdb: number; poster_path: string | null; type: 'serie' | 'movie' } | null;
+                };
+            };
             watchtime?: { total: number; days: number; hours: number };
             notaPromedioGeneral: string;
         };
@@ -43,6 +67,7 @@ interface Props {
 const { stats } = Astro.props;
 const wt = stats.general.watchtime;
 const opinions = stats.general.opinionStats;
+const ratings = stats.general.ratingStats;
 ---
 <details class="mb-6 group">
     <summary class="flex items-center justify-between px-5 py-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-all">
@@ -102,6 +127,144 @@ const opinions = stats.general.opinionStats;
                         </div>
                     </div>
                 )}
+            </div>
+        )}
+
+        <!-- Ratings personales -->
+        {ratings && ratings.total > 0 && (
+            <div class="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl p-4 border border-yellow-200">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <div class="text-sm text-yellow-700 font-semibold">Tus puntuaciones</div>
+                        <div class="text-xs text-yellow-600 mt-0.5">{ratings.total} títulos · {ratings.percentage}% de tu colección</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-2xl font-bold text-yellow-700">{ratings.avgPersonal}/10</div>
+                        <div class="text-xs text-yellow-500">
+                            {ratings.avgDiffVsTmdb === 0 ? 'igual que TMDB' : (
+                                ratings.avgDiffVsTmdb > 0
+                                    ? <><span class="text-green-600">+{ratings.avgDiffVsTmdb}</span> sobre TMDB</>
+                                    : <><span class="text-red-600">{ratings.avgDiffVsTmdb}</span> bajo TMDB</>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-yellow-200">
+                    <!-- Series -->
+                    <div class="bg-white/60 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-semibold text-blue-600 flex items-center gap-1.5">
+                                <span class="w-1 h-3.5 bg-blue-500 rounded-full"></span>
+                                Series
+                            </h4>
+                            {ratings.series.total > 0 ? (
+                                <span class="text-sm font-bold text-yellow-700">{ratings.series.avgPersonal}/10</span>
+                            ) : (
+                                <span class="text-xs text-gray-400">sin puntuar</span>
+                            )}
+                        </div>
+                        {ratings.series.total > 0 ? (
+                            <>
+                                <div class="text-xs text-yellow-600 mb-2">
+                                    {ratings.series.total} puntuadas
+                                    {ratings.series.avgDiffVsTmdb !== 0 && (
+                                        <> · {ratings.series.avgDiffVsTmdb > 0
+                                            ? <span class="text-green-600 font-medium">+{ratings.series.avgDiffVsTmdb}</span>
+                                            : <span class="text-red-600 font-medium">{ratings.series.avgDiffVsTmdb}</span>} vs TMDB</>
+                                    )}
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    {ratings.series.best && (
+                                        <a href={`/serie/${ratings.series.best.id}`} class="flex items-center gap-2 rounded hover:bg-white transition p-1 -m-1">
+                                            {ratings.series.best.poster_path
+                                                ? <img src={posterUrl(ratings.series.best.poster_path, 'w92')} alt={ratings.series.best.title} class="w-7 h-10 object-cover rounded flex-shrink-0"/>
+                                                : <div class="w-7 h-10 bg-gray-200 rounded flex-shrink-0"></div>
+                                            }
+                                            <div class="min-w-0 flex-1">
+                                                <div class="text-xs text-yellow-600 font-medium">Mejor</div>
+                                                <div class="text-sm font-semibold text-gray-800 truncate">{ratings.series.best.title}</div>
+                                            </div>
+                                            <span class="text-sm text-yellow-700 font-bold flex-shrink-0">{ratings.series.best.personal}</span>
+                                        </a>
+                                    )}
+                                    {ratings.series.worst && (
+                                        <a href={`/serie/${ratings.series.worst.id}`} class="flex items-center gap-2 rounded hover:bg-white transition p-1 -m-1">
+                                            {ratings.series.worst.poster_path
+                                                ? <img src={posterUrl(ratings.series.worst.poster_path, 'w92')} alt={ratings.series.worst.title} class="w-7 h-10 object-cover rounded flex-shrink-0"/>
+                                                : <div class="w-7 h-10 bg-gray-200 rounded flex-shrink-0"></div>
+                                            }
+                                            <div class="min-w-0 flex-1">
+                                                <div class="text-xs text-orange-600 font-medium">Peor</div>
+                                                <div class="text-sm font-semibold text-gray-800 truncate">{ratings.series.worst.title}</div>
+                                            </div>
+                                            <span class="text-sm text-orange-700 font-bold flex-shrink-0">{ratings.series.worst.personal}</span>
+                                        </a>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <p class="text-xs text-gray-400 italic">Ninguna serie puntuada aún</p>
+                        )}
+                    </div>
+
+                    <!-- Películas -->
+                    <div class="bg-white/60 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-semibold text-red-600 flex items-center gap-1.5">
+                                <span class="w-1 h-3.5 bg-red-500 rounded-full"></span>
+                                Películas
+                            </h4>
+                            {ratings.movies.total > 0 ? (
+                                <span class="text-sm font-bold text-yellow-700">{ratings.movies.avgPersonal}/10</span>
+                            ) : (
+                                <span class="text-xs text-gray-400">sin puntuar</span>
+                            )}
+                        </div>
+                        {ratings.movies.total > 0 ? (
+                            <>
+                                <div class="text-xs text-yellow-600 mb-2">
+                                    {ratings.movies.total} puntuadas
+                                    {ratings.movies.avgDiffVsTmdb !== 0 && (
+                                        <> · {ratings.movies.avgDiffVsTmdb > 0
+                                            ? <span class="text-green-600 font-medium">+{ratings.movies.avgDiffVsTmdb}</span>
+                                            : <span class="text-red-600 font-medium">{ratings.movies.avgDiffVsTmdb}</span>} vs TMDB</>
+                                    )}
+                                </div>
+                                <div class="grid grid-cols-2 gap-2">
+                                    {ratings.movies.best && (
+                                        <a href={`/movie/${ratings.movies.best.id}`} class="flex items-center gap-2 rounded hover:bg-white transition p-1 -m-1">
+                                            {ratings.movies.best.poster_path
+                                                ? <img src={posterUrl(ratings.movies.best.poster_path, 'w92')} alt={ratings.movies.best.title} class="w-7 h-10 object-cover rounded flex-shrink-0"/>
+                                                : <div class="w-7 h-10 bg-gray-200 rounded flex-shrink-0"></div>
+                                            }
+                                            <div class="min-w-0 flex-1">
+                                                <div class="text-xs text-yellow-600 font-medium">Mejor</div>
+                                                <div class="text-sm font-semibold text-gray-800 truncate">{ratings.movies.best.title}</div>
+                                            </div>
+                                            <span class="text-sm text-yellow-700 font-bold flex-shrink-0">{ratings.movies.best.personal}</span>
+                                        </a>
+                                    )}
+                                    {ratings.movies.worst && (
+                                        <a href={`/movie/${ratings.movies.worst.id}`} class="flex items-center gap-2 rounded hover:bg-white transition p-1 -m-1">
+                                            {ratings.movies.worst.poster_path
+                                                ? <img src={posterUrl(ratings.movies.worst.poster_path, 'w92')} alt={ratings.movies.worst.title} class="w-7 h-10 object-cover rounded flex-shrink-0"/>
+                                                : <div class="w-7 h-10 bg-gray-200 rounded flex-shrink-0"></div>
+                                            }
+                                            <div class="min-w-0 flex-1">
+                                                <div class="text-xs text-orange-600 font-medium">Peor</div>
+                                                <div class="text-sm font-semibold text-gray-800 truncate">{ratings.movies.worst.title}</div>
+                                            </div>
+                                            <span class="text-sm text-orange-700 font-bold flex-shrink-0">{ratings.movies.worst.personal}</span>
+                                        </a>
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <p class="text-xs text-gray-400 italic">Ninguna película puntuada aún</p>
+                        )}
+                    </div>
+                </div>
             </div>
         )}
 

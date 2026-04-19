@@ -123,6 +123,63 @@ export function calculateStats({seriesData, moviesData, seriesDetails, moviesDet
         percentage: allData.length > 0 ? Math.round((withOpinion.length / allData.length) * 100) : 0,
     };
 
+    // Ratings personales (1-10). Dedup por id+tipo para no contar el mismo item varias veces
+    // (los ratings se replican en todas las colecciones, como las opiniones)
+    interface RatingPair {
+        id: string;
+        title: string;
+        personal: number;
+        tmdb: number;
+        poster_path: string | null;
+        type: 'serie' | 'movie';
+    }
+    const ratingMap = new Map<string, RatingPair>();
+    seriesData.forEach(d => {
+        if (typeof d.rating === 'number' && !ratingMap.has(`s-${d.id}`)) {
+            const det = seriesDetails.find(s => s.id.toString() === d.id);
+            if (det) ratingMap.set(`s-${d.id}`, {
+                id: d.id, title: det.name, personal: d.rating, tmdb: Number(det.vote_average) || 0,
+                poster_path: det.poster_path || null, type: 'serie'
+            });
+        }
+    });
+    moviesData.forEach(d => {
+        if (typeof d.rating === 'number' && !ratingMap.has(`m-${d.id}`)) {
+            const det = moviesDetails.find(m => m.id.toString() === d.id);
+            if (det) ratingMap.set(`m-${d.id}`, {
+                id: d.id, title: det.title, personal: d.rating, tmdb: Number(det.vote_average) || 0,
+                poster_path: det.poster_path || null, type: 'movie'
+            });
+        }
+    });
+    const ratingPairs = Array.from(ratingMap.values());
+    const uniqueSeriesCount = new Set(seriesData.map(d => d.id)).size;
+    const uniqueMoviesCount = new Set(moviesData.map(d => d.id)).size;
+    const uniqueItemCount = uniqueSeriesCount + uniqueMoviesCount;
+
+    function summarize(pairs: RatingPair[], totalItems: number) {
+        if (pairs.length === 0) {
+            return { total: 0, percentage: 0, avgPersonal: 0, avgDiffVsTmdb: 0, best: null, worst: null };
+        }
+        const sorted = [...pairs].sort((a, b) => b.personal - a.personal);
+        return {
+            total: pairs.length,
+            percentage: totalItems > 0 ? Math.round((pairs.length / totalItems) * 100) : 0,
+            avgPersonal: Number((pairs.reduce((a, p) => a + p.personal, 0) / pairs.length).toFixed(1)),
+            avgDiffVsTmdb: Number((pairs.reduce((a, p) => a + (p.personal - p.tmdb), 0) / pairs.length).toFixed(1)),
+            best: sorted[0] || null,
+            worst: sorted.length > 1 ? sorted[sorted.length - 1] : null,
+        };
+    }
+
+    const seriesPairs = ratingPairs.filter(p => p.type === 'serie');
+    const moviesPairs = ratingPairs.filter(p => p.type === 'movie');
+    const ratingStats = {
+        ...summarize(ratingPairs, uniqueItemCount),
+        series: summarize(seriesPairs, uniqueSeriesCount),
+        movies: summarize(moviesPairs, uniqueMoviesCount),
+    };
+
     return {
         series: seriesStats,
         movies: moviesStats,
@@ -132,6 +189,7 @@ export function calculateStats({seriesData, moviesData, seriesDetails, moviesDet
             topDecades,
             topCountries,
             opinionStats,
+            ratingStats,
             watchtime: { total: totalWatchtime, days: watchtimeDays, hours: watchtimeHours },
             notaPromedioGeneral: (((seriesStats.notaPromedio * seriesDetails.length) + (moviesStats.notaPromedio * moviesDetails.length)) / Math.max(seriesDetails.length + moviesDetails.length, 1)).toFixed(1)
         }

@@ -29,6 +29,7 @@ import LightboxGallery from "../../components/detail/LightboxGallery.astro";
 import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
+import StarRating from "../../components/detail/StarRating.astro";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -94,7 +95,7 @@ const clientData = {
 };
 
 // Verificar existencia en las 5 colecciones de películas (lectura paralela)
-const { exists: movieExists, opinion: opinionFromAny } = await checkMediaExistence('movie', clientData.id);
+const { exists: movieExists, opinion: opinionFromAny, rating: ratingFromAny } = await checkMediaExistence('movie', clientData.id);
 const isInFavorites = movieExists.MovieFavs;
 const isInPendientes = movieExists.MoviesPendientes;
 const isInVistas = movieExists.MoviesVistas;
@@ -437,6 +438,16 @@ const jsonLd = item ? {
 
                     <!-- Dónde ver -->
                     <StreamingProviders providersByCountry={item?.providersByCountry || {}} />
+
+                    <!-- Nota personal -->
+                    {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
+                        <StarRating
+                            currentRating={ratingFromAny}
+                            tmdbRating={Number(item?.vote_average) || 0}
+                            itemId={String(item?.id)}
+                            mediaType="movie"
+                        />
+                    )}
 
                     <!-- Opinión -->
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (

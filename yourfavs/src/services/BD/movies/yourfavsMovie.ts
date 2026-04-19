@@ -49,6 +49,32 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         return `/movie/${movieId}`;
     }
 
+    // Guardar rating 1-10 en todas las colecciones
+    if (action === 'save_rating') {
+        const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
+        if (!ratingNum) return `/movie/${movieId}`;
+        for (const col of MOVIE_COLLECTIONS) {
+            const ref = doc(db, col, movieId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                await updateDoc(ref, { rating: ratingNum });
+            }
+        }
+        return `/movie/${movieId}`;
+    }
+
+    // Eliminar rating
+    if (action === 'delete_rating') {
+        for (const col of MOVIE_COLLECTIONS) {
+            const ref = doc(db, col, movieId);
+            const snap = await getDoc(ref);
+            if (snap.exists()) {
+                await updateDoc(ref, { rating: deleteField() });
+            }
+        }
+        return `/movie/${movieId}`;
+    }
+
     // Eliminar opinión en todas las colecciones
     if (action === 'delete_opinion') {
         for (const col of MOVIE_COLLECTIONS) {

@@ -31,6 +31,7 @@ import LightboxGallery from "../../components/detail/LightboxGallery.astro";
 import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
+import StarRating from "../../components/detail/StarRating.astro";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -148,7 +149,7 @@ const [serieExistenceResult, watchedProgress] = await Promise.all([
     checkMediaExistence('serie', clientData.id),
     getWatchedProgress(clientData.id),
 ]);
-const { exists: serieExists, opinion: opinionFromAny } = serieExistenceResult;
+const { exists: serieExists, opinion: opinionFromAny, rating: ratingFromAny } = serieExistenceResult;
 
 // Set de episodios vistos para lookup rápido
 const watchedSet = new Set<string>();
@@ -509,6 +510,16 @@ const jsonLd = item ? {
 
                     <!-- Dónde ver -->
                     <StreamingProviders providersByCountry={(item as any)?.providersByCountry || {}} />
+
+                    <!-- Nota personal -->
+                    {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
+                        <StarRating
+                            currentRating={ratingFromAny}
+                            tmdbRating={Number(item?.vote_average) || 0}
+                            itemId={String(item?.id)}
+                            mediaType="serie"
+                        />
+                    )}
 
                     <!-- Opinión -->
                     {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
