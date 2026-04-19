@@ -95,10 +95,21 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const docSnap = await getDoc(docRef);
     const exists = docSnap.exists();
 
+    let mutated = false;
     if (action === 'add' && !exists) {
         await setDoc(docRef, movieData);
+        mutated = true;
     } else if (action === 'remove' && exists) {
         await deleteDoc(docRef);
+        mutated = true;
+    }
+
+    // Invalida la cache de "Tus sagas" al cambiar colecciones de movies
+    if (mutated) {
+        try {
+            const { invalidateUserCollectionsCache } = await import('../../API/shared/collectionsDiscovery');
+            invalidateUserCollectionsCache();
+        } catch { /* ignore */ }
     }
 
     return `/movie/${movieId}`;

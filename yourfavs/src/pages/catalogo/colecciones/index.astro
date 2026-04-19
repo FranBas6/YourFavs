@@ -1,0 +1,231 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import { searchCollections, type MovieCollectionInfo, type CollectionSearchResponse } from "../../../services/API/Movies/InfoMovies";
+import { getUserCollections, getPopularCollections, invalidateCollectionsCache } from "../../../services/API/shared/collectionsDiscovery";
+
+const url = new URL(Astro.request.url);
+const q = (url.searchParams.get('q') || '').trim();
+const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
+
+if (url.searchParams.get('refresh') === '1') {
+    invalidateCollectionsCache();
+    return Astro.redirect('/catalogo/colecciones');
+}
+
+let userCollections: MovieCollectionInfo[] = [];
+let popularCollections: MovieCollectionInfo[] = [];
+let search: CollectionSearchResponse = { results: [], page: 1, totalPages: 0, totalResults: 0 };
+
+if (q) {
+    search = await searchCollections(q, page);
+} else {
+    [userCollections, popularCollections] = await Promise.all([
+        getUserCollections(),
+        getPopularCollections(),
+    ]);
+}
+// Set de IDs del usuario para poner badge "En tu lista" también en Franquicias icónicas
+const userIdSet = new Set(userCollections.map(c => c.id));
+
+function searchUrl(p: number): string {
+    const u = new URLSearchParams({ q });
+    if (p > 1) u.set('page', String(p));
+    return `/catalogo/colecciones?${u.toString()}`;
+}
+---
+<Layout title="Sagas y colecciones">
+    <section class="px-1 sm:py-8">
+        <header class="mb-6">
+            <p class="text-sm text-gray-4000 mb-1">Explora</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Sagas y colecciones</h1>
+            <p class="text-gray-500 text-base mt-2">Franquicias del cine agrupadas cronológicamente</p>
+        </header>
+
+        <!-- Buscador -->
+        <form method="GET" class="mb-8">
+            <div class="relative max-w-xl">
+                <input
+                    type="text"
+                    name="q"
+                    value={q}
+                    placeholder="Buscar saga (ej. Star Wars, Marvel, Rocky...)"
+                    aria-label="Buscar saga"
+                    class="w-full px-4 py-3 pl-11 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-200"
+                />
+                <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                {q && (
+                    <a href="/catalogo/colecciones" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-500 hover:text-gray-900 underline">Limpiar</a>
+                )}
+            </div>
+        </form>
+
+        {/* Resultados de búsqueda */}
+        {q && (
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-gray-800 mb-4">
+                    Resultados para "<span class="text-red-600">{q}</span>"
+                    <span class="text-sm font-normal text-gray-4000 ml-2">
+                        ({search.totalResults} {search.totalResults === 1 ? 'resultado' : 'resultados'}
+                        {search.totalPages > 1 && ` · página ${search.page} de ${search.totalPages}`})
+                    </span>
+                </h2>
+
+                {search.results.length === 0 ? (
+                    <div class="text-center py-12 text-gray-500">
+                        <div class="text-4xl mb-3">🔍</div>
+                        <p>No se han encontrado sagas con ese nombre</p>
+                        <a href="/catalogo/colecciones" class="inline-block mt-4 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium">Ver sagas destacadas</a>
+                    </div>
+                ) : (
+                    <>
+                        <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+                            {search.results.map(col => (
+                                <a href={`/catalogo/colecciones/${col.id}`}
+                                   class="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all bg-white">
+                                    <div class="aspect-[3/4] bg-gray-100">
+                                        {col.poster_path ? (
+                                            <img src={col.poster_path} alt={col.name} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
+                                        ) : (
+                                            <div class="w-full h-full flex items-center justify-center text-gray-300 text-5xl">🎬</div>
+                                        )}
+                                    </div>
+                                    <div class="p-2.5">
+                                        <div class="text-sm font-semibold text-gray-900 truncate group-hover:text-red-600 transition-colors">{col.name}</div>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
+
+                        {/* Paginación */}
+                        {search.totalPages > 1 && (
+                            <div class="flex items-center justify-between mt-8">
+                                {search.page > 1 ? (
+                                    <a href={searchUrl(search.page - 1)} rel="prev"
+                                       class="min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 md:px-3 md:py-1.5 bg-white rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                                        Anterior
+                                    </a>
+                                ) : <div></div>}
+                                <span class="text-sm text-gray-500">
+                                    Página <strong class="text-gray-900">{search.page}</strong> de {search.totalPages}
+                                </span>
+                                {search.page < search.totalPages ? (
+                                    <a href={searchUrl(search.page + 1)} rel="next"
+                                       class="min-h-[44px] md:min-h-0 flex items-center gap-2 px-4 py-2.5 md:px-3 md:py-1.5 bg-white rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                        Siguiente
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                    </a>
+                                ) : <div></div>}
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
+        )}
+
+        {/* Tus sagas: derivadas de tus colecciones personales */}
+        {!q && userCollections.length > 0 && (
+            <div class="mb-10">
+                <h2 class="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                    <span class="w-1 h-5 bg-yellow-500 rounded-full"></span>
+                    Tus sagas
+                    <span class="text-sm font-normal text-gray-4000">({userCollections.length})</span>
+                </h2>
+                <p class="text-xs text-gray-500 mb-4">Franquicias de películas que tienes en tus colecciones personales</p>
+
+                <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {userCollections.map(col => (
+                        <a href={`/catalogo/colecciones/${col.id}`}
+                           class="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all">
+                            <div class="aspect-[16/9] bg-gray-100 relative">
+                                {col.backdrop_path ? (
+                                    <img src={col.backdrop_path} alt={col.name} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                ) : col.poster_path ? (
+                                    <img src={col.poster_path} alt={col.name} class="w-full h-full object-cover"/>
+                                ) : (
+                                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-5xl">🎬</div>
+                                )}
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                                <div class="absolute top-2 right-2">
+                                    <span class="bg-yellow-500/95 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shadow">En tu lista</span>
+                                </div>
+                                <div class="absolute bottom-0 left-0 right-0 p-4">
+                                    <h3 class="text-lg md:text-xl font-bold text-white drop-shadow-md">{col.name}</h3>
+                                    <div class="flex items-center gap-3 text-xs text-white/80 mt-1">
+                                        <span class="bg-red-500/90 text-white px-2 py-0.5 rounded-full font-medium">
+                                            {col.parts.length} {col.parts.length === 1 ? 'película' : 'películas'}
+                                        </span>
+                                        {col.parts[0]?.release_date && col.parts[col.parts.length - 1]?.release_date && (
+                                            <span>
+                                                {new Date(col.parts[0].release_date).getFullYear()}–{new Date(col.parts[col.parts.length - 1].release_date!).getFullYear()}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* Populares de TMDB */}
+        {!q && popularCollections.length > 0 && (
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                    <span class="w-1 h-5 bg-red-500 rounded-full"></span>
+                    Franquicias icónicas
+                    <span class="text-sm font-normal text-gray-4000">({popularCollections.length})</span>
+                </h2>
+                <p class="text-xs text-gray-500 mb-4">Sagas descubiertas de las películas más valoradas y votadas del cine</p>
+
+                <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {popularCollections.map(col => (
+                        <a href={`/catalogo/colecciones/${col.id}`}
+                           class="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all">
+                            <div class="aspect-[16/9] bg-gray-100 relative">
+                                {col.backdrop_path ? (
+                                    <img src={col.backdrop_path} alt={col.name} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"/>
+                                ) : col.poster_path ? (
+                                    <img src={col.poster_path} alt={col.name} class="w-full h-full object-cover"/>
+                                ) : (
+                                    <div class="w-full h-full flex items-center justify-center text-gray-300 text-5xl">🎬</div>
+                                )}
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                                {userIdSet.has(col.id) && (
+                                    <div class="absolute top-2 right-2">
+                                        <span class="bg-yellow-500/95 text-white text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full shadow">En tu lista</span>
+                                    </div>
+                                )}
+                                <div class="absolute bottom-0 left-0 right-0 p-4">
+                                    <h3 class="text-lg md:text-xl font-bold text-white drop-shadow-md">{col.name}</h3>
+                                    <div class="flex items-center gap-3 text-xs text-white/80 mt-1">
+                                        <span class="bg-red-500/90 text-white px-2 py-0.5 rounded-full font-medium">
+                                            {col.parts.length} {col.parts.length === 1 ? 'película' : 'películas'}
+                                        </span>
+                                        {col.parts[0]?.release_date && col.parts[col.parts.length - 1]?.release_date && (
+                                            <span>
+                                                {new Date(col.parts[0].release_date).getFullYear()}–{new Date(col.parts[col.parts.length - 1].release_date!).getFullYear()}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            </div>
+        )}
+
+        {/* Empty: sin búsqueda y sin ambas fuentes */}
+        {!q && userCollections.length === 0 && popularCollections.length === 0 && (
+            <div class="text-center py-16 text-gray-500">
+                <div class="text-5xl mb-3">🎬</div>
+                <p class="text-base">No se han podido cargar sagas</p>
+                <p class="text-sm mt-1">Intenta una búsqueda manual en la barra superior</p>
+            </div>
+        )}
+    </section>
+</Layout>

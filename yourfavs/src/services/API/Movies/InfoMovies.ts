@@ -145,6 +145,10 @@ export interface MovieCollectionPart {
     title: string;
     poster_path: string | null;
     release_date: string | null;
+    vote_average?: number;
+    vote_count?: number;
+    overview?: string;
+    genre_ids?: number[];
 }
 
 export const getMovieCollectionInfo = async (
@@ -163,11 +167,55 @@ export const getMovieCollectionInfo = async (
                 title: part.title,
                 poster_path: posterUrl(part.poster_path, 'w200') || null,
                 release_date: part.release_date,
+                vote_average: part.vote_average || 0,
+                vote_count: part.vote_count || 0,
+                overview: part.overview || '',
+                genre_ids: part.genre_ids || [],
             })) || [],
         };
     } catch (error) {
         console.error("Error al obtener la colección:", error);
         return null;
+    }
+};
+
+export interface CollectionSearchResult {
+    id: number;
+    name: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+}
+
+export interface CollectionSearchResponse {
+    results: CollectionSearchResult[];
+    page: number;
+    totalPages: number;
+    totalResults: number;
+}
+
+export const searchCollections = async (query: string, page: number = 1): Promise<CollectionSearchResponse> => {
+    if (!query || query.trim().length < 2) {
+        return { results: [], page: 1, totalPages: 0, totalResults: 0 };
+    }
+    try {
+        const data = await tmdbFetch<{ results?: any[]; page?: number; total_pages?: number; total_results?: number }>(
+            `/search/collection`,
+            { query: query.trim(), page: String(page) }
+        );
+        return {
+            results: (data.results || []).map(r => ({
+                id: r.id,
+                name: r.name,
+                poster_path: posterUrl(r.poster_path, 'w342') || null,
+                backdrop_path: backdropUrl(r.backdrop_path) || null,
+            })),
+            page: data.page || 1,
+            totalPages: data.total_pages || 0,
+            totalResults: data.total_results || 0,
+        };
+    } catch (error) {
+        console.error("Error al buscar colecciones:", error);
+        return { results: [], page: 1, totalPages: 0, totalResults: 0 };
     }
 };
 
