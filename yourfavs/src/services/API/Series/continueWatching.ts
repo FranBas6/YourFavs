@@ -81,6 +81,8 @@ export async function getContinueWatchingData(): Promise<ContinueWatchingItem[]>
             try {
                 const season = await tmdbFetch<{ episodes?: any[] }>(`/tv/${c.id}/season/${c.nextSeason}`);
                 const ep = (season.episodes || []).find((e: any) => e.episode_number === c.nextEpisode);
+                // Ocultar si el episodio aún no se ha estrenado (TMDB anuncia capítulos futuros con air_date).
+                if (!ep?.air_date || new Date(ep.air_date + 'T23:59:59') > new Date()) return null;
                 return {
                     id: Number(c.id),
                     name: c.detail.name,

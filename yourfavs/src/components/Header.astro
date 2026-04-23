@@ -357,20 +357,63 @@ function isActive(href: string): boolean {
             calNotifList.innerHTML = '<p class="cal-notif-empty">No hay notificaciones este mes</p>';
             return;
         }
-        var html = '';
+
+        // Agrupar por media+tmdb_id+title
+        var map = {};
         subs.forEach(function (s) {
-            var link = s.event.media_type === 'movie' ? '/movie/' + s.event.tmdb_id : '/serie/' + s.event.tmdb_id;
-            var dateLabel = new Date(s.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-            html += '<a href="' + link + '" class="cal-notif-item">';
-            if (s.event.poster_path) {
-                html += '<img src="' + s.event.poster_path + '" alt="" class="cal-notif-poster"/>';
-            } else {
-                html += '<div class="cal-notif-poster-empty">?</div>';
+            var key = s.event.media_type + ':' + s.event.tmdb_id + ':' + s.event.title;
+            if (!map[key]) map[key] = [];
+            map[key].push(s);
+        });
+        var todayStr = new Date().toISOString().slice(0, 10);
+        var groups = Object.keys(map).map(function (k) {
+            var items = map[k].slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+            var upcoming = items.filter(function (s) { return s.date >= todayStr; });
+            var nextDate = upcoming.length ? upcoming[0].date : items[items.length - 1].date;
+            return { items: items, firstDate: items[0].date, nextDate: nextDate, hasUpcoming: upcoming.length > 0, head: items[0].event };
+        }).sort(function (a, b) { return a.nextDate.localeCompare(b.nextDate); });
+
+        var fmt = function (date) {
+            return new Date(date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        };
+
+        var html = '';
+        groups.forEach(function (g) {
+            var head = g.head;
+            var link = head.media_type === 'movie' ? '/movie/' + head.tmdb_id : '/serie/' + head.tmdb_id;
+            var poster = head.poster_path
+                ? '<img src="' + head.poster_path + '" alt="" class="cal-notif-poster"/>'
+                : '<div class="cal-notif-poster-empty">?</div>';
+
+            if (g.items.length === 1) {
+                html += '<a href="' + link + '" class="cal-notif-item">';
+                html += poster;
+                html += '<div class="cal-notif-body">';
+                html += '<div class="cal-notif-top"><span class="cal-notif-name">' + escapeAttr(head.title) + '</span><span class="cal-notif-date">' + fmt(g.firstDate) + '</span></div>';
+                html += '<span class="cal-notif-label">' + escapeAttr(head.label) + '</span>';
+                html += '</div></a>';
+                return;
             }
+
+            var startOpen = g.items.length <= 3;
+            html += '<details class="cal-notif-group"' + (startOpen ? ' open' : '') + '>';
+            html += '<summary class="cal-notif-item cal-notif-summary">';
+            html += poster;
             html += '<div class="cal-notif-body">';
-            html += '<div class="cal-notif-top"><span class="cal-notif-name">' + s.event.title + '</span><span class="cal-notif-date">' + dateLabel + '</span></div>';
-            html += '<span class="cal-notif-label">' + s.event.label + '</span>';
-            html += '</div></a>';
+            html += '<div class="cal-notif-top"><span class="cal-notif-name">' + escapeAttr(head.title) + '</span><span class="cal-notif-count">' + g.items.length + ' episodios</span></div>';
+            html += '<span class="cal-notif-label">' + (g.hasUpcoming ? 'Próximo: ' : 'Último: ') + fmt(g.nextDate) + '</span>';
+            html += '</div>';
+            html += '<svg class="cal-notif-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>';
+            html += '</summary>';
+            html += '<ul class="cal-notif-sublist">';
+            g.items.forEach(function (s) {
+                html += '<li><a href="' + link + '" class="cal-notif-subitem">';
+                html += '<span class="cal-notif-sublabel">' + escapeAttr(s.event.label) + '</span>';
+                html += '<span class="cal-notif-subdate">' + fmt(s.date) + '</span>';
+                html += '</a></li>';
+            });
+            html += '</ul>';
+            html += '</details>';
         });
         calNotifList.innerHTML = html;
     }

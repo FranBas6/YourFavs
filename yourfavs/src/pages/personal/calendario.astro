@@ -59,6 +59,25 @@ const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const subscribedEvents = calendarData?.days?.flatMap(d =>
     d.events.filter(e => e.is_subscribed).map(e => ({ ...e, date: d.date }))
 ) || [];
+
+// Agrupar por título y ordenar cada grupo por fecha ascendente.
+// Ordenar los grupos por fecha del próximo (primer) evento.
+type SubEvent = typeof subscribedEvents[number];
+const groupsMap = new Map<string, SubEvent[]>();
+for (const ev of subscribedEvents) {
+    const key = `${ev.media_type}:${ev.tmdb_id}:${ev.title}`;
+    if (!groupsMap.has(key)) groupsMap.set(key, []);
+    groupsMap.get(key)!.push(ev);
+}
+const todayStr = new Date().toISOString().slice(0, 10);
+const notificationGroups = Array.from(groupsMap.entries())
+    .map(([key, events]) => {
+        const sorted = events.slice().sort((a, b) => a.date.localeCompare(b.date));
+        const upcoming = sorted.filter(e => e.date >= todayStr);
+        const nextDate = upcoming.length ? upcoming[0].date : sorted[sorted.length - 1].date;
+        return { key, events: sorted, nextDate, hasUpcoming: upcoming.length > 0, head: sorted[0] };
+    })
+    .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 ---
 <Layout title="Calendario de Estrenos">
     <section class="px-1 sm:py-8">
@@ -113,7 +132,7 @@ const subscribedEvents = calendarData?.days?.flatMap(d =>
                     const hasSeasonPremiere = cell.events.some(e => e.event_type === 'season_premiere');
 
                     return (
-                        <div class={`min-h-[3rem] sm:min-h-[5rem] lg:min-h-[6rem] border-b border-r border-gray-50 p-1 sm:p-2 relative
+                        <div class={`calendar-cell min-h-[3rem] sm:min-h-[5rem] lg:min-h-[6rem] border-b border-r border-gray-50 p-1 sm:p-2 relative
                             ${!cell.day ? 'bg-gray-50/50' : ''}
                             ${isToday ? 'bg-blue-50/50 ring-2 ring-inset ring-blue-400' : ''}
                             ${hasEvents && cell.day ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
@@ -197,30 +216,68 @@ const subscribedEvents = calendarData?.days?.flatMap(d =>
             )}
 
             <div class="space-y-2">
-                {subscribedEvents.map(event => (
-                    <a href={`/${event.media_type === 'movie' ? 'movie' : 'serie'}/${event.tmdb_id}`}
-                       class="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-all group">
-                        {event.poster_path ? (
-                            <img src={event.poster_path} alt={event.title} class="w-12 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy"/>
-                        ) : (
-                            <div class="w-12 h-16 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-gray-4000 text-xs">?</div>
-                        )}
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center justify-between gap-2">
-                                <p class="text-sm font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">{event.title}</p>
-                                <span class="text-xs text-gray-4000 whitespace-nowrap">
-                                    {new Date(event.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
-                                </span>
-                            </div>
-                            <span class={`inline-flex items-center gap-1 text-xs mt-0.5
-                                ${event.media_type === 'movie' ? 'text-red-500' : ''}
-                                ${event.event_type === 'season_premiere' ? 'text-purple-500' : ''}
-                                ${event.event_type === 'episode' ? 'text-blue-500' : ''}`}>
-                                {event.label}
-                            </span>
-                        </div>
-                    </a>
-                ))}
+                {notificationGroups.map(group => {
+                    const detailLink = `/${group.head.media_type === 'movie' ? 'movie' : 'serie'}/${group.head.tmdb_id}`;
+                    const isGrouped = group.events.length > 1;
+                    const startOpen = !isGrouped || group.events.length <= 3;
+                    return (
+                        <details class="notification-group bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden" open={startOpen}>
+                            <summary class={`flex items-center gap-3 p-3 list-none ${isGrouped ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}>
+                                {group.head.poster_path ? (
+                                    <img src={group.head.poster_path} alt={group.head.title} class="w-12 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy"/>
+                                ) : (
+                                    <div class="w-12 h-16 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-gray-4000 text-xs">?</div>
+                                )}
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <p class="text-sm font-semibold text-gray-800 truncate">{group.head.title}</p>
+                                        {isGrouped ? (
+                                            <span class="text-xs font-medium text-amber-600 whitespace-nowrap bg-amber-50 px-2 py-0.5 rounded-full">
+                                                {group.events.length} episodios
+                                            </span>
+                                        ) : (
+                                            <span class="text-xs text-gray-4000 whitespace-nowrap">
+                                                {new Date(group.head.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span class="text-xs text-gray-500 mt-0.5 block">
+                                        {isGrouped
+                                            ? `${group.hasUpcoming ? 'Próximo' : 'Último'}: ${new Date(group.nextDate + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}`
+                                            : group.head.label}
+                                    </span>
+                                </div>
+                                {isGrouped && (
+                                    <svg class="chevron w-4 h-4 text-gray-4000 flex-shrink-0 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                    </svg>
+                                )}
+                            </summary>
+                            {isGrouped && (
+                                <ul class="border-t border-gray-100 divide-y divide-gray-50">
+                                    {group.events.map(ev => (
+                                        <li>
+                                            <a href={detailLink} class="flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 transition-colors">
+                                                <span class={`text-xs font-medium whitespace-nowrap
+                                                    ${ev.media_type === 'movie' ? 'text-red-500' : ''}
+                                                    ${ev.event_type === 'season_premiere' ? 'text-purple-500' : ''}
+                                                    ${ev.event_type === 'episode' ? 'text-blue-500' : ''}`}>
+                                                    {ev.label}
+                                                </span>
+                                                <span class="text-xs text-gray-4000 whitespace-nowrap">
+                                                    {new Date(ev.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                                </span>
+                                            </a>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {!isGrouped && (
+                                <a href={detailLink} class="block px-3 pb-3 -mt-1 text-xs text-blue-600 hover:underline">Ver detalle →</a>
+                            )}
+                        </details>
+                    );
+                })}
             </div>
         </div>
     </section>
@@ -234,13 +291,23 @@ const subscribedEvents = calendarData?.days?.flatMap(d =>
     var closeBtn = document.getElementById('day-detail-close');
     if (!panel || !title || !list || !closeBtn) return;
 
-    closeBtn.addEventListener('click', function () { panel.style.display = 'none'; });
+    var selectedCell = null;
 
+    closeBtn.addEventListener('click', function () {
+        panel.style.display = 'none';
+        if (selectedCell) { selectedCell.removeAttribute('data-selected'); selectedCell = null; }
+    });
     document.querySelectorAll('[data-events]').forEach(function (cell) {
         cell.addEventListener('click', function () {
             var date = cell.getAttribute('data-date');
             var events = JSON.parse(cell.getAttribute('data-events') || '[]');
             if (!events.length) return;
+
+            if (selectedCell && selectedCell !== cell) {
+                selectedCell.removeAttribute('data-selected');
+            }
+            cell.setAttribute('data-selected', 'true');
+            selectedCell = cell;
 
             var d = new Date(date + 'T12:00:00');
             title.textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -268,3 +335,13 @@ const subscribedEvents = calendarData?.days?.flatMap(d =>
     });
 })();
 </script>
+
+<style>
+    .calendar-cell[data-selected="true"] {
+        background-color: rgb(254 242 242); /* red-50 */
+        box-shadow: inset 0 0 0 2px rgb(239 68 68); /* ring red-500 */
+    }
+    .notification-group > summary::-webkit-details-marker { display: none; }
+    .notification-group > summary { list-style: none; }
+    .notification-group[open] > summary .chevron { transform: rotate(180deg); }
+</style>
