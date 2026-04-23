@@ -85,6 +85,13 @@ function handleWatchedEpisodeForm(form) {
                 btn.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Visto'; });
             }
 
+            // Atenuar/restaurar la fila del episodio (igual que en el SSR: opacity-60 cuando está visto)
+            var summary = btn.closest('summary');
+            if (summary) {
+                if (isWatched) summary.classList.remove('opacity-60');
+                else summary.classList.add('opacity-60');
+            }
+
             var seasonNum = formData.get('season');
             var bar = document.querySelector('[data-season-bar="' + seasonNum + '"]');
             var count = document.querySelector('[data-season-count="' + seasonNum + '"]');
@@ -96,6 +103,27 @@ function handleWatchedEpisodeForm(form) {
                 current = Math.max(0, Math.min(total, current));
                 count.textContent = current + '/' + total;
                 bar.style.width = Math.round(current / total * 100) + '%';
+            }
+
+            // Totales globales (solo si la temporada es "regular", no la 0)
+            if (seasonNum !== '0') {
+                var totalWrap = document.querySelector('[data-total-watched]');
+                var totalCount = document.querySelector('[data-total-count]');
+                var totalPct = document.querySelector('[data-total-pct]');
+                var totalBarWrap = document.querySelector('[data-total-progress]');
+                var totalBar = document.querySelector('[data-total-bar]');
+                if (totalWrap && totalCount && totalPct && totalBarWrap && totalBar) {
+                    var totalRegular = parseInt(totalWrap.getAttribute('data-total-regular') || '0');
+                    var currentTotal = parseInt(totalWrap.getAttribute('data-total-watched') || '0') + (isWatched ? -1 : 1);
+                    currentTotal = Math.max(0, Math.min(totalRegular, currentTotal));
+                    totalWrap.setAttribute('data-total-watched', String(currentTotal));
+                    totalCount.textContent = currentTotal + '/' + totalRegular;
+                    var pct = totalRegular > 0 ? Math.round(currentTotal / totalRegular * 100) : 0;
+                    totalPct.textContent = String(pct);
+                    totalBar.style.width = pct + '%';
+                    totalWrap.style.display = currentTotal > 0 ? '' : 'none';
+                    totalBarWrap.style.display = currentTotal > 0 ? '' : 'none';
+                }
             }
         },
         successMsg: function (formData) {

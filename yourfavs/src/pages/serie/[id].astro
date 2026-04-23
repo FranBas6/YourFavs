@@ -683,16 +683,27 @@ const jsonLd = item ? {
                         </div>
                         <div class="flex flex-wrap items-center gap-2 mb-4">
                             <span class="text-sm text-gray-500">{regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios{hasSpecialSeasons ? ` • ${specialSeasonsCount} especiales` : ''}</span>
-                            {totalWatchedEpisodes > 0 && (
-                                <span class="text-sm font-medium text-green-600">• {totalWatchedEpisodes}/{totalRegularEpisodes} vistos ({Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)}%)</span>
-                            )}
+                            <span
+                                class="text-sm font-medium text-green-600"
+                                data-total-watched={totalWatchedEpisodes}
+                                data-total-regular={totalRegularEpisodes}
+                                style={totalWatchedEpisodes > 0 ? '' : 'display:none'}
+                            >
+                                • <span data-total-count>{totalWatchedEpisodes}/{totalRegularEpisodes}</span> vistos (<span data-total-pct>{totalRegularEpisodes > 0 ? Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100) : 0}</span>%)
+                            </span>
                         </div>
                         {/* Barra de progreso global */}
-                        {totalWatchedEpisodes > 0 && (
-                            <div class="w-full bg-gray-200 rounded-full h-2 mb-6">
-                                <div class="bg-green-500 h-2 rounded-full transition-all" style={`width: ${Math.min(100, Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100))}%`}></div>
-                            </div>
-                        )}
+                        <div
+                            class="w-full bg-gray-200 rounded-full h-2 mb-6"
+                            data-total-progress
+                            style={totalWatchedEpisodes > 0 ? '' : 'display:none'}
+                        >
+                            <div
+                                class="bg-green-500 h-2 rounded-full transition-all"
+                                data-total-bar
+                                style={`width: ${totalRegularEpisodes > 0 ? Math.min(100, Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)) : 0}%`}
+                            ></div>
+                        </div>
                         <div class="space-y-4">
                             {sortedSeasons.map((season) => {
                                 const seasonEpisodes = allSeasonEpisodes[season.season_number] || [];
