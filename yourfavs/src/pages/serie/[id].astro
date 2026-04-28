@@ -18,7 +18,7 @@ import {
 } from "../../services/API/Series/InfoSeries";
 import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
 import {initializeApp} from "firebase/app";
-import {getFirestore, doc, getDoc} from "firebase/firestore";
+import {getFirestore, doc, getDoc, collection, getDocs, query, orderBy} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
@@ -181,6 +181,17 @@ const isInVistas = serieExists.SeriesVistas;
 const isInSiguiendo = serieExists.SeriesSiguiendo;
 const isInLiked = serieExists.LikedSeries;
 const isInVerPronto = serieExists.SeriesVerPronto;
+
+// Posición actual en favoritos + total (siempre que la serie esté añadida o quiera añadirse)
+let currentFavPosition: number | null = null;
+let totalFavorites = 0;
+{
+    const favsSnap = await getDocs(query(collection(db, 'SeriesFavs'), orderBy('position')));
+    totalFavorites = favsSnap.size;
+    favsSnap.forEach((d: any) => {
+        if (d.id === id) currentFavPosition = (d.data()?.position ?? null);
+    });
+}
 
 // Verificar suscripción de notificación
 const notifSub = await getNotificationSub('tv', id);
@@ -378,20 +389,6 @@ const jsonLd = item ? {
                     </button>
                 </form>
                 <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="siguiendo"/>
-                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInSiguiendo ? 'bg-blue-500 text-white' : 'border border-blue-200 text-blue-600 hover:bg-blue-50'}`}>
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                        {isInSiguiendo ? 'Siguiendo' : 'Seguir'}
-                    </button>
-                </form>
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="verPronto"/>
-                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600 hover:bg-purple-50'}`}>
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
-                        {isInVerPronto ? 'Ver Pronto' : 'Ver Pronto'}
-                    </button>
-                </form>
-                <form method="POST">
                     <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="pendientes"/>
                     <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
                         <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
@@ -399,10 +396,24 @@ const jsonLd = item ? {
                     </button>
                 </form>
                 <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="siguiendo"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInSiguiendo ? 'bg-blue-500 text-white' : 'border border-blue-200 text-blue-600 hover:bg-blue-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        {isInSiguiendo ? 'Siguiendo' : 'Seguir'}
+                    </button>
+                </form>
+                <form method="POST">
                     <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="vistas"/>
                     <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600 hover:bg-green-50'}`}>
                         <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                         {isInVistas ? 'Vista' : 'Vista'}
+                    </button>
+                </form>
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="verpronto"/>
+                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600 hover:bg-purple-50'}`}>
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+                        {isInVerPronto ? 'Ver Pronto' : 'Ver Pronto'}
                     </button>
                 </form>
                 <div class="ml-auto flex items-center gap-2">
@@ -430,16 +441,16 @@ const jsonLd = item ? {
                             {isInFavorites ? 'Favoritos' : 'Favoritos'}
                         </button>
                     </form>
-                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="siguiendo"/>
-                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInSiguiendo ? 'bg-blue-500 text-white' : 'border border-blue-200 text-blue-600'}`}>
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                            {isInSiguiendo ? 'Siguiendo' : 'Seguir'}
-                        </button>
-                    </form>
                     <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="pendientes"/>
                         <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600'}`}>
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
                             {isInPendientes ? 'Pendiente' : 'Pendiente'}
+                        </button>
+                    </form>
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInSiguiendo ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="siguiendo"/>
+                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInSiguiendo ? 'bg-blue-500 text-white' : 'border border-blue-200 text-blue-600'}`}>
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                            {isInSiguiendo ? 'Siguiendo' : 'Seguir'}
                         </button>
                     </form>
                     <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="vistas"/>
@@ -457,13 +468,58 @@ const jsonLd = item ? {
                             {isInLiked ? 'Me gusta' : 'Me gusta'}
                         </button>
                     </form>
-                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="verPronto"/>
+                    <form method="POST"><input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="actionType" value="verpronto"/>
                         <button type="submit" class={`min-h-[44px] px-4 py-2 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600'}`}>Ver Pronto</button>
                     </form>
                     {imdbId && (
                         <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="min-h-[44px] px-4 py-2 text-xs font-bold bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors flex items-center">IMDb</a>
                     )}
                 </div>
+            </div>
+        </div>
+
+        <div class="bg-red-50/40 border-b border-red-100">
+            <div class="max-w-6xl mx-auto px-4 py-2 flex items-center gap-3 flex-wrap">
+                {isInFavorites ? (
+                    <>
+                        <span class="text-xs text-gray-600">
+                            Posición en favoritos: <span class="font-bold text-red-600">#{currentFavPosition ?? '?'}</span>
+                            {totalFavorites > 0 && <span class="text-gray-400"> de {totalFavorites}</span>}
+                        </span>
+                        <form method="POST" class="flex items-center gap-2" data-optimistic="skip">
+                            <input type="hidden" name="id" value={item?.id} />
+                            <input type="hidden" name="action" value="update" />
+                            <input type="hidden" name="actionType" value="favs" />
+                            <input
+                                type="number"
+                                name="custom_position"
+                                min="1"
+                                max={totalFavorites || 1}
+                                placeholder="Nueva"
+                                class="w-20 px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                            />
+                            <button type="submit" class="px-3 py-1 text-xs font-medium bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
+                                Mover
+                            </button>
+                        </form>
+                    </>
+                ) : (
+                    <>
+                        <span class="text-xs text-gray-600">
+                            Posición al añadir a favoritos:
+                            {totalFavorites > 0 && <span class="text-gray-400"> (1 - {totalFavorites + 1})</span>}
+                        </span>
+                        <input
+                            type="number"
+                            id="fav-add-position-input"
+                            min="1"
+                            max={totalFavorites + 1}
+                            placeholder="Indica posición"
+                            class="w-36 px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-400"
+                        />
+                        <span class="text-[11px] text-gray-400">Añadir desde botón Favoritos</span>
+                    </>
+                )}
             </div>
         </div>
 
@@ -889,4 +945,30 @@ const jsonLd = item ? {
     </article>
 </Layout>
 
+<script is:inline>
+// Cuando se añade a favoritos (action=add, actionType=favs), si el input
+// #fav-add-position-input tiene un valor, lo inyectamos en el form antes
+// del submit para que el backend lo lea como custom_position.
+// Capture phase para correr antes que el handler optimista.
+document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!form || form.method?.toLowerCase() !== 'post') return;
+    var actionInput = form.querySelector('input[name="action"]');
+    var typeInput = form.querySelector('input[name="actionType"]');
+    if (!actionInput || !typeInput) return;
+    if (actionInput.value !== 'add' || typeInput.value !== 'favs') return;
+    var posInput = document.getElementById('fav-add-position-input');
+    var pos = posInput && posInput.value ? posInput.value.trim() : '';
+    // Limpia cualquier custom_position previo que hayamos podido añadir
+    form.querySelectorAll('input[name="custom_position"][data-injected="1"]').forEach(function (n) { n.remove(); });
+    if (pos) {
+        var hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'custom_position';
+        hidden.value = pos;
+        hidden.setAttribute('data-injected', '1');
+        form.appendChild(hidden);
+    }
+}, true);
+</script>
 <script is:inline src="/js/optimistic-actions.js"></script>
