@@ -11,6 +11,9 @@ import {getGenreName} from "../../utils/constants/genres";
 import {processBatch} from "../../utils/processBatch";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import type {Serie} from "../../types/ApiSerie";
+import type {Movie} from "../../types/ApiMovie";
+import type {SeriesInterface} from "../../types/DbSerie";
 import '../../styles/pages/personal/personal.css';
 
 let clearedType = null;
@@ -26,10 +29,10 @@ if (Astro.request.method === "POST") {
     }
 }
 
-let seriesVerPronto: any[] = [];
-let peliculasVerPronto: any[] = [];
-let seriesData: any[] = [];
-let moviesData: any[] = [];
+let seriesVerPronto: Serie[] = [];
+let peliculasVerPronto: Movie[] = [];
+let seriesData: SeriesInterface[] = [];
+let moviesData: { id: string }[] = [];
 
 try {
     [seriesData, moviesData] = await Promise.all([
@@ -38,12 +41,12 @@ try {
     ]);
 
     const [seriesResults, moviesResults] = await Promise.all([
-        processBatch(seriesData.map(s => s.id), (id) => fetchSerieDetails(id), 10),
-        processBatch(moviesData.map(p => p.id), (id) => fetchMovieDetails(id), 10)
+        processBatch(seriesData.map((s: SeriesInterface) => s.id), (id: string) => fetchSerieDetails(id), 10),
+        processBatch(moviesData.map((p: { id: string }) => p.id), (id: string) => fetchMovieDetails(id), 10)
     ]);
 
-    seriesVerPronto = seriesResults.filter(s => s !== null);
-    peliculasVerPronto = moviesResults.filter(m => m !== null);
+    seriesVerPronto = (seriesResults as (Serie | null)[]).filter((s): s is Serie => s !== null);
+    peliculasVerPronto = (moviesResults as (Movie | null)[]).filter((m): m is Movie => m !== null);
 } catch (error) {
     console.error("Error al cargar contenido para ver pronto:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";

@@ -1,5 +1,7 @@
 import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, getDoc, setDoc, deleteField} from "firebase/firestore";
 import { db } from "../../../utils/firebaseConfig";
+import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
+export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 
 const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'];
 
@@ -170,159 +172,6 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
     return `/serie/${serieId}`;
 }
-
-interface SeriesFavs {
-    id: string;
-    name: string;
-    poster_path: string;
-    vote_average: number;
-    overview: string;
-    opinion?: string;
-    added_at: Date | string;
-    position: number;
-    custom_order?: number;
-    first_air_date?: string;
-    seasons?: {
-        air_date: string,
-        episode_count: number,
-        id: number,
-        name: string,
-        overview: string,
-        poster_path: string,
-        season_number: number
-    }[];
-    last_episode_to_air?: {
-        air_date: string,
-        episode_number: number,
-        id: number,
-        name: string,
-        overview: string,
-        production_code: string,
-        season_number: number,
-        still_path: string,
-        vote_average: number,
-        vote_count: number
-    };
-    next_episode_to_air?: {
-        air_date: string,
-        episode_number: number,
-        id: number,
-        name: string,
-        overview: string,
-        production_code: string,
-        season_number: number,
-        still_path: string,
-        vote_average: number,
-        vote_count: number
-    };
-    genres?: {
-        id: number,
-        name: string
-    }[];
-    status?: string;
-}
-
-interface SeriesInterface {
-    id: string;
-    name: string;
-    poster_path: string;
-    vote_average: number;
-    overview: string;
-    opinion?: string;
-    added_at: Date | string;
-    first_air_date?: string;
-    seasons?: {
-        air_date: string,
-        episode_count: number,
-        id: number,
-        name: string,
-        overview: string,
-        poster_path: string,
-        season_number: number
-    }[];
-    last_episode_to_air?: {
-        air_date: string,
-        episode_number: number,
-        id: number,
-        name: string,
-        overview: string,
-        production_code: string,
-        season_number: number,
-        still_path: string,
-        vote_average: number,
-        vote_count: number
-    };
-    next_episode_to_air?: {
-        air_date: string,
-        episode_number: number,
-        id: number,
-        name: string,
-        overview: string,
-        production_code: string,
-        season_number: number,
-        still_path: string,
-        vote_average: number,
-        vote_count: number
-    };
-    genres?: {
-        id: number,
-        name: string
-    }[];
-    status?: string;
-}
-
-// Interfaz para las series recomendadas
-interface RecommendedSeries {
-    id: string;
-    name: string;
-    poster_path: string;
-    vote_average: number;
-    overview: string;
-    score?: number; // Puntuación calculada
-    added_at?: Date | string;
-    first_air_date?: string;
-    seasons?: {
-        air_date: string,
-        episode_count: number,
-        id: number,
-        name: string,
-        overview: string,
-        poster_path: string,
-        season_number: number
-    }[];
-    last_episode_to_air?: {
-        air_date: string,
-        episode_number: number,
-        id: number,
-        name: string,
-        overview: string,
-        production_code: string,
-        season_number: number,
-        still_path: string,
-        vote_average: number,
-        vote_count: number
-    };
-    next_episode_to_air?: {
-        air_date: string,
-        episode_number: number,
-        id: number,
-        name: string,
-        overview: string,
-        production_code: string,
-        season_number: number,
-        still_path: string,
-        vote_average: number,
-        vote_count: number
-    };
-    genres?: {
-        id: number,
-        name: string
-    }[];
-    status?: string;
-    sourceTitle?: string;
-}
-
-export type {SeriesFavs, SeriesInterface};
 
 // Helper para obtener documentos de una colección ordenados por fecha
 async function getSeriesCollection<T>(collectionName: string, orderField: string = "added_at", orderDirection: "asc" | "desc" = "desc"): Promise<T[]> {
@@ -504,20 +353,6 @@ const removeDuplicatesAndCalculateScores = (recommendations: RecommendedSeries[]
 };
 
 // === Watched Episodes ===
-
-interface WatchedEpisode {
-    season: number;
-    episode: number;
-    watched_at: string;
-}
-
-interface WatchedProgress {
-    id: string;
-    watched_episodes: WatchedEpisode[];
-    last_watched: WatchedEpisode | null;
-}
-
-export type { WatchedProgress, WatchedEpisode };
 
 export async function getWatchedProgress(serieId: string): Promise<WatchedProgress | null> {
     try {

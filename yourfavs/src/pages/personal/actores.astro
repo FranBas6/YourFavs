@@ -5,18 +5,22 @@ import { getActorDetailsById, getMoviesAndSeriesByActorId } from "../../services
 import { calculateAge, processProductions } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import type { Movie } from "../../types/ApiMovie";
+import type { Serie } from "../../types/ApiSerie";
+
+type ActorDetailsData = NonNullable<Awaited<ReturnType<typeof getActorDetailsById>>>;
 
 interface ActorDetail {
     id: string;
     position: number;
-    details: any;
+    details: ActorDetailsData;
     age: number | null;
     totalMovies: number;
     totalSeries: number;
-    releasedMovies: any[];
-    releasedSeries: any[];
-    upcomingMovies: any[];
-    upcomingSeries: any[];
+    releasedMovies: Movie[];
+    releasedSeries: Serie[];
+    upcomingMovies: Movie[];
+    upcomingSeries: Serie[];
 }
 
 let actorsWithDetails: ActorDetail[] = [];
@@ -26,7 +30,7 @@ try {
     const actorsFav = await getActorsFav();
 
     const rawResults = await Promise.all(
-        actorsFav.map(async (fav) => {
+        actorsFav.map(async (fav: { id: string; position: number }) => {
             try {
                 const [actorDetails, { movies, series }] = await Promise.all([
                     getActorDetailsById({ id: fav.id }),
@@ -56,7 +60,7 @@ try {
     );
 
     // Filtrar nulos (actores no encontrados en TMDB)
-    actorsWithDetails = rawResults.filter((actor): actor is ActorDetail => actor !== null);
+    actorsWithDetails = rawResults.filter((actor: ActorDetail | null): actor is ActorDetail => actor !== null);
 } catch (error) {
     console.error("Error al cargar actores favoritos:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido";
@@ -135,18 +139,22 @@ try {
                                     Próximamente
                                 </h4>
                                 <div class="flex gap-2.5 overflow-x-auto pb-2">
-                                    {[...actor.upcomingMovies, ...actor.upcomingSeries].map((prod) => (
-                                        <a href={prod.title ? `/movie/${prod.id}` : `/serie/${prod.id}`}
+                                    {[...actor.upcomingMovies, ...actor.upcomingSeries].map((prod: Movie | Serie) => {
+                                        const title = 'title' in prod ? prod.title : prod.name;
+                                        const isMovie = 'title' in prod;
+                                        return (
+                                        <a href={isMovie ? `/movie/${prod.id}` : `/serie/${prod.id}`}
                                            class="flex-shrink-0 w-24 group/prod">
                                             <div class="relative rounded-lg overflow-hidden shadow-sm group-hover/prod:shadow-md transition-shadow">
                                                 <img src={posterUrl(prod.poster_path, 'w185') || '/placeholder.jpg'}
-                                                     alt={prod.title || prod.name}
+                                                     alt={title}
                                                      class="w-full h-36 object-cover"/>
                                                 <span class="absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 bg-green-500 text-white rounded">Próximo</span>
                                             </div>
-                                            <p class="mt-1 text-xs text-gray-600 line-clamp-2 leading-tight">{prod.title || prod.name}</p>
+                                            <p class="mt-1 text-xs text-gray-600 line-clamp-2 leading-tight">{title}</p>
                                         </a>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}

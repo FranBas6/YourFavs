@@ -10,6 +10,8 @@ import {fetchPersonalPageData} from "../../utils/personalPageHelper";
 import StatsPanel from "../../components/personal/StatsPanel.astro";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import PersonalFilter from "../../components/personal/PersonalFilter.astro";
+import type {Serie} from "../../types/ApiSerie";
+import type {Movie} from "../../types/ApiMovie";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
@@ -69,7 +71,7 @@ const {
                     )}
                     {seriesPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {seriesPaginadas.map((item: any) => (
+                            {seriesPaginadas.map((item: Serie) => (
                                 <CardSerie
                                     id={item.id.toString()}
                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -124,7 +126,7 @@ const {
                     )}
                     {peliculasPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {peliculasPaginadas.map((item: any) => (
+                            {peliculasPaginadas.map((item: Movie) => (
                                 <CardMovie
                                     id={item.id.toString()}
                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}

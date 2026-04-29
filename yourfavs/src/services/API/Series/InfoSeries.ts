@@ -152,15 +152,20 @@ export const fetchAllSeriesPosters = async (
         const seriesData = await tmdbFetch<{ seasons: any[] }>(`/tv/${numericId}`, {});
         const seasons = seriesData.seasons || [];
 
-        const seriesImagesRes = await fetch(`${BASE_URL}/tv/${numericId}/images?api_key=${API_KEY}`);
-        const seriesImagesData = await seriesImagesRes.json();
+        const fetchImages = (url: string) =>
+            fetch(url)
+                .then(r => r.json())
+                .catch(() => ({ posters: [] }));
+
+        const [seriesImagesData, ...seasonResults] = await Promise.all([
+            fetchImages(`${BASE_URL}/tv/${numericId}/images?api_key=${API_KEY}`),
+            ...seasons.map((season: any) =>
+                fetchImages(`${BASE_URL}/tv/${numericId}/season/${season.season_number}/images?api_key=${API_KEY}`)
+            ),
+        ]);
+
         let posters: TMDBPosterImage[] = seriesImagesData.posters || [];
-
-        for (const season of seasons) {
-            const seasonNumber = season.season_number;
-            const seasonImagesRes = await fetch(`${BASE_URL}/tv/${numericId}/season/${seasonNumber}/images?api_key=${API_KEY}`);
-            const seasonImagesData = await seasonImagesRes.json();
-
+        for (const seasonImagesData of seasonResults) {
             if (Array.isArray(seasonImagesData.posters)) {
                 posters = posters.concat(seasonImagesData.posters);
             }

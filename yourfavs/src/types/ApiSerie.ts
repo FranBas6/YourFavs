@@ -75,4 +75,5 @@ export type Serie = {
     character?: string;  // Añadido 'character' para series de tipo "cast"ç
     imdb_id?: string;
     availableInSpain?: boolean; // Indica si la serie está disponible en España
+    status?: string;
 };

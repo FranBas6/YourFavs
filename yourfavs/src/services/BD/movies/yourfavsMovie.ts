@@ -21,12 +21,15 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         added_at: new Date(),
     };
 
+    // Refs y lectura paralela de todas las colecciones (reutilizada por los bloques de abajo)
+    const refs = MOVIE_COLLECTIONS.map(col => doc(db, col, movieId));
+    const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+
     // Buscar opinión existente en cualquier colección
     let existingOpinion = '';
-    for (const col of MOVIE_COLLECTIONS) {
-        const checkSnap = await getDoc(doc(db, col, movieId));
-        if (checkSnap.exists() && checkSnap.data()?.opinion) {
-            existingOpinion = checkSnap.data()?.opinion;
+    for (const snap of snaps) {
+        if (snap.exists() && snap.data()?.opinion) {
+            existingOpinion = snap.data()?.opinion;
             break;
         }
     }
@@ -36,54 +39,34 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         ? { ...movieDataBase, opinion: opinionTextForCreate }
         : movieDataBase;
 
-    // Guardar opinión en todas las colecciones
+    // Helper: aplica un patch en paralelo a todas las colecciones donde la peli existe
+    const updateExisting = (patch: Record<string, any>) =>
+        Promise.all(
+            snaps
+                .map((snap, i) => snap.exists() ? updateDoc(refs[i], patch) : null)
+                .filter(Boolean) as Promise<void>[]
+        );
+
     if (action === 'save_opinion') {
         const opinionText = String(formData.get('opinion') || '').trim();
-        for (const col of MOVIE_COLLECTIONS) {
-            const ref = doc(db, col, movieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { opinion: opinionText });
-            }
-        }
+        await updateExisting({ opinion: opinionText });
         return `/movie/${movieId}`;
     }
 
-    // Guardar rating 1-10 en todas las colecciones
     if (action === 'save_rating') {
         const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
         if (!ratingNum) return `/movie/${movieId}`;
-        for (const col of MOVIE_COLLECTIONS) {
-            const ref = doc(db, col, movieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { rating: ratingNum });
-            }
-        }
+        await updateExisting({ rating: ratingNum });
         return `/movie/${movieId}`;
     }
 
-    // Eliminar rating
     if (action === 'delete_rating') {
-        for (const col of MOVIE_COLLECTIONS) {
-            const ref = doc(db, col, movieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { rating: deleteField() });
-            }
-        }
+        await updateExisting({ rating: deleteField() });
         return `/movie/${movieId}`;
     }
 
-    // Eliminar opinión en todas las colecciones
     if (action === 'delete_opinion') {
-        for (const col of MOVIE_COLLECTIONS) {
-            const ref = doc(db, col, movieId);
-            const snap = await getDoc(ref);
-            if (snap.exists()) {
-                await updateDoc(ref, { opinion: deleteField() });
-            }
-        }
+        await updateExisting({ opinion: deleteField() });
         return `/movie/${movieId}`;
     }
 

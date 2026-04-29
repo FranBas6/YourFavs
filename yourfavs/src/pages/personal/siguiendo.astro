@@ -8,15 +8,18 @@ import {buildUrl} from "../../utils/buildUrl";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {processBatch} from "../../utils/processBatch";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import type {Serie} from "../../types/ApiSerie";
+import type {SeriesInterface} from "../../types/DbSerie";
 import '../../styles/pages/personal/personal.css';
 
-let seriesSiguiendo: any[] = [];
+let seriesSiguiendo: Serie[] = [];
 let errorMessage = "";
 
 try {
-    const seriesSiguiendoIds = (await getSeriesSiguiendo()).map((s: any) => s.id);
+    const seriesSiguiendoIds = (await getSeriesSiguiendo()).map((s: SeriesInterface) => s.id);
 
-    seriesSiguiendo = await processBatch(seriesSiguiendoIds, (id: string) => fetchSerieDetails(id), 10);
+    const rawResults = await processBatch(seriesSiguiendoIds, (id: string) => fetchSerieDetails(id), 10);
+    seriesSiguiendo = (rawResults as (Serie | null)[]).filter((s): s is Serie => s !== null);
 
     seriesSiguiendo.sort((a, b) => {
         const dateA = a.last_episode_to_air?.air_date;
