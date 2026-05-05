@@ -6,6 +6,7 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName } from "../../utils/constants/genres";
 import { getMainRole, calculateAge } from "../../utils/constants/helpers/team-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
+import EmptyState from "../../components/EmptyState.astro";
 
 const { name } = Astro.params;
 const { searchParams } = Astro.url;
@@ -175,9 +176,7 @@ const hasSocial = socialLinks && Object.values(socialLinks).some(v => v);
                 </h3>
 
                 {movies.length === 0 && (
-                    <div class="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
-                        <p class="text-gray-4000">No se encontraron películas</p>
-                    </div>
+                    <EmptyState size="sm" title="No se encontraron películas" />
                 )}
                 {movies.length > 0 && (
                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
@@ -206,9 +205,7 @@ const hasSocial = socialLinks && Object.values(socialLinks).some(v => v);
                 </h3>
 
                 {series.length === 0 && (
-                    <div class="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
-                        <p class="text-gray-4000">No se encontraron series</p>
-                    </div>
+                    <EmptyState size="sm" title="No se encontraron series" />
                 )}
                 {series.length > 0 && (
                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">

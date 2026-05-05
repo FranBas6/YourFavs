@@ -2,6 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import { getCalendarData } from "../../services/API/Calendar/calendarService";
 import type { CalendarEvent } from "../../services/API/Calendar/calendarService";
+import EmptyState from "../../components/EmptyState.astro";
 
 const now = new Date();
 const year = parseInt(Astro.url.searchParams.get("year") || String(now.getFullYear()));
@@ -206,13 +207,11 @@ const notificationGroups = Array.from(groupsMap.entries())
             </h2>
 
             {subscribedEvents.length === 0 && (
-                <div class="text-center py-10 text-gray-4000">
-                    <svg class="w-12 h-12 mx-auto mb-3 text-gray-300" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                    </svg>
-                    <p>No tienes notificaciones activas</p>
-                    <p class="text-sm mt-1">Activa la campana en películas o series para recibir avisos de estrenos</p>
-                </div>
+                <EmptyState
+                    size="sm"
+                    title="No tienes notificaciones activas"
+                    description="Activa la campana en películas o series para recibir avisos de estrenos."
+                />
             )}
 
             <div class="space-y-2">

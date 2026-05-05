@@ -1,0 +1,28 @@
+---
+interface Props {
+  count?: number;
+  aspectRatio?: '2/3' | '3/4' | '16/9';
+  showMeta?: boolean;
+  class?: string;
+}
+
+const { count = 1, aspectRatio = '2/3', showMeta = true, class: className = '' } = Astro.props;
+
+const aspectClass = aspectRatio === '2/3'
+  ? 'aspect-[2/3]'
+  : aspectRatio === '3/4'
+    ? 'aspect-[3/4]'
+    : 'aspect-video';
+---
+
+{Array.from({ length: count }).map(() => (
+  <div class={`rounded-xl overflow-hidden bg-white border border-gray-200 animate-pulse ${className}`} aria-hidden="true">
+    <div class={`${aspectClass} bg-gray-200`}></div>
+    {showMeta && (
+      <div class="p-3 space-y-2">
+        <div class="h-3.5 bg-gray-200 rounded w-3/4"></div>
+        <div class="h-3 bg-gray-200 rounded w-1/2"></div>
+      </div>
+    )}
+  </div>
+))}

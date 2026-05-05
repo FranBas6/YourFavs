@@ -11,6 +11,7 @@ import {getGenreName} from "../../utils/constants/genres";
 import {processBatch} from "../../utils/processBatch";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import EmptyState from "../../components/EmptyState.astro";
 import type {Serie} from "../../types/ApiSerie";
 import type {Movie} from "../../types/ApiMovie";
 import type {SeriesInterface} from "../../types/DbSerie";
@@ -130,10 +131,9 @@ const hasContent = hasSeries || hasMovies;
                     </h2>
 
                     {seriesVerPronto.length === 0 && (
-                        <div class="text-center py-10 text-gray-4000">
-                            <p>No tienes series para ver pronto</p>
-                            <a href="/catalogo/tendencias" class="inline-block mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
-                        </div>
+                        <EmptyState size="sm" title="No tienes series para ver pronto">
+                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
+                        </EmptyState>
                     )}
                     {seriesVerPronto.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
@@ -179,10 +179,9 @@ const hasContent = hasSeries || hasMovies;
                     </h2>
 
                     {peliculasVerPronto.length === 0 && (
-                        <div class="text-center py-10 text-gray-4000">
-                            <p>No tienes películas para ver pronto</p>
-                            <a href="/catalogo/tendencias" class="inline-block mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
-                        </div>
+                        <EmptyState size="sm" title="No tienes películas para ver pronto">
+                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
+                        </EmptyState>
                     )}
                     {peliculasVerPronto.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">

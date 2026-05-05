@@ -10,6 +10,7 @@ import {fetchPersonalPageData} from "../../utils/personalPageHelper";
 import StatsPanel from "../../components/personal/StatsPanel.astro";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import PersonalFilter from "../../components/personal/PersonalFilter.astro";
+import EmptyState from "../../components/EmptyState.astro";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
@@ -63,10 +64,9 @@ const {
                     </div>
 
                     {seriesPaginadas.length === 0 && (
-                        <div class="text-center py-10 text-gray-4000">
-                            <p>Aún no tienes series en esta colección</p>
-                            <a href="/catalogo/tendencias" class="inline-block mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
-                        </div>
+                        <EmptyState size="sm" title="Aún no tienes series en esta colección">
+                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
+                        </EmptyState>
                     )}
                     {seriesPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
@@ -121,10 +121,9 @@ const {
                     </div>
 
                     {peliculasPaginadas.length === 0 && (
-                        <div class="text-center py-10 text-gray-4000">
-                            <p>Aún no tienes películas en esta colección</p>
-                            <a href="/catalogo/tendencias" class="inline-block mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
-                        </div>
+                        <EmptyState size="sm" title="Aún no tienes películas en esta colección">
+                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
+                        </EmptyState>
                     )}
                     {peliculasPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">

@@ -154,6 +154,16 @@ function handleWatchedAllForm(form) {
     });
 }
 
+function handleOpinionForm(form) {
+    submitOptimistic(form, {
+        successMsg: function (formData) {
+            return formData.get('action') === 'delete_opinion' ? 'Opinión eliminada' : 'Opinión guardada';
+        },
+        reload: true,
+        reloadDelay: 400
+    });
+}
+
 function handleRatingForm(form) {
     submitOptimistic(form, {
         successMsg: function (formData) {
@@ -224,7 +234,7 @@ function handleGenericFavAction(form) {
 
 function initOptimisticActions() {
     document.querySelectorAll('form[method="POST"]').forEach(function (form) {
-        if (form.querySelector('textarea') || form.dataset.optimistic) return;
+        if (form.dataset.optimistic) return;
         form.dataset.optimistic = 'true';
 
         var actionType = form.querySelector('input[name="actionType"]');
@@ -235,6 +245,10 @@ function initOptimisticActions() {
         if (val === 'watched_all') return handleWatchedAllForm(form);
         if (val === 'notification') return handleNotificationForm(form);
         if (val === 'rating') return handleRatingForm(form);
+
+        var actionInput = form.querySelector('input[name="action"]');
+        var action = actionInput ? actionInput.value : '';
+        if (action === 'save_opinion' || action === 'delete_opinion') return handleOpinionForm(form);
 
         handleGenericFavAction(form);
     });

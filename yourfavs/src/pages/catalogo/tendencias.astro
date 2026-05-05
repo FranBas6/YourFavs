@@ -8,6 +8,7 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import FilterBar from "../../components/FilterBar.astro";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import CardActor from "../../components/Cards/CardActor.astro";
+import EmptyState from "../../components/EmptyState.astro";
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
@@ -30,6 +31,11 @@ const [rawMovies, rawSeries, trendingPeople] = await Promise.all([
 // El filtro de duración (runtime) no aplica — no viene en la respuesta de trending.
 const trendingMovies = filtersActive ? applyClientFilters(rawMovies, filters, 'movie') : rawMovies;
 const trendingSeries = filtersActive ? applyClientFilters(rawSeries, filters, 'tv') : rawSeries;
+
+const visibleCount =
+    ((type === 'all' || type === 'movies') ? trendingMovies.length : 0) +
+    ((type === 'all' || type === 'series') ? trendingSeries.length : 0) +
+    ((type === 'all' || type === 'people') ? trendingPeople.length : 0);
 
 function buildFilterUrl(changes: Record<string, string | null>) {
     const p = new URLSearchParams(urlParams);
@@ -123,6 +129,18 @@ function buildFilterUrl(changes: Record<string, string | null>) {
                     ))}
                 </div>
             </div>
+        )}
+
+        {visibleCount === 0 && (
+            <EmptyState
+                variant={filtersActive ? 'filter' : 'empty'}
+                title={filtersActive ? 'Sin resultados con esos filtros' : 'Sin tendencias disponibles'}
+                description={filtersActive ? 'Prueba a relajar la nota mínima, la década o el idioma.' : 'Vuelve más tarde o explora otra sección.'}
+            >
+                {filtersActive && (
+                    <a slot="cta" href={`/catalogo/tendencias${type !== 'all' ? `?type=${type}` : ''}`} class="inline-flex items-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 transition-all">Limpiar filtros</a>
+                )}
+            </EmptyState>
         )}
 
         {(type === 'all' || type === 'people') && trendingPeople.length > 0 && (

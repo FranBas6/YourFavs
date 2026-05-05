@@ -2,6 +2,7 @@
 import Layout from "../../../layouts/Layout.astro";
 import { searchCollections, type MovieCollectionInfo, type CollectionSearchResponse } from "../../../services/API/Movies/InfoMovies";
 import { getUserCollections, getPopularCollections, invalidateCollectionsCache } from "../../../services/API/shared/collectionsDiscovery";
+import EmptyState from "../../../components/EmptyState.astro";
 
 const url = new URL(Astro.request.url);
 const q = (url.searchParams.get('q') || '').trim();
@@ -73,14 +74,16 @@ function searchUrl(p: number): string {
                 </h2>
 
                 {search.results.length === 0 ? (
-                    <div class="text-center py-12 text-gray-500">
-                        <div class="text-4xl mb-3">🔍</div>
-                        <p>No se han encontrado sagas con ese nombre</p>
-                        <a href="/catalogo/colecciones" class="inline-block mt-4 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium">Ver sagas destacadas</a>
-                    </div>
+                    <EmptyState
+                        variant="search"
+                        title="No se han encontrado sagas con ese nombre"
+                        description="Prueba con otro término o vuelve al listado destacado."
+                    >
+                        <a slot="cta" href="/catalogo/colecciones" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors">Ver sagas destacadas</a>
+                    </EmptyState>
                 ) : (
                     <>
-                        <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+                        <div class="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                             {search.results.map(col => (
                                 <a href={`/catalogo/colecciones/${col.id}`}
                                    class="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all bg-white">
@@ -135,7 +138,7 @@ function searchUrl(p: number): string {
                 </h2>
                 <p class="text-xs text-gray-500 mb-4">Franquicias de películas que tienes en tus colecciones personales</p>
 
-                <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                     {userCollections.map(col => (
                         <a href={`/catalogo/colecciones/${col.id}`}
                            class="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all">
@@ -181,7 +184,7 @@ function searchUrl(p: number): string {
                 </h2>
                 <p class="text-xs text-gray-500 mb-4">Sagas descubiertas de las películas más valoradas y votadas del cine</p>
 
-                <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                <div class="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
                     {popularCollections.map(col => (
                         <a href={`/catalogo/colecciones/${col.id}`}
                            class="group relative rounded-xl overflow-hidden border border-gray-200 hover:border-gray-400 hover:shadow-lg transition-all">
@@ -221,11 +224,12 @@ function searchUrl(p: number): string {
 
         {/* Empty: sin búsqueda y sin ambas fuentes */}
         {!q && userCollections.length === 0 && popularCollections.length === 0 && (
-            <div class="text-center py-16 text-gray-500">
-                <div class="text-5xl mb-3">🎬</div>
-                <p class="text-base">No se han podido cargar sagas</p>
-                <p class="text-sm mt-1">Intenta una búsqueda manual en la barra superior</p>
-            </div>
+            <EmptyState
+                variant="error"
+                size="lg"
+                title="No se han podido cargar sagas"
+                description="Intenta una búsqueda manual en la barra superior."
+            />
         )}
     </section>
 </Layout>

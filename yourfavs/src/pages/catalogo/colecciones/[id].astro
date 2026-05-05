@@ -3,6 +3,7 @@ import Layout from "../../../layouts/Layout.astro";
 import CardMovie from "../../../components/Cards/CardMovie.astro";
 import { getMovieCollectionInfo } from "../../../services/API/Movies/InfoMovies";
 import { getGenreName } from "../../../utils/constants/genres";
+import EmptyState from "../../../components/EmptyState.astro";
 import '../../../styles/pages/catalogo/shared.css';
 
 const { id } = Astro.params;
@@ -84,9 +85,10 @@ const avgRating = partsSorted.length > 0
         </h2>
 
         {partsSorted.length === 0 ? (
-            <div class="text-center py-12 text-gray-500">
-                <p>Esta colección no tiene películas registradas.</p>
-            </div>
+            <EmptyState
+                size="sm"
+                title="Esta colección no tiene películas registradas"
+            />
         ) : (
             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {partsSorted.map(part => (
