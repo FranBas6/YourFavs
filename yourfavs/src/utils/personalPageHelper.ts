@@ -1,6 +1,6 @@
 import { fetchMovieDetails } from "../services/API/Movies/tmdbMovies";
 import { fetchSerieDetails } from "../services/API/Series/tmdbSeries";
-import { getWatchedProgressBatch } from "../services/BD/series/yourfavsSerie";
+import { getWatchedProgressBatch, getWatchStreak } from "../services/BD/series/yourfavsSerie";
 import { tmdbFetch } from "../services/API/shared/tmdbClient";
 import { mapAndDeduplicateProviders } from "../services/API/shared/tmdbInfoService";
 import { getGenreName } from "./constants/genres";
@@ -90,7 +90,10 @@ export async function fetchPersonalPageData(
         errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
     }
 
-    const watchedMap = await getWatchedProgressBatch(seriesItems.map((s: any) => String(s.id)));
+    const [watchedMap, watchStreak] = await Promise.all([
+        getWatchedProgressBatch(seriesItems.map((s: any) => String(s.id))),
+        getWatchStreak(),
+    ]);
 
     // Géneros disponibles
     const genreSet = new Set<string>();
@@ -177,6 +180,7 @@ export async function fetchPersonalPageData(
     (stats as any).watched = {
         totalEpisodes: totalWatchedEpisodes,
         topSerie: topSerieName && topWatchedEntry ? { name: topSerieName, watched: topWatchedEntry[1].watched } : null,
+        streak: watchStreak.current,
     };
 
     return {

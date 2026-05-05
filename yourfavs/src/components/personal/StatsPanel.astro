@@ -18,6 +18,7 @@ interface Props {
         watched?: {
             totalEpisodes: number;
             topSerie: { name: string; watched: number } | null;
+            streak?: number;
         };
         movies: {
             total: number;
@@ -285,6 +286,9 @@ const ratings = stats.general.ratingStats;
                     <div class="flex justify-between"><span class="text-gray-500">Años</span><span class="font-medium">{stats.series.añoMasAntiguo}-{stats.series.añoMasReciente}</span></div>
                     {stats.watched && stats.watched.totalEpisodes > 0 && (
                         <div class="flex justify-between"><span class="text-gray-500">Eps. vistos</span><span class="font-medium text-green-600">{stats.watched.totalEpisodes}</span></div>
+                    )}
+                    {stats.watched && (stats.watched.streak ?? 0) > 0 && (
+                        <div class="flex justify-between"><span class="text-gray-500">Racha</span><span class="font-medium text-orange-600">🔥 {stats.watched.streak} {stats.watched.streak === 1 ? 'día' : 'días'}</span></div>
                     )}
                     {stats.watched?.topSerie && (
                         <div class="flex justify-between col-span-2"><span class="text-gray-500">Más vista</span><span class="font-medium text-green-600 truncate ml-2">{stats.watched.topSerie.name} ({stats.watched.topSerie.watched})</span></div>

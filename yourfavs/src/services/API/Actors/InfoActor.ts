@@ -62,6 +62,8 @@ export const getActorDetailsById = async ({ id }: { id: string }) => {
             homepage: actorDetails.homepage || null,
             redes: {
                 imdb: socialLinks.imdb_id ? `https://www.imdb.com/name/${socialLinks.imdb_id}` : null,
+                wikidata: socialLinks.wikidata_id ? `https://www.wikidata.org/wiki/${socialLinks.wikidata_id}` : null,
+                wikipedia: actorDetails.name ? `https://es.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(actorDetails.name)}` : null,
                 twitter: socialLinks.twitter_id ? `https://twitter.com/${socialLinks.twitter_id}` : null,
                 instagram: socialLinks.instagram_id ? `https://instagram.com/${socialLinks.instagram_id}` : null,
                 facebook: socialLinks.facebook_id ? `https://facebook.com/${socialLinks.facebook_id}` : null,

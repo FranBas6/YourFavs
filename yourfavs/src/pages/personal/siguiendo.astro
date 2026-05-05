@@ -54,6 +54,25 @@ const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
 const seriesPaginadas = filteredSeries.slice(0, seriesItemsToShow);
 const hasMoreSeries = filteredSeries.length > seriesItemsToShow;
 
+// C13 — A un paso de terminar: faltan 1-2 episodios y la serie no ha acabado
+function totalRegularEpisodes(s: any): number {
+    return (s.seasons || []).filter((sn: any) => sn.season_number > 0).reduce((sum: number, sn: any) => sum + (sn.episode_count || 0), 0);
+}
+const almostDone = seriesSiguiendo
+    .map(s => {
+        const total = totalRegularEpisodes(s);
+        const watched = watchedMap[String(s.id)]?.watched ?? 0;
+        const remaining = total - watched;
+        return { serie: s, total, watched, remaining };
+    })
+    .filter(x =>
+        x.total > 0 &&
+        x.watched > 0 &&
+        x.remaining >= 1 &&
+        x.remaining <= 2
+    )
+    .sort((a, b) => a.remaining - b.remaining);
+
 const pageUrl = Astro.url;
 ---
 <Layout title="Siguiendo">
@@ -81,6 +100,43 @@ const pageUrl = Astro.url;
         )}
 
         <div class="space-y-10">
+            {/* C13 — A un paso de terminar */}
+            {!searchQuery && almostDone.length > 0 && (
+                <section class="scroll-mt-20">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
+                            A un paso de terminar
+                            <span class="text-sm font-normal text-gray-4000">({almostDone.length})</span>
+                        </h2>
+                    </div>
+                    <p class="text-xs text-gray-500 mb-3">Series a las que solo te quedan 1 o 2 episodios para ponerte al día</p>
+                    <div class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                        {almostDone.map(({ serie, total, watched, remaining }) => (
+                            <a href={`/serie/${serie.id}`} class="group flex items-center gap-3 bg-white rounded-xl p-3 border border-emerald-200 hover:border-emerald-400 hover:shadow-md transition">
+                                {serie.poster_path ? (
+                                    <img src={posterUrl(serie.poster_path, 'w154')} alt={serie.name} class="w-14 h-20 object-cover rounded flex-shrink-0" loading="lazy"/>
+                                ) : (
+                                    <div class="w-14 h-20 bg-gray-100 rounded flex-shrink-0"></div>
+                                )}
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-semibold text-gray-900 truncate group-hover:text-emerald-700 transition">{serie.name}</div>
+                                    <div class="mt-1 flex items-center gap-2">
+                                        <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">
+                                            {remaining === 1 ? '1 episodio' : '2 episodios'}
+                                        </span>
+                                        <span class="text-xs text-gray-500">{watched}/{total}</span>
+                                    </div>
+                                    <div class="mt-1.5 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-1 bg-emerald-500 rounded-full" style={`width: ${Math.min(100, Math.round((watched / total) * 100))}%`}></div>
+                                    </div>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                </section>
+            )}
+
             {/* Series */}
             <section id="series-section" class="scroll-mt-20">
                 <div class="flex items-center justify-between mb-4">

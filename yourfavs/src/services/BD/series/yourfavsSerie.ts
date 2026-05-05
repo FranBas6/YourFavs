@@ -465,5 +465,54 @@ export async function getWatchedProgressBatch(serieIds: string[]): Promise<Recor
     return map;
 }
 
+/**
+ * Calcula la racha actual de días consecutivos viendo episodios.
+ * Usa la zona horaria local. Cuenta hoy o ayer como inicio (para no romper la racha
+ * antes de la medianoche). Si el día más reciente es anterior a ayer, la racha es 0.
+ */
+export async function getWatchStreak(): Promise<{ current: number; lastDay: string | null }> {
+    try {
+        const snap = await getDocs(collection(db, 'WatchedEpisodes'));
+        const dayKeys = new Set<string>();
+        for (const docSnap of snap.docs) {
+            const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
+            for (const ep of data.watched_episodes || []) {
+                if (!ep.watched_at) continue;
+                const d = new Date(ep.watched_at);
+                if (isNaN(d.getTime())) continue;
+                dayKeys.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+            }
+        }
+        if (dayKeys.size === 0) return { current: 0, lastDay: null };
+
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+
+        let cursor = new Date(today);
+        if (!dayKeys.has(todayKey)) {
+            if (dayKeys.has(yesterdayKey)) cursor = yesterday;
+            else return { current: 0, lastDay: null };
+        }
+
+        let streak = 0;
+        while (true) {
+            const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
+            if (dayKeys.has(key)) {
+                streak++;
+                cursor.setDate(cursor.getDate() - 1);
+            } else break;
+        }
+
+        const lastDayDate = new Date(today);
+        if (!dayKeys.has(todayKey)) lastDayDate.setDate(lastDayDate.getDate() - 1);
+        return { current: streak, lastDay: lastDayDate.toISOString() };
+    } catch (error) {
+        console.error('Error al calcular racha:', error);
+        return { current: 0, lastDay: null };
+    }
+}
+
 // Exportar db para que pueda ser utilizada por otros módulos si es necesario
 export {db};
