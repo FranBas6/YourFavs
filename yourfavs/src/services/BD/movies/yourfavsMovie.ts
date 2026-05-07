@@ -93,6 +93,14 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
             const { invalidateUserCollectionsCache } = await import('../../API/shared/collectionsDiscovery');
             invalidateUserCollectionsCache();
         } catch { /* ignore */ }
+        try {
+            const { invalidateYearStatsCache } = await import('../../../utils/yearStats');
+            invalidateYearStatsCache();
+        } catch { /* ignore */ }
+        try {
+            const { invalidateGenrePreferencesCache } = await import('../../../utils/genrePreferences');
+            invalidateGenrePreferencesCache();
+        } catch { /* ignore */ }
     }
 
     return `/movie/${movieId}`;

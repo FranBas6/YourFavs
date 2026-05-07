@@ -291,18 +291,35 @@ export async function calculateYearStats(year: number): Promise<YearStats> {
     const totalHours = Math.round((hoursFromMovies + hoursFromEpisodes) / 60);
 
     // Top series por eps vistos en el año (top 5)
-    const topSeries: SeriesEpsRanking[] = Array.from(seriesEpsCount.entries())
+    const topSeriesRaw = Array.from(seriesEpsCount.entries())
         .sort(([, a], [, b]) => b - a)
-        .slice(0, 5)
-        .map(([serieId, eps]) => {
-            const detail = enrichedById.get(serieId);
-            return {
-                id: serieId,
-                title: detail?.title || `Serie ${serieId}`,
-                poster_path: detail?.poster_path || '',
-                episodesWatched: eps,
-            };
-        });
+        .slice(0, 5);
+    const missingIds = topSeriesRaw
+        .map(([id]) => id)
+        .filter(id => !enrichedById.has(id));
+    const extraDetails = await processBatch(
+        missingIds,
+        async (id: string) => {
+            try {
+                const d: any = await tmdbFetch<any>(`/tv/${id}`);
+                return { id, title: d?.name || '', poster_path: d?.poster_path || '' };
+            } catch {
+                return { id, title: '', poster_path: '' };
+            }
+        },
+        10
+    );
+    const extraById = new Map(extraDetails.map(e => [e.id, e]));
+    const topSeries: SeriesEpsRanking[] = topSeriesRaw.map(([serieId, eps]) => {
+        const detail = enrichedById.get(serieId);
+        const extra = extraById.get(serieId);
+        return {
+            id: serieId,
+            title: detail?.title || extra?.title || `Serie ${serieId}`,
+            poster_path: detail?.poster_path || extra?.poster_path || '',
+            episodesWatched: eps,
+        };
+    });
 
     // Showcase
     const toShowcase = (e: typeof enriched[number]): ItemShowcase => ({

@@ -170,6 +170,17 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         }
     }
 
+    if (action === 'add' || action === 'remove') {
+        try {
+            const { invalidateYearStatsCache } = await import('../../../utils/yearStats');
+            invalidateYearStatsCache();
+        } catch { /* ignore */ }
+        try {
+            const { invalidateGenrePreferencesCache } = await import('../../../utils/genrePreferences');
+            invalidateGenrePreferencesCache();
+        } catch { /* ignore */ }
+    }
+
     return `/serie/${serieId}`;
 }
 
