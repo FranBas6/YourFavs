@@ -451,15 +451,20 @@ export async function unmarkAllWatched(serieId: string): Promise<void> {
     await deleteDoc(ref);
 }
 
-export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number }>> {
+export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number> }>> {
     if (serieIds.length === 0) return {};
     const results = await Promise.all(
         serieIds.map(id => getWatchedProgress(id))
     );
-    const map: Record<string, { watched: number }> = {};
+    const map: Record<string, { watched: number; bySeasons?: Record<number, number> }> = {};
     for (let i = 0; i < serieIds.length; i++) {
-        if (results[i] && results[i]!.watched_episodes.length > 0) {
-            map[serieIds[i]] = { watched: results[i]!.watched_episodes.length };
+        const data = results[i];
+        if (data && data.watched_episodes.length > 0) {
+            const bySeasons: Record<number, number> = {};
+            for (const ep of data.watched_episodes) {
+                if (ep.season > 0) bySeasons[ep.season] = (bySeasons[ep.season] || 0) + 1;
+            }
+            map[serieIds[i]] = { watched: data.watched_episodes.length, bySeasons };
         }
     }
     return map;
