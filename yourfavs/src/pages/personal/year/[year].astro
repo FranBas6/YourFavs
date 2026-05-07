@@ -1,0 +1,374 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import PersonalNav from "../../../components/personal/PersonalNav.astro";
+import EmptyState from "../../../components/EmptyState.astro";
+import { calculateYearStats, type ItemShowcase } from "../../../utils/yearStats";
+import { getGenreName } from "../../../utils/constants/genres";
+import { getLanguageDisplayName } from "../../../utils/constants/helpers/media-helpers";
+import { posterUrl } from "../../../services/API/shared/tmdbClient";
+import '../../../styles/pages/personal/personal.css';
+
+const yearParam = Astro.params.year;
+const yearNum = Number(yearParam);
+const currentYear = new Date().getFullYear();
+
+if (!yearParam || isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 1) {
+    return Astro.redirect(`/personal/year/${currentYear}`);
+}
+
+const stats = await calculateYearStats(yearNum);
+
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+const WEEKDAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+const maxMonthly = Math.max(1, ...stats.monthlyBreakdown);
+const maxDecade = Math.max(1, ...stats.byDecade.map(d => d.count));
+const maxCollection = Math.max(1, ...stats.byCollection.map(c => c.count));
+const maxLanguage = Math.max(1, ...stats.byLanguage.map(l => l.count));
+
+const prevYear = yearNum - 1;
+const nextYear = yearNum + 1;
+const hasPrev = stats.availableYears.some(y => y < yearNum);
+const hasNext = yearNum < currentYear;
+
+// Heatmap: construir grid de celdas — todos los días del año agrupados por semana
+const heatmapMap = new Map(stats.heatmap.map(h => [h.dayKey, h.count]));
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+const yearStart = new Date(yearNum, 0, 1);
+const yearEnd = new Date(yearNum, 11, 31);
+const daysInYear: { key: string; date: Date; count: number }[] = [];
+for (let d = new Date(yearStart); d <= yearEnd; d.setDate(d.getDate() + 1)) {
+    const key = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    daysInYear.push({ key, date: new Date(d), count: heatmapMap.get(key) || 0 });
+}
+const maxHeat = Math.max(0, ...stats.heatmap.map(h => h.count));
+function heatLevel(count: number): number {
+    if (count === 0) return 0;
+    if (maxHeat <= 1) return count > 0 ? 4 : 0;
+    const ratio = count / maxHeat;
+    if (ratio < 0.25) return 1;
+    if (ratio < 0.5) return 2;
+    if (ratio < 0.75) return 3;
+    return 4;
+}
+const HEAT_COLORS = ['bg-gray-100', 'bg-emerald-200', 'bg-emerald-400', 'bg-emerald-600', 'bg-emerald-800'];
+
+// Agrupar días en semanas de calendario (columnas)
+const weeks: ({ key: string; date: Date; count: number } | null)[][] = [];
+let currentWeek: ({ key: string; date: Date; count: number } | null)[] = new Array(7).fill(null);
+for (const day of daysInYear) {
+    const dow = day.date.getDay(); // 0 = domingo
+    if (dow === 0 && currentWeek.some(c => c !== null)) {
+        weeks.push(currentWeek);
+        currentWeek = new Array(7).fill(null);
+    }
+    currentWeek[dow] = day;
+}
+if (currentWeek.some(c => c !== null)) weeks.push(currentWeek);
+
+function showcaseHref(s: ItemShowcase): string {
+    return s.kind === 'movie' ? `/movie/${s.id}` : `/serie/${s.id}`;
+}
+function deltaLabel(delta: number | null): { text: string; className: string } {
+    if (delta === null) return { text: '', className: '' };
+    if (delta > 0) return { text: `+${delta}% vs ${prevYear}`, className: 'text-emerald-600' };
+    if (delta < 0) return { text: `${delta}% vs ${prevYear}`, className: 'text-red-600' };
+    return { text: `=  ${prevYear}`, className: 'text-gray-500' };
+}
+const moviesDelta = deltaLabel(stats.comparison.moviesDelta);
+const seriesDelta = deltaLabel(stats.comparison.seriesDelta);
+const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
+---
+<Layout title={`Tu ${yearNum}`}>
+    <section class="px-1 sm:py-8">
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Tu {yearNum}</h1>
+            <p class="text-gray-500 text-base">Resumen de lo que has añadido y visto este año</p>
+        </header>
+
+        <div class="mb-6">
+            <PersonalNav currentPage="/personal/year" />
+        </div>
+
+        {/* Selector de año */}
+        <div class="flex items-center justify-center gap-3 mb-8">
+            {hasPrev ? (
+                <a href={`/personal/year/${prevYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                    {prevYear}
+                </a>
+            ) : (
+                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 text-sm font-medium text-gray-300 cursor-not-allowed">{prevYear}</span>
+            )}
+            <span class="text-2xl font-bold text-gray-900 px-4">{yearNum}</span>
+            {hasNext ? (
+                <a href={`/personal/year/${nextYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                    {nextYear}
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+                </a>
+            ) : (
+                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 text-sm font-medium text-gray-300 cursor-not-allowed">{nextYear}</span>
+            )}
+        </div>
+
+        {!stats.hasData && (
+            <EmptyState
+                size="md"
+                title={`Nada en ${yearNum}`}
+                description="No hay items añadidos ni episodios vistos en este año.">
+                {stats.availableYears.length > 0 && (
+                    <a slot="cta" href={`/personal/year/${stats.availableYears[0]}`} class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">
+                        Ver tu {stats.availableYears[0]}
+                    </a>
+                )}
+            </EmptyState>
+        )}
+
+        {stats.hasData && (
+            <div class="space-y-10">
+                {/* Stat cards principales */}
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div class="rounded-xl bg-gradient-to-br from-red-50 to-red-100 border border-red-200 p-4">
+                        <div class="text-3xl">🎬</div>
+                        <div class="mt-2 text-3xl font-bold text-red-700">{stats.moviesAdded}</div>
+                        <div class="text-xs text-red-600 font-medium uppercase tracking-wide mt-1">Películas</div>
+                        {moviesDelta.text && <div class={`text-[11px] mt-1 font-medium ${moviesDelta.className}`}>{moviesDelta.text}</div>}
+                    </div>
+                    <div class="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-4">
+                        <div class="text-3xl">📺</div>
+                        <div class="mt-2 text-3xl font-bold text-blue-700">{stats.seriesAdded}</div>
+                        <div class="text-xs text-blue-600 font-medium uppercase tracking-wide mt-1">Series</div>
+                        {seriesDelta.text && <div class={`text-[11px] mt-1 font-medium ${seriesDelta.className}`}>{seriesDelta.text}</div>}
+                    </div>
+                    <div class="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 p-4">
+                        <div class="text-3xl">▶️</div>
+                        <div class="mt-2 text-3xl font-bold text-emerald-700">{stats.episodesWatched}</div>
+                        <div class="text-xs text-emerald-600 font-medium uppercase tracking-wide mt-1">Episodios</div>
+                        {episodesDelta.text && <div class={`text-[11px] mt-1 font-medium ${episodesDelta.className}`}>{episodesDelta.text}</div>}
+                    </div>
+                    <div class="rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 p-4">
+                        <div class="text-3xl">⏱️</div>
+                        <div class="mt-2 text-3xl font-bold text-amber-700">{stats.totalHours}h</div>
+                        <div class="text-xs text-amber-600 font-medium uppercase tracking-wide mt-1">Horas estimadas</div>
+                        <div class="text-[11px] text-amber-500 mt-1">~{Math.round(stats.totalHours / 24)} días</div>
+                    </div>
+                    <div class="rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 p-4 col-span-2 md:col-span-1">
+                        <div class="text-3xl">📅</div>
+                        <div class="mt-2 text-xl font-bold text-purple-700 truncate">
+                            {stats.activeMonth ? MONTH_NAMES[stats.activeMonth.month] : '—'}
+                        </div>
+                        <div class="text-xs text-purple-600 font-medium uppercase tracking-wide mt-1">Mes más activo</div>
+                        {stats.activeMonth && <div class="text-[11px] text-purple-500 mt-1">{stats.activeMonth.count} items · {stats.activeWeekday ? `${WEEKDAY_NAMES[stats.activeWeekday.weekday]}s` : ''}</div>}
+                    </div>
+                </div>
+
+                {/* Showcase con posters */}
+                {(stats.showcase.bestUserRated || stats.showcase.bestTmdb || stats.showcase.firstOfYear || stats.showcase.lastOfYear) && (
+                    <section>
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-rose-500 rounded-full"></span>
+                            Destacados del {yearNum}
+                        </h2>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {[
+                                { item: stats.showcase.bestUserRated, label: '⭐ Tu mejor nota', sub: (s: ItemShowcase) => s.user_rating ? `${s.user_rating}/10` : '' },
+                                { item: stats.showcase.bestTmdb, label: '🏆 Mejor TMDB', sub: (s: ItemShowcase) => `${s.tmdb_rating.toFixed(1)}` },
+                                { item: stats.showcase.firstOfYear, label: '🎯 Primer item', sub: (s: ItemShowcase) => new Date(s.addedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) },
+                                { item: stats.showcase.lastOfYear, label: '🔥 Último item', sub: (s: ItemShowcase) => new Date(s.addedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) },
+                            ].filter(x => x.item).map(({ item, label, sub }) => (
+                                <a href={showcaseHref(item!)} class="group block">
+                                    <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
+                                        {item!.poster_path ? (
+                                            <img src={posterUrl(item!.poster_path) || ''} alt={item!.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                        ) : (
+                                            <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">🎞️</div>
+                                        )}
+                                        <span class={`absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${item!.kind === 'movie' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
+                                            {item!.kind === 'movie' ? 'Película' : 'Serie'}
+                                        </span>
+                                    </div>
+                                    <div class="mt-2 text-[10px] font-bold text-rose-600 uppercase tracking-wider">{label}</div>
+                                    <div class="text-sm font-semibold text-gray-800 line-clamp-1">{item!.title}</div>
+                                    <div class="text-xs text-gray-500">{sub(item!)}</div>
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Top series del año */}
+                {stats.showcase.topSeries.length > 0 && (
+                    <section>
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
+                            Series con más episodios vistos
+                        </h2>
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                            {stats.showcase.topSeries.map((s, idx) => (
+                                <a href={`/serie/${s.id}`} class="group block">
+                                    <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
+                                        {s.poster_path ? (
+                                            <img src={posterUrl(s.poster_path) || ''} alt={s.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                        ) : (
+                                            <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">📺</div>
+                                        )}
+                                        <span class="absolute top-2 left-2 w-7 h-7 flex items-center justify-center text-sm font-bold rounded-full bg-emerald-500 text-white shadow-lg">{idx + 1}</span>
+                                        <span class="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-emerald-300">▶ {s.episodesWatched}</span>
+                                    </div>
+                                    <div class="mt-2 text-sm font-semibold text-gray-800 line-clamp-1">{s.title}</div>
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Heatmap calendario */}
+                {stats.heatmap.length > 0 && (
+                    <section>
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
+                            Tu actividad en {yearNum}
+                        </h2>
+                        <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
+                            <div class="flex gap-[3px] min-w-fit">
+                                {weeks.map((week) => (
+                                    <div class="flex flex-col gap-[3px]">
+                                        {week.map((day) => day === null ? (
+                                            <div class="w-3 h-3"></div>
+                                        ) : (
+                                            <div
+                                                class={`w-3 h-3 rounded-sm ${HEAT_COLORS[heatLevel(day.count)]}`}
+                                                title={`${day.date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}: ${day.count} ep${day.count !== 1 ? 's' : ''}`}
+                                            ></div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                            <div class="flex items-center gap-2 mt-3 text-xs text-gray-500">
+                                <span>Menos</span>
+                                {HEAT_COLORS.map((c) => <div class={`w-3 h-3 rounded-sm ${c}`}></div>)}
+                                <span>Más</span>
+                            </div>
+                        </div>
+                    </section>
+                )}
+
+                {/* Distribuciones */}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {stats.byDecade.length > 0 && (
+                        <section class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <span class="text-base">📆</span> Por década de estreno
+                            </h3>
+                            <div class="space-y-2">
+                                {stats.byDecade.map((d) => (
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs font-medium text-gray-600 w-16">{d.decade}</span>
+                                        <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
+                                            <div class="h-full bg-cyan-500 rounded" style={`width: ${(d.count / maxDecade) * 100}%`}></div>
+                                        </div>
+                                        <span class="text-xs font-semibold text-gray-700 w-8 text-right">{d.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {stats.byCollection.length > 0 && (
+                        <section class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <span class="text-base">🗂️</span> Por colección
+                            </h3>
+                            <div class="space-y-2">
+                                {stats.byCollection.map((c) => (
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs font-medium text-gray-600 w-20 truncate">{c.label}</span>
+                                        <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
+                                            <div class="h-full bg-fuchsia-500 rounded" style={`width: ${(c.count / maxCollection) * 100}%`}></div>
+                                        </div>
+                                        <span class="text-xs font-semibold text-gray-700 w-8 text-right">{c.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {stats.byLanguage.length > 0 && (
+                        <section class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <span class="text-base">🌍</span> Por idioma original
+                            </h3>
+                            <div class="space-y-2">
+                                {stats.byLanguage.map((l) => (
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-xs font-medium text-gray-600 w-24 truncate">{getLanguageDisplayName(l.code)}</span>
+                                        <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
+                                            <div class="h-full bg-teal-500 rounded" style={`width: ${(l.count / maxLanguage) * 100}%`}></div>
+                                        </div>
+                                        <span class="text-xs font-semibold text-gray-700 w-8 text-right">{l.count}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+
+                    {stats.topGenres.length > 0 && (
+                        <section class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                <span class="text-base">🎭</span> Top géneros
+                            </h3>
+                            <div class="flex flex-wrap gap-2">
+                                {stats.topGenres.map((g) => (
+                                    <span class="text-sm px-3 py-1.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-medium">
+                                        {getGenreName(g.id)} <span class="text-xs text-orange-500 ml-1">×{g.count}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+                </div>
+
+                {/* Breakdown mensual */}
+                <section>
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="w-1 h-6 bg-indigo-500 rounded-full"></span>
+                        Items añadidos por mes
+                    </h2>
+                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                        <div class="grid grid-cols-12 gap-1 items-end h-32">
+                            {stats.monthlyBreakdown.map((count, idx) => (
+                                <div class="flex flex-col items-center justify-end h-full gap-1" title={`${MONTH_NAMES[idx]}: ${count} items`}>
+                                    <div class="text-[10px] font-semibold text-gray-600">{count > 0 ? count : ''}</div>
+                                    <div
+                                        class={`w-full rounded-t transition ${count > 0 ? 'bg-indigo-500' : 'bg-gray-100'}`}
+                                        style={`height: ${count === 0 ? '4px' : `${Math.max(8, (count / maxMonthly) * 100)}%`}`}>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div class="grid grid-cols-12 gap-1 mt-1">
+                            {MONTH_SHORT.map((m) => (
+                                <div class="text-[10px] text-center text-gray-500 font-medium">{m}</div>
+                            ))}
+                        </div>
+                    </div>
+                </section>
+
+                {/* Otros años */}
+                {stats.availableYears.length > 1 && (
+                    <section>
+                        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Saltar a otro año</h2>
+                        <div class="flex flex-wrap gap-2">
+                            {stats.availableYears.map((y) => (
+                                <a href={`/personal/year/${y}`} class={`text-sm px-3 py-1.5 rounded-lg border font-medium transition ${y === yearNum ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
+                                    {y}
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+                )}
+            </div>
+        )}
+    </section>
+</Layout>

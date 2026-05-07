@@ -1,0 +1,66 @@
+---
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import type { ForYouItem } from "../../services/API/shared/forYouRecommendations";
+
+interface Props {
+    items: ForYouItem[];
+}
+
+const { items } = Astro.props;
+---
+{items.length > 0 && (
+    <section class="for-you-section mb-8">
+        <header class="flex items-center justify-between mb-4 px-1">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl" aria-hidden="true">✨</span>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 uppercase tracking-wide">Para ti</h2>
+            </div>
+            <a href="/personal/recomendaciones" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Ver todo →</a>
+        </header>
+
+        <div class="for-you-scroll flex gap-4 overflow-x-auto pb-4 px-1 snap-x snap-mandatory">
+            {items.map((item) => (
+                <a
+                    href={item.kind === 'movie' ? `/movie/${item.id}` : `/serie/${item.id}`}
+                    class="for-you-card flex-shrink-0 w-36 sm:w-40 snap-start group"
+                    aria-label={`${item.kind === 'movie' ? 'Película' : 'Serie'}: ${item.title}`}
+                >
+                    <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-300 aspect-[2/3] bg-gray-200">
+                        <img
+                            src={posterUrl(item.poster_path) || '/placeholder.jpg'}
+                            alt={item.title}
+                            loading="lazy"
+                            class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <span class={`absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${item.kind === 'movie' ? 'bg-red-500 text-white' : 'bg-blue-500 text-white'}`}>
+                            {item.kind === 'movie' ? 'Película' : 'Serie'}
+                        </span>
+                        {item.vote_average > 0 && (
+                            <span class="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-yellow-300">
+                                ★ {item.vote_average.toFixed(1)}
+                            </span>
+                        )}
+                    </div>
+                    <p class="mt-2 text-sm font-semibold text-gray-800 line-clamp-1">{item.title}</p>
+                    {item.date && (
+                        <p class="text-xs text-gray-500">{item.date.slice(0, 4)}</p>
+                    )}
+                </a>
+            ))}
+        </div>
+    </section>
+)}
+
+<style>
+    .for-you-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+    }
+    .for-you-scroll::-webkit-scrollbar {
+        height: 6px;
+    }
+    .for-you-scroll::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 3px;
+    }
+</style>

@@ -2,23 +2,61 @@
 import Layout from "../../layouts/Layout.astro"
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getRecommendedSeries, getWatchedProgressBatch} from "../../services/BD/series/yourfavsSerie";
-import {getRecommendedMovies} from "../../services/BD/movies/yourfavsMovie";
-import {getGenreName} from "../../utils/constants/genres";
-import {posterUrl} from "../../services/API/shared/tmdbClient";
+import { getWatchedProgressBatch } from "../../services/BD/series/yourfavsSerie";
+import { tmdbFetchList } from "../../services/API/shared/tmdbClient";
+import { calculateGenrePreferences } from "../../utils/genrePreferences";
+import { getGenreName } from "../../utils/constants/genres";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import EmptyState from "../../components/EmptyState.astro";
 import '../../styles/pages/personal/personal.css';
 
+let prefs: Awaited<ReturnType<typeof calculateGenrePreferences>> | null = null;
 let seriesRecomendadas: any[] = [];
 let peliculasRecomendadas: any[] = [];
 let errorMessage = "";
 
 try {
-    // Parallelizar las 2 llamadas de recomendaciones
-    [seriesRecomendadas, peliculasRecomendadas] = await Promise.all([
-        getRecommendedSeries(),
-        getRecommendedMovies(),
+    prefs = await calculateGenrePreferences();
+
+    const movieGenresParam = prefs.movies.topGenres.join(',');
+    const tvGenresParam = prefs.tv.topGenres.join(',');
+
+    const movieParams = (page: string) => ({
+        with_genres: movieGenresParam,
+        sort_by: 'popularity.desc',
+        'vote_count.gte': '100',
+        include_adult: 'false',
+        page,
+    });
+    const tvParams = (page: string) => ({
+        with_genres: tvGenresParam,
+        sort_by: 'popularity.desc',
+        'vote_count.gte': '50',
+        include_adult: 'false',
+        page,
+    });
+
+    const moviePromises = movieGenresParam
+        ? [tmdbFetchList<any>('/discover/movie', movieParams('1')), tmdbFetchList<any>('/discover/movie', movieParams('2'))]
+        : [];
+    const tvPromises = tvGenresParam
+        ? [tmdbFetchList<any>('/discover/tv', tvParams('1')), tmdbFetchList<any>('/discover/tv', tvParams('2'))]
+        : [];
+
+    const [moviePages, tvPages] = await Promise.all([
+        Promise.all(moviePromises),
+        Promise.all(tvPromises),
     ]);
+    const moviesRaw = moviePages.flat();
+    const seriesRaw = tvPages.flat();
+
+    peliculasRecomendadas = moviesRaw
+        .filter((m: any) => !prefs!.libraryIds.movies.has(String(m.id)))
+        .slice(0, 20);
+    seriesRecomendadas = seriesRaw
+        .filter((s: any) => !prefs!.libraryIds.tv.has(String(s.id)))
+        .slice(0, 20);
 } catch (error) {
     console.error("Error al cargar recomendaciones:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
@@ -29,8 +67,9 @@ const watchedMap = await getWatchedProgressBatch(seriesRecomendadas.map((s: any)
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
 const showMovies = filter === "peliculas" || filter === "todos";
-const showAll = filter === "todos";
 const totalRecs = seriesRecomendadas.length + peliculasRecomendadas.length;
+const hasLibrary = !!prefs && (prefs.libraryIds.movies.size + prefs.libraryIds.tv.size) > 0;
+const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres.length) > 0;
 ---
 <Layout title="Recomendaciones">
     <section class="px-1 sm:py-8">
@@ -43,10 +82,9 @@ const totalRecs = seriesRecomendadas.length + peliculasRecomendadas.length;
         <header class="mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Recomendaciones</h1>
             <p class="text-gray-500 text-base">
-                {totalRecs > 0
-                    ? `${totalRecs} títulos recomendados basados en tus favoritos`
-                    : 'Añade contenido a favoritos para generar recomendaciones'
-                }
+                {hasLibrary
+                    ? 'Calculadas a partir de los géneros que más aparecen en tu biblioteca'
+                    : 'Añade contenido a tu biblioteca para generar recomendaciones'}
             </p>
         </header>
 
@@ -54,7 +92,24 @@ const totalRecs = seriesRecomendadas.length + peliculasRecomendadas.length;
             <PersonalNav currentPage="/personal/recomendaciones" />
         </div>
 
-        <!-- Filtro simple tipo -->
+        {/* Géneros detectados */}
+        {hasGenres && prefs && (
+            <div class="mb-6 flex flex-wrap items-center gap-2">
+                <span class="text-xs font-medium text-gray-500 uppercase tracking-wide mr-1">Tus géneros</span>
+                {prefs.movies.topGenres.map((id: number) => (
+                    <span class="text-xs px-3 py-1 rounded-full bg-red-50 text-red-700 border border-red-200 font-medium">
+                        🎬 {getGenreName(id)}
+                    </span>
+                ))}
+                {prefs.tv.topGenres.map((id: number) => (
+                    <span class="text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-medium">
+                        📺 {getGenreName(id)}
+                    </span>
+                ))}
+            </div>
+        )}
+
+        {/* Filtro tipo */}
         {totalRecs > 0 && (
             <div class="flex justify-center mb-6">
                 <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
@@ -65,76 +120,76 @@ const totalRecs = seriesRecomendadas.length + peliculasRecomendadas.length;
             </div>
         )}
 
-        <div class="space-y-10">
-            {/* Series */}
-            {(showSeries || showAll) && (
-                <section id="series-section" class="scroll-mt-20">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                        Series recomendadas
-                        <span class="text-sm font-normal text-gray-4000">({seriesRecomendadas.length})</span>
-                    </h2>
+        {!hasLibrary && (
+            <EmptyState
+                size="md"
+                title="Tu biblioteca está vacía"
+                description="Añade películas y series a tus colecciones (favoritos, siguiendo, vistos) y te calcularemos recomendaciones por géneros.">
+                <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium">Explorar tendencias</a>
+            </EmptyState>
+        )}
 
-                    {seriesRecomendadas.length === 0 && (
-                        <div class="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
-                            <p class="text-gray-4000 mb-2">Sin recomendaciones de series</p>
-                            <p class="text-xs text-gray-4000">Añade series a favoritos o siguiendo para generar recomendaciones</p>
-                        </div>
-                    )}
-                    {seriesRecomendadas.length > 0 && (
-                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {seriesRecomendadas.map((item) => (
-                                <CardSerie
-                                    id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                    name={item.name}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    first_air_date={item.first_air_date}
-                                    seasons={item.seasons}
-                                    last_episode_to_air={item.last_episode_to_air}
-                                    next_episode_to_air={item.next_episode_to_air}
-                                    status={item.status}
-                                    watchedEpisodes={watchedMap[String(item.id)]?.watched}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </section>
-            )}
+        {hasLibrary && (
+            <div class="space-y-10">
+                {showSeries && (
+                    <section id="series-section" class="scroll-mt-20">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                            Series para ti
+                            <span class="text-sm font-normal text-gray-400">({seriesRecomendadas.length})</span>
+                        </h2>
 
-            {/* Películas */}
-            {(showMovies || showAll) && (
-                <section id="movies-section" class="scroll-mt-20">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                        Películas recomendadas
-                        <span class="text-sm font-normal text-gray-4000">({peliculasRecomendadas.length})</span>
-                    </h2>
+                        {seriesRecomendadas.length === 0 && (
+                            <EmptyState size="sm" title="Sin recomendaciones de series" description="Quizá ya las tienes todas en tu biblioteca, o aún no hay datos suficientes para identificar tus géneros favoritos." />
+                        )}
+                        {seriesRecomendadas.length > 0 && (
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                                {seriesRecomendadas.map((item) => (
+                                    <CardSerie
+                                        id={item.id.toString()}
+                                        img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                        name={item.name}
+                                        vote_average={item.vote_average}
+                                        overview={item.overview}
+                                        first_air_date={item.first_air_date}
+                                        genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                        watchedEpisodes={watchedMap[String(item.id)]?.watched}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                )}
 
-                    {peliculasRecomendadas.length === 0 && (
-                        <div class="bg-gray-50 border border-gray-100 rounded-xl p-8 text-center">
-                            <p class="text-gray-4000 mb-2">Sin recomendaciones de películas</p>
-                            <p class="text-xs text-gray-4000">Añade películas a favoritos para generar recomendaciones</p>
-                        </div>
-                    )}
-                    {peliculasRecomendadas.length > 0 && (
-                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {peliculasRecomendadas.map((item) => (
-                                <CardMovie
-                                    id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                    title={item.title}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    release_date={item.release_date}
-                                    genres={item.genres?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
-                                />
-                            ))}
-                        </div>
-                    )}
-                </section>
-            )}
-        </div>
+                {showMovies && (
+                    <section id="movies-section" class="scroll-mt-20">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                            Películas para ti
+                            <span class="text-sm font-normal text-gray-400">({peliculasRecomendadas.length})</span>
+                        </h2>
+
+                        {peliculasRecomendadas.length === 0 && (
+                            <EmptyState size="sm" title="Sin recomendaciones de películas" description="Quizá ya las tienes todas en tu biblioteca, o aún no hay datos suficientes para identificar tus géneros favoritos." />
+                        )}
+                        {peliculasRecomendadas.length > 0 && (
+                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                                {peliculasRecomendadas.map((item) => (
+                                    <CardMovie
+                                        id={item.id.toString()}
+                                        img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                        title={item.title}
+                                        vote_average={item.vote_average}
+                                        overview={item.overview}
+                                        release_date={item.release_date}
+                                        genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+                )}
+            </div>
+        )}
     </section>
 </Layout>

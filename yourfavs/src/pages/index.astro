@@ -9,6 +9,8 @@ import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCat
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getContinueWatchingData} from "../services/API/Series/continueWatching";
 import ContinueWatching from "../components/Sections/ContinueWatching.astro";
+import {getForYouRecommendations} from "../services/API/shared/forYouRecommendations";
+import RecommendedForYou from "../components/Sections/RecommendedForYou.astro";
 import {fetchAllPlatforms} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
@@ -36,6 +38,7 @@ const [
     categoriesMovies,
     categoriesSeries,
     continueWatching,
+    forYouItems,
 ] = await Promise.all([
     getTrending<Movie>('movie', 'week'),
     getTrending<Serie>('tv', 'week'),
@@ -49,6 +52,7 @@ const [
     getMoviesByCategory(randomCategorySlug, pageStr),
     getSeriesByCategory(randomCategorySlug, pageStr),
     getContinueWatchingData().catch(() => []),
+    getForYouRecommendations().catch(() => []),
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
@@ -165,6 +169,13 @@ const sections = [
         {continueWatching.length > 0 && (
             <div class="content-wrapper">
                 <ContinueWatching items={continueWatching} />
+            </div>
+        )}
+
+        <!-- Para ti (recomendaciones por géneros) -->
+        {forYouItems.length > 0 && (
+            <div class="content-wrapper">
+                <RecommendedForYou items={forYouItems} />
             </div>
         )}
 
