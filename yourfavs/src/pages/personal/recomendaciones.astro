@@ -5,6 +5,7 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getWatchedProgressBatch } from "../../services/BD/series/yourfavsSerie";
 import { tmdbFetchList } from "../../services/API/shared/tmdbClient";
 import { calculateGenrePreferences } from "../../utils/genrePreferences";
+import { getPersonalRecommendations } from "../../utils/personalRecommendations";
 import { getGenreName } from "../../utils/constants/genres";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
@@ -12,28 +13,39 @@ import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import '../../styles/pages/personal/personal.css';
 
+const debug = Astro.url.searchParams.get("debug") === "1";
+
 let prefs: Awaited<ReturnType<typeof calculateGenrePreferences>> | null = null;
-let seriesRecomendadas: any[] = [];
-let peliculasRecomendadas: any[] = [];
+let recs: Awaited<ReturnType<typeof getPersonalRecommendations>> | null = null;
+let exploraMovies: any[] = [];
+let exploraSeries: any[] = [];
+let exploraMoviesRaw: any[] = [];
+let exploraSeriesRaw: any[] = [];
 let errorMessage = "";
 
 try {
-    prefs = await calculateGenrePreferences();
+    [prefs, recs] = await Promise.all([
+        calculateGenrePreferences(),
+        getPersonalRecommendations(),
+    ]);
 
     const movieGenresParam = prefs.movies.topGenres.join(',');
     const tvGenresParam = prefs.tv.topGenres.join(',');
 
+    // Sección "Explora por géneros" — discover ENDURECIDO: vote_average.desc, vote_count alto.
     const movieParams = (page: string) => ({
         with_genres: movieGenresParam,
-        sort_by: 'popularity.desc',
-        'vote_count.gte': '100',
+        sort_by: 'vote_average.desc',
+        'vote_count.gte': '500',
+        'vote_average.gte': '7',
         include_adult: 'false',
         page,
     });
     const tvParams = (page: string) => ({
         with_genres: tvGenresParam,
-        sort_by: 'popularity.desc',
-        'vote_count.gte': '50',
+        sort_by: 'vote_average.desc',
+        'vote_count.gte': '200',
+        'vote_average.gte': '7',
         include_adult: 'false',
         page,
     });
@@ -49,21 +61,27 @@ try {
         Promise.all(moviePromises),
         Promise.all(tvPromises),
     ]);
-    const moviesRaw = moviePages.flat();
-    const seriesRaw = tvPages.flat();
+    exploraMoviesRaw = moviePages.flat();
+    exploraSeriesRaw = tvPages.flat();
 
-    peliculasRecomendadas = moviesRaw
-        .filter((m: any) => !prefs!.libraryIds.movies.has(String(m.id)))
-        .slice(0, 20);
-    seriesRecomendadas = seriesRaw
-        .filter((s: any) => !prefs!.libraryIds.tv.has(String(s.id)))
-        .slice(0, 20);
+    // Excluye biblioteca y dedup contra recommendations principales
+    const recMovieIds = new Set(recs.movies.map((m: any) => String(m.id)));
+    const recTvIds = new Set(recs.tv.map((s: any) => String(s.id)));
+    exploraMovies = exploraMoviesRaw
+        .filter((m: any) => !prefs!.libraryIds.movies.has(String(m.id)) && !recMovieIds.has(String(m.id)))
+        .slice(0, 15);
+    exploraSeries = exploraSeriesRaw
+        .filter((s: any) => !prefs!.libraryIds.tv.has(String(s.id)) && !recTvIds.has(String(s.id)))
+        .slice(0, 15);
 } catch (error) {
     console.error("Error al cargar recomendaciones:", error);
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
 
-const watchedMap = await getWatchedProgressBatch(seriesRecomendadas.map((s: any) => String(s.id)));
+const seriesRecomendadas = recs?.tv ?? [];
+const peliculasRecomendadas = recs?.movies ?? [];
+const allSeriesIdsForWatched = [...seriesRecomendadas, ...exploraSeries].map((s: any) => String(s.id));
+const watchedMap = await getWatchedProgressBatch(allSeriesIdsForWatched);
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
@@ -92,6 +110,147 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
         <div class="mb-4">
             <PersonalNav currentPage="/personal/recomendaciones" />
         </div>
+
+        {debug && prefs && (
+            <div class="mb-8 border border-amber-300 bg-amber-50 rounded-xl p-4 text-sm">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="font-bold text-amber-900">🐛 Debug recomendaciones</h2>
+                    <a href="/personal/recomendaciones" class="text-xs text-amber-700 underline">Salir del modo debug</a>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white rounded-lg p-3 border border-amber-200">
+                        <h3 class="font-semibold text-gray-800 mb-2">🎬 Películas — items por colección</h3>
+                        <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
+                            <li>Favs: <strong>{prefs.breakdown.movies.favs}</strong> (peso 2)</li>
+                            <li>Like: <strong>{prefs.breakdown.movies.like}</strong> (peso 1.5)</li>
+                            <li>Vistos: <strong>{prefs.breakdown.movies.vistos}</strong> (peso 1)</li>
+                            <li>Pendientes: <strong>{prefs.breakdown.movies.pendientes}</strong> (peso 0.5)</li>
+                            <li>VerPronto: <strong>{prefs.breakdown.movies.verpronto}</strong> (peso 0.5)</li>
+                            <li class="pt-1 border-t border-gray-200 mt-1">Únicos en map: <strong>{prefs.libraryIds.movies.size}</strong></li>
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-3 border border-amber-200">
+                        <h3 class="font-semibold text-gray-800 mb-2">📺 Series — items por colección</h3>
+                        <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
+                            <li>Favs: <strong>{prefs.breakdown.tv.favs}</strong> (peso 2)</li>
+                            <li>Siguiendo: <strong>{prefs.breakdown.tv.siguiendo}</strong> (peso 1.5)</li>
+                            <li>Like: <strong>{prefs.breakdown.tv.like}</strong> (peso 1.5)</li>
+                            <li>Vistos: <strong>{prefs.breakdown.tv.vistos}</strong> (peso 1)</li>
+                            <li>Pendientes: <strong>{prefs.breakdown.tv.pendientes}</strong> (peso 0.5)</li>
+                            <li>VerPronto: <strong>{prefs.breakdown.tv.verpronto}</strong> (peso 0.5)</li>
+                            <li class="pt-1 border-t border-gray-200 mt-1">Únicos en map: <strong>{prefs.libraryIds.tv.size}</strong></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4 mb-4">
+                    <div class="bg-white rounded-lg p-3 border border-amber-200">
+                        <h3 class="font-semibold text-gray-800 mb-2">🎬 Pesos completos por género</h3>
+                        <ul class="text-xs text-gray-700 space-y-0.5 font-mono max-h-64 overflow-y-auto">
+                            {Object.entries(prefs.movies.weighted)
+                                .sort(([, a]: any, [, b]: any) => b - a)
+                                .map(([gid, w]: [string, any], idx: number) => (
+                                    <li class={idx < 3 ? 'text-red-700 font-bold' : ''}>
+                                        {idx < 3 ? '★ ' : '  '}{getGenreName(Number(gid))}: <strong>{(w as number).toFixed(1)}</strong>
+                                    </li>
+                                ))}
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-3 border border-amber-200">
+                        <h3 class="font-semibold text-gray-800 mb-2">📺 Pesos completos por género</h3>
+                        <ul class="text-xs text-gray-700 space-y-0.5 font-mono max-h-64 overflow-y-auto">
+                            {Object.entries(prefs.tv.weighted)
+                                .sort(([, a]: any, [, b]: any) => b - a)
+                                .map(([gid, w]: [string, any], idx: number) => (
+                                    <li class={idx < 3 ? 'text-blue-700 font-bold' : ''}>
+                                        {idx < 3 ? '★ ' : '  '}{getGenreName(Number(gid))}: <strong>{(w as number).toFixed(1)}</strong>
+                                    </li>
+                                ))}
+                        </ul>
+                    </div>
+                </div>
+
+                {recs && (
+                    <div class="grid md:grid-cols-2 gap-4 mb-4">
+                        <div class="bg-white rounded-lg p-3 border border-amber-200">
+                            <h3 class="font-semibold text-gray-800 mb-2">🎬 Seeds usadas (películas)</h3>
+                            <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
+                                {recs.seedsMovies.map((s: any) => (
+                                    <li>· {s.title || `id ${s.id}`} <span class="text-gray-400">(peso {s.weight})</span></li>
+                                ))}
+                                {recs.seedsMovies.length === 0 && <li class="text-gray-400">— sin seeds (¿no hay Favs/Like de pelis?)</li>}
+                            </ul>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 border border-amber-200">
+                            <h3 class="font-semibold text-gray-800 mb-2">📺 Seeds usadas (series)</h3>
+                            <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
+                                {recs.seedsTv.map((s: any) => (
+                                    <li>· {s.title || `id ${s.id}`} <span class="text-gray-400">(peso {s.weight})</span></li>
+                                ))}
+                                {recs.seedsTv.length === 0 && <li class="text-gray-400">— sin seeds</li>}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
+                {recs && (
+                    <div class="grid md:grid-cols-2 gap-4 mb-4">
+                        <div class="bg-white rounded-lg p-3 border border-amber-200">
+                            <h3 class="font-semibold text-gray-800 mb-2">🎬 Top recommendations (agregadas)</h3>
+                            <ul class="text-xs text-gray-700 space-y-1 font-mono max-h-64 overflow-y-auto">
+                                {recs.movies.slice(0, 10).map((m: any) => (
+                                    <li>
+                                        <strong>{m.title}</strong> · ⭐{m.vote_average?.toFixed(1)} · score <strong>{m._recScore?.toFixed(1)}</strong> ({m._recSources} seeds)<br/>
+                                        <span class="text-gray-500">  Géneros: [{(m.genre_ids || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                        <div class="bg-white rounded-lg p-3 border border-amber-200">
+                            <h3 class="font-semibold text-gray-800 mb-2">📺 Top recommendations (agregadas)</h3>
+                            <ul class="text-xs text-gray-700 space-y-1 font-mono max-h-64 overflow-y-auto">
+                                {recs.tv.slice(0, 10).map((s: any) => (
+                                    <li>
+                                        <strong>{s.name}</strong> · ⭐{s.vote_average?.toFixed(1)} · score <strong>{s._recScore?.toFixed(1)}</strong> ({s._recSources} seeds)<br/>
+                                        <span class="text-gray-500">  Géneros: [{(s.genre_ids || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    </div>
+                )}
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-white rounded-lg p-3 border border-amber-200">
+                        <h3 class="font-semibold text-gray-800 mb-2">🎬 Discover endurecido (vote_avg.desc)</h3>
+                        <ul class="text-xs text-gray-700 space-y-1 font-mono max-h-64 overflow-y-auto">
+                            {exploraMoviesRaw.slice(0, 10).map((m: any) => (
+                                <li class={prefs!.libraryIds.movies.has(String(m.id)) ? 'opacity-40 line-through' : ''}>
+                                    <strong>{m.title}</strong> · ⭐{m.vote_average?.toFixed(1)} · 🔢{m.vote_count}<br/>
+                                    <span class="text-gray-500">  Géneros: [{(m.genre_ids || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div class="bg-white rounded-lg p-3 border border-amber-200">
+                        <h3 class="font-semibold text-gray-800 mb-2">📺 Discover endurecido (vote_avg.desc)</h3>
+                        <ul class="text-xs text-gray-700 space-y-1 font-mono max-h-64 overflow-y-auto">
+                            {exploraSeriesRaw.slice(0, 10).map((s: any) => (
+                                <li class={prefs!.libraryIds.tv.has(String(s.id)) ? 'opacity-40 line-through' : ''}>
+                                    <strong>{s.name}</strong> · ⭐{s.vote_average?.toFixed(1)} · 🔢{s.vote_count}<br/>
+                                    <span class="text-gray-500">  Géneros: [{(s.genre_ids || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+
+                <p class="text-xs text-amber-800 mt-3">
+                    💡 La sección principal "Para ti" usa <strong>recommendations por seed</strong>. La secundaria "Explora" usa discover endurecido. Score = suma de pesos de seeds que recomiendan ese item.
+                </p>
+            </div>
+        )}
 
         {/* Géneros detectados */}
         {hasGenres && prefs && (
@@ -137,6 +296,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
                             Series para ti
+                            <span class="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">basado en tus favoritos</span>
                             <span class="text-sm font-normal text-gray-400">({seriesRecomendadas.length})</span>
                         </h2>
 
@@ -145,7 +305,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         )}
                         {seriesRecomendadas.length > 0 && (
                             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                {seriesRecomendadas.map((item) => (
+                                {seriesRecomendadas.map((item: any) => (
                                     <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
                                         id={item.id.toString()}
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -167,6 +327,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="w-1 h-6 bg-red-500 rounded-full"></span>
                             Películas para ti
+                            <span class="text-xs font-normal text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">basado en tus favoritos</span>
                             <span class="text-sm font-normal text-gray-400">({peliculasRecomendadas.length})</span>
                         </h2>
 
@@ -175,7 +336,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         )}
                         {peliculasRecomendadas.length > 0 && (
                             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                {peliculasRecomendadas.map((item) => (
+                                {peliculasRecomendadas.map((item: any) => (
                                     <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
                                         id={item.id.toString()}
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -188,6 +349,58 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                                 ))}
                             </div>
                         )}
+                    </section>
+                )}
+
+                {/* Explora por géneros (secundaria) */}
+                {(showSeries && exploraSeries.length > 0) && (
+                    <section class="scroll-mt-20 pt-6 border-t border-gray-100">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
+                            Explora series mejor valoradas
+                            <span class="text-xs font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">por tus géneros</span>
+                            <span class="text-sm font-normal text-gray-400">({exploraSeries.length})</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 mb-4">Joyas con nota TMDB ≥ 7 que tocan alguno de tus géneros favoritos.</p>
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {exploraSeries.map((item: any) => (
+                                <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
+                                    id={item.id.toString()}
+                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                    name={item.name}
+                                    vote_average={item.vote_average}
+                                    overview={item.overview}
+                                    first_air_date={item.first_air_date}
+                                    genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                    watchedEpisodes={watchedMap[String(item.id)]?.watched}
+                                /></HoverPreview>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {(showMovies && exploraMovies.length > 0) && (
+                    <section class="scroll-mt-20 pt-6 border-t border-gray-100">
+                        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
+                            Explora pelis mejor valoradas
+                            <span class="text-xs font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">por tus géneros</span>
+                            <span class="text-sm font-normal text-gray-400">({exploraMovies.length})</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 mb-4">Joyas con nota TMDB ≥ 7 y muchos votos que tocan alguno de tus géneros favoritos.</p>
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {exploraMovies.map((item: any) => (
+                                <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
+                                    id={item.id.toString()}
+                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                    title={item.title}
+                                    vote_average={item.vote_average}
+                                    overview={item.overview}
+                                    release_date={item.release_date}
+                                    genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                /></HoverPreview>
+                            ))}
+                        </div>
                     </section>
                 )}
             </div>

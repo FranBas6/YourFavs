@@ -12,6 +12,10 @@ export interface GenrePrefs {
     movies: { topGenres: number[]; weighted: Record<number, number> };
     tv: { topGenres: number[]; weighted: Record<number, number> };
     libraryIds: { movies: Set<string>; tv: Set<string> };
+    breakdown: {
+        movies: { favs: number; like: number; vistos: number; pendientes: number; verpronto: number };
+        tv: { favs: number; siguiendo: number; like: number; vistos: number; pendientes: number; verpronto: number };
+    };
 }
 
 const TTL_MS = 30 * 60 * 1000;
@@ -99,6 +103,16 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
         libraryIds: {
             movies: new Set(movieEntries.map(([id]) => id)),
             tv: new Set(tvEntries.map(([id]) => id)),
+        },
+        breakdown: {
+            movies: {
+                favs: movFavs.length, like: movLike.length, vistos: movVistos.length,
+                pendientes: movPend.length, verpronto: movVerPronto.length,
+            },
+            tv: {
+                favs: tvFavs.length, siguiendo: tvSig.length, like: tvLike.length,
+                vistos: tvVistos.length, pendientes: tvPend.length, verpronto: tvVerPronto.length,
+            },
         },
     };
 

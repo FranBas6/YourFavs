@@ -180,6 +180,10 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             invalidateGenrePreferencesCache();
         } catch { /* ignore */ }
         try {
+            const { invalidatePersonalRecsCache } = await import('../../../utils/personalRecommendations');
+            invalidatePersonalRecsCache();
+        } catch { /* ignore */ }
+        try {
             const { invalidateTopActorsCache } = await import('../../../utils/topActorsLibrary');
             invalidateTopActorsCache();
         } catch { /* ignore */ }
