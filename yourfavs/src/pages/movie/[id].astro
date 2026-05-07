@@ -19,6 +19,7 @@ import {initializeApp} from "firebase/app";
 import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
+import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import NotificationBell from "../../components/personal/NotificationBell.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
@@ -54,6 +55,11 @@ if (Astro.request.method === 'POST') {
                 await removeNotificationSub('movie', tmdbId);
             }
             return Astro.redirect(`/movie/${id}`);
+        }
+
+        if (actionType === 'media_tags') {
+            const url = await handleMediaTagsAction(formData);
+            return Astro.redirect(url);
         }
 
         const redirectUrl = await handleMovieFavAction(formData);
@@ -95,12 +101,18 @@ const clientData = {
 };
 
 // Verificar existencia en las 5 colecciones de películas (lectura paralela)
-const { exists: movieExists, opinion: opinionFromAny, rating: ratingFromAny } = await checkMediaExistence('movie', clientData.id);
+const [{ exists: movieExists, opinion: opinionFromAny, rating: ratingFromAny }, mediaTagsDoc] = await Promise.all([
+    checkMediaExistence('movie', clientData.id),
+    getMediaTags('movie', clientData.id),
+]);
 const isInFavorites = movieExists.MovieFavs;
 const isInPendientes = movieExists.MoviesPendientes;
 const isInVistas = movieExists.MoviesVistas;
 const isInVerPronto = movieExists.MoviesVerPronto;
 const isInLiked = movieExists.LikedMovies;
+const userTags = mediaTagsDoc?.tags || [];
+const userNotes = mediaTagsDoc?.notes || '';
+const inAnyCollection = isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked;
 
 // Verificar suscripción de notificación (solo películas no estrenadas)
 const isUnreleased = item?.release_date ? new Date(item.release_date) > new Date() : false;
@@ -484,10 +496,44 @@ const jsonLd = item ? {
                         </div>
                     )}
 
-                    <!-- Keywords -->
+                    <!-- Tus tags + notas (C15) -->
+                    {inAnyCollection && (
+                        <div class="bg-white rounded-xl border border-gray-200 p-4">
+                            <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <span class="w-1 h-5 bg-fuchsia-500 rounded-full"></span>
+                                Tus tags y notas
+                            </h3>
+                            {userTags.length > 0 && (
+                                <div class="flex flex-wrap gap-1.5 mb-3">
+                                    {userTags.map(t => (
+                                        <span class="px-2 py-0.5 text-xs bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 rounded-full">#{t}</span>
+                                    ))}
+                                </div>
+                            )}
+                            {userNotes && (
+                                <blockquote class="p-3 mb-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">{userNotes}</blockquote>
+                            )}
+                            <details>
+                                <summary class="cursor-pointer text-xs text-fuchsia-600 hover:text-fuchsia-700 font-medium">
+                                    {userTags.length > 0 || userNotes ? 'Editar' : 'Añadir tags y notas'}
+                                </summary>
+                                <form method="POST" class="mt-3 space-y-2">
+                                    <input type="hidden" name="actionType" value="media_tags" />
+                                    <input type="hidden" name="media_type" value="movie" />
+                                    <input type="hidden" name="tmdb_id" value={item?.id} />
+                                    <input type="text" name="tags" value={userTags.join(', ')} placeholder="comedia, road trip, 90s..." class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-fuchsia-400" />
+                                    <p class="text-[11px] text-gray-400">Separados por comas. Máx 20.</p>
+                                    <textarea name="notes" rows="3" placeholder="Notas más libres que la opinión..." class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-fuchsia-400">{userNotes}</textarea>
+                                    <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-fuchsia-600 text-white text-xs rounded-lg hover:bg-fuchsia-700">Guardar</button>
+                                </form>
+                            </details>
+                        </div>
+                    )}
+
+                    <!-- Keywords TMDB -->
                     {movieKeywords.length > 0 && (
                         <div class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-base font-semibold text-gray-800 mb-2">Tags</h3>
+                            <h3 class="text-base font-semibold text-gray-800 mb-2">Keywords</h3>
                             <div class="flex flex-wrap gap-1.5">
                                 {movieKeywords.map((kw) => (
                                     <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">{kw.name}</span>

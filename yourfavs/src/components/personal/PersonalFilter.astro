@@ -8,9 +8,11 @@ interface Props {
     genreFilter?: string;
     platformFilter?: string;
     availableGenres?: string[];
+    tagsFilter?: string;
+    availableTags?: string[];
 }
 
-const { pageUrl, filter, searchQuery = '', genreFilter = '', platformFilter = '', availableGenres = [] } = Astro.props;
+const { pageUrl, filter, searchQuery = '', genreFilter = '', platformFilter = '', availableGenres = [], tagsFilter = '', availableTags = [] } = Astro.props;
 
 const PLATFORM_OPTIONS = [
     { id: 8, label: 'Netflix' },
@@ -46,8 +48,17 @@ const togglePlatform = (id: string) => {
     return [...activePlatforms, id].join(',');
 };
 
-const hasActiveFilters = searchQuery || activeGenres.length > 0 || activePlatforms.length > 0 || filter !== 'todos';
-const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatforms.length + (filter !== 'todos' ? 1 : 0);
+// Soporte multi-tags: "comedia,90s" → ["comedia", "90s"]
+const activeTags = tagsFilter ? tagsFilter.split(',').filter(Boolean) : [];
+const toggleTag = (tag: string) => {
+    if (activeTags.includes(tag)) {
+        return activeTags.filter(t => t !== tag).join(',');
+    }
+    return [...activeTags, tag].join(',');
+};
+
+const hasActiveFilters = searchQuery || activeGenres.length > 0 || activePlatforms.length > 0 || activeTags.length > 0 || filter !== 'todos';
+const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatforms.length + activeTags.length + (filter !== 'todos' ? 1 : 0);
 ---
 <details class="group relative" open={hasActiveFilters ? true : undefined}>
     <summary class="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-all text-sm font-medium text-gray-600 whitespace-nowrap">
@@ -64,7 +75,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
         <!-- Tipo -->
         <div class="flex flex-wrap gap-1.5 justify-center">
             {typeFilters.map(f => (
-                <a href={buildUrl(pageUrl, { filter: f.key, search: searchQuery, genre: genreFilter, platforms: platformFilter })}
+                <a href={buildUrl(pageUrl, { filter: f.key, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter })}
                    class={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200
                        ${filter === f.key
                            ? 'bg-red-500 text-white shadow-sm shadow-red-200'
@@ -101,7 +112,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             <div>
                 <p class="text-xs text-gray-4000 mb-2">Géneros {activeGenres.length > 0 && `(${activeGenres.length})`}</p>
                 <div class="flex flex-wrap gap-1.5">
-                    <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: '', platforms: platformFilter })}
+                    <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: '', platforms: platformFilter, tags: tagsFilter })}
                        class={`min-h-[44px] md:min-h-0 inline-flex items-center px-3 py-2 md:px-2.5 md:py-1 rounded-full text-xs font-medium transition-all border
                            ${activeGenres.length === 0
                                ? 'bg-gray-800 text-white border-gray-800'
@@ -109,7 +120,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
                         Todos
                     </a>
                     {availableGenres.map(genre => (
-                        <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: toggleGenre(genre), platforms: platformFilter })}
+                        <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: toggleGenre(genre), platforms: platformFilter, tags: tagsFilter })}
                            class={`min-h-[44px] md:min-h-0 inline-flex items-center px-3 py-2 md:px-2.5 md:py-1 rounded-full text-xs font-medium transition-all border
                                ${activeGenres.includes(genre)
                                    ? 'bg-gray-800 text-white border-gray-800'
@@ -126,7 +137,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             <p class="text-xs text-gray-4000 mb-2">Plataformas {activePlatforms.length > 0 && `(${activePlatforms.length})`}</p>
             <div class="flex flex-wrap gap-1.5">
                 {PLATFORM_OPTIONS.map(platform => (
-                    <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: togglePlatform(String(platform.id)) })}
+                    <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: togglePlatform(String(platform.id)), tags: tagsFilter })}
                        class={`min-h-[44px] md:min-h-0 inline-flex items-center px-3 py-2 md:px-2.5 md:py-1 rounded-full text-xs font-medium transition-all border
                            ${activePlatforms.includes(String(platform.id))
                                ? 'bg-gray-800 text-white border-gray-800'
@@ -137,10 +148,28 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             </div>
         </div>
 
+        <!-- Tags personales -->
+        {availableTags.length > 0 && (
+            <div>
+                <p class="text-xs text-gray-4000 mb-2">Tus tags {activeTags.length > 0 && `(${activeTags.length})`}</p>
+                <div class="flex flex-wrap gap-1.5">
+                    {availableTags.map(tag => (
+                        <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: toggleTag(tag) })}
+                           class={`min-h-[44px] md:min-h-0 inline-flex items-center px-3 py-2 md:px-2.5 md:py-1 rounded-full text-xs font-medium transition-all border
+                               ${activeTags.includes(tag)
+                                   ? 'bg-fuchsia-600 text-white border-fuchsia-600'
+                                   : 'bg-white text-fuchsia-700 border-fuchsia-200 hover:border-fuchsia-400'}`}>
+                            #{tag}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        )}
+
         <!-- Limpiar filtros -->
         {hasActiveFilters && (
             <div class="flex justify-center pt-1">
-                <a href={buildUrl(pageUrl, { filter: 'todos', search: '', genre: '', platforms: '' })}
+                <a href={buildUrl(pageUrl, { filter: 'todos', search: '', genre: '', platforms: '', tags: '' })}
                    class="text-xs text-gray-4000 hover:text-red-500 transition-colors">
                     Limpiar filtros
                 </a>

@@ -6,6 +6,7 @@ import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import Pagination from "../../components/Pagination.astro";
 import EmptyState from "../../components/EmptyState.astro";
+import HoverPreview from "../../components/HoverPreview.astro";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/cartelera.css';
 
@@ -44,7 +45,7 @@ const totalPages = 3;
                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                         {onAirMovies.map((item) => (
                                 <div class="movie-card group">
-                                    <CardMovie
+                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                             title={item.title}
@@ -52,7 +53,7 @@ const totalPages = 3;
                                             overview={item.overview}
                                             release_date={item.release_date}
                                             genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                    />
+                                    /></HoverPreview>
                                 </div>
                         ))}
                     </div>

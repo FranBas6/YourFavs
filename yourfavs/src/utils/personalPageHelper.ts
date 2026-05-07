@@ -6,6 +6,7 @@ import { mapAndDeduplicateProviders } from "../services/API/shared/tmdbInfoServi
 import { getGenreName } from "./constants/genres";
 import { processBatch } from "./processBatch";
 import { calculateStats } from "./calculateStats";
+import { getMediaTagsBatch, type MediaTagsDoc } from "../services/BD/shared/mediaTags";
 
 const ITEMS_PER_PAGE = 20;
 
@@ -46,6 +47,10 @@ export interface PersonalPageData {
     availableGenres: string[];
     activeGenres: string[];
     activePlatformIds: number[];
+    availableTags: string[];
+    activeTags: string[];
+    tagsFilter: string;
+    tagsByItem: Record<string, MediaTagsDoc>;
     stats: any;
     watchedMap: Record<string, { watched: number; total?: number }>;
     errorMessage: string;
@@ -65,6 +70,7 @@ export async function fetchPersonalPageData(
     const searchQuery = url.searchParams.get("search") || "";
     const genreFilter = url.searchParams.get("genre") || "";
     const platformFilter = url.searchParams.get("platforms") || "";
+    const tagsFilter = url.searchParams.get("tags") || "";
     const showSeries = filter === "series" || filter === "todos";
     const showMovies = filter === "peliculas" || filter === "todos";
     const showAll = filter === "todos";
@@ -121,6 +127,30 @@ export async function fetchPersonalPageData(
         };
         filteredSeries = filteredSeries.filter(matchesGenre);
         filteredMovies = filteredMovies.filter(matchesGenre);
+    }
+
+    // Tags: batch read para todos los items, agregamos lista de únicos y filtrado
+    const tagsBatch = await getMediaTagsBatch([
+        ...seriesItems.map((s: any) => ({ mediaType: 'tv' as const, tmdbId: s.id })),
+        ...moviesItems.map((m: any) => ({ mediaType: 'movie' as const, tmdbId: m.id })),
+    ]);
+    const tagsForItem = (mediaType: 'movie' | 'tv', id: string | number): string[] => {
+        return tagsBatch[`${mediaType}_${id}`]?.tags || [];
+    };
+    const availableTagsSet = new Set<string>();
+    for (const doc of Object.values(tagsBatch)) {
+        for (const t of doc.tags || []) availableTagsSet.add(t);
+    }
+    const availableTags = Array.from(availableTagsSet).sort();
+
+    const activeTags = tagsFilter ? tagsFilter.split(',').map(t => t.trim()).filter(Boolean) : [];
+    if (activeTags.length > 0) {
+        filteredSeries = filteredSeries.filter((s: any) =>
+            activeTags.every(t => tagsForItem('tv', s.id).includes(t))
+        );
+        filteredMovies = filteredMovies.filter((m: any) =>
+            activeTags.every(t => tagsForItem('movie', m.id).includes(t))
+        );
     }
 
     // Filtro por plataforma (batch fetch solo si hay filtro)
@@ -196,6 +226,7 @@ export async function fetchPersonalPageData(
         hasMoreSeries, hasMoreMovies,
         seriesItemsToShow, moviesItemsToShow,
         availableGenres, activeGenres, activePlatformIds,
+        availableTags, activeTags, tagsFilter, tagsByItem: tagsBatch,
         stats, watchedMap, errorMessage,
     };
 }

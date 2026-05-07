@@ -2,6 +2,7 @@
 import Layout from '../layouts/Layout.astro';
 import CardMovie from "../components/Cards/CardMovie.astro";
 import CardSerie from "../components/Cards/CardSerie.astro";
+import HoverPreview from "../components/HoverPreview.astro";
 import type {Movie} from "../types/ApiMovie"
 import type {Serie} from "../types/ApiSerie";
 import {getLatestMovies, getMostPopularMovies, getTopRatedMovies, getMoviesByCategory} from "../services/API/Movies/tmdbMovies";
@@ -219,7 +220,7 @@ const sections = [
                                             <div class="cards-grid">
                                                 {section.movies.slice(0, 10).map((item) => (
                                                         <div class="card-container">
-                                                            <CardMovie
+                                                            <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
                                                                     id={item.id.toString()}
                                                                     img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                                                     title={item.title}
@@ -230,7 +231,7 @@ const sections = [
                                                                         id,
                                                                         name: getGenreName(id)
                                                                     }))}
-                                                            />
+                                                            /></HoverPreview>
                                                         </div>
                                                 ))}
                                             </div>
@@ -254,7 +255,7 @@ const sections = [
                                             <div class="cards-grid">
                                                 {section.series.slice(0, 10).map((item) => (
                                                         <div class="card-container">
-                                                            <CardSerie
+                                                            <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
                                                                     id={item.id.toString()}
                                                                     img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                                                     name={item.name}
@@ -268,7 +269,7 @@ const sections = [
                                                                         id,
                                                                         name: getGenreName(id)
                                                                     }))}
-                                                            />
+                                                            /></HoverPreview>
                                                         </div>
                                                 ))}
                                             </div>

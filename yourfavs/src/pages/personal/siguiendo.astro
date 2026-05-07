@@ -9,6 +9,7 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {processBatch} from "../../utils/processBatch";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
+import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
 import type {SeriesInterface} from "../../types/DbSerie";
 import '../../styles/pages/personal/personal.css';
@@ -274,7 +275,7 @@ const pageUrl = Astro.url;
                 {seriesPaginadas.length > 0 && (
                     <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                         {seriesPaginadas.map((item) => (
-                            <CardSerie
+                            <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
                                 id={item.id.toString()}
                                 img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                 name={item.name}
@@ -287,7 +288,7 @@ const pageUrl = Astro.url;
                                 genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                 status={item.status}
                                 watchedEpisodes={watchedMap[String(item.id)]?.watched}
-                            />
+                            /></HoverPreview>
                         ))}
                     </div>
                 )}

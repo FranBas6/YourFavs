@@ -4,6 +4,7 @@ import CardMovie from "../../../components/Cards/CardMovie.astro";
 import { getMovieCollectionInfo } from "../../../services/API/Movies/InfoMovies";
 import { getGenreName } from "../../../utils/constants/genres";
 import EmptyState from "../../../components/EmptyState.astro";
+import HoverPreview from "../../../components/HoverPreview.astro";
 import '../../../styles/pages/catalogo/shared.css';
 
 const { id } = Astro.params;
@@ -93,7 +94,7 @@ const avgRating = partsSorted.length > 0
             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {partsSorted.map(part => (
                     <div class="card-wrapper group relative">
-                        <CardMovie
+                        <HoverPreview tmdbId={part.id} tmdbType="movie" title={part.title} backdropPath={part.backdrop_path} href={`/movie/${part.id}`} year={part.release_date?.slice(0,4)} rating={part.vote_average}><CardMovie
                             id={part.id.toString()}
                             img={part.poster_path || "/placeholder.jpg"}
                             title={part.title}
@@ -101,7 +102,7 @@ const avgRating = partsSorted.length > 0
                             overview={part.overview || ''}
                             release_date={part.release_date || ''}
                             genres={part.genre_ids?.map(gId => ({ id: gId, name: getGenreName(gId) }))}
-                        />
+                        /></HoverPreview>
                     </div>
                 ))}
             </div>

@@ -177,6 +177,19 @@ function handleRatingForm(form) {
     });
 }
 
+function handleMediaTagsForm(form) {
+    submitOptimistic(form, {
+        successMsg: function (formData) {
+            var tags = String(formData.get('tags') || '').trim();
+            var notes = String(formData.get('notes') || '').trim();
+            if (!tags && !notes) return 'Tags y notas eliminados';
+            return 'Tags y notas guardados';
+        },
+        reload: true,
+        reloadDelay: 400
+    });
+}
+
 function handleNotificationForm(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (f, btn, formData) {
@@ -245,6 +258,7 @@ function initOptimisticActions() {
         if (val === 'watched_all') return handleWatchedAllForm(form);
         if (val === 'notification') return handleNotificationForm(form);
         if (val === 'rating') return handleRatingForm(form);
+        if (val === 'media_tags') return handleMediaTagsForm(form);
 
         var actionInput = form.querySelector('input[name="action"]');
         var action = actionInput ? actionInput.value : '';
