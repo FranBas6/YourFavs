@@ -111,6 +111,37 @@ const almostDoneSeason: AlmostDoneSeason[] = seriesSiguiendo
     .filter((x): x is AlmostDoneSeason => x !== null)
     .sort((a, b) => a.remaining - b.remaining);
 
+// C14 — Series abandonadas: en emisión, con progreso, último visto > 6 meses
+type Abandoned = { serie: Serie; lastWatchedAt: number; watched: number; lastSeason: number };
+const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+const abandonedCutoff = Date.now() - SIX_MONTHS_MS;
+const almostDoneSeasonIds = new Set(almostDoneSeason.map(x => String(x.serie.id)));
+
+const abandonadas: Abandoned[] = seriesSiguiendo
+    .filter(s => {
+        const id = String(s.id);
+        if (almostDoneIds.has(id) || almostDoneSeasonIds.has(id)) return false;
+        if (s.status === 'Ended' || s.status === 'Canceled') return false;
+        const w = watchedMap[id];
+        if (!w || !w.lastWatchedAt) return false;
+        return w.watched > 0 && w.lastWatchedAt < abandonedCutoff;
+    })
+    .map(s => {
+        const w = watchedMap[String(s.id)]!;
+        const seasonsWatched = Object.keys(w.bySeasons || {}).map(Number);
+        const lastSeason = seasonsWatched.length > 0 ? Math.max(...seasonsWatched) : 1;
+        return { serie: s, lastWatchedAt: w.lastWatchedAt!, watched: w.watched, lastSeason };
+    })
+    .sort((a, b) => a.lastWatchedAt - b.lastWatchedAt) // más antiguas primero
+    .slice(0, 5);
+
+function monthsAgo(timestamp: number): string {
+    const months = Math.floor((Date.now() - timestamp) / (30 * 24 * 60 * 60 * 1000));
+    if (months < 12) return `hace ${months} meses`;
+    const years = Math.floor(months / 12);
+    return years === 1 ? 'hace 1 año' : `hace ${years} años`;
+}
+
 const pageUrl = Astro.url;
 ---
 <Layout title="Siguiendo">
@@ -187,6 +218,42 @@ const pageUrl = Astro.url;
                         ))}
                     </div>
                 </section>
+            )}
+
+            {/* C14 — Series abandonadas */}
+            {!searchQuery && abandonadas.length > 0 && (
+                <details class="group bg-amber-50/40 rounded-xl border border-amber-200">
+                    <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer">
+                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-amber-500 rounded-full"></span>
+                            Series abandonadas
+                            <span class="text-sm font-normal text-gray-400">({abandonadas.length})</span>
+                        </h2>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </summary>
+                    <div class="px-4 pb-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                        {abandonadas.map(({ serie, lastWatchedAt, watched, lastSeason }) => (
+                            <a href={`/serie/${serie.id}#season-${lastSeason}`} class="group/item flex items-center gap-3 bg-white rounded-xl p-3 border border-amber-200 hover:border-amber-400 hover:shadow-md transition">
+                                {serie.poster_path ? (
+                                    <img src={posterUrl(serie.poster_path, 'w154')} alt={serie.name} class="w-12 h-16 object-cover rounded flex-shrink-0" loading="lazy"/>
+                                ) : (
+                                    <div class="w-12 h-16 bg-gray-100 rounded flex-shrink-0"></div>
+                                )}
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-sm font-semibold text-gray-900 truncate group-hover/item:text-amber-700 transition">{serie.name}</div>
+                                    <div class="mt-1 flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium whitespace-nowrap">
+                                            Retomar T{lastSeason}
+                                        </span>
+                                        <span class="text-xs text-gray-500">{watched} eps · {monthsAgo(lastWatchedAt)}</span>
+                                    </div>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                </details>
             )}
 
             {/* Series */}

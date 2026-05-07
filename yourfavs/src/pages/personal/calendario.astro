@@ -7,6 +7,8 @@ import EmptyState from "../../components/EmptyState.astro";
 const now = new Date();
 const year = parseInt(Astro.url.searchParams.get("year") || String(now.getFullYear()));
 const month = parseInt(Astro.url.searchParams.get("month") || String(now.getMonth() + 1));
+const view = Astro.url.searchParams.get("view") === 'list' ? 'list' : 'grid';
+const buildViewUrl = (v: 'grid' | 'list') => `/personal/calendario?year=${year}&month=${month}&view=${v}`;
 
 let calendarData;
 let errorMessage = "";
@@ -93,7 +95,29 @@ const notificationGroups = Array.from(groupsMap.entries())
             <p class="text-gray-500 text-base">Estrenos de películas y episodios de tus series</p>
         </header>
 
-        <!-- Calendario -->
+        <!-- Toggle vista + Suscripción ICS -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1 self-start">
+                <a href={buildViewUrl('grid')}
+                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${view === 'grid' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Cuadrícula
+                </a>
+                <a href={buildViewUrl('list')}
+                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${view === 'list' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    Lista
+                </a>
+            </div>
+            <button id="ics-subscribe-btn"
+                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition self-start">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Suscribir en Google/Apple Calendar
+            </button>
+        </div>
+
+        <!-- Calendario (vista grid) -->
+        {view === 'grid' && (
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
             <!-- Header del mes -->
             <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
@@ -188,6 +212,79 @@ const notificationGroups = Array.from(groupsMap.entries())
                 </span>
             </div>
         </div>
+        )}
+
+        <!-- Calendario (vista lista) -->
+        {view === 'list' && (
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
+                <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
+                    <a href={`/personal/calendario?year=${prevYear}&month=${prevMonth}&view=list`}
+                       class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </a>
+                    <h2 class="text-lg sm:text-xl font-semibold text-gray-800">{monthNames[month - 1]} {year}</h2>
+                    <a href={`/personal/calendario?year=${nextYear}&month=${nextMonth}&view=list`}
+                       class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                {calendarData?.days?.length === 0 && (
+                    <div class="px-4 py-8">
+                        <EmptyState size="sm" title="Sin estrenos este mes" description="No hay estrenos ni episodios programados." />
+                    </div>
+                )}
+                {calendarData?.days && calendarData.days.length > 0 && (
+                    <div class="divide-y divide-gray-100">
+                        {calendarData.days.map(day => {
+                            const isToday = day.date === today;
+                            const dt = new Date(day.date + 'T12:00:00');
+                            const weekday = dt.toLocaleDateString('es-ES', { weekday: 'long' });
+                            const datePretty = dt.toLocaleDateString('es-ES', { day: 'numeric', month: 'long' });
+                            return (
+                                <div class={`px-4 sm:px-6 py-4 ${isToday ? 'bg-blue-50/40' : ''}`}>
+                                    <div class="flex items-baseline gap-2 mb-3">
+                                        <span class={`text-sm font-bold uppercase tracking-wide ${isToday ? 'text-blue-600' : 'text-gray-700'}`}>
+                                            {isToday ? 'Hoy' : weekday}
+                                        </span>
+                                        <span class="text-xs text-gray-500">{datePretty}</span>
+                                        <span class="text-xs text-gray-400">· {day.events.length} {day.events.length === 1 ? 'evento' : 'eventos'}</span>
+                                    </div>
+                                    <div class="space-y-2">
+                                        {day.events.map(ev => {
+                                            const link = ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`;
+                                            const colorClass = ev.media_type === 'movie' ? 'text-red-600' : (ev.event_type === 'season_premiere' ? 'text-purple-600' : 'text-blue-600');
+                                            const bgClass = ev.media_type === 'movie' ? 'bg-red-50 border-red-100' : (ev.event_type === 'season_premiere' ? 'bg-purple-50 border-purple-100' : 'bg-blue-50 border-blue-100');
+                                            return (
+                                                <a href={link} class={`flex items-center gap-3 p-2.5 rounded-xl border ${bgClass} hover:shadow-md transition`}>
+                                                    {ev.poster_path ? (
+                                                        <img src={ev.poster_path} alt={ev.title} class="w-10 h-14 object-cover rounded-lg flex-shrink-0" loading="lazy"/>
+                                                    ) : (
+                                                        <div class="w-10 h-14 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center text-gray-400 text-xs">?</div>
+                                                    )}
+                                                    <div class="min-w-0 flex-1">
+                                                        <p class="text-sm font-semibold text-gray-800 truncate">{ev.title}</p>
+                                                        <span class={`text-xs ${colorClass}`}>{ev.label}</span>
+                                                    </div>
+                                                    {ev.is_subscribed && (
+                                                        <span class="text-amber-500 flex-shrink-0" title="Suscrito">
+                                                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+                                                        </span>
+                                                    )}
+                                                </a>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        )}
 
         <!-- Detalle del día seleccionado -->
         <div id="day-detail-panel" class="mb-6" style="display:none;">
@@ -331,6 +428,34 @@ const notificationGroups = Array.from(groupsMap.entries())
             panel.style.display = 'block';
             panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         });
+    });
+})();
+</script>
+
+<script is:inline>
+(function () {
+    var btn = document.getElementById('ics-subscribe-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var origin = window.location.origin;
+        var httpUrl = origin + '/api/calendar/subscribe.ics';
+        var webcalUrl = httpUrl.replace(/^https?:\/\//, 'webcal://');
+        var copy = function () {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(httpUrl).then(function () {
+                    alert('URL copiada al portapapeles:\n\n' + httpUrl + '\n\nPégala en Google Calendar → "Otros calendarios" → "Desde URL", o en Apple Calendar → "Archivo" → "Nueva suscripción a calendario".');
+                });
+            } else {
+                window.prompt('Copia esta URL y suscríbela en tu calendario:', httpUrl);
+            }
+        };
+        // Intenta abrir webcal:// (Apple Calendar lo registra). Si falla, copia URL.
+        try {
+            window.location.href = webcalUrl;
+            setTimeout(copy, 800);
+        } catch (e) {
+            copy();
+        }
     });
 })();
 </script>

@@ -4,6 +4,7 @@ import { getActorsFav } from "../../services/BD/actors/yourfavsActor";
 import { getActorDetailsById, getMoviesAndSeriesByActorId } from "../../services/API/Actors/InfoActor";
 import { calculateAge, processProductions } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { calculateTopActors } from "../../utils/topActorsLibrary";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import type { Movie } from "../../types/ApiMovie";
@@ -26,6 +27,13 @@ interface ActorDetail {
 
 let actorsWithDetails: ActorDetail[] = [];
 let errorMessage = "";
+let topLibraryActors: Awaited<ReturnType<typeof calculateTopActors>> = [];
+
+try {
+    topLibraryActors = await calculateTopActors(10);
+} catch (error) {
+    console.error("Error al calcular top actores de la biblioteca:", error);
+}
 
 try {
     const actorsFav = await getActorsFav();
@@ -83,6 +91,37 @@ try {
         <div class="mb-4">
             <PersonalNav currentPage="/personal/actores" />
         </div>
+
+        {topLibraryActors.length > 0 && (
+            <section class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-rose-500 rounded-full"></span>
+                    Top actores en tu biblioteca
+                    <span class="text-sm font-normal text-gray-400">según pelis y series que has añadido</span>
+                </h2>
+                <div class="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1 snap-x snap-mandatory">
+                    {topLibraryActors.map((a, idx) => (
+                        <a href={`/actor/${a.id}`} class="snap-start group flex-shrink-0 w-32 sm:w-36">
+                            <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
+                                {a.profile_path ? (
+                                    <img src={posterUrl(a.profile_path, 'w185') || ''} alt={a.name} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                ) : (
+                                    <div class="w-full h-full flex items-center justify-center text-gray-400 text-4xl">👤</div>
+                                )}
+                                <span class="absolute top-2 left-2 w-7 h-7 flex items-center justify-center text-sm font-bold rounded-full bg-rose-500 text-white shadow-lg">{idx + 1}</span>
+                                <span class="absolute bottom-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-rose-300">×{a.appearances}</span>
+                            </div>
+                            <div class="mt-2 text-sm font-semibold text-gray-800 line-clamp-1">{a.name}</div>
+                            <div class="text-[11px] text-gray-500">
+                                {a.movies > 0 && <span>{a.movies} 🎬</span>}
+                                {a.movies > 0 && a.series > 0 && <span class="mx-1">·</span>}
+                                {a.series > 0 && <span>{a.series} 📺</span>}
+                            </div>
+                        </a>
+                    ))}
+                </div>
+            </section>
+        )}
 
         {actorsWithDetails.length === 0 && (
             <EmptyState

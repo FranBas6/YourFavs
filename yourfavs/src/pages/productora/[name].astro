@@ -35,6 +35,48 @@ if (!success) {
 
 const totalWorks = movies.length + series.length;
 const sortUrl = (sort: string) => companyIdParam ? `?sort=${sort}&companyId=${companyIdParam}` : `?sort=${sort}`;
+
+// C22 — Stats analíticas (cálculo cliente sobre los arrays ya cargados)
+const allWorks: { vote_average: number; date?: string; genre_ids?: number[] }[] = [
+    ...movies.map((m: any) => ({ vote_average: m.vote_average, date: m.release_date, genre_ids: m.genre_ids })),
+    ...series.map((s: any) => ({ vote_average: s.vote_average, date: s.first_air_date, genre_ids: s.genre_ids })),
+];
+
+// Géneros: histograma top 5
+const genreHistogram: Record<number, number> = {};
+for (const w of allWorks) for (const g of (w.genre_ids || [])) genreHistogram[g] = (genreHistogram[g] || 0) + 1;
+const topGenresProduced = Object.entries(genreHistogram)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([id, count]) => ({ id: Number(id), name: getGenreName(Number(id)), count }));
+const maxGenreCount = topGenresProduced.length > 0 ? topGenresProduced[0].count : 0;
+
+// Década más activa
+const decadeHistogram: Record<string, number> = {};
+for (const w of allWorks) {
+    if (!w.date) continue;
+    const y = Number(String(w.date).slice(0, 4));
+    if (!y || y < 1900) continue;
+    const dec = `${Math.floor(y / 10) * 10}s`;
+    decadeHistogram[dec] = (decadeHistogram[dec] || 0) + 1;
+}
+const topDecade = Object.entries(decadeHistogram).sort(([, a], [, b]) => b - a)[0] || null;
+
+// Nota media (solo items con voto > 0)
+const ratedWorks = allWorks.filter(w => w.vote_average > 0);
+const avgRating = ratedWorks.length > 0
+    ? ratedWorks.reduce((sum, w) => sum + w.vote_average, 0) / ratedWorks.length
+    : null;
+
+// Mejor película + mejor serie
+const bestMovie = movies.length > 0
+    ? [...movies].sort((a: any, b: any) => b.vote_average - a.vote_average)[0]
+    : null;
+const bestSerie = series.length > 0
+    ? [...series].sort((a: any, b: any) => b.vote_average - a.vote_average)[0]
+    : null;
+
+const showStats = topGenresProduced.length > 0 || topDecade !== null || avgRating !== null || bestMovie || bestSerie;
 ---
 <Layout title={`${name}`}>
     <section class="px-1 sm:py-8">
@@ -86,6 +128,85 @@ const sortUrl = (sort: string) => companyIdParam ? `?sort=${sort}&companyId=${co
                 </div>
             </div>
         </div>
+
+        <!-- C22: Stats analíticas -->
+        {showStats && (
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <!-- Top géneros producidos -->
+                {topGenresProduced.length > 0 && (
+                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
+                            <span class="text-base">🎭</span> Géneros más producidos
+                        </h3>
+                        <div class="space-y-2">
+                            {topGenresProduced.map((g) => (
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs font-medium text-gray-600 w-20 truncate">{g.name}</span>
+                                    <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
+                                        <div class="h-full bg-orange-500 rounded" style={`width: ${(g.count / maxGenreCount) * 100}%`}></div>
+                                    </div>
+                                    <span class="text-xs font-semibold text-gray-700 w-8 text-right">{g.count}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <!-- Resumen numérico -->
+                <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                        <span class="text-base">📊</span> Resumen
+                    </h3>
+                    {topDecade && (
+                        <div>
+                            <div class="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Década más activa</div>
+                            <div class="text-2xl font-bold text-cyan-600">{topDecade[0]}</div>
+                            <div class="text-[11px] text-gray-500">{topDecade[1]} producciones</div>
+                        </div>
+                    )}
+                    {avgRating !== null && (
+                        <div>
+                            <div class="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Nota media</div>
+                            <div class="text-2xl font-bold text-yellow-600">⭐ {avgRating.toFixed(1)}</div>
+                            <div class="text-[11px] text-gray-500">{ratedWorks.length} con votos</div>
+                        </div>
+                    )}
+                </div>
+
+                <!-- Mejores producciones -->
+                {(bestMovie || bestSerie) && (
+                    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                        <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
+                            <span class="text-base">🏆</span> Mejor valoradas
+                        </h3>
+                        {bestMovie && (
+                            <a href={`/movie/${bestMovie.id}`} class="flex items-center gap-2 group/best">
+                                {bestMovie.poster_path && (
+                                    <img src={bestMovie.poster_path} alt={bestMovie.title} class="w-10 h-14 rounded object-cover flex-shrink-0" loading="lazy"/>
+                                )}
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-[10px] uppercase tracking-wide text-red-600 font-bold">Película</div>
+                                    <div class="text-sm font-semibold text-gray-800 line-clamp-1 group-hover/best:text-red-600 transition">{bestMovie.title}</div>
+                                    <div class="text-xs text-yellow-600 font-semibold">⭐ {bestMovie.vote_average?.toFixed(1)}</div>
+                                </div>
+                            </a>
+                        )}
+                        {bestSerie && (
+                            <a href={`/serie/${bestSerie.id}`} class="flex items-center gap-2 group/best">
+                                {bestSerie.poster_path && (
+                                    <img src={bestSerie.poster_path} alt={bestSerie.name} class="w-10 h-14 rounded object-cover flex-shrink-0" loading="lazy"/>
+                                )}
+                                <div class="flex-1 min-w-0">
+                                    <div class="text-[10px] uppercase tracking-wide text-blue-600 font-bold">Serie</div>
+                                    <div class="text-sm font-semibold text-gray-800 line-clamp-1 group-hover/best:text-blue-600 transition">{bestSerie.name}</div>
+                                    <div class="text-xs text-yellow-600 font-semibold">⭐ {bestSerie.vote_average?.toFixed(1)}</div>
+                                </div>
+                            </a>
+                        )}
+                    </div>
+                )}
+            </div>
+        )}
 
         <!-- Navegación rápida -->
         <div class="flex flex-wrap gap-2 mb-4">

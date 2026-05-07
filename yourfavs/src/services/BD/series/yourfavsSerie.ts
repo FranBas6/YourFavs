@@ -179,6 +179,10 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             const { invalidateGenrePreferencesCache } = await import('../../../utils/genrePreferences');
             invalidateGenrePreferencesCache();
         } catch { /* ignore */ }
+        try {
+            const { invalidateTopActorsCache } = await import('../../../utils/topActorsLibrary');
+            invalidateTopActorsCache();
+        } catch { /* ignore */ }
     }
 
     return `/serie/${serieId}`;
@@ -462,20 +466,29 @@ export async function unmarkAllWatched(serieId: string): Promise<void> {
     await deleteDoc(ref);
 }
 
-export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number> }>> {
+export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }>> {
     if (serieIds.length === 0) return {};
     const results = await Promise.all(
         serieIds.map(id => getWatchedProgress(id))
     );
-    const map: Record<string, { watched: number; bySeasons?: Record<number, number> }> = {};
+    const map: Record<string, { watched: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }> = {};
     for (let i = 0; i < serieIds.length; i++) {
         const data = results[i];
         if (data && data.watched_episodes.length > 0) {
             const bySeasons: Record<number, number> = {};
+            let lastWatchedAt = 0;
             for (const ep of data.watched_episodes) {
                 if (ep.season > 0) bySeasons[ep.season] = (bySeasons[ep.season] || 0) + 1;
+                if (ep.watched_at) {
+                    const t = new Date(ep.watched_at).getTime();
+                    if (!isNaN(t) && t > lastWatchedAt) lastWatchedAt = t;
+                }
             }
-            map[serieIds[i]] = { watched: data.watched_episodes.length, bySeasons };
+            map[serieIds[i]] = {
+                watched: data.watched_episodes.length,
+                bySeasons,
+                ...(lastWatchedAt > 0 ? { lastWatchedAt } : {}),
+            };
         }
     }
     return map;

@@ -101,6 +101,10 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
             const { invalidateGenrePreferencesCache } = await import('../../../utils/genrePreferences');
             invalidateGenrePreferencesCache();
         } catch { /* ignore */ }
+        try {
+            const { invalidateTopActorsCache } = await import('../../../utils/topActorsLibrary');
+            invalidateTopActorsCache();
+        } catch { /* ignore */ }
     }
 
     return `/movie/${movieId}`;

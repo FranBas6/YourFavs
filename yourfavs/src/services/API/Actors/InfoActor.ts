@@ -30,6 +30,49 @@ export const getSeriesByActorId = async ({ id }: { id: string }): Promise<Serie[
     }
 };
 
+export interface CrewCredit {
+    id: number;
+    media_type: 'movie' | 'tv';
+    title: string;
+    poster_path: string | null;
+    job: string;
+    year: number | null;
+    vote_average: number;
+}
+
+const RELEVANT_JOBS = new Set(['Director', 'Producer', 'Executive Producer', 'Writer', 'Screenplay', 'Creator']);
+
+export const getActorCrewCredits = async ({ id }: { id: string }): Promise<CrewCredit[]> => {
+    try {
+        const data = await tmdbFetch<{ crew: any[] }>(`/person/${id}/combined_credits`);
+        const seen = new Map<string, CrewCredit>();
+        for (const c of data.crew || []) {
+            if (!RELEVANT_JOBS.has(c.job)) continue;
+            const mediaType: 'movie' | 'tv' = c.media_type === 'tv' ? 'tv' : 'movie';
+            const title = c.title || c.name || '';
+            if (!title) continue;
+            const dateStr = c.release_date || c.first_air_date || '';
+            const year = dateStr ? Number(dateStr.slice(0, 4)) || null : null;
+            const key = `${mediaType}-${c.id}-${c.job}`;
+            if (!seen.has(key)) {
+                seen.set(key, {
+                    id: c.id,
+                    media_type: mediaType,
+                    title,
+                    poster_path: c.poster_path || null,
+                    job: c.job,
+                    year,
+                    vote_average: c.vote_average || 0,
+                });
+            }
+        }
+        return Array.from(seen.values()).sort((a, b) => (b.year || 0) - (a.year || 0));
+    } catch (error) {
+        console.error('Error al obtener créditos de crew del actor:', error);
+        return [];
+    }
+};
+
 export const getMoviesByActorId = async ({ id }: { id: string }): Promise<Movie[]> => {
     try {
         const creditsData = await tmdbFetch<{ cast: any[] }>(`/person/${id}/combined_credits`);
