@@ -17,10 +17,10 @@ export interface PersonalRecResult {
     seedsMovies: SeedInfo[];
     seedsTv: SeedInfo[];
     libraryIds: { movies: Set<string>; tv: Set<string> };
-    /** Cuántos candidatos quedaron tras filtro afinidad / total candidatos */
+    /** Cuántos candidatos quedaron tras cada paso */
     filterStats: {
-        movies: { kept: number; total: number };
-        tv: { kept: number; total: number };
+        movies: { kept: number; diversified: number; total: number };
+        tv: { kept: number; diversified: number; total: number };
     };
 }
 
@@ -39,6 +39,13 @@ function setSum(map: Map<string, number>, items: { id: string }[], weight: numbe
     }
 }
 
+const BOOST_PER_GENRE_MATCH = 0.5;
+
+/**
+ * Filtra candidatos que tocan al menos 1 género top y boostea el peso por nº de matches.
+ * Una peli con [Acción, Sci-Fi, Aventura] cuando tus top son esos 3 → +1.5 al peso base.
+ * Una peli con [Acción, Drama] (Drama no top) → +0.5.
+ */
 function filterByGenreAffinity(
     entries: Array<[string, number]>,
     genresById: Record<string, number[]>,
@@ -46,11 +53,32 @@ function filterByGenreAffinity(
 ): Array<[string, number, number[]]> {
     const top = new Set(topGenres);
     const out: Array<[string, number, number[]]> = [];
-    for (const [id, weight] of entries) {
+    for (const [id, baseWeight] of entries) {
         const genres = genresById[id] || [];
-        if (genres.some(g => top.has(g))) out.push([id, weight, genres]);
+        let matches = 0;
+        for (const g of genres) if (top.has(g)) matches++;
+        if (matches === 0) continue;
+        out.push([id, baseWeight + BOOST_PER_GENRE_MATCH * matches, genres]);
     }
     return out;
+}
+
+/**
+ * Si dos candidatos tienen el mismo set ordenado de géneros, mantener solo el de mayor peso.
+ * Mata cosas tipo "3 Guardianes de la Galaxia con [Sci-Fi, Aventura, Acción]" → solo el mejor.
+ * Empuja diversidad sin fetch extra.
+ */
+function diversifyByGenreProfile(
+    items: Array<[string, number, number[]]>,
+): Array<[string, number, number[]]> {
+    const best = new Map<string, [string, number, number[]]>();
+    for (const item of items) {
+        const [, weight, genres] = item;
+        const key = [...genres].sort((a, b) => a - b).join(',');
+        const cur = best.get(key);
+        if (!cur || weight > cur[1]) best.set(key, item);
+    }
+    return Array.from(best.values());
 }
 
 function topSeedsFiltered(
@@ -90,26 +118,29 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const movieFiltered = filterByGenreAffinity(movieEntries, prefs.genresById.movies, prefs.movies.topGenres);
     const tvFiltered = filterByGenreAffinity(tvEntries, prefs.genresById.tv, prefs.tv.topGenres);
 
-    // Completar hasta SEED_LIMIT: filtered como prioridad, rellenar con los descartados (también
-    // ordenados por peso) si no llegamos al límite. Así nunca degradamos a "sin filtro" entero.
+    const movieDiversified = diversifyByGenreProfile(movieFiltered);
+    const tvDiversified = diversifyByGenreProfile(tvFiltered);
+
+    // Completar hasta SEED_LIMIT: diversified como prioridad, rellenar con los descartados
+    // (incluyendo perfiles duplicados o sin afinidad) si no llegamos al límite.
     function completeSeeds(
-        filtered: Array<[string, number, number[]]>,
+        primary: Array<[string, number, number[]]>,
         all: Array<[string, number]>,
         genresById: Record<string, number[]>,
         limit: number,
     ): Array<[string, number, number[]]> {
-        if (filtered.length >= limit) return filtered;
-        const filteredIds = new Set(filtered.map(([id]) => id));
+        if (primary.length >= limit) return primary;
+        const usedIds = new Set(primary.map(([id]) => id));
         const fillers = all
-            .filter(([id]) => !filteredIds.has(id))
+            .filter(([id]) => !usedIds.has(id))
             .sort(([, a], [, b]) => b - a)
-            .slice(0, limit - filtered.length)
+            .slice(0, limit - primary.length)
             .map(([id, w]) => [id, w, genresById[id] || []] as [string, number, number[]]);
-        return [...filtered, ...fillers];
+        return [...primary, ...fillers];
     }
 
-    const movieFinal = completeSeeds(movieFiltered, movieEntries, prefs.genresById.movies, SEED_LIMIT);
-    const tvFinal = completeSeeds(tvFiltered, tvEntries, prefs.genresById.tv, SEED_LIMIT);
+    const movieFinal = completeSeeds(movieDiversified, movieEntries, prefs.genresById.movies, SEED_LIMIT);
+    const tvFinal = completeSeeds(tvDiversified, tvEntries, prefs.genresById.tv, SEED_LIMIT);
 
     const movieSeeds = topSeedsFiltered(movieFinal, SEED_LIMIT);
     const tvSeeds = topSeedsFiltered(tvFinal, SEED_LIMIT);
@@ -165,8 +196,8 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         seedsTv: tvSeeds,
         libraryIds: prefs.libraryIds,
         filterStats: {
-            movies: { kept: movieFiltered.length, total: movieEntries.length },
-            tv: { kept: tvFiltered.length, total: tvEntries.length },
+            movies: { kept: movieFiltered.length, diversified: movieDiversified.length, total: movieEntries.length },
+            tv: { kept: tvFiltered.length, diversified: tvDiversified.length, total: tvEntries.length },
         },
     };
 
