@@ -44,50 +44,45 @@ const backdrop = backdropPath ? backdropUrl(backdropPath) : '';
 
     /* Solo desktop con hover real */
     @media (hover: hover) and (min-width: 1024px) {
+        .hover-preview-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 8999;
+            opacity: 0;
+            pointer-events: auto;
+            cursor: pointer;
+            transition: opacity 280ms ease;
+        }
+        .hover-preview-backdrop.is-visible { opacity: 1; }
+
         .hover-preview-overlay {
             position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 70vw;
+            max-width: 900px;
             background: #0a0a0a;
-            border-radius: 12px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+            border-radius: 14px;
+            box-shadow: 0 35px 80px -10px rgba(0, 0, 0, 0.75);
             overflow: hidden;
             z-index: 9000;
             opacity: 0;
-            transform-origin: left top;
-            transform: scale(0.85);
+            transform: translate(-50%, -50%) scale(0.7);
+            transform-origin: center center;
             pointer-events: auto;
             cursor: pointer;
         }
-        .hover-preview-overlay[data-anchor="right"]        { transform-origin: right top; }
-        .hover-preview-overlay[data-anchor="left-bottom"]  { transform-origin: left bottom; }
-        .hover-preview-overlay[data-anchor="right-bottom"] { transform-origin: right bottom; }
-
-        .hover-preview-overlay.is-visible                          { animation: hp-grow-in        520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .hover-preview-overlay[data-anchor="right"].is-visible        { animation: hp-grow-in-right  520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .hover-preview-overlay[data-anchor="left-bottom"].is-visible  { animation: hp-grow-in-left-bottom  520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        .hover-preview-overlay[data-anchor="right-bottom"].is-visible { animation: hp-grow-in-right-bottom 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-
-        @keyframes hp-grow-in {
-            0%   { opacity: 0;    transform: scale(0.85);  transform-origin: left top; }
-            40%  { opacity: 0.85; transform: scale(1.45);  transform-origin: left top; }
-            100% { opacity: 1;    transform: scale(2);     transform-origin: left top; }
+        .hover-preview-overlay.is-visible {
+            animation: hp-center-in 380ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        @keyframes hp-grow-in-right {
-            0%   { opacity: 0;    transform: scale(0.85);  transform-origin: right top; }
-            40%  { opacity: 0.85; transform: scale(1.45);  transform-origin: right top; }
-            100% { opacity: 1;    transform: scale(2);     transform-origin: right top; }
+        @keyframes hp-center-in {
+            0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+            60%  { opacity: 1; }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
         }
-        @keyframes hp-grow-in-left-bottom {
-            0%   { opacity: 0;    transform: scale(0.85);  transform-origin: left bottom; }
-            40%  { opacity: 0.85; transform: scale(1.45);  transform-origin: left bottom; }
-            100% { opacity: 1;    transform: scale(2);     transform-origin: left bottom; }
-        }
-        @keyframes hp-grow-in-right-bottom {
-            0%   { opacity: 0;    transform: scale(0.85);  transform-origin: right bottom; }
-            40%  { opacity: 0.85; transform: scale(1.45);  transform-origin: right bottom; }
-            100% { opacity: 1;    transform: scale(2);     transform-origin: right bottom; }
-        }
-        /* El iframe no recibe ratón: oculta los controles de YouTube y deja que el click navegue */
-        .hover-preview-media iframe { pointer-events: none; }
         .hover-preview-media {
             position: relative;
             width: 100%;
@@ -163,6 +158,43 @@ const backdrop = backdropPath ? backdropUrl(backdropPath) : '';
         }
         .hover-preview-mute:hover { background: rgba(255,255,255,0.3); }
 
+        .hover-preview-close {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 4;
+            width: 32px;
+            height: 32px;
+            border-radius: 9999px;
+            background: rgba(0, 0, 0, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 150ms ease;
+        }
+        .hover-preview-close:hover { background: rgba(0, 0, 0, 0.9); }
+
+        .hover-preview-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #ef4444;
+            color: #fff;
+            border: 0;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 150ms ease;
+            flex-shrink: 0;
+        }
+        .hover-preview-cta:hover { background: #dc2626; }
+
         /* Ocultar badges del card original durante el preview, solo dentro del host */
         .hover-preview-host.is-previewing > :not(.hover-preview-overlay) [data-card-badge] {
             opacity: 0;
@@ -172,11 +204,10 @@ const backdrop = backdropPath ? backdropUrl(backdropPath) : '';
 
     /* Respetar prefers-reduced-motion: sin scale, solo fade */
     @media (prefers-reduced-motion: reduce) {
-        .hover-preview-overlay.is-visible,
-        .hover-preview-overlay[data-anchor="right"].is-visible {
+        .hover-preview-overlay.is-visible {
             animation: none !important;
             opacity: 1 !important;
-            transform: scale(1.4) !important;
+            transform: translate(-50%, -50%) scale(1) !important;
             transition: opacity 200ms ease;
         }
     }

@@ -4,9 +4,7 @@
     var mq = window.matchMedia('(hover: hover) and (min-width: 1024px)');
     if (!mq.matches) return;
 
-    var DEBOUNCE_MS = 500;
-    var SCALE = 2;
-    var EDGE_MARGIN = 40;
+    var DEBOUNCE_MS = 1250;
     var MUTE_PREF_KEY = 'yf_hover_muted';
 
     function isMutedPref() {
@@ -55,20 +53,20 @@
     }
 
     function buildOverlay(host) {
-        var anchor = decideAnchor(host);
-        var rect = host.getBoundingClientRect();
         var overlay = document.createElement('div');
         overlay.className = 'hover-preview-overlay';
-        overlay.setAttribute('data-anchor', anchor);
-
-        // Position: fixed, anclado al rect del host para evitar problemas de stacking
-        overlay.style.top = rect.top + 'px';
-        overlay.style.left = rect.left + 'px';
-        overlay.style.width = rect.width + 'px';
+        // Centrado por CSS (top/left 50% + transform translate). No fijamos rect.
 
         var media = document.createElement('div');
         media.className = 'hover-preview-media';
         overlay.appendChild(media);
+
+        var closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'hover-preview-close';
+        closeBtn.setAttribute('aria-label', 'Cerrar');
+        closeBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+        overlay.appendChild(closeBtn);
 
         var info = document.createElement('div');
         info.className = 'hover-preview-info';
@@ -92,40 +90,25 @@
             titleWrap.appendChild(meta);
         }
         info.appendChild(titleWrap);
+
+        // CTA explícito "Ver detalles" — único lugar que navega
+        var href = host.dataset.href;
+        if (href) {
+            var cta = document.createElement('a');
+            cta.className = 'hover-preview-cta';
+            cta.href = href;
+            cta.innerHTML = 'Ver detalles <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>';
+            info.appendChild(cta);
+        }
+
         overlay.appendChild(info);
 
-        // Click bubbles up to the wrapped <a>
-        overlay.addEventListener('click', function (e) {
-            var href = host.dataset.href;
-            // Si el click es en el botón mute, no navegar
-            if (e.target.closest('.hover-preview-mute')) return;
-            if (href) window.location.href = href;
+        closeBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            destroyOverlay(host);
         });
 
         return { overlay: overlay, media: media, info: info };
-    }
-
-    function decideAnchor(host) {
-        var rect = host.getBoundingClientRect();
-        var vw = window.innerWidth;
-        var vh = window.innerHeight;
-        var extraX = rect.width * (SCALE - 1) / 2;
-        var heightGuess = rect.width * 9 / 16; // overlay es 16:9 sobre rect.width
-        var extraY = heightGuess * (SCALE - 1);
-
-        // Horizontal: si toca borde derecho, anclar derecha
-        var hAnchor = 'left';
-        if (rect.right + extraX + EDGE_MARGIN > vw) hAnchor = 'right';
-        else if (rect.left - extraX - EDGE_MARGIN < 0) hAnchor = 'left';
-
-        // Vertical: si crece y se sale por abajo, anclar bottom
-        var vAnchor = 'top';
-        if (rect.top + heightGuess * SCALE + EDGE_MARGIN > vh) vAnchor = 'bottom';
-
-        if (hAnchor === 'right' && vAnchor === 'bottom') return 'right-bottom';
-        if (hAnchor === 'left' && vAnchor === 'bottom') return 'left-bottom';
-        if (hAnchor === 'right') return 'right';
-        return 'left';
     }
 
     function fillFallback(media, host) {
@@ -168,8 +151,8 @@
             var player = new window.YT.Player(iframeEl.id, {
                 videoId: ytKey,
                 playerVars: {
-                    autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1,
-                    iv_load_policy: 3, playsinline: 1, fs: 0, disablekb: 1,
+                    autoplay: 1, mute: 1, controls: 1, rel: 0, modestbranding: 1,
+                    iv_load_policy: 3, playsinline: 1, fs: 0,
                     showinfo: 0, loop: 1, playlist: ytKey,
                 },
                 events: {
@@ -185,10 +168,12 @@
                         } catch (_) {}
                     },
                     onStateChange: function (e) {
+                        // Quitamos el mask en cuanto empieza a reproducir (ya no necesitamos
+                        // tapar los controles porque ahora son intencionalmente visibles).
                         if (e.data === 1) {
                             setTimeout(function () {
                                 if (loadingMask.isConnected) loadingMask.classList.add('is-hidden');
-                            }, 1500);
+                            }, 200);
                         }
                     }
                 }
@@ -233,27 +218,37 @@
             try { media.__ytPlayer.destroy(); } catch (_) {}
         }
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        if (host.__backdrop && host.__backdrop.parentNode) {
+            host.__backdrop.parentNode.removeChild(host.__backdrop);
+        }
+        host.__backdrop = null;
         host.__overlay = null;
         host.classList.remove('is-previewing');
     }
 
     function activate(host) {
         if (host.__overlay) return;
+        var backdrop = document.createElement('div');
+        backdrop.className = 'hover-preview-backdrop';
+        document.body.appendChild(backdrop);
+        host.__backdrop = backdrop;
+
+        // Click en el dim cierra
+        backdrop.addEventListener('click', function () { destroyOverlay(host); });
+
         var built = buildOverlay(host);
         document.body.appendChild(built.overlay);
         host.__overlay = built.overlay;
         host.classList.add('is-previewing');
 
-        // Cuando el ratón sale del overlay (ej. saltar a otra card), también lo cerramos
-        built.overlay.addEventListener('mouseleave', function () {
-            destroyOverlay(host);
-        });
-
         // Pintamos fallback inmediatamente (backdrop o poster), y luego intentamos trailer
         fillFallback(built.media, host);
 
         // Trigger animación
-        requestAnimationFrame(function () { built.overlay.classList.add('is-visible'); });
+        requestAnimationFrame(function () {
+            backdrop.classList.add('is-visible');
+            built.overlay.classList.add('is-visible');
+        });
 
         var type = host.dataset.tmdbType;
         var id = host.dataset.tmdbId;
@@ -273,19 +268,15 @@
         host.__hpAttached = true;
 
         var enterTimer = null;
-        var leaveTimer = null;
 
         host.addEventListener('mouseenter', function () {
-            if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
             if (enterTimer) clearTimeout(enterTimer);
             enterTimer = setTimeout(function () { activate(host); }, DEBOUNCE_MS);
         });
-        host.addEventListener('mouseleave', function (e) {
+        host.addEventListener('mouseleave', function () {
+            // Solo cancelamos el enterTimer si el usuario sale antes de que abra el preview.
+            // El cierre del preview ya abierto es por: click backdrop, X, Esc o scroll.
             if (enterTimer) { clearTimeout(enterTimer); enterTimer = null; }
-            // Si el ratón está pasando al overlay, no destruir
-            if (host.__overlay && e.relatedTarget && host.__overlay.contains(e.relatedTarget)) return;
-            // Pequeño delay para evitar flicker entre rect del host y rect visual del overlay
-            leaveTimer = setTimeout(function () { destroyOverlay(host); }, 80);
         });
     }
 
@@ -295,8 +286,12 @@
 
     function init() {
         document.querySelectorAll('.hover-preview-host').forEach(attach);
-        // Si el usuario scrollea, cerramos cualquier overlay (fixed se desincroniza con el host)
+        // Si el usuario scrollea, cerramos cualquier overlay
         window.addEventListener('scroll', destroyAll, { passive: true });
+        // Esc cierra cualquier preview abierto
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') destroyAll();
+        });
     }
 
     if (document.readyState === 'loading') {
