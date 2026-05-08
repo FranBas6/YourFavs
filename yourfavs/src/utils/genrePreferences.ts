@@ -12,6 +12,7 @@ export interface GenrePrefs {
     movies: { topGenres: number[]; weighted: Record<number, number> };
     tv: { topGenres: number[]; weighted: Record<number, number> };
     libraryIds: { movies: Set<string>; tv: Set<string> };
+    genresById: { movies: Record<string, number[]>; tv: Record<string, number[]> };
     breakdown: {
         movies: { favs: number; like: number; vistos: number; pendientes: number; verpronto: number };
         tv: { favs: number; siguiendo: number; like: number; vistos: number; pendientes: number; verpronto: number };
@@ -97,6 +98,11 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
         ),
     ]);
 
+    const movieGenresById: Record<string, number[]> = {};
+    movieEntries.forEach(([id], i) => { movieGenresById[id] = movieDetails[i]?.genres || []; });
+    const tvGenresById: Record<string, number[]> = {};
+    tvEntries.forEach(([id], i) => { tvGenresById[id] = tvDetails[i]?.genres || []; });
+
     const data: GenrePrefs = {
         movies: aggregateGenres(movieDetails),
         tv: aggregateGenres(tvDetails),
@@ -104,6 +110,7 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
             movies: new Set(movieEntries.map(([id]) => id)),
             tv: new Set(tvEntries.map(([id]) => id)),
         },
+        genresById: { movies: movieGenresById, tv: tvGenresById },
         breakdown: {
             movies: {
                 favs: movFavs.length, like: movLike.length, vistos: movVistos.length,
