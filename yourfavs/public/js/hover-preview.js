@@ -1,8 +1,7 @@
-/* HoverPreview (C24) — solo desktop con hover real */
+/* HoverPreview — desktop por hover; mobile por click en .card-quickview-btn */
 (function () {
     if (typeof window === 'undefined') return;
-    var mq = window.matchMedia('(hover: hover) and (min-width: 1024px)');
-    if (!mq.matches) return;
+    var isDesktop = window.matchMedia('(hover: hover) and (min-width: 1024px)').matches;
 
     var DEBOUNCE_MS = 1250;
     var MUTE_PREF_KEY = 'yf_hover_muted';
@@ -284,11 +283,32 @@
         document.querySelectorAll('.hover-preview-host.is-previewing').forEach(function (h) { destroyOverlay(h); });
     }
 
+    function repurposeViewDetailsButton(host) {
+        // Reusamos el span "Ver detalles" de la card como trigger de preview en mobile.
+        var btn = host.querySelector('.view-details-btn');
+        if (!btn) return;
+        btn.classList.add('is-quickview');
+        btn.innerHTML = '<svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 3.3a1 1 0 0 1 1.5-.86l9 5.7a1 1 0 0 1 0 1.72l-9 5.7A1 1 0 0 1 6.3 14.7V3.3z"/></svg>Vista rápida';
+    }
+
     function init() {
-        document.querySelectorAll('.hover-preview-host').forEach(attach);
-        // Si el usuario scrollea, cerramos cualquier overlay
+        if (isDesktop) {
+            // Desktop: hover sobre cards
+            document.querySelectorAll('.hover-preview-host').forEach(attach);
+        } else {
+            // Mobile: rehúsa el span "Ver detalles" como trigger del preview
+            document.querySelectorAll('.hover-preview-host').forEach(repurposeViewDetailsButton);
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('.view-details-btn.is-quickview');
+                if (!btn) return;
+                e.preventDefault();
+                e.stopPropagation();
+                var host = btn.closest('.hover-preview-host');
+                if (host) activate(host);
+            });
+        }
+        // Compartido: scroll y Esc cierran cualquier overlay
         window.addEventListener('scroll', destroyAll, { passive: true });
-        // Esc cierra cualquier preview abierto
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') destroyAll();
         });

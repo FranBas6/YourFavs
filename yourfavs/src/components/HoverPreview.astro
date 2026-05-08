@@ -42,9 +42,8 @@ const backdrop = backdropPath ? backdropUrl(backdropPath) : '';
         height: 100%;
     }
 
-    /* Solo desktop con hover real */
-    @media (hover: hover) and (min-width: 1024px) {
-        .hover-preview-backdrop {
+    /* Estilos comunes desktop + mobile (size se ajusta abajo en media queries) */
+    .hover-preview-backdrop {
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.5);
@@ -195,10 +194,26 @@ const backdrop = backdropPath ? backdropUrl(backdropPath) : '';
         }
         .hover-preview-cta:hover { background: #dc2626; }
 
-        /* Ocultar badges del card original durante el preview, solo dentro del host */
-        .hover-preview-host.is-previewing > :not(.hover-preview-overlay) [data-card-badge] {
-            opacity: 0;
-            transition: opacity 150ms;
+    /* Ocultar badges del card original durante el preview, solo dentro del host */
+    .hover-preview-host.is-previewing > :not(.hover-preview-overlay) [data-card-badge] {
+        opacity: 0;
+        transition: opacity 150ms;
+    }
+
+    /* Mobile: preview más grande proporcionalmente (90vw vs 70vw desktop) */
+    @media (max-width: 1023px) {
+        .hover-preview-overlay {
+            width: 90vw;
+            max-width: 90vw;
+            border-radius: 12px;
+        }
+        .hover-preview-cta {
+            padding: 8px 14px;
+            font-size: 13px;
+        }
+        .hover-preview-close {
+            width: 36px;
+            height: 36px;
         }
     }
 
