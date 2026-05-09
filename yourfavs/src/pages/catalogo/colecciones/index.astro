@@ -2,6 +2,7 @@
 import Layout from "../../../layouts/Layout.astro";
 import { searchCollections, type MovieCollectionInfo, type CollectionSearchResponse } from "../../../services/API/Movies/InfoMovies";
 import { getUserCollections, getPopularCollections, invalidateCollectionsCache } from "../../../services/API/shared/collectionsDiscovery";
+import { safeFetch } from "../../../utils/safeFetch";
 import EmptyState from "../../../components/EmptyState.astro";
 
 const url = new URL(Astro.request.url);
@@ -18,11 +19,15 @@ let popularCollections: MovieCollectionInfo[] = [];
 let search: CollectionSearchResponse = { results: [], page: 1, totalPages: 0, totalResults: 0 };
 
 if (q) {
-    search = await searchCollections(q, page);
+    search = await safeFetch(
+        searchCollections(q, page),
+        'colecciones/search',
+        { results: [], page: 1, totalPages: 0, totalResults: 0 } as CollectionSearchResponse
+    );
 } else {
     [userCollections, popularCollections] = await Promise.all([
-        getUserCollections(),
-        getPopularCollections(),
+        safeFetch(getUserCollections(), 'colecciones/user', [] as MovieCollectionInfo[]),
+        safeFetch(getPopularCollections(), 'colecciones/popular', [] as MovieCollectionInfo[]),
     ]);
 }
 // Set de IDs del usuario para poner badge "En tu lista" también en Franquicias icónicas

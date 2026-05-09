@@ -16,6 +16,7 @@ import {fetchAllPlatforms} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
 import {posterUrl, backdropUrl} from "../services/API/shared/tmdbClient";
+import {safeFetch} from "../utils/safeFetch";
 import '../styles/pages/index.css';
 
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
@@ -25,7 +26,8 @@ const randomIndex = Math.floor(Math.random() * allCategories.length);
 const randomCategorySlug = allCategories[randomIndex].slug;
 const randomCategoryName = allCategories[randomIndex].name;
 
-// Todas las llamadas TMDB en paralelo (11 calls)
+// Cada fetch con su propio catch: si TMDB/Firebase falla en cold start,
+// la home renderiza con esa sección vacía en lugar de devolver Web Server Error
 const [
     trendingMovies,
     trendingSeries,
@@ -41,19 +43,19 @@ const [
     continueWatching,
     forYouItems,
 ] = await Promise.all([
-    getTrending<Movie>('movie', 'week'),
-    getTrending<Serie>('tv', 'week'),
-    getLatestMovies({page: pageStr}),
-    getLatestSeries({page: pageStr}),
-    getMostPopularMovies({page: pageStr}),
-    getMostPopularSeries({page: pageStr}),
-    getTopRatedMovies({page: pageStr}),
-    getTopRatedSeries({page: pageStr}),
-    fetchAllPlatforms(pageStr),
-    getMoviesByCategory(randomCategorySlug, pageStr),
-    getSeriesByCategory(randomCategorySlug, pageStr),
-    getContinueWatchingData().catch(() => []),
-    getForYouRecommendations().catch(() => []),
+    safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
+    safeFetch(getTrending<Serie>('tv', 'week'), 'home/trendingSeries', [] as Serie[]),
+    safeFetch(getLatestMovies({page: pageStr}), 'home/latestMovies', [] as Movie[]),
+    safeFetch(getLatestSeries({page: pageStr}), 'home/latestSeries', [] as Serie[]),
+    safeFetch(getMostPopularMovies({page: pageStr}), 'home/popularMovies', [] as Movie[]),
+    safeFetch(getMostPopularSeries({page: pageStr}), 'home/popularSeries', [] as Serie[]),
+    safeFetch(getTopRatedMovies({page: pageStr}), 'home/topRatedMovies', [] as Movie[]),
+    safeFetch(getTopRatedSeries({page: pageStr}), 'home/topRatedSeries', [] as Serie[]),
+    safeFetch(fetchAllPlatforms(pageStr), 'home/platforms', []),
+    safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
+    safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
+    safeFetch(getContinueWatchingData(), 'home/continueWatching', [] as any[]),
+    safeFetch(getForYouRecommendations(), 'home/forYou', [] as any[]),
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];

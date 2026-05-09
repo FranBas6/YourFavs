@@ -17,9 +17,10 @@ import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
 import { handleActorFavAction } from "../../services/BD/actors/yourfavsActor";
 import type { ActorsFavs } from "../../services/BD/actors/yourfavsActor";
-import type { ActorImage } from "../../services/API/Actors/InfoActor";
+import type { ActorImage, TaggedImage } from "../../services/API/Actors/InfoActor";
 import { db } from "../../utils/firebaseConfig";
 import { doc, getDoc, collection, getDocs } from "firebase/firestore";
+import { safeFetch } from "../../utils/safeFetch";
 
 const { actor } = Astro.params;
 
@@ -39,14 +40,16 @@ if (Astro.request.method === 'POST') {
 }
 
 // Fetch datos en paralelo: detalles + créditos (1 llamada) + crew + imágenes + tagged + favorito
+const FAKE_DOC_SNAP = { exists: () => false, data: () => null } as any;
+const FAKE_DOCS_SNAP = { size: 0, docs: [], empty: true } as any;
 const [actorDetails, credits, crewCredits, profileImages, taggedImages, actorDocSnap, actorsFavsSnapshot] = await Promise.all([
-    getActorDetailsById({ id: actor }),
-    getMoviesAndSeriesByActorId({ id: actor }),
-    getActorCrewCredits({ id: actor }),
-    fetchActorImages(actor).catch(() => []),
-    fetchTaggedImages(actor).catch(() => []),
-    getDoc(doc(db, 'ActorsFavs', actor)),
-    getDocs(collection(db, 'ActorsFavs')),
+    safeFetch(getActorDetailsById({ id: actor }), `actor/${actor}/details`, null as any),
+    safeFetch(getMoviesAndSeriesByActorId({ id: actor }), `actor/${actor}/credits`, { movies: [], series: [] } as any),
+    safeFetch(getActorCrewCredits({ id: actor }), `actor/${actor}/crew`, [] as CrewCredit[]),
+    safeFetch(fetchActorImages(actor), `actor/${actor}/images`, [] as ActorImage[]),
+    safeFetch(fetchTaggedImages(actor), `actor/${actor}/tagged`, [] as TaggedImage[]),
+    safeFetch(getDoc(doc(db, 'ActorsFavs', actor)), `actor/${actor}/favDoc`, FAKE_DOC_SNAP),
+    safeFetch(getDocs(collection(db, 'ActorsFavs')), `actor/favsList`, FAKE_DOCS_SNAP),
 ]);
 
 // Agrupar crew por job (Director, Producer, etc.)

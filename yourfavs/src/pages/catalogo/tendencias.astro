@@ -12,6 +12,7 @@ import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
+import {safeFetch} from "../../utils/safeFetch";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/card-animations.css';
 
@@ -23,9 +24,9 @@ const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
 
 const [rawMovies, rawSeries, trendingPeople] = await Promise.all([
-    getTrending<Movie>('movie', timeWindow),
-    getTrending<Serie>('tv', timeWindow),
-    getTrendingPeople(timeWindow),
+    safeFetch(getTrending<Movie>('movie', timeWindow), 'tendencias/movies', [] as Movie[]),
+    safeFetch(getTrending<Serie>('tv', timeWindow), 'tendencias/series', [] as Serie[]),
+    safeFetch(getTrendingPeople(timeWindow), 'tendencias/people', []),
 ]);
 
 // Los endpoints /trending no soportan params de discover, así que filtramos en memoria.

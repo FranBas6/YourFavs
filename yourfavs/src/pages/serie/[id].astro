@@ -33,6 +33,7 @@ import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import StarRating from "../../components/detail/StarRating.astro";
+import {safeFetch} from "../../utils/safeFetch";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -107,11 +108,11 @@ if (Astro.request.method === 'POST') {
 
 // Todas las llamadas TMDB iniciales en paralelo
 let [item, cast, directors, trailerUrl, status] = await Promise.all([
-    getSeriesById({id}),
-    getSeriesCast(id),
-    getSeriesDirectorsAndRoles(id),
-    getSeriesTrailer(id),
-    getSeriesStatus(id),
+    safeFetch(getSeriesById({id}), `serie/${id}/details`, null as any),
+    safeFetch(getSeriesCast(id), `serie/${id}/cast`, [] as any[]),
+    safeFetch(getSeriesDirectorsAndRoles(id), `serie/${id}/directors`, [] as { name: string; job: string }[]),
+    safeFetch(getSeriesTrailer(id), `serie/${id}/trailer`, null),
+    safeFetch(getSeriesStatus(id), `serie/${id}/status`, '' as any),
 ]);
 if (!item) return Astro.redirect('/404');
 let title = item?.name || "Serie no encontrada";
@@ -135,7 +136,9 @@ const clientData = {
 const allSeasonEpisodes: { [key: number]: any[] } = {};
 if (item?.seasons) {
     const episodeResults = await Promise.all(
-        item.seasons.map((season: any) => getEpisodesBySeasonNumber(id, season.season_number))
+        item.seasons.map((season: any) =>
+            safeFetch(getEpisodesBySeasonNumber(id, season.season_number), `serie/${id}/episodes/${season.season_number}`, [] as any[])
+        )
     );
     item.seasons.forEach((season: any, i: number) => {
         allSeasonEpisodes[season.season_number] = episodeResults[i] || [];
@@ -151,10 +154,15 @@ const totalSpecialEpisodes = specialSeasons.reduce((total, season) => total + (s
 const totalEpisodes = totalRegularEpisodes + totalSpecialEpisodes; // Total completo para compatibilidad
 
 // Verificar existencia en las 6 colecciones (lectura paralela) + watched progress + tags
+const EMPTY_SERIE_EXISTENCE = {
+    exists: { SeriesFavs: false, SeriesPendientes: false, SeriesVistas: false, SeriesViendo: false, SeriesVerPronto: false, LikedSeries: false },
+    opinion: '',
+    rating: 0,
+} as any;
 const [serieExistenceResult, watchedProgress, mediaTagsDoc] = await Promise.all([
-    checkMediaExistence('serie', clientData.id),
-    getWatchedProgress(clientData.id),
-    getMediaTags('tv', clientData.id),
+    safeFetch(checkMediaExistence('serie', clientData.id), `serie/${clientData.id}/existence`, EMPTY_SERIE_EXISTENCE),
+    safeFetch(getWatchedProgress(clientData.id), `serie/${clientData.id}/watched`, null as any),
+    safeFetch(getMediaTags('tv', clientData.id), `serie/${clientData.id}/tags`, null as any),
 ]);
 const { exists: serieExists, opinion: opinionFromAny, rating: ratingFromAny } = serieExistenceResult;
 const userTags = mediaTagsDoc?.tags || [];

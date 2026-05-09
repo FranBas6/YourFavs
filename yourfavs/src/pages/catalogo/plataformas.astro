@@ -14,6 +14,7 @@ import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
+import {safeFetch} from "../../utils/safeFetch";
 import '../../styles/pages/catalogo/shared.css';
 
 const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
@@ -55,17 +56,21 @@ if (filtersActive) {
     });
 
     [movies, series] = await Promise.all([
-        tmdbFetchList<Movie>('/discover/movie', buildParams('movie')),
-        tmdbFetchList<Serie>('/discover/tv', buildParams('tv')),
+        safeFetch(tmdbFetchList<Movie>('/discover/movie', buildParams('movie')), 'plataformas/moviesFiltered', [] as Movie[]),
+        safeFetch(tmdbFetchList<Serie>('/discover/tv', buildParams('tv')), 'plataformas/seriesFiltered', [] as Serie[]),
     ]);
 } else if (platformParam === 'all') {
-    const allPlatforms = await fetchAllPlatforms(pageStr);
+    const allPlatforms = await safeFetch(fetchAllPlatforms(pageStr), 'plataformas/all', [] as { movies: Movie[]; series: Serie[] }[]);
     const allMovies = allPlatforms.flatMap(p => p.movies);
     const allSeries = allPlatforms.flatMap(p => p.series);
     movies = allMovies.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
     series = allSeries.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
 } else {
-    const result = await fetchPlatformBySlug(platformParam, pageStr);
+    const result = await safeFetch(
+        fetchPlatformBySlug(platformParam, pageStr),
+        `plataformas/${platformParam}`,
+        { movies: [] as Movie[], series: [] as Serie[] }
+    );
     movies = result.movies;
     series = result.series;
 }

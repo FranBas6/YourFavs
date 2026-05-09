@@ -17,6 +17,7 @@ import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
+import {safeFetch} from "../../utils/safeFetch";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/card-animations.css';
 
@@ -61,10 +62,13 @@ async function fetchSeriesWithFilters(): Promise<Serie[]> {
 }
 
 const [latestMovies, latestSeries] = filtersActive
-    ? await Promise.all([fetchMoviesWithFilters(), fetchSeriesWithFilters()])
+    ? await Promise.all([
+        safeFetch(fetchMoviesWithFilters(), 'categorias/moviesFiltered', [] as Movie[]),
+        safeFetch(fetchSeriesWithFilters(), 'categorias/seriesFiltered', [] as Serie[]),
+    ])
     : await Promise.all([
-        getMoviesByCategory(category, pageStr),
-        getSeriesByCategory(category, pageStr),
+        safeFetch(getMoviesByCategory(category, pageStr), 'categorias/movies', [] as Movie[]),
+        safeFetch(getSeriesByCategory(category, pageStr), 'categorias/series', [] as Serie[]),
     ]);
 
 const totalPages = 190;

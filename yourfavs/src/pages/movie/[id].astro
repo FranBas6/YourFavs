@@ -31,6 +31,7 @@ import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import StarRating from "../../components/detail/StarRating.astro";
+import {safeFetch} from "../../utils/safeFetch";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -80,10 +81,10 @@ let title = "Película no encontrada";
 if (id) {
     // Todas las llamadas TMDB en paralelo (antes eran secuenciales)
     [item, cast, directors, trailerUrl] = await Promise.all([
-        getMovieById({id}),
-        getMovieCast(id),
-        getMovieDirectorsAndRoles(id),
-        getMovieTrailer(id),
+        safeFetch(getMovieById({id}), `movie/${id}/details`, null as any),
+        safeFetch(getMovieCast(id), `movie/${id}/cast`, [] as CastMember[]),
+        safeFetch(getMovieDirectorsAndRoles(id), `movie/${id}/directors`, [] as { name: string; job: string }[]),
+        safeFetch(getMovieTrailer(id), `movie/${id}/trailer`, null),
     ]);
     if (!item) return Astro.redirect('/404');
     title = item?.title || title;
@@ -101,9 +102,14 @@ const clientData = {
 };
 
 // Verificar existencia en las 5 colecciones de películas (lectura paralela)
+const EMPTY_MOVIE_EXISTENCE = {
+    exists: { MovieFavs: false, MoviesPendientes: false, MoviesVistas: false, MoviesVerPronto: false, LikedMovies: false },
+    opinion: '',
+    rating: 0,
+} as any;
 const [{ exists: movieExists, opinion: opinionFromAny, rating: ratingFromAny }, mediaTagsDoc] = await Promise.all([
-    checkMediaExistence('movie', clientData.id),
-    getMediaTags('movie', clientData.id),
+    safeFetch(checkMediaExistence('movie', clientData.id), `movie/${clientData.id}/existence`, EMPTY_MOVIE_EXISTENCE),
+    safeFetch(getMediaTags('movie', clientData.id), `movie/${clientData.id}/tags`, null as any),
 ]);
 const isInFavorites = movieExists.MovieFavs;
 const isInPendientes = movieExists.MoviesPendientes;

@@ -9,6 +9,7 @@ import {getActorsByName} from "../../services/API/Actors/tmdbActor";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {loadAllPages} from "../../utils/loadAllPages";
+import {safeFetch} from "../../utils/safeFetch";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import '../../styles/pages/catalogo/shared.css';
@@ -17,17 +18,17 @@ const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
 const title = queryParams.get('query') || '';
 
 const [allMovies, allSeries, allActors] = await Promise.all([
-    loadAllPages(
-        ({title, page}) => getMoviesByTitle({title, page}),
-        title, "title"
+    safeFetch(
+        loadAllPages(({title, page}) => getMoviesByTitle({title, page}), title, "title"),
+        'busqueda/movies', [] as any[]
     ),
-    loadAllPages(
-        ({title, page}) => getSeriesByTitle({title, page}),
-        title, "title"
+    safeFetch(
+        loadAllPages(({title, page}) => getSeriesByTitle({title, page}), title, "title"),
+        'busqueda/series', [] as any[]
     ),
-    loadAllPages(
-        ({name, page}) => getActorsByName({name, page}),
-        title, "name"
+    safeFetch(
+        loadAllPages(({name, page}) => getActorsByName({name, page}), title, "name"),
+        'busqueda/actors', [] as any[]
     ),
 ]);
 
