@@ -1,5 +1,6 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
+import { getCached, setCached, invalidateCached } from './recsBlobCache';
 import {
     getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
 } from '../services/BD/movies/yourfavsMovie';
@@ -19,8 +20,35 @@ export interface GenrePrefs {
     };
 }
 
-const TTL_MS = 30 * 60 * 1000;
+// Serializable: Sets convertidos a Arrays para JSON.stringify del Blob.
+type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
+    libraryIds: { movies: string[]; tv: string[] };
+};
+
+const BLOB_KEY = 'genrePrefs';
+const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
+const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 let cache: { data: GenrePrefs; expires: number } | null = null;
+
+function deserialize(s: SerializedGenrePrefs): GenrePrefs {
+    return {
+        ...s,
+        libraryIds: {
+            movies: new Set(s.libraryIds.movies),
+            tv: new Set(s.libraryIds.tv),
+        },
+    };
+}
+
+function serialize(p: GenrePrefs): SerializedGenrePrefs {
+    return {
+        ...p,
+        libraryIds: {
+            movies: Array.from(p.libraryIds.movies),
+            tv: Array.from(p.libraryIds.tv),
+        },
+    };
+}
 
 const MOVIE_WEIGHTS = { favs: 2, like: 1.5, vistos: 1, pendientes: 0.5, verpronto: 0.5 };
 const TV_WEIGHTS    = { favs: 2, siguiendo: 1.5, like: 1.5, vistos: 1, pendientes: 0.5, verpronto: 0.5 };
@@ -48,6 +76,14 @@ function aggregateGenres(entries: { weight: number; genres: number[] }[]) {
 export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const now = Date.now();
     if (cache && cache.expires > now) return cache.data;
+
+    // L2: Netlify Blobs (sobrevive a cold starts de Lambda).
+    const cachedL2 = await getCached<SerializedGenrePrefs>(BLOB_KEY);
+    if (cachedL2) {
+        const data = deserialize(cachedL2);
+        cache = { data, expires: now + L1_TTL_MS };
+        return data;
+    }
 
     const [movFavs, movPend, movVistos, movLike, movVerPronto] = await Promise.all([
         getMovieFav(), getMoviesPendientes(), getMoviesVistas(), getLikedMovies(), getMoviesVerPronto()
@@ -123,10 +159,14 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
         },
     };
 
-    cache = { data, expires: now + TTL_MS };
+    cache = { data, expires: now + L1_TTL_MS };
+    // L2 write fire-and-forget (no bloquear la respuesta esperando al Blob)
+    setCached(BLOB_KEY, serialize(data), L2_TTL_MS).catch(() => {});
     return data;
 }
 
 export function invalidateGenrePreferencesCache() {
     cache = null;
+    // L2 invalidación también
+    invalidateCached(BLOB_KEY).catch(() => {});
 }

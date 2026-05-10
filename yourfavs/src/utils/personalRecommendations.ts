@@ -1,6 +1,7 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { calculateGenrePreferences } from './genrePreferences';
+import { getCached, setCached, invalidateCached } from './recsBlobCache';
 import { getMovieFav, getLikedMovies } from '../services/BD/movies/yourfavsMovie';
 import { getSerieFav, getLikedSeries, getSeriesSiguiendo } from '../services/BD/series/yourfavsSerie';
 
@@ -24,8 +25,34 @@ export interface PersonalRecResult {
     };
 }
 
-const TTL_MS = 30 * 60 * 1000;
+type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
+    libraryIds: { movies: string[]; tv: string[] };
+};
+
+const BLOB_KEY = 'personalRecs';
+const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
+const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 let cache: { data: PersonalRecResult; expires: number } | null = null;
+
+function deserializeRecs(s: SerializedRecs): PersonalRecResult {
+    return {
+        ...s,
+        libraryIds: {
+            movies: new Set(s.libraryIds.movies),
+            tv: new Set(s.libraryIds.tv),
+        },
+    };
+}
+
+function serializeRecs(r: PersonalRecResult): SerializedRecs {
+    return {
+        ...r,
+        libraryIds: {
+            movies: Array.from(r.libraryIds.movies),
+            tv: Array.from(r.libraryIds.tv),
+        },
+    };
+}
 
 const SEED_WEIGHT_FAVS = 2;
 const SEED_WEIGHT_LIKE = 1.5;
@@ -95,6 +122,14 @@ function topSeedsFiltered(
 export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const now = Date.now();
     if (cache && cache.expires > now) return cache.data;
+
+    // L2: si la Lambda es fría pero hay un cómputo reciente en Blobs, lo usamos.
+    const cachedL2 = await getCached<SerializedRecs>(BLOB_KEY);
+    if (cachedL2) {
+        const data = deserializeRecs(cachedL2);
+        cache = { data, expires: now + L1_TTL_MS };
+        return data;
+    }
 
     const prefs = await calculateGenrePreferences();
 
@@ -201,10 +236,12 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         },
     };
 
-    cache = { data, expires: now + TTL_MS };
+    cache = { data, expires: now + L1_TTL_MS };
+    setCached(BLOB_KEY, serializeRecs(data), L2_TTL_MS).catch(() => {});
     return data;
 }
 
 export function invalidatePersonalRecsCache() {
     cache = null;
+    invalidateCached(BLOB_KEY).catch(() => {});
 }

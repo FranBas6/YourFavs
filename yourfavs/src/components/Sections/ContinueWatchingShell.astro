@@ -1,0 +1,51 @@
+---
+// Shell SSR para "Continuar viendo".
+// Renderiza header + skeleton placeholders. Un script en index.astro
+// hace fetch a /api/home-deferred.json y popula este container.
+// Si el JSON viene vacío, el script oculta toda la sección.
+---
+<section
+    class="continue-watching-section mb-8"
+    data-deferred-section="continue-watching"
+>
+    <header class="flex items-center justify-between mb-4 px-1">
+        <div class="flex items-center gap-2">
+            <span class="text-2xl" aria-hidden="true">▶️</span>
+            <h2 class="text-lg sm:text-xl font-bold text-gray-800 uppercase tracking-wide">Continuar viendo</h2>
+            <span data-deferred-loading="continue-watching" class="flex items-center gap-1.5 text-xs text-gray-500 ml-2" aria-live="polite">
+                <svg class="w-3.5 h-3.5 animate-spin text-gray-400" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.25" />
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                </svg>
+                <span>Cargando…</span>
+            </span>
+        </div>
+        <a href="/personal/siguiendo" class="text-sm text-blue-600 hover:text-blue-800 font-medium">Ver todo →</a>
+    </header>
+
+    <div
+        class="continue-watching-scroll flex gap-4 overflow-x-auto pb-4 px-1 snap-x snap-mandatory"
+        data-deferred-list="continue-watching"
+    >
+        {Array.from({ length: 4 }).map(() => (
+            <div class="flex-shrink-0 w-36 sm:w-40">
+                <div class="rounded-xl aspect-[2/3] bg-gray-200 animate-pulse"></div>
+                <div class="mt-2 h-4 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+        ))}
+    </div>
+</section>
+
+<style>
+    .continue-watching-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #cbd5e1 transparent;
+    }
+    .continue-watching-scroll::-webkit-scrollbar {
+        height: 6px;
+    }
+    .continue-watching-scroll::-webkit-scrollbar-thumb {
+        background-color: #cbd5e1;
+        border-radius: 3px;
+    }
+</style>
