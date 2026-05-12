@@ -8,8 +8,8 @@ import type {Serie} from "../types/ApiSerie";
 import {getLatestMovies, getMostPopularMovies, getTopRatedMovies, getMoviesByCategory} from "../services/API/Movies/tmdbMovies";
 import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCategory} from "../services/API/Series/tmdbSeries";
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
-import ContinueWatchingShell from "../components/Sections/ContinueWatchingShell.astro";
-import RecommendedForYouShell from "../components/Sections/RecommendedForYouShell.astro";
+import {getContinueWatchingData} from "../services/API/Series/continueWatching";
+import ContinueWatching from "../components/Sections/ContinueWatching.astro";
 import {fetchAllPlatforms} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
@@ -38,6 +38,7 @@ const [
     platforms,
     categoriesMovies,
     categoriesSeries,
+    continueWatching,
 ] = await Promise.all([
     safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
     safeFetch(getTrending<Serie>('tv', 'week'), 'home/trendingSeries', [] as Serie[]),
@@ -50,9 +51,8 @@ const [
     safeFetch(fetchAllPlatforms(pageStr), 'home/platforms', []),
     safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
     safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
+    safeFetch(getContinueWatchingData(), 'home/continueWatching', [] as any[]),
 ]);
-// continueWatching y forYou se cargan vía /api/home-deferred.json client-side
-// para que el SSR no espere a TMDB+Firebase en cold start (antes ~19s, ahora ~3-5s)
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
 
@@ -164,14 +164,12 @@ const sections = [
             </div>
         )}
 
-        <!-- Continuar viendo + Para ti: shells con skeleton, hidratan via /api/home-deferred.json -->
-        <div class="content-wrapper">
-            <ContinueWatchingShell />
-        </div>
-
-        <div class="content-wrapper">
-            <RecommendedForYouShell />
-        </div>
+        <!-- Continuar viendo (solo si hay series con progreso pendiente) -->
+        {continueWatching.length > 0 && (
+            <div class="content-wrapper">
+                <ContinueWatching items={continueWatching} />
+            </div>
+        )}
 
         <!-- Contenido principal -->
         <div class="content-wrapper">
@@ -274,79 +272,3 @@ const sections = [
         </div>
     </main>
 </Layout>
-
-<script>
-    // Hidrata "Continuar viendo" y "Para ti" via fetch al endpoint diferido.
-    // Si el JSON tarda mucho o falla, las secciones se ocultan; el resto del SSR
-    // (hero + tendencias + populares + ...) ya está visible para el usuario.
-    (async () => {
-        const continueSection = document.querySelector('[data-deferred-section="continue-watching"]') as HTMLElement | null;
-        const forYouSection = document.querySelector('[data-deferred-section="for-you"]') as HTMLElement | null;
-        const continueList = document.querySelector('[data-deferred-list="continue-watching"]');
-        const forYouList = document.querySelector('[data-deferred-list="for-you"]');
-        if (!continueSection || !forYouSection || !continueList || !forYouList) return;
-
-        const hide = (el: HTMLElement | null) => { if (el) el.style.display = 'none'; };
-        const removeLoader = (key: string) => {
-            const el = document.querySelector(`[data-deferred-loading="${key}"]`);
-            if (el) el.remove();
-        };
-        const poster = (path: string | null) => path ? `https://image.tmdb.org/t/p/w500${path}` : '/placeholder.jpg';
-        const esc = (s: any) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] as string));
-
-        try {
-            const res = await fetch('/api/home-deferred.json', { credentials: 'same-origin' });
-            if (!res.ok) throw new Error(`status ${res.status}`);
-            const { continueWatching, forYou } = await res.json();
-
-            removeLoader('continue-watching');
-            removeLoader('for-you');
-
-            if (!Array.isArray(continueWatching) || continueWatching.length === 0) {
-                hide(continueSection);
-            } else {
-                continueList.innerHTML = continueWatching.map((it: any) => `
-                    <a href="/serie/${it.id}#season-${it.next_season}" class="continue-watching-card flex-shrink-0 w-36 sm:w-40 snap-start group" aria-label="Continuar ${esc(it.name)}, Temporada ${it.next_season} Episodio ${it.next_episode}: ${esc(it.next_episode_name)}">
-                        <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-300 aspect-[2/3] bg-gray-200">
-                            <img src="${esc(poster(it.poster_path))}" alt="${esc(it.name)}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent p-2.5 pt-8">
-                                <p class="text-[10px] font-bold text-blue-300 tracking-wider">T${it.next_season} · E${it.next_episode}</p>
-                                <p class="text-xs text-white font-medium line-clamp-2 mt-0.5 leading-snug">${esc(it.next_episode_name)}</p>
-                            </div>
-                        </div>
-                        <p class="mt-2 text-sm font-semibold text-gray-800 line-clamp-1">${esc(it.name)}</p>
-                    </a>
-                `).join('');
-            }
-
-            if (!Array.isArray(forYou) || forYou.length === 0) {
-                hide(forYouSection);
-            } else {
-                forYouList.innerHTML = forYou.map((it: any) => {
-                    const href = it.kind === 'movie' ? `/movie/${it.id}` : `/serie/${it.id}`;
-                    const badge = it.kind === 'movie' ? 'Película' : 'Serie';
-                    const badgeColor = it.kind === 'movie' ? 'bg-red-500' : 'bg-blue-500';
-                    const ratingHtml = it.vote_average > 0
-                        ? `<span class="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-yellow-300">★ ${Number(it.vote_average).toFixed(1)}</span>`
-                        : '';
-                    const yearHtml = it.date ? `<p class="text-xs text-gray-500">${esc(String(it.date).slice(0, 4))}</p>` : '';
-                    return `
-                        <a href="${href}" class="for-you-card flex-shrink-0 w-36 sm:w-40 snap-start group" aria-label="${badge}: ${esc(it.title)}">
-                            <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-300 aspect-[2/3] bg-gray-200">
-                                <img src="${esc(poster(it.poster_path))}" alt="${esc(it.title)}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                                <span class="absolute top-2 left-2 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${badgeColor} text-white">${badge}</span>
-                                ${ratingHtml}
-                            </div>
-                            <p class="mt-2 text-sm font-semibold text-gray-800 line-clamp-1">${esc(it.title)}</p>
-                            ${yearHtml}
-                        </a>
-                    `;
-                }).join('');
-            }
-        } catch (err) {
-            console.warn('[home-deferred] fetch falló, ocultando secciones:', err);
-            hide(continueSection);
-            hide(forYouSection);
-        }
-    })();
-</script>
