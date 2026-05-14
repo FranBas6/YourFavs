@@ -8,6 +8,7 @@ import { calculateGenrePreferences } from "../../utils/genrePreferences";
 import { getPersonalRecommendations } from "../../utils/personalRecommendations";
 import { getGenreName } from "../../utils/constants/genres";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { safeFetch } from "../../utils/safeFetch";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
@@ -81,7 +82,11 @@ try {
 const seriesRecomendadas = recs?.tv ?? [];
 const peliculasRecomendadas = recs?.movies ?? [];
 const allSeriesIdsForWatched = [...seriesRecomendadas, ...exploraSeries].map((s: any) => String(s.id));
-const watchedMap = await getWatchedProgressBatch(allSeriesIdsForWatched);
+const watchedMap = await safeFetch(
+    getWatchedProgressBatch(allSeriesIdsForWatched),
+    'personal/recomendaciones/watchedMap',
+    {} as Record<string, { watched: number }>,
+);
 
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";

@@ -35,16 +35,28 @@ try {
     console.error("Error al calcular top actores de la biblioteca:", error);
 }
 
+const fetchActorBundle = async (id: string) => {
+    return Promise.all([
+        getActorDetailsById({ id }),
+        getMoviesAndSeriesByActorId({ id }),
+    ]);
+};
+
 try {
     const actorsFav = await getActorsFav();
 
     const rawResults = await Promise.all(
         actorsFav.map(async (fav: { id: string; position: number }) => {
             try {
-                const [actorDetails, { movies, series }] = await Promise.all([
-                    getActorDetailsById({ id: fav.id }),
-                    getMoviesAndSeriesByActorId({ id: fav.id }),
-                ]);
+                let bundle;
+                try {
+                    bundle = await fetchActorBundle(fav.id);
+                } catch (e) {
+                    // Cold-start: TMDB lento/timeout → 1 reintento tras 300ms para no perder al actor
+                    await new Promise((r) => setTimeout(r, 300));
+                    bundle = await fetchActorBundle(fav.id);
+                }
+                const [actorDetails, { movies, series }] = bundle;
                 if (!actorDetails) return null;
 
                 const { released: releasedMovies, upcoming: upcomingMovies } = processProductions(movies, 'release_date', 9);
