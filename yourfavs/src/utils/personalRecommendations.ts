@@ -29,7 +29,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v2';
+const BLOB_KEY = 'personalRecs_v3';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 let cache: { data: PersonalRecResult; expires: number } | null = null;
@@ -59,6 +59,11 @@ const SEED_WEIGHT_LIKE = 1.5;
 const SEED_WEIGHT_SIGUIENDO = 1.5;
 const SEED_LIMIT = 12;
 const RESULT_LIMIT = 20;
+// E: filtro vote_count mínimo para cortar nicho obscuro (pelis más exigente que series).
+const MIN_VOTE_COUNT_MOVIE = 300;
+const MIN_VOTE_COUNT_TV = 150;
+// H: cap por seed → 1 seed nicho no puede monopolizar el pool con 10 recos cerradas.
+const MAX_ITEMS_PER_SEED = 3;
 
 function setSum(map: Map<string, number>, items: { id: string }[], weight: number) {
     for (const it of items) {
@@ -198,8 +203,11 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 const r = await tmdbFetch<any>(`/movie/${seed.id}/recommendations`);
                 const detail = await tmdbFetch<any>(`/movie/${seed.id}`).catch(() => null);
                 if (detail?.title) seed.title = detail.title;
-                for (const m of (r?.results || [])) {
-                    if (prefs.libraryIds.movies.has(String(m.id))) continue;
+                const eligible = (r?.results || [])
+                    .filter((m: any) => !prefs.libraryIds.movies.has(String(m.id)) && (m.vote_count ?? 0) >= MIN_VOTE_COUNT_MOVIE)
+                    .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
+                    .slice(0, MAX_ITEMS_PER_SEED);
+                for (const m of eligible) {
                     const k = String(m.id);
                     const cur = movieAgg.get(k);
                     if (cur) { cur.score += seed.weight; cur.sources += 1; }
@@ -212,8 +220,11 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 const r = await tmdbFetch<any>(`/tv/${seed.id}/recommendations`);
                 const detail = await tmdbFetch<any>(`/tv/${seed.id}`).catch(() => null);
                 if (detail?.name) seed.title = detail.name;
-                for (const m of (r?.results || [])) {
-                    if (prefs.libraryIds.tv.has(String(m.id))) continue;
+                const eligible = (r?.results || [])
+                    .filter((m: any) => !prefs.libraryIds.tv.has(String(m.id)) && (m.vote_count ?? 0) >= MIN_VOTE_COUNT_TV)
+                    .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
+                    .slice(0, MAX_ITEMS_PER_SEED);
+                for (const m of eligible) {
                     const k = String(m.id);
                     const cur = tvAgg.get(k);
                     if (cur) { cur.score += seed.weight; cur.sources += 1; }
@@ -223,10 +234,15 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         }, 8),
     ]);
 
+    // I: score híbrido. sources×1.5 + score×0.5 + (rating/10)×2.
+    // sources sigue siendo la señal dominante, pero rating evita que pelis 2-seeds mediocres
+    // entierren a pelis 1-seed con rating excepcional (Matrix ⭐8.2 vs Tomb Raider ⭐6.4).
+    const hybridScore = (a: Agg) =>
+        a.sources * 1.5 + a.score * 0.5 + ((a.item.vote_average ?? 0) / 10) * 2;
     const sortAgg = (m: Map<string, Agg>) => Array.from(m.values())
         .sort((a, b) =>
+            hybridScore(b) - hybridScore(a) ||
             b.sources - a.sources ||
-            b.score - a.score ||
             (b.item.vote_average ?? 0) - (a.item.vote_average ?? 0)
         )
         .slice(0, RESULT_LIMIT)

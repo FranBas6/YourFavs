@@ -25,7 +25,7 @@ type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'genrePrefs_v2';
+const BLOB_KEY = 'genrePrefs_v3';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 let cache: { data: GenrePrefs; expires: number } | null = null;
@@ -52,7 +52,10 @@ function serialize(p: GenrePrefs): SerializedGenrePrefs {
 
 const MOVIE_WEIGHTS = { favs: 2, like: 1.5, vistos: 1, pendientes: 0.5, verpronto: 0.5 };
 const TV_WEIGHTS    = { favs: 2, siguiendo: 1.5, like: 1.5, vistos: 1, pendientes: 0.5, verpronto: 0.5 };
-const TOP_N = 5;
+// Pelis: 5 top (Aventura, Acción, SciFi, Comedia, Fantasía es señal sana).
+// Series: 3 top (puesto 4-5 metía Animación → anime deportivo nicho monopoliza).
+const TOP_N_MOVIES = 5;
+const TOP_N_TV = 3;
 
 function mergeMaxWeight(map: Map<string, number>, items: { id: string }[], weight: number) {
     for (const it of items) {
@@ -61,14 +64,14 @@ function mergeMaxWeight(map: Map<string, number>, items: { id: string }[], weigh
     }
 }
 
-function aggregateGenres(entries: { weight: number; genres: number[] }[]) {
+function aggregateGenres(entries: { weight: number; genres: number[] }[], topN: number) {
     const weighted: Record<number, number> = {};
     for (const e of entries) {
         for (const g of e.genres) weighted[g] = (weighted[g] || 0) + e.weight;
     }
     const topGenres = Object.entries(weighted)
         .sort(([, a], [, b]) => b - a)
-        .slice(0, TOP_N)
+        .slice(0, topN)
         .map(([id]) => Number(id));
     return { topGenres, weighted };
 }
@@ -140,8 +143,8 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     tvEntries.forEach(([id], i) => { tvGenresById[id] = tvDetails[i]?.genres || []; });
 
     const data: GenrePrefs = {
-        movies: aggregateGenres(movieDetails),
-        tv: aggregateGenres(tvDetails),
+        movies: aggregateGenres(movieDetails, TOP_N_MOVIES),
+        tv: aggregateGenres(tvDetails, TOP_N_TV),
         libraryIds: {
             movies: new Set(movieEntries.map(([id]) => id)),
             tv: new Set(tvEntries.map(([id]) => id)),
