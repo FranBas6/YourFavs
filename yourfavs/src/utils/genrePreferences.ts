@@ -25,7 +25,7 @@ type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'genrePrefs';
+const BLOB_KEY = 'genrePrefs_v2';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 let cache: { data: GenrePrefs; expires: number } | null = null;
@@ -52,7 +52,7 @@ function serialize(p: GenrePrefs): SerializedGenrePrefs {
 
 const MOVIE_WEIGHTS = { favs: 2, like: 1.5, vistos: 1, pendientes: 0.5, verpronto: 0.5 };
 const TV_WEIGHTS    = { favs: 2, siguiendo: 1.5, like: 1.5, vistos: 1, pendientes: 0.5, verpronto: 0.5 };
-const TOP_N = 3;
+const TOP_N = 5;
 
 function mergeMaxWeight(map: Map<string, number>, items: { id: string }[], weight: number) {
     for (const it of items) {

@@ -29,7 +29,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs';
+const BLOB_KEY = 'personalRecs_v2';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 let cache: { data: PersonalRecResult; expires: number } | null = null;
@@ -66,26 +66,34 @@ function setSum(map: Map<string, number>, items: { id: string }[], weight: numbe
     }
 }
 
-const BOOST_PER_GENRE_MATCH = 0.5;
+const AFFINITY_BOOST_SCALE = 2;
 
 /**
- * Filtra candidatos que tocan al menos 1 género top y boostea el peso por nº de matches.
- * Una peli con [Acción, Sci-Fi, Aventura] cuando tus top son esos 3 → +1.5 al peso base.
- * Una peli con [Acción, Drama] (Drama no top) → +0.5.
+ * Filtra candidatos que tocan al menos 1 género top y boostea por afinidad ponderada.
+ * Boost = (Σ peso_real_género_usuario) / nº_géneros_seed / max_peso → 0..1 × scale.
+ * Penaliza seeds multi-etiqueta (anime/familia) frente a seeds limpios en géneros top.
  */
 function filterByGenreAffinity(
     entries: Array<[string, number]>,
     genresById: Record<string, number[]>,
     topGenres: number[],
+    weighted: Record<number, number>,
 ): Array<[string, number, number[]]> {
     const top = new Set(topGenres);
     const out: Array<[string, number, number[]]> = [];
+    let maxW = 0;
+    for (const w of Object.values(weighted)) if (w > maxW) maxW = w;
     for (const [id, baseWeight] of entries) {
         const genres = genresById[id] || [];
         let matches = 0;
-        for (const g of genres) if (top.has(g)) matches++;
+        let sum = 0;
+        for (const g of genres) {
+            if (top.has(g)) matches++;
+            sum += weighted[g] || 0;
+        }
         if (matches === 0) continue;
-        out.push([id, baseWeight + BOOST_PER_GENRE_MATCH * matches, genres]);
+        const normalized = maxW > 0 ? (sum / Math.max(1, genres.length)) / maxW : 0;
+        out.push([id, baseWeight + normalized * AFFINITY_BOOST_SCALE, genres]);
     }
     return out;
 }
@@ -150,8 +158,8 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const movieEntries = Array.from(movieMap.entries());
     const tvEntries = Array.from(tvMap.entries());
 
-    const movieFiltered = filterByGenreAffinity(movieEntries, prefs.genresById.movies, prefs.movies.topGenres);
-    const tvFiltered = filterByGenreAffinity(tvEntries, prefs.genresById.tv, prefs.tv.topGenres);
+    const movieFiltered = filterByGenreAffinity(movieEntries, prefs.genresById.movies, prefs.movies.topGenres, prefs.movies.weighted);
+    const tvFiltered = filterByGenreAffinity(tvEntries, prefs.genresById.tv, prefs.tv.topGenres, prefs.tv.weighted);
 
     const movieDiversified = diversifyByGenreProfile(movieFiltered);
     const tvDiversified = diversifyByGenreProfile(tvFiltered);
@@ -217,8 +225,8 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
 
     const sortAgg = (m: Map<string, Agg>) => Array.from(m.values())
         .sort((a, b) =>
-            b.score - a.score ||
             b.sources - a.sources ||
+            b.score - a.score ||
             (b.item.vote_average ?? 0) - (a.item.vote_average ?? 0)
         )
         .slice(0, RESULT_LIMIT)
