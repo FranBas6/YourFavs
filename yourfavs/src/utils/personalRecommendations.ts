@@ -29,7 +29,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v3';
+const BLOB_KEY = 'personalRecs_v4';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 let cache: { data: PersonalRecResult; expires: number } | null = null;
@@ -63,7 +63,10 @@ const RESULT_LIMIT = 20;
 const MIN_VOTE_COUNT_MOVIE = 300;
 const MIN_VOTE_COUNT_TV = 150;
 // H: cap por seed → 1 seed nicho no puede monopolizar el pool con 10 recos cerradas.
-const MAX_ITEMS_PER_SEED = 3;
+// Asimétrico: series 6 (biblioteca ecléctica, necesita más muestras para que haya solape
+// entre seeds dispares); pelis 3 (universo más cohesivo, basta con top-rated por seed).
+const MAX_ITEMS_PER_SEED_MOVIE = 3;
+const MAX_ITEMS_PER_SEED_TV = 6;
 
 function setSum(map: Map<string, number>, items: { id: string }[], weight: number) {
     for (const it of items) {
@@ -206,7 +209,7 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 const eligible = (r?.results || [])
                     .filter((m: any) => !prefs.libraryIds.movies.has(String(m.id)) && (m.vote_count ?? 0) >= MIN_VOTE_COUNT_MOVIE)
                     .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
-                    .slice(0, MAX_ITEMS_PER_SEED);
+                    .slice(0, MAX_ITEMS_PER_SEED_MOVIE);
                 for (const m of eligible) {
                     const k = String(m.id);
                     const cur = movieAgg.get(k);
@@ -223,7 +226,7 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 const eligible = (r?.results || [])
                     .filter((m: any) => !prefs.libraryIds.tv.has(String(m.id)) && (m.vote_count ?? 0) >= MIN_VOTE_COUNT_TV)
                     .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
-                    .slice(0, MAX_ITEMS_PER_SEED);
+                    .slice(0, MAX_ITEMS_PER_SEED_TV);
                 for (const m of eligible) {
                     const k = String(m.id);
                     const cur = tvAgg.get(k);

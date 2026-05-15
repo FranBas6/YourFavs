@@ -28,7 +28,7 @@ let isWarming = false; // true si timeout SSR → render shell con auto-reintent
 
 // Timeout duro: Netlify mata Lambdas a los 10s. 6500ms deja margen para que
 // el catch corra, renderice loading shell y la respuesta llegue al navegador.
-const SSR_TIMEOUT_MS = 6500;
+const SSR_TIMEOUT_MS = 8000;
 
 try {
     [prefs, recs] = await Promise.all([
@@ -36,8 +36,10 @@ try {
         withTimeout(getPersonalRecommendations(), SSR_TIMEOUT_MS, 'recos/personalRecs'),
     ]);
 
-    const movieGenresParam = prefs.movies.topGenres.join(',');
-    const tvGenresParam = prefs.tv.topGenres.join(',');
+    // TMDB: ',' = AND (debe tener TODOS) · '|' = OR (cualquiera). Usamos OR para que
+    // con TOP_N_MOVIES=5 no exija una peli con los 5 géneros simultáneamente (devuelve vacío).
+    const movieGenresParam = prefs.movies.topGenres.join('|');
+    const tvGenresParam = prefs.tv.topGenres.join('|');
 
     // Sección "Explora por géneros" — discover ENDURECIDO: vote_average.desc, vote_count alto.
     const movieParams = (page: string) => ({
