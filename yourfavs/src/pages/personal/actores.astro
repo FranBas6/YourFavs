@@ -42,43 +42,52 @@ const fetchActorBundle = async (id: string) => {
     ]);
 };
 
+// Chunking: 6 actores × 2 llamadas TMDB = 12 requests paralelos por lote.
+// Evita saturar TMDB (límite ~40 req/10s) y agotar sockets de la Lambda en cold start.
+// Sin chunking, 47+ actores disparaban 94 fetches simultáneos y se perdía el 80% silenciosamente.
+const CHUNK_SIZE = 6;
+
+const processActor = async (fav: { id: string; position: number }): Promise<ActorDetail | null> => {
+    try {
+        let bundle;
+        try {
+            bundle = await fetchActorBundle(fav.id);
+        } catch {
+            await new Promise((r) => setTimeout(r, 500));
+            bundle = await fetchActorBundle(fav.id);
+        }
+        const [actorDetails, { movies, series }] = bundle;
+        if (!actorDetails) return null;
+
+        const { released: releasedMovies, upcoming: upcomingMovies } = processProductions(movies, 'release_date', 9);
+        const { released: releasedSeries, upcoming: upcomingSeries } = processProductions(series, 'first_air_date', 9);
+
+        return {
+            id: fav.id,
+            position: fav.position,
+            details: actorDetails,
+            age: calculateAge(actorDetails.fechaNacimiento),
+            totalMovies: movies.length,
+            totalSeries: series.length,
+            releasedMovies,
+            releasedSeries,
+            upcomingMovies,
+            upcomingSeries,
+        };
+    } catch {
+        return null;
+    }
+};
+
 try {
     const actorsFav = await getActorsFav();
 
-    const rawResults = await Promise.all(
-        actorsFav.map(async (fav: { id: string; position: number }) => {
-            try {
-                let bundle;
-                try {
-                    bundle = await fetchActorBundle(fav.id);
-                } catch (e) {
-                    // Cold-start: TMDB lento/timeout → 1 reintento tras 300ms para no perder al actor
-                    await new Promise((r) => setTimeout(r, 300));
-                    bundle = await fetchActorBundle(fav.id);
-                }
-                const [actorDetails, { movies, series }] = bundle;
-                if (!actorDetails) return null;
-
-                const { released: releasedMovies, upcoming: upcomingMovies } = processProductions(movies, 'release_date', 9);
-                const { released: releasedSeries, upcoming: upcomingSeries } = processProductions(series, 'first_air_date', 9);
-
-                return {
-                    id: fav.id,
-                    position: fav.position,
-                    details: actorDetails,
-                    age: calculateAge(actorDetails.fechaNacimiento),
-                    totalMovies: movies.length,
-                    totalSeries: series.length,
-                    releasedMovies,
-                    releasedSeries,
-                    upcomingMovies,
-                    upcomingSeries,
-                };
-            } catch {
-                return null;
-            }
-        })
-    );
+    const rawResults: (ActorDetail | null)[] = [];
+    for (let i = 0; i < actorsFav.length; i += CHUNK_SIZE) {
+        const chunk = actorsFav.slice(i, i + CHUNK_SIZE);
+        const chunkResults = await Promise.all(chunk.map(processActor));
+        rawResults.push(...chunkResults);
+    }
 
     // Filtrar nulos (actores no encontrados en TMDB)
     actorsWithDetails = rawResults.filter((actor: ActorDetail | null): actor is ActorDetail => actor !== null);

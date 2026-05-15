@@ -9,6 +9,7 @@ import { getPersonalRecommendations } from "../../utils/personalRecommendations"
 import { getGenreName } from "../../utils/constants/genres";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import { safeFetch } from "../../utils/safeFetch";
+import { withTimeout, isTimeout } from "../../utils/withTimeout";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
@@ -23,11 +24,16 @@ let exploraSeries: any[] = [];
 let exploraMoviesRaw: any[] = [];
 let exploraSeriesRaw: any[] = [];
 let errorMessage = "";
+let isWarming = false; // true si timeout SSR → render shell con auto-reintento
+
+// Timeout duro: Netlify mata Lambdas a los 10s. 6500ms deja margen para que
+// el catch corra, renderice loading shell y la respuesta llegue al navegador.
+const SSR_TIMEOUT_MS = 6500;
 
 try {
     [prefs, recs] = await Promise.all([
-        calculateGenrePreferences(),
-        getPersonalRecommendations(),
+        withTimeout(calculateGenrePreferences(), SSR_TIMEOUT_MS, 'recos/genrePrefs'),
+        withTimeout(getPersonalRecommendations(), SSR_TIMEOUT_MS, 'recos/personalRecs'),
     ]);
 
     const movieGenresParam = prefs.movies.topGenres.join(',');
@@ -75,8 +81,15 @@ try {
         .filter((s: any) => !prefs!.libraryIds.tv.has(String(s.id)) && !recTvIds.has(String(s.id)))
         .slice(0, 15);
 } catch (error) {
-    console.error("Error al cargar recomendaciones:", error);
-    errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+    if (isTimeout(error)) {
+        // Cold start: Lambda+Firebase lentos. Servimos shell con auto-reintento.
+        // El segundo hit pega a Lambda warm (L1/L2 cache caliente) y cabe en timeout.
+        isWarming = true;
+        console.warn("[recos] SSR timeout, sirviendo shell de warming:", (error as Error).message);
+    } else {
+        console.error("Error al cargar recomendaciones:", error);
+        errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
+    }
 }
 
 const seriesRecomendadas = recs?.tv ?? [];
@@ -96,7 +109,25 @@ const hasLibrary = !!prefs && (prefs.libraryIds.movies.size + prefs.libraryIds.t
 const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres.length) > 0;
 ---
 <Layout title="Recomendaciones">
+    {isWarming && (
+        <Fragment slot="head">
+            <meta http-equiv="refresh" content="3" />
+        </Fragment>
+    )}
     <section class="px-1 sm:py-8">
+        {isWarming && (
+            <div class="flex flex-col items-center justify-center py-20 px-4 text-center">
+                <div class="relative w-16 h-16 mb-6">
+                    <div class="absolute inset-0 rounded-full border-4 border-red-100"></div>
+                    <div class="absolute inset-0 rounded-full border-4 border-red-500 border-t-transparent animate-spin"></div>
+                </div>
+                <h2 class="text-xl font-semibold text-gray-800 mb-2">Preparando tus recomendaciones…</h2>
+                <p class="text-sm text-gray-500 max-w-md">
+                    Estamos calentando el servidor con tu biblioteca. Esto pasa la primera vez del día y dura unos segundos. La página se recargará sola.
+                </p>
+            </div>
+        )}
+        {!isWarming && (<>
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
                 {errorMessage}
@@ -418,5 +449,6 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                 )}
             </div>
         )}
+        </>)}
     </section>
 </Layout>
