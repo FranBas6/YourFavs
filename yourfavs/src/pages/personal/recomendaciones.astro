@@ -26,9 +26,11 @@ let exploraSeriesRaw: any[] = [];
 let errorMessage = "";
 let isWarming = false; // true si timeout SSR → render shell con auto-reintento
 
-// Timeout duro: Netlify mata Lambdas a los 10s. 6500ms deja margen para que
-// el catch corra, renderice loading shell y la respuesta llegue al navegador.
-const SSR_TIMEOUT_MS = 8000;
+// Timeout duro: Netlify Starter mata Lambdas a los 10s (max_duration solo aplica en Pro).
+// Cold-start boot (Astro+Firebase+TMDB) come 2-4s antes de que corra nada del frontmatter,
+// así que el timeout interno debe firar dentro de los ~6s útiles que quedan para que el
+// catch alcance a renderizar el shell de warming antes del corte de Netlify.
+const SSR_TIMEOUT_MS = 5500;
 
 try {
     [prefs, recs] = await Promise.all([
