@@ -3,7 +3,6 @@ import Layout from "../../layouts/Layout.astro"
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getWatchedProgressBatch } from "../../services/BD/series/yourfavsSerie";
-import { tmdbFetchList } from "../../services/API/shared/tmdbClient";
 import { calculateGenrePreferences } from "../../utils/genrePreferences";
 import { getPersonalRecommendations } from "../../utils/personalRecommendations";
 import { getGenreName } from "../../utils/constants/genres";
@@ -19,10 +18,6 @@ const debug = Astro.url.searchParams.get("debug") === "1";
 
 let prefs: Awaited<ReturnType<typeof calculateGenrePreferences>> | null = null;
 let recs: Awaited<ReturnType<typeof getPersonalRecommendations>> | null = null;
-let exploraMovies: any[] = [];
-let exploraSeries: any[] = [];
-let exploraMoviesRaw: any[] = [];
-let exploraSeriesRaw: any[] = [];
 let errorMessage = "";
 let isWarming = false; // true si timeout SSR → render shell con auto-reintento
 
@@ -37,53 +32,6 @@ try {
         withTimeout(calculateGenrePreferences(), SSR_TIMEOUT_MS, 'recos/genrePrefs'),
         withTimeout(getPersonalRecommendations(), SSR_TIMEOUT_MS, 'recos/personalRecs'),
     ]);
-
-    // TMDB: ',' = AND (debe tener TODOS) · '|' = OR (cualquiera). Usamos OR para que
-    // con TOP_N_MOVIES=5 no exija una peli con los 5 géneros simultáneamente (devuelve vacío).
-    const movieGenresParam = prefs.movies.topGenres.join('|');
-    const tvGenresParam = prefs.tv.topGenres.join('|');
-
-    // Sección "Explora por géneros" — discover ENDURECIDO: vote_average.desc, vote_count alto.
-    const movieParams = (page: string) => ({
-        with_genres: movieGenresParam,
-        sort_by: 'vote_average.desc',
-        'vote_count.gte': '500',
-        'vote_average.gte': '7',
-        include_adult: 'false',
-        page,
-    });
-    const tvParams = (page: string) => ({
-        with_genres: tvGenresParam,
-        sort_by: 'vote_average.desc',
-        'vote_count.gte': '200',
-        'vote_average.gte': '7',
-        include_adult: 'false',
-        page,
-    });
-
-    const moviePromises = movieGenresParam
-        ? [tmdbFetchList<any>('/discover/movie', movieParams('1')), tmdbFetchList<any>('/discover/movie', movieParams('2'))]
-        : [];
-    const tvPromises = tvGenresParam
-        ? [tmdbFetchList<any>('/discover/tv', tvParams('1')), tmdbFetchList<any>('/discover/tv', tvParams('2'))]
-        : [];
-
-    const [moviePages, tvPages] = await Promise.all([
-        Promise.all(moviePromises),
-        Promise.all(tvPromises),
-    ]);
-    exploraMoviesRaw = moviePages.flat();
-    exploraSeriesRaw = tvPages.flat();
-
-    // Excluye biblioteca y dedup contra recommendations principales
-    const recMovieIds = new Set(recs.movies.map((m: any) => String(m.id)));
-    const recTvIds = new Set(recs.tv.map((s: any) => String(s.id)));
-    exploraMovies = exploraMoviesRaw
-        .filter((m: any) => !prefs!.libraryIds.movies.has(String(m.id)) && !recMovieIds.has(String(m.id)))
-        .slice(0, 15);
-    exploraSeries = exploraSeriesRaw
-        .filter((s: any) => !prefs!.libraryIds.tv.has(String(s.id)) && !recTvIds.has(String(s.id)))
-        .slice(0, 15);
 } catch (error) {
     if (isTimeout(error)) {
         // Cold start: Lambda+Firebase lentos. Servimos shell con auto-reintento.
@@ -98,7 +46,7 @@ try {
 
 const seriesRecomendadas = recs?.tv ?? [];
 const peliculasRecomendadas = recs?.movies ?? [];
-const allSeriesIdsForWatched = [...seriesRecomendadas, ...exploraSeries].map((s: any) => String(s.id));
+const allSeriesIdsForWatched = seriesRecomendadas.map((s: any) => String(s.id));
 const watchedMap = await safeFetch(
     getWatchedProgressBatch(allSeriesIdsForWatched),
     'personal/recomendaciones/watchedMap',
@@ -269,33 +217,8 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                     </div>
                 )}
 
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div class="bg-white rounded-lg p-3 border border-amber-200">
-                        <h3 class="font-semibold text-gray-800 mb-2">🎬 Discover endurecido (vote_avg.desc)</h3>
-                        <ul class="text-xs text-gray-700 space-y-1 font-mono max-h-64 overflow-y-auto">
-                            {exploraMoviesRaw.slice(0, 10).map((m: any) => (
-                                <li class={prefs!.libraryIds.movies.has(String(m.id)) ? 'opacity-40 line-through' : ''}>
-                                    <strong>{m.title}</strong> · ⭐{m.vote_average?.toFixed(1)} · 🔢{m.vote_count}<br/>
-                                    <span class="text-gray-500">  Géneros: [{(m.genre_ids || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                    <div class="bg-white rounded-lg p-3 border border-amber-200">
-                        <h3 class="font-semibold text-gray-800 mb-2">📺 Discover endurecido (vote_avg.desc)</h3>
-                        <ul class="text-xs text-gray-700 space-y-1 font-mono max-h-64 overflow-y-auto">
-                            {exploraSeriesRaw.slice(0, 10).map((s: any) => (
-                                <li class={prefs!.libraryIds.tv.has(String(s.id)) ? 'opacity-40 line-through' : ''}>
-                                    <strong>{s.name}</strong> · ⭐{s.vote_average?.toFixed(1)} · 🔢{s.vote_count}<br/>
-                                    <span class="text-gray-500">  Géneros: [{(s.genre_ids || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-
                 <p class="text-xs text-amber-800 mt-3">
-                    💡 La sección principal "Para ti" usa <strong>recommendations por seed</strong>. La secundaria "Explora" usa discover endurecido. Score = suma de pesos de seeds que recomiendan ese item.
+                    💡 Feed unificado: <strong>recommendations por seed</strong> (sources ≥ 1) mezclado con <strong>discover endurecido</strong> como booster suave (+0.5 score, sources = 0). Items solo-discover quedan abajo; seeds reales dominan el top.
                 </p>
             </div>
         )}
@@ -344,7 +267,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
                             Series para ti
-                            <span class="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">basado en tus favoritos</span>
+                            <span class="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">favoritos + tus géneros</span>
                             <span class="text-sm font-normal text-gray-400">({seriesRecomendadas.length})</span>
                         </h2>
 
@@ -375,7 +298,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="w-1 h-6 bg-red-500 rounded-full"></span>
                             Películas para ti
-                            <span class="text-xs font-normal text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">basado en tus favoritos</span>
+                            <span class="text-xs font-normal text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">favoritos + tus géneros</span>
                             <span class="text-sm font-normal text-gray-400">({peliculasRecomendadas.length})</span>
                         </h2>
 
@@ -400,57 +323,6 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                     </section>
                 )}
 
-                {/* Explora por géneros (secundaria) */}
-                {(showSeries && exploraSeries.length > 0) && (
-                    <section class="scroll-mt-20 pt-6 border-t border-gray-100">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
-                            Explora series mejor valoradas
-                            <span class="text-xs font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">por tus géneros</span>
-                            <span class="text-sm font-normal text-gray-400">({exploraSeries.length})</span>
-                        </h2>
-                        <p class="text-xs text-gray-500 mb-4">Joyas con nota TMDB ≥ 7 que tocan alguno de tus géneros favoritos.</p>
-                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {exploraSeries.map((item: any) => (
-                                <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
-                                    id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                    name={item.name}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    first_air_date={item.first_air_date}
-                                    genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
-                                    watchedEpisodes={watchedMap[String(item.id)]?.watched}
-                                /></HoverPreview>
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {(showMovies && exploraMovies.length > 0) && (
-                    <section class="scroll-mt-20 pt-6 border-t border-gray-100">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
-                            Explora pelis mejor valoradas
-                            <span class="text-xs font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">por tus géneros</span>
-                            <span class="text-sm font-normal text-gray-400">({exploraMovies.length})</span>
-                        </h2>
-                        <p class="text-xs text-gray-500 mb-4">Joyas con nota TMDB ≥ 7 y muchos votos que tocan alguno de tus géneros favoritos.</p>
-                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {exploraMovies.map((item: any) => (
-                                <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
-                                    id={item.id.toString()}
-                                    img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                    title={item.title}
-                                    vote_average={item.vote_average}
-                                    overview={item.overview}
-                                    release_date={item.release_date}
-                                    genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
-                                /></HoverPreview>
-                            ))}
-                        </div>
-                    </section>
-                )}
             </div>
         )}
         </>)}

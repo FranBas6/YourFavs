@@ -1,5 +1,5 @@
 import { processBatch } from './processBatch';
-import { tmdbFetch } from '../services/API/shared/tmdbClient';
+import { tmdbFetch, tmdbFetchList } from '../services/API/shared/tmdbClient';
 import { calculateGenrePreferences } from './genrePreferences';
 import { getCached, setCached, invalidateCached } from './recsBlobCache';
 import { getMovieFav, getLikedMovies } from '../services/BD/movies/yourfavsMovie';
@@ -29,7 +29,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v4';
+const BLOB_KEY = 'personalRecs_v5';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 let cache: { data: PersonalRecResult; expires: number } | null = null;
@@ -57,7 +57,7 @@ function serializeRecs(r: PersonalRecResult): SerializedRecs {
 const SEED_WEIGHT_FAVS = 2;
 const SEED_WEIGHT_LIKE = 1.5;
 const SEED_WEIGHT_SIGUIENDO = 1.5;
-const SEED_LIMIT = 12;
+const SEED_LIMIT = 6;
 const RESULT_LIMIT = 20;
 // E: filtro vote_count mínimo para cortar nicho obscuro (pelis más exigente que series).
 const MIN_VOTE_COUNT_MOVIE = 300;
@@ -200,12 +200,36 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const movieAgg = new Map<string, Agg>();
     const tvAgg = new Map<string, Agg>();
 
-    await Promise.all([
+    // Discover endurecido por géneros top: corre EN PARALELO con recommendations.
+    // Sus resultados se mergean al pool con score base bajo (DISCOVER_BOOST), boosteando
+    // candidatos que ya venían de seeds y rellenando el long tail con joyas del género.
+    const movieGenresParam = prefs.movies.topGenres.join('|');
+    const tvGenresParam = prefs.tv.topGenres.join('|');
+    const discoverMoviePromise = movieGenresParam
+        ? tmdbFetchList<any>('/discover/movie', {
+            with_genres: movieGenresParam,
+            sort_by: 'vote_average.desc',
+            'vote_count.gte': '500',
+            'vote_average.gte': '7',
+            include_adult: 'false',
+            page: '1',
+        }).catch(() => [] as any[])
+        : Promise.resolve([] as any[]);
+    const discoverTvPromise = tvGenresParam
+        ? tmdbFetchList<any>('/discover/tv', {
+            with_genres: tvGenresParam,
+            sort_by: 'vote_average.desc',
+            'vote_count.gte': '200',
+            'vote_average.gte': '7',
+            include_adult: 'false',
+            page: '1',
+        }).catch(() => [] as any[])
+        : Promise.resolve([] as any[]);
+
+    const [, , discoverMoviesList, discoverTvList] = await Promise.all([
         processBatch(movieSeeds, async (seed: SeedInfo) => {
             try {
                 const r = await tmdbFetch<any>(`/movie/${seed.id}/recommendations`);
-                const detail = await tmdbFetch<any>(`/movie/${seed.id}`).catch(() => null);
-                if (detail?.title) seed.title = detail.title;
                 const eligible = (r?.results || [])
                     .filter((m: any) => !prefs.libraryIds.movies.has(String(m.id)) && (m.vote_count ?? 0) >= MIN_VOTE_COUNT_MOVIE)
                     .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
@@ -221,8 +245,6 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         processBatch(tvSeeds, async (seed: SeedInfo) => {
             try {
                 const r = await tmdbFetch<any>(`/tv/${seed.id}/recommendations`);
-                const detail = await tmdbFetch<any>(`/tv/${seed.id}`).catch(() => null);
-                if (detail?.name) seed.title = detail.name;
                 const eligible = (r?.results || [])
                     .filter((m: any) => !prefs.libraryIds.tv.has(String(m.id)) && (m.vote_count ?? 0) >= MIN_VOTE_COUNT_TV)
                     .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
@@ -235,7 +257,30 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 }
             } catch {}
         }, 8),
+        discoverMoviePromise,
+        discoverTvPromise,
     ]);
+
+    // Booster conservador: candidatos que solo vienen de discover entran con score 0.5 y
+    // sources 0, así nunca superan a un seed real en el ranking; los que coinciden con un
+    // seed reciben +0.5 al score (sources no se incrementa: solo seeds cuentan como fuente).
+    const DISCOVER_BOOST = 0.5;
+    for (const m of discoverMoviesList) {
+        const k = String(m.id);
+        if (prefs.libraryIds.movies.has(k)) continue;
+        if ((m.vote_count ?? 0) < MIN_VOTE_COUNT_MOVIE) continue;
+        const cur = movieAgg.get(k);
+        if (cur) cur.score += DISCOVER_BOOST;
+        else movieAgg.set(k, { item: m, score: DISCOVER_BOOST, sources: 0 });
+    }
+    for (const s of discoverTvList) {
+        const k = String(s.id);
+        if (prefs.libraryIds.tv.has(k)) continue;
+        if ((s.vote_count ?? 0) < MIN_VOTE_COUNT_TV) continue;
+        const cur = tvAgg.get(k);
+        if (cur) cur.score += DISCOVER_BOOST;
+        else tvAgg.set(k, { item: s, score: DISCOVER_BOOST, sources: 0 });
+    }
 
     // I: score híbrido. sources×1.5 + score×0.5 + (rating/10)×2.
     // sources sigue siendo la señal dominante, pero rating evita que pelis 2-seeds mediocres

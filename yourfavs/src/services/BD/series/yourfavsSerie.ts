@@ -547,5 +547,59 @@ export async function getWatchStreak(): Promise<{ current: number; lastDay: stri
     }
 }
 
+export interface SerieYearActivity {
+    id: string;
+    lastWatchedAt: number;
+    firstWatchedAtInYear: number;
+    episodesInYear: number;
+    totalWatched: number;
+}
+
+/**
+ * Lee todos los WatchedEpisodes y devuelve las series con actividad en el año dado.
+ * Una serie entra si tiene al menos 1 episodio cuyo watched_at cae en [year, year+1).
+ * lastWatchedAt y firstWatchedAtInYear corresponden a episodios DEL año, no overall.
+ * Una sola lectura de colección (snapshot completo) — no se puede filtrar por server-side
+ * con Firestore porque watched_at vive dentro de un array, no en un campo top-level.
+ */
+export async function getSeriesActivityByYear(year: number): Promise<SerieYearActivity[]> {
+    try {
+        const snap = await getDocs(collection(db, 'WatchedEpisodes'));
+        const yearStart = new Date(year, 0, 1).getTime();
+        const yearEnd = new Date(year + 1, 0, 1).getTime();
+        const out: SerieYearActivity[] = [];
+        for (const docSnap of snap.docs) {
+            const data = docSnap.data() as { watched_episodes?: WatchedEpisode[] };
+            const eps = data.watched_episodes || [];
+            let lastWatchedAt = 0;
+            let firstWatchedAtInYear = 0;
+            let episodesInYear = 0;
+            for (const ep of eps) {
+                if (!ep.watched_at) continue;
+                const t = new Date(ep.watched_at).getTime();
+                if (isNaN(t)) continue;
+                if (t >= yearStart && t < yearEnd) {
+                    episodesInYear++;
+                    if (t > lastWatchedAt) lastWatchedAt = t;
+                    if (firstWatchedAtInYear === 0 || t < firstWatchedAtInYear) firstWatchedAtInYear = t;
+                }
+            }
+            if (episodesInYear > 0) {
+                out.push({
+                    id: docSnap.id,
+                    lastWatchedAt,
+                    firstWatchedAtInYear,
+                    episodesInYear,
+                    totalWatched: eps.length,
+                });
+            }
+        }
+        return out;
+    } catch (error) {
+        console.error('Error en getSeriesActivityByYear:', error);
+        return [];
+    }
+}
+
 // Exportar db para que pueda ser utilizada por otros módulos si es necesario
 export {db};

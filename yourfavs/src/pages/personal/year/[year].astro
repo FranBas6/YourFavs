@@ -3,6 +3,9 @@ import Layout from "../../../layouts/Layout.astro";
 import PersonalNav from "../../../components/personal/PersonalNav.astro";
 import EmptyState from "../../../components/EmptyState.astro";
 import { calculateYearStats, type ItemShowcase } from "../../../utils/yearStats";
+import { getSeriesActivityByYear } from "../../../services/BD/series/yourfavsSerie";
+import { fetchSerieDetails } from "../../../services/API/Series/tmdbSeries";
+import { processBatch } from "../../../utils/processBatch";
 import { getGenreName } from "../../../utils/constants/genres";
 import { getLanguageDisplayName } from "../../../utils/constants/helpers/media-helpers";
 import { posterUrl } from "../../../services/API/shared/tmdbClient";
@@ -16,7 +19,56 @@ if (!yearParam || isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 1)
     return Astro.redirect(`/personal/year/${currentYear}`);
 }
 
-const stats = await calculateYearStats(yearNum);
+const [stats, yearActivity] = await Promise.all([
+    calculateYearStats(yearNum),
+    getSeriesActivityByYear(yearNum),
+]);
+
+// Timeline mes a mes: para cada serie con actividad en el año, fetch detail TMDB y
+// agrupar por mes del lastWatchedAt. Si TMDB falla en alguna, el filter(Boolean) la deja
+// fuera silenciosamente — la sección sigue mostrando el resto sin romper la página.
+interface SerieMonthItem {
+    id: string;
+    name: string;
+    poster_path: string | null;
+    lastWatchedAt: number;
+    firstWatchedAtInYear: number;
+    episodesInYear: number;
+}
+let seriesByMonth: Array<{ month: number; items: SerieMonthItem[] }> = [];
+if (yearActivity.length > 0) {
+    const details = await processBatch(
+        yearActivity,
+        async (act) => {
+            try {
+                const det = await fetchSerieDetails(act.id);
+                if (!det) return null;
+                return {
+                    id: String(det.id),
+                    name: det.name,
+                    poster_path: det.poster_path || null,
+                    lastWatchedAt: act.lastWatchedAt,
+                    firstWatchedAtInYear: act.firstWatchedAtInYear,
+                    episodesInYear: act.episodesInYear,
+                } as SerieMonthItem;
+            } catch { return null; }
+        },
+        10,
+    );
+    const valid = details.filter((d): d is SerieMonthItem => d !== null);
+    const byMonth = new Map<number, SerieMonthItem[]>();
+    for (const s of valid) {
+        const m = new Date(s.lastWatchedAt).getMonth();
+        if (!byMonth.has(m)) byMonth.set(m, []);
+        byMonth.get(m)!.push(s);
+    }
+    // Dentro de cada mes: orden cronológico ascendente (más antiguo primero).
+    // Entre meses: enero arriba → diciembre abajo (lectura natural del año).
+    for (const arr of byMonth.values()) arr.sort((a, b) => a.lastWatchedAt - b.lastWatchedAt);
+    seriesByMonth = Array.from(byMonth.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([month, items]) => ({ month, items }));
+}
 
 const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 const MONTH_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -218,6 +270,47 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                                     </div>
                                     <div class="mt-2 text-sm font-semibold text-gray-800 line-clamp-1">{s.title}</div>
                                 </a>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Timeline mes a mes — series con actividad real (episodios marcados) */}
+                {seriesByMonth.length > 0 && (
+                    <section>
+                        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
+                            <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
+                            Tus series mes a mes
+                            <span class="text-sm font-normal text-gray-400">({seriesByMonth.reduce((sum, m) => sum + m.items.length, 0)})</span>
+                        </h2>
+                        <p class="text-xs text-gray-500 mb-4">Series en las que viste algún episodio cada mes del {yearNum}, en orden cronológico.</p>
+                        <div class="space-y-6">
+                            {seriesByMonth.map(({ month, items }) => (
+                                <div>
+                                    <h3 class="text-sm font-semibold text-purple-700 uppercase tracking-wide mb-3 flex items-center gap-2">
+                                        <span class="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
+                                        {MONTH_NAMES[month]}
+                                        <span class="text-xs text-gray-400 normal-case font-normal">· {items.length} serie{items.length !== 1 ? 's' : ''}</span>
+                                    </h3>
+                                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                                        {items.map((s) => (
+                                            <a href={`/serie/${s.id}`} class="group block">
+                                                <div class="relative aspect-[2/3] rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition bg-gray-200">
+                                                    {s.poster_path ? (
+                                                        <img src={posterUrl(s.poster_path) || ''} alt={s.name} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                                    ) : (
+                                                        <div class="w-full h-full flex items-center justify-center text-gray-400 text-2xl">📺</div>
+                                                    )}
+                                                    <span class="absolute bottom-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded bg-black/70 text-purple-200">▶ {s.episodesInYear}</span>
+                                                </div>
+                                                <div class="mt-1.5 text-xs font-semibold text-gray-800 line-clamp-1">{s.name}</div>
+                                                <div class="text-[10px] text-gray-500">
+                                                    {new Date(s.lastWatchedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                                </div>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
                             ))}
                         </div>
                     </section>
