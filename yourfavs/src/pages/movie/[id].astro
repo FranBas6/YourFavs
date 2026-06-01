@@ -23,6 +23,7 @@ import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/me
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import NotificationBell from "../../components/personal/NotificationBell.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
+import DubbingSection from "../../components/detail/DubbingSection.astro";
 import CrewGrid from "../../components/detail/CrewGrid.astro";
 import ProductionCompanies from "../../components/detail/ProductionCompanies.astro";
 import ReviewsSection from "../../components/detail/ReviewsSection.astro";
@@ -116,7 +117,7 @@ const isInPendientes = movieExists.MoviesPendientes;
 const isInVistas = movieExists.MoviesVistas;
 const isInVerPronto = movieExists.MoviesVerPronto;
 const isInLiked = movieExists.LikedMovies;
-const userTags = mediaTagsDoc?.tags || [];
+const userTags: string[] = mediaTagsDoc?.tags || [];
 const userNotes = mediaTagsDoc?.notes || '';
 const inAnyCollection = isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked;
 
@@ -582,11 +583,11 @@ const jsonLd = item ? {
                             </summary>
                             {collectionInfo.overview && <p class="text-sm text-gray-500 px-5 pb-3">{collectionInfo.overview}</p>}
                             <div class="px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                {collectionInfo.parts.sort((a, b) => {
+                                {collectionInfo.parts.sort((a: { release_date?: string | null }, b: { release_date?: string | null }) => {
                                     const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
                                     const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
                                     return dateA - dateB;
-                                }).map((part) => (
+                                }).map((part: { id: number; release_date?: string | null; poster_path?: string | null; title: string }) => (
                                     <a href={`/movie/${part.id}`} class={`text-center group rounded-xl overflow-hidden ${part.id === item?.id ? 'ring-2 ring-red-500 bg-red-50' : 'hover:bg-gray-50'} transition-colors`}>
                                         <img src={part.poster_path || '/placeholder.jpg'} alt={part.title} class="w-full aspect-[2/3] object-cover group-hover:scale-[1.02] transition-transform" loading="lazy" />
                                         <div class="p-2">
@@ -605,6 +606,9 @@ const jsonLd = item ? {
 
                     <!-- Reparto (grid cards) -->
                     <CastGrid cast={cast} />
+
+                    <!-- Dobladores en español (lazy, eldoblaje.com) -->
+                    <DubbingSection type="movie" tmdbId={id} />
 
                     <!-- Equipo -->
                     <CrewGrid crew={directors} />

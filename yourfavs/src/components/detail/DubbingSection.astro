@@ -1,0 +1,174 @@
+---
+// Desplegable "Dobladores en español". Datos de eldoblaje.com vía /api/dubbing.
+// Fetch LAZY al abrir el <details> → no añade carga al SSR de la página.
+interface Props {
+    type: 'movie' | 'tv';
+    tmdbId: number | string;
+}
+const { type, tmdbId } = Astro.props;
+---
+<section class="mt-8" data-dubbing data-type={type} data-id={String(tmdbId)}>
+    <details class="group bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <summary class="flex items-center justify-between cursor-pointer px-4 py-3 select-none list-none">
+            <span class="flex items-center gap-2 text-base font-semibold text-gray-800">
+                <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+                </svg>
+                Dobladores en español
+            </span>
+            <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </summary>
+
+        <div class="px-4 pb-4 border-t border-gray-100">
+            <!-- Estado: cargando -->
+            <div data-dub-loading class="hidden py-4">
+                <p class="flex items-center gap-2 text-sm text-gray-500">
+                    <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"/></svg>
+                    Buscando en eldoblaje.com…
+                </p>
+            </div>
+
+            <!-- Estado: con datos -->
+            <div data-dub-results class="hidden pt-3"></div>
+
+            <!-- Estado: sin match → linkout + reintentar -->
+            <div data-dub-fallback class="hidden py-4">
+                <p class="text-sm text-gray-500 mb-3">No encontramos la ficha de doblaje automáticamente.</p>
+                <div class="flex flex-wrap items-center gap-4">
+                    <a data-dub-search href="#" target="_blank" rel="noopener noreferrer"
+                       class="inline-flex items-center gap-1.5 text-sm font-medium text-purple-600 hover:text-purple-700">
+                        Buscar en eldoblaje.com
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                    </a>
+                    <button type="button" data-dub-retry
+                            class="inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-gray-700">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Reintentar búsqueda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </details>
+</section>
+
+<script>
+    document.querySelectorAll('[data-dubbing]').forEach((root) => {
+        const details = root.querySelector('details');
+        const type = (root as HTMLElement).dataset.type;
+        const id = (root as HTMLElement).dataset.id;
+        const loading = root.querySelector('[data-dub-loading]') as HTMLElement;
+        const results = root.querySelector('[data-dub-results]') as HTMLElement;
+        const fallback = root.querySelector('[data-dub-fallback]') as HTMLElement;
+        const searchLink = root.querySelector('[data-dub-search]') as HTMLAnchorElement;
+        const retryBtn = root.querySelector('[data-dub-retry]') as HTMLButtonElement;
+        let loaded = false;
+
+        const esc = (s: string) =>
+            (s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
+
+        async function load(refresh = false, season: string | number | null = null) {
+            loaded = true;
+            results.classList.add('hidden');
+            fallback.classList.add('hidden');
+            loading.classList.remove('hidden');
+            try {
+                const params = new URLSearchParams();
+                if (refresh) params.set('refresh', '1');
+                if (season != null) params.set('season', String(season));
+                const qs = params.toString();
+                const res = await fetch(`/api/dubbing/${type}/${id}${qs ? '?' + qs : ''}`);
+                const data = await res.json();
+                loading.classList.add('hidden');
+
+                const hasSeasons = Array.isArray(data.seasons) && data.seasons.length > 0;
+                if (hasSeasons || (data.source === 'eldoblaje' && data.items?.length)) {
+                    renderResults(data);
+                    results.classList.remove('hidden');
+                } else {
+                    if (data.searchUrl) searchLink.href = data.searchUrl;
+                    fallback.classList.remove('hidden');
+                }
+            } catch {
+                loading.classList.add('hidden');
+                fallback.classList.remove('hidden');
+            }
+        }
+
+        details?.addEventListener('toggle', () => {
+            if (details.open && !loaded) load(false);
+        });
+        retryBtn?.addEventListener('click', () => load(true));
+
+        function renderResults(data: any) {
+            const seasons: any[] = Array.isArray(data.seasons) ? data.seasons : [];
+            // Selector de temporada (solo series). Al cambiar, scrapea esa temporada.
+            const selector = seasons.length
+                ? `<div class="flex items-center gap-2">
+                       <label class="text-xs text-gray-500">Temporada</label>
+                       <select data-dub-select class="text-sm border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-purple-400">
+                           ${seasons.map((s) => `<option value="${s}" ${s === data.currentSeason ? 'selected' : ''}>Temporada ${s}</option>`).join('')}
+                       </select>
+                   </div>`
+                : '<span></span>';
+            const header = `<div class="flex items-center justify-between gap-2 mb-3 pt-1">
+                   ${selector}
+                   <button type="button" data-dub-refresh class="text-xs text-gray-400 hover:text-purple-600 inline-flex items-center gap-1 flex-shrink-0">
+                       <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                       Refrescar
+                   </button>
+               </div>`;
+            const body = (data.items && data.items.length)
+                ? renderTable(data.items, data.fichaUrl)
+                : `<p class="py-2 text-sm text-gray-400">Sin datos de doblaje para esta temporada.</p>${data.fichaUrl ? `<a href="${data.fichaUrl}" target="_blank" rel="noopener noreferrer" class="block mt-2 text-xs text-gray-400 hover:text-gray-600">Ver ficha en eldoblaje.com ↗</a>` : ''}`;
+            results.innerHTML = header + body;
+            const select = results.querySelector('[data-dub-select]') as HTMLSelectElement | null;
+            if (select) select.addEventListener('change', (e) => load(false, (e.target as HTMLSelectElement).value));
+            const rb = results.querySelector('[data-dub-refresh]') as HTMLButtonElement | null;
+            if (rb) rb.addEventListener('click', () => load(true, data.currentSeason ?? null));
+        }
+
+        function renderTable(items: any[], fichaUrl: string | null) {
+            const TMDB_IMG = 'https://image.tmdb.org/t/p/w92';
+            const anyAvatar = items.some((it) => it.dubTmdbId);
+
+            const rows = items.map((it) => {
+                const name = esc(it.dubActor);
+                // Nombre → carrera de doblaje completa en eldoblaje.
+                const nameLink = it.dubUrl
+                    ? `<a href="${it.dubUrl}" target="_blank" rel="noopener noreferrer" title="Carrera de doblaje en eldoblaje.com" class="text-purple-600 hover:text-purple-700 hover:underline">${name}</a>`
+                    : name;
+                // Avatar (foto real) → página del doblador en YourFavs.
+                let avatar = '';
+                if (it.dubTmdbId) {
+                    const inner = it.dubProfilePath
+                        ? `<img src="${TMDB_IMG}${it.dubProfilePath}" alt="${name}" class="w-9 h-9 rounded-full object-cover" loading="lazy" />`
+                        : `<span class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center"><svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg></span>`;
+                    avatar = `<a href="/actor/${it.dubTmdbId}" title="Ver a ${name} en YourFavs" class="flex-shrink-0 rounded-full ring-2 ring-transparent hover:ring-purple-300 transition">${inner}</a>`;
+                }
+                return `
+                    <div class="flex items-center gap-2 py-2 border-b border-gray-50 last:border-0 text-sm">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-gray-800 truncate">${esc(it.originalActor)}</p>
+                            ${it.character ? `<p class="text-xs text-gray-400 truncate">${esc(it.character)}</p>` : ''}
+                        </div>
+                        <svg class="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        <div class="flex-1 min-w-0 flex items-center justify-end gap-2 font-medium">
+                            ${avatar}
+                            <span class="truncate">${nameLink}</span>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            // Mini-leyenda: aclara los dos destinos (solo si hay fotos que explicar).
+            const legend = anyAvatar
+                ? `<p class="text-xs text-gray-400 mb-2">Toca el <span class="text-gray-500">nombre</span> para su carrera de doblaje · la <span class="text-gray-500">foto</span> para su ficha en YourFavs</p>`
+                : '';
+            const credit = fichaUrl
+                ? `<a href="${fichaUrl}" target="_blank" rel="noopener noreferrer" class="block mt-3 text-xs text-gray-400 hover:text-gray-600">Datos de eldoblaje.com ↗</a>`
+                : '';
+            return legend + rows + credit;
+        }
+    });
+</script>

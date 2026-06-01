@@ -13,6 +13,7 @@ import { sortBycriterion } from "../../utils/sorting";
 import { calculateAge } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import EmptyState from "../../components/EmptyState.astro";
+import ActorDubbingSection from "../../components/detail/ActorDubbingSection.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
 import { handleActorFavAction } from "../../services/BD/actors/yourfavsActor";
@@ -564,6 +565,9 @@ const jsonLd = {
                     </div>
                 </details>
             )}
+
+            <!-- Doblajes (lazy, eldoblaje.com — solo si el actor es doblador) -->
+            <ActorDubbingSection tmdbId={actor} name={actorInfo.nombre} />
         </div>
     </section>
 </Layout>
