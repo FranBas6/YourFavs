@@ -165,7 +165,7 @@ export const getMovieCollectionInfo = async (
             parts: data.parts?.map((part: any) => ({
                 id: part.id,
                 title: part.title,
-                poster_path: posterUrl(part.poster_path, 'w200') || null,
+                poster_path: posterUrl(part.poster_path, 'w500') || null,
                 release_date: part.release_date,
                 vote_average: part.vote_average || 0,
                 vote_count: part.vote_count || 0,

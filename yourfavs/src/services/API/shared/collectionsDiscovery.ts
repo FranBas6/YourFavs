@@ -67,15 +67,16 @@ export async function getPopularCollections(): Promise<MovieCollectionInfo[]> {
 
         // 4. Filtros + ordenación:
         //    - Siempre ≥3 pelis en la saga
-        //    - Seeds pasan siempre (curadas)
-        //    - Descubiertas deben tener popularidad suficiente (suma vote_count ≥ 10k) — evita nicho tipo "Gabriel's Inferno"
+        //    - Seeds (curadas) pasan siempre con ≥2 partes (confiamos en la lista; el ≥2
+        //      solo descarta un ID roto/vacío accidental).
+        //    - Descubiertas (complemento menor): ≥3 partes Y suma vote_count ≥ 15k —
+        //      umbral alto a propósito porque la base ya la dan las ~58 seeds curadas.
         //    - Orden: seeds primero (en el orden de SEED_COLLECTION_IDS), luego descubiertas por votos totales desc
         const totalVotes = (c: MovieCollectionInfo) => c.parts.reduce((s, p) => s + (p.vote_count || 0), 0);
         const seedIdx = (id: number) => SEED_COLLECTION_IDS.indexOf(id);
 
         const filtered = collections
-            .filter(c => c.parts.length >= 3)
-            .filter(c => seedIdx(c.id) !== -1 || totalVotes(c) >= 10000)
+            .filter(c => seedIdx(c.id) !== -1 ? c.parts.length >= 2 : (c.parts.length >= 3 && totalVotes(c) >= 15000))
             .sort((a, b) => {
                 const sa = seedIdx(a.id);
                 const sb = seedIdx(b.id);
