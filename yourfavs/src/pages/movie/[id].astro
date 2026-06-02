@@ -331,7 +331,7 @@ const jsonLd = item ? {
                     {isUnreleased && <NotificationBell mediaType="movie" tmdbId={id} isSubscribed={isNotifSubscribed} />}
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="liked"/>
-                        <button type="submit" class={`p-1.5 rounded-full transition-colors ${isInLiked ? 'text-red-500' : 'text-gray-4000 hover:text-red-400'}`}>
+                        <button type="submit" class={`p-1.5 rounded-full transition-colors ${isInLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}>
                             <svg class="w-5 h-5" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
                         </button>
                     </form>
@@ -411,7 +411,7 @@ const jsonLd = item ? {
                         <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
                         <ul class="space-y-2.5 text-sm sm:text-base">
                             <li class="flex justify-between"><span class="text-gray-500">Estreno</span><span class="text-gray-800 font-medium">{formatDate(item?.release_date)}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-4000 text-xs">({item?.vote_count})</span></span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
                             {item?.original_title && item.original_title !== item.title && (
@@ -579,7 +579,7 @@ const jsonLd = item ? {
                         <details class="bg-white rounded-xl border border-gray-200">
                             <summary class="p-5 cursor-pointer flex items-center justify-between">
                                 <h2 class="text-lg font-semibold text-gray-800">{collectionInfo.name}</h2>
-                                <svg class="w-5 h-5 text-gray-4000 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                <svg class="w-5 h-5 text-gray-400 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                             </summary>
                             {collectionInfo.overview && <p class="text-sm text-gray-500 px-5 pb-3">{collectionInfo.overview}</p>}
                             <div class="px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -592,7 +592,7 @@ const jsonLd = item ? {
                                         <img src={part.poster_path || '/placeholder.jpg'} alt={part.title} class="w-full aspect-[2/3] object-cover group-hover:scale-[1.02] transition-transform" loading="lazy" />
                                         <div class="p-2">
                                             <p class="text-sm font-medium text-gray-800 line-clamp-2">{part.title}</p>
-                                            <p class="text-xs text-gray-4000">{part.release_date ? new Date(part.release_date).getFullYear() : '?'}</p>
+                                            <p class="text-xs text-gray-400">{part.release_date ? new Date(part.release_date).getFullYear() : '?'}</p>
                                             {part.id === item?.id && <span class="text-xs font-bold text-red-500">Actual</span>}
                                         </div>
                                     </a>
