@@ -1,0 +1,450 @@
+/* ============================================================================
+   dark-mode.css — MODO OSCURO completo de YourFavs
+   ----------------------------------------------------------------------------
+   Cómo se usa:
+     1) Importar DESPUÉS de tokens.css y del resto de estilos en Layout.astro:
+          import "../styles/tokens.css";
+          import "../styles/layout.css";
+          ...resto...
+          import "../styles/dark-mode.css";   // <- el ÚLTIMO, para que gane
+     2) El toggle ya existe: pone data-theme="dark" en <html> y lo persiste en
+        localStorage. Este archivo aporta las reglas que faltaban.
+
+   Estrategia (las 3 capas que hay que cubrir para que NO falte nada):
+     CAPA 1 · Tokens     — se reescriben las variables bajo [data-theme="dark"].
+                           Todo lo que ya consume --bg/--text/--card/etc. cambia solo.
+     CAPA 2 · Hex sueltos — superficies con color hardcodeado en CSS por-página
+                           (body gradient, scrollbars, calendar dropdown, paginación,
+                           filtros, .card-wrapper blanco, .bg-light-gray…).
+     CAPA 3 · Utilidades Tailwind — clases hardcodeadas en los .astro
+                           (bg-white, text-gray-*, border-gray-*, bg-gray-50/100,
+                           tiles pastel bg-blue-50…). NO responden a tokens, hay
+                           que mapearlas explícitamente.
+
+   Nota: las media-cards (.bg-midnight-blue #0F172A) YA son oscuras por diseño;
+   en modo oscuro se mantienen — no se tocan. Los badges de rating y los colores
+   de estado (verde/azul/ámbar) también se conservan: son señal, no superficie.
+   ============================================================================ */
+
+/* ============================================================================
+   CAPA 1 · TOKENS  (la base: reescribe el sistema entero)
+   ============================================================================ */
+[data-theme="dark"] {
+    /* Surface / Ink — familia slate/navy que armoniza con las cards #0F172A */
+    --bg:            #0B1120;  /* fondo de página (más oscuro que las cards) */
+    --bg-elev:       #141D2E;  /* section cards, panels (lee como panel elevado) */
+    --bg-tint:       #1E293B;  /* hover suave */
+    --text:          #E6EAF2;  /* texto primario */
+    --text-2:        #BAC3D2;  /* secundario */
+    --text-3:        #8A95A8;  /* terciario / meta */
+    --text-4:        #5E6A7D;  /* placeholder */
+    --border:        #243044;  /* hairline */
+    --border-strong: #34425A;
+
+    /* Brand — el azul se aclara un punto para contrastar sobre fondo oscuro */
+    --primary:       #5C9DF5;
+    --primary-dark:  #3B82F6;
+    --primary-deep:  #1E3A8A;
+    --primary-soft:  rgba(96, 165, 250, .12);
+
+    /* Acento — el rojo de marca #E63946 sigue funcionando como relleno sobre
+       oscuro; soft/light se suben de alfa para que se vean sobre el fondo. */
+    --accent:        #E63946;
+    --accent-dark:   #C7283A;
+    --accent-soft:   rgba(230, 57, 70, .16);
+    --accent-light:  rgba(230, 57, 70, .24);
+
+    /* Card oscura — se mantiene el navy; el hover sube un peldaño */
+    --card:          #0F172A;
+    --card-hover:    #1B2740;
+    --card-text:     #FFFFFF;
+    --card-text-2:   #CBD5E1;
+    --card-text-3:   #94A3B8;
+    --card-border:   rgba(255, 255, 255, .07);
+    --card-border-h: rgba(255, 255, 255, .18);
+
+    /* Rating por nota — se conservan (son señal); 'poor' se aclara para leerse */
+    --rating-high:   #34D399;  /* >= 8 */
+    --rating-med:    #60A5FA;  /* 6.5–7.9 */
+    --rating-low:    #FBBF24;  /* 5–6.4 */
+    --rating-poor:   #94A3B8;  /* < 5 */
+
+    /* Section "stamps" — se INVIERTEN: fondo oscuro translúcido + tinta clara */
+    --stamp-red:    #3A1A1F;  --stamp-red-ink:    #FCA5A5;
+    --stamp-amber:  #3A2A12;  --stamp-amber-ink:  #FCD34D;
+    --stamp-blue:   #16284A;  --stamp-blue-ink:   #93C5FD;
+    --stamp-green:  #123026;  --stamp-green-ink:  #6EE7B7;
+    --stamp-purple: #2A1E45;  --stamp-purple-ink: #C4B5FD;
+    --stamp-pink:   #3A1A2C;  --stamp-pink-ink:   #F9A8D4;
+    --stamp-slate:  #1E293B;  --stamp-slate-ink:  #CBD5E1;
+
+    /* Sombras — más profundas y neutras (el azul no se ve sobre negro) */
+    --sh-sm:     0 1px 3px rgba(0, 0, 0, .50), 0 1px 2px rgba(0, 0, 0, .40);
+    --sh-md:     0 4px 12px rgba(0, 0, 0, .50);
+    --sh-lg:     0 12px 28px rgba(0, 0, 0, .55);
+    --sh-card:   0 12px 28px rgba(0, 0, 0, .60);
+    --sh-header: 0 4px 20px rgba(0, 0, 0, .45);
+
+    /* Variables heredadas de layout.css (todavía sin migrar a tokens, F10) */
+    --color-background: #0B1120;
+    --color-text:       #E6EAF2;
+    --color-text-light: #8A95A8;
+
+    /* Esquema nativo: formularios, scrollbars de UA, etc. */
+    color-scheme: dark;
+}
+
+/* ============================================================================
+   CAPA 2 · SUPERFICIES CON HEX HARDCODEADO
+   ============================================================================ */
+
+/* --- Base: body, html, fondo de página --- */
+[data-theme="dark"] body { color: var(--text); }
+
+/* layout.css: .bg-light-gray (#F3F4F6) es el fondo del <body> global */
+[data-theme="dark"] .bg-light-gray { background-color: var(--bg); }
+
+/* index.css: el body de la home tiene un gradiente que termina en #EDF2F7 */
+[data-theme="dark"] body {
+    background: linear-gradient(135deg, var(--bg) 0%, #0E1729 100%);
+}
+
+/* Scrollbars (layout.css + index.css) */
+[data-theme="dark"] ::-webkit-scrollbar-track { background: #0E1729; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: #2A3750; }
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background: #3A4A66; }
+
+/* Selección de texto */
+[data-theme="dark"] ::selection { background-color: rgba(96, 165, 250, .28); color: #fff; }
+
+/* Footer del Layout (border-gray-200 / text-gray-500 ya cubiertos por CAPA 3) */
+[data-theme="dark"] footer { border-color: var(--border) !important; }
+
+/* --- Header: gradiente azul atenuado (mantiene identidad, baja el brillo) --- */
+[data-theme="dark"] .header-main {
+    background: linear-gradient(135deg, #14213D 0%, #1E3A8A 100%);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, .5);
+}
+[data-theme="dark"] .mobile-panel {
+    background: linear-gradient(180deg, #0F1B38 0%, #16264B 100%);
+}
+/* El logo wordmark conserva su degradado claro: contrasta bien sobre el header. */
+
+/* --- Calendar dropdown (header.css: todo hardcodeado en claro) --- */
+[data-theme="dark"] .header-calendar-dropdown {
+    background: var(--bg-elev);
+    border-color: var(--border);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, .6);
+}
+[data-theme="dark"] .cal-month-title { color: var(--text); }
+[data-theme="dark"] .cal-nav-btn { color: var(--text-3); }
+[data-theme="dark"] .cal-nav-btn:hover { background: var(--bg-tint); color: var(--text); }
+[data-theme="dark"] .cal-weekdays { color: var(--text-4); border-bottom-color: var(--border); }
+[data-theme="dark"] .cal-cell.cal-has-events:hover { background: var(--bg-tint); }
+[data-theme="dark"] .cal-day-num { color: var(--text-2); }
+[data-theme="dark"] .cal-day-detail,
+[data-theme="dark"] .cal-notifications { border-top-color: var(--border); }
+[data-theme="dark"] .cal-detail-header { color: var(--text-2); }
+[data-theme="dark"] .cal-event:hover { background: var(--bg-tint); }
+[data-theme="dark"] .cal-ev-title { color: var(--text); }
+[data-theme="dark"] .cal-notif-title { color: var(--text-3); }
+[data-theme="dark"] .cal-notif-empty { color: var(--text-4); }
+[data-theme="dark"] .cal-notif-item { border-bottom-color: var(--border); }
+[data-theme="dark"] .cal-notif-item:hover { background: var(--bg-tint); }
+[data-theme="dark"] .cal-notif-poster-empty { background: var(--bg-tint); color: var(--text-4); }
+[data-theme="dark"] .cal-notif-name { color: var(--text); }
+[data-theme="dark"] .cal-notif-date { color: var(--text-4); }
+[data-theme="dark"] .cal-notif-label { color: var(--text-3); }
+[data-theme="dark"] .cal-notif-group { border-bottom-color: var(--border); }
+[data-theme="dark"] .cal-notif-subitem:hover { background: var(--bg-tint); }
+[data-theme="dark"] .cal-notif-sublist { background: #0E1729; }
+[data-theme="dark"] .cal-notif-sublabel { color: var(--text-2); }
+[data-theme="dark"] .cal-notif-subdate { color: var(--text-4); }
+[data-theme="dark"] .cal-notif-count { color: #FCD34D; background: #3A2A12; }
+[data-theme="dark"] .cal-detail-close { color: var(--text-3); }   /* :hover mantiene su rojo semántico */
+[data-theme="dark"] .cal-notif-chevron { color: var(--text-4); }
+
+/* --- Catálogo: paginación + filtros (shared.css, todo hardcodeado) --- */
+[data-theme="dark"] .pagination-btn,
+[data-theme="dark"] .pagination-btn-mobile {
+    color: var(--text-2);
+    background-color: var(--bg-elev);
+    border-color: var(--border);
+}
+[data-theme="dark"] .pagination-btn:hover:not(.disabled),
+[data-theme="dark"] .pagination-btn-mobile:hover:not(.disabled) {
+    background-color: var(--accent);
+    color: #fff;
+}
+[data-theme="dark"] .pagination-number { color: var(--text-3); }
+[data-theme="dark"] .pagination-number:hover { background-color: var(--bg-tint); color: var(--text); }
+[data-theme="dark"] .pagination-number.active { background-color: var(--accent); color: #fff; }
+[data-theme="dark"] .filter-btn { color: var(--text-3); }
+[data-theme="dark"] .filter-btn:hover { background-color: var(--bg-tint); color: var(--text); }
+[data-theme="dark"] .filter-btn.active { background-color: var(--accent); color: #fff; }
+
+/* --- Catálogo: .card-wrapper tiene background:white detrás de la media-card --- */
+[data-theme="dark"] .card-wrapper > * {
+    background-color: var(--card);
+    box-shadow: var(--sh-card);
+}
+
+/* --- Personal: stats panel / sliders (personal.css) --- */
+[data-theme="dark"] .series-stats,
+[data-theme="dark"] .movies-stats,
+[data-theme="dark"] .top-genres,
+[data-theme="dark"] .top-decades { border-color: var(--border); }
+[data-theme="dark"] .visual-summary { border-color: rgba(147, 51, 234, .25); }
+
+/* Rating slider (índigo): se conserva el degradado pero la pista base se oscurece */
+[data-theme="dark"] .rating-slider::-webkit-slider-thumb { background: #0B1120; }
+[data-theme="dark"] .rating-slider::-moz-range-thumb { background: #0B1120; }
+
+/* --- Detalle (detail-common): el carrusel de recomendaciones NO tiene fade de
+   borde en claro (.recommendations-carousel::before/::after no definen left/right
+   ni background → invisibles). El handoff les añadía un degradado en oscuro que,
+   al no estar posicionados, se apilaba a la izquierda y se veía raro. Se omite el
+   fade en oscuro para igualar al claro. --- */
+
+/* ============================================================================
+   CAPA 3 · UTILIDADES TAILWIND HARDCODEADAS  (lo que más "faltaba")
+   ----------------------------------------------------------------------------
+   Se mapean las clases de color que se usan directamente en los .astro.
+   Usan !important porque compiten con utilidades Tailwind del mismo peso.
+   ============================================================================ */
+
+/* --- Fondos neutros --- */
+[data-theme="dark"] .bg-white      { background-color: var(--bg-elev) !important; }
+[data-theme="dark"] .bg-gray-50    { background-color: #0F1828 !important; }
+[data-theme="dark"] .bg-gray-100   { background-color: var(--bg-tint) !important; }
+[data-theme="dark"] .bg-gray-200   { background-color: #2A3750 !important; }
+[data-theme="dark"] .bg-white\/60  { background-color: rgba(20, 29, 46, .6) !important; }
+[data-theme="dark"] .bg-white\/90  { background-color: rgba(20, 29, 46, .9) !important; }
+[data-theme="dark"] .hover\:bg-white:hover { background-color: var(--bg-tint) !important; }
+
+/* about.astro: gradiente from-gray-50 to-white */
+[data-theme="dark"] .from-gray-50 { --tw-gradient-from: #0F1828 !important; }
+[data-theme="dark"] .to-white     { --tw-gradient-to: #141D2E !important; }
+
+/* --- Texto neutro --- */
+[data-theme="dark"] .text-gray-900 { color: #E6EAF2 !important; }
+[data-theme="dark"] .text-gray-800 { color: #D2D9E5 !important; }
+[data-theme="dark"] .text-gray-700 { color: #B8C0CE !important; }
+[data-theme="dark"] .text-gray-600 { color: #9AA5B5 !important; }
+[data-theme="dark"] .text-gray-500 { color: #8A95A8 !important; }
+[data-theme="dark"] .text-gray-400 { color: #6B7686 !important; }
+[data-theme="dark"] .text-gray-300 { color: #56627A !important; }
+/* (El typo text-gray-4000 del repo sigue sin aplicar nada — ver Round 2 análisis) */
+
+/* --- Bordes neutros --- */
+[data-theme="dark"] .border-gray-100 { border-color: #1E293B !important; }
+[data-theme="dark"] .border-gray-200 { border-color: var(--border) !important; }
+[data-theme="dark"] .border-gray-300 { border-color: var(--border-strong) !important; }
+[data-theme="dark"] .border-yellow-200 { border-color: rgba(234, 179, 8, .25) !important; }
+
+/* --- Tiles pastel de about.astro y badges: fondo translúcido, texto claro --- */
+[data-theme="dark"] .bg-blue-50   { background-color: rgba(59, 130, 246, .14) !important; }
+[data-theme="dark"] .bg-green-50  { background-color: rgba(16, 185, 129, .14) !important; }
+[data-theme="dark"] .bg-purple-50 { background-color: rgba(139, 92, 246, .14) !important; }
+[data-theme="dark"] .bg-orange-50 { background-color: rgba(249, 115, 22, .14) !important; }
+[data-theme="dark"] .bg-yellow-50 { background-color: rgba(234, 179, 8, .12) !important; }
+[data-theme="dark"] .bg-red-50    { background-color: rgba(230, 57, 70, .14) !important; }
+
+[data-theme="dark"] .text-blue-700   { color: #93C5FD !important; }
+[data-theme="dark"] .text-green-700  { color: #6EE7B7 !important; }
+[data-theme="dark"] .text-purple-700 { color: #C4B5FD !important; }
+[data-theme="dark"] .text-orange-700 { color: #FDBA74 !important; }
+[data-theme="dark"] .text-blue-600   { color: #60A5FA !important; }
+[data-theme="dark"] .text-green-600  { color: #34D399 !important; }
+[data-theme="dark"] .text-purple-600 { color: #A78BFA !important; }
+[data-theme="dark"] .text-orange-600 { color: #FB923C !important; }
+[data-theme="dark"] .text-red-600    { color: #F87171 !important; }
+[data-theme="dark"] .text-yellow-600 { color: #FBBF24 !important; }
+[data-theme="dark"] .text-yellow-700 { color: #FCD34D !important; }
+
+[data-theme="dark"] .border-blue-100   { border-color: rgba(59, 130, 246, .25) !important; }
+[data-theme="dark"] .border-green-100  { border-color: rgba(16, 185, 129, .25) !important; }
+[data-theme="dark"] .border-purple-100 { border-color: rgba(139, 92, 246, .25) !important; }
+[data-theme="dark"] .border-orange-100 { border-color: rgba(249, 115, 22, .25) !important; }
+
+/* Chips/badges con fondo gris claro dentro de stats (bg-gray-100 ya cubierto) */
+
+/* --- Sombras Tailwind sueltas que quedan demasiado suaves sobre oscuro --- */
+[data-theme="dark"] .shadow-sm { box-shadow: var(--sh-sm) !important; }
+[data-theme="dark"] .shadow-md,
+[data-theme="dark"] .hover\:shadow-md:hover { box-shadow: var(--sh-md) !important; }
+
+/* ============================================================================
+   AJUSTES FINOS  (legibilidad sobre oscuro)
+   ============================================================================ */
+
+/* El divisor "·" del footer usa text-gray-300; ya cubierto arriba. */
+
+/* Inputs/areas de texto que puedan quedar blancos por defecto del UA */
+[data-theme="dark"] input,
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+    background-color: var(--bg-elev);
+    color: var(--text);
+    border-color: var(--border);
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: var(--text-4); }
+
+/* Las búsquedas del header viven sobre el azul: conservan su estilo translúcido. */
+[data-theme="dark"] .header-search-input,
+[data-theme="dark"] .mobile-search-input {
+    background: rgba(255, 255, 255, .10);
+    color: #fff;
+    border-color: rgba(255, 255, 255, .20);
+}
+
+/* Toast: se mantienen los colores de estado (verde/rojo). */
+
+/* Skip-link / focus: el azul se aclara con el token --primary ya reescrito. */
+
+/* ============================================================================
+   AMPLIACIÓN — superficies/utilidades añadidas al repo DESPUÉS del handoff
+   (year stats, season cards, StatsPanel, barra de favoritos, calendario página,
+   badges productora, controles segmentados, logos de marca). Mismas 3 capas.
+   ============================================================================ */
+
+/* --- Controles segmentados: el activo era bg-gray-900 / bg-[#111827], que en
+       oscuro queda MÁS oscuro que el contenedor (bg-gray-100→--bg-tint) y no se
+       distingue. Se eleva a un slate claro para que "el seleccionado" destaque. */
+[data-theme="dark"] .bg-gray-900,
+[data-theme="dark"] .bg-gray-800 { background-color: #30415C !important; }
+[data-theme="dark"] .border-gray-800 { border-color: #30415C !important; }
+[data-theme="dark"] .bg-\[\#111827\] { background-color: #30415C !important; border-color: #30415C !important; }
+
+/* --- Rejilla del calendario (página /personal/calendario): las líneas
+       border-gray-50 quedaban blancas y marcaban una cuadrícula dura. --- */
+[data-theme="dark"] .border-gray-50 { border-color: var(--border) !important; }
+
+/* --- Logos de marca (productora + production companies): el logo suele ser
+       negro/oscuro; sobre superficie oscura desaparece → chip claro detrás. --- */
+[data-theme="dark"] .dark-logo-chip { background-color: #E8EAEE !important; border-radius: 8px; }
+
+/* --- Variantes con opacidad de gris (bg-gray-50/50, bg-gray-50/100) --- */
+[data-theme="dark"] [class*="bg-gray-50/"] { background-color: rgba(15, 24, 40, .6) !important; }
+
+/* ----------------------------------------------------------------------------
+   Familias de color: fondo translúcido + borde translúcido + texto claro.
+   Cubre bg-*-50/-100 (+variantes /xx), border-*-100/-200, gradient stops
+   from-*/to-*, y text-*-600/700/800 que el handoff no incluía.
+   ---------------------------------------------------------------------------- */
+
+/* RED / ROSE (acento) */
+[data-theme="dark"] .bg-red-100,
+[data-theme="dark"] [class*="bg-red-50/"],
+[data-theme="dark"] .bg-rose-50 { background-color: rgba(230, 57, 70, .14) !important; }
+[data-theme="dark"] .border-red-100,
+[data-theme="dark"] .border-red-200 { border-color: rgba(230, 57, 70, .28) !important; }
+[data-theme="dark"] .from-red-50 { --tw-gradient-from: rgba(230, 57, 70, .12) !important; }
+[data-theme="dark"] .to-red-100 { --tw-gradient-to: rgba(230, 57, 70, .16) !important; }
+[data-theme="dark"] .text-red-700 { color: #F87171 !important; }
+[data-theme="dark"] .text-rose-600 { color: #FB7185 !important; }
+
+/* ORANGE */
+[data-theme="dark"] .bg-orange-50,
+[data-theme="dark"] [class*="bg-orange-50/"] { background-color: rgba(249, 115, 22, .14) !important; }
+[data-theme="dark"] .border-orange-200 { border-color: rgba(249, 115, 22, .28) !important; }
+[data-theme="dark"] .to-orange-50 { --tw-gradient-to: rgba(249, 115, 22, .12) !important; }
+
+/* AMBER */
+[data-theme="dark"] .bg-amber-50,
+[data-theme="dark"] .bg-amber-100,
+[data-theme="dark"] [class*="bg-amber-50/"] { background-color: rgba(245, 158, 11, .14) !important; }
+[data-theme="dark"] .border-amber-100,
+[data-theme="dark"] .border-amber-200 { border-color: rgba(245, 158, 11, .28) !important; }
+[data-theme="dark"] .from-amber-50 { --tw-gradient-from: rgba(245, 158, 11, .12) !important; }
+[data-theme="dark"] .to-amber-100,
+[data-theme="dark"] .to-amber-50 { --tw-gradient-to: rgba(245, 158, 11, .14) !important; }
+[data-theme="dark"] .text-amber-500,
+[data-theme="dark"] .text-amber-600,
+[data-theme="dark"] .text-amber-700 { color: #FBBF24 !important; }
+[data-theme="dark"] .text-amber-800,
+[data-theme="dark"] .text-yellow-800 { color: #FCD34D !important; }
+
+/* YELLOW */
+[data-theme="dark"] .bg-yellow-100,
+[data-theme="dark"] [class*="bg-yellow-50/"] { background-color: rgba(234, 179, 8, .12) !important; }
+[data-theme="dark"] .border-yellow-100 { border-color: rgba(234, 179, 8, .25) !important; }
+[data-theme="dark"] .from-yellow-50 { --tw-gradient-from: rgba(234, 179, 8, .12) !important; }
+
+/* GREEN / EMERALD */
+[data-theme="dark"] .bg-green-100,
+[data-theme="dark"] .bg-emerald-50,
+[data-theme="dark"] [class*="bg-green-50/"],
+[data-theme="dark"] [class*="bg-emerald-50/"] { background-color: rgba(16, 185, 129, .14) !important; }
+[data-theme="dark"] .border-green-200,
+[data-theme="dark"] .border-emerald-100,
+[data-theme="dark"] .border-emerald-200 { border-color: rgba(16, 185, 129, .28) !important; }
+[data-theme="dark"] .from-emerald-50 { --tw-gradient-from: rgba(16, 185, 129, .12) !important; }
+[data-theme="dark"] .to-emerald-100 { --tw-gradient-to: rgba(16, 185, 129, .16) !important; }
+[data-theme="dark"] .text-emerald-600 { color: #34D399 !important; }
+[data-theme="dark"] .text-emerald-700 { color: #6EE7B7 !important; }
+
+/* TEAL */
+[data-theme="dark"] .bg-teal-50 { background-color: rgba(20, 184, 166, .14) !important; }
+[data-theme="dark"] .from-teal-50 { --tw-gradient-from: rgba(20, 184, 166, .12) !important; }
+[data-theme="dark"] .text-teal-600 { color: #2DD4BF !important; }
+
+/* CYAN */
+[data-theme="dark"] .bg-cyan-50 { background-color: rgba(6, 182, 212, .14) !important; }
+[data-theme="dark"] .border-cyan-100 { border-color: rgba(6, 182, 212, .25) !important; }
+[data-theme="dark"] .text-cyan-600 { color: #22D3EE !important; }
+[data-theme="dark"] .text-cyan-700 { color: #67E8F9 !important; }
+
+/* SKY */
+[data-theme="dark"] .bg-sky-50,
+[data-theme="dark"] .bg-sky-100 { background-color: rgba(14, 165, 233, .14) !important; }
+[data-theme="dark"] .text-sky-700 { color: #7DD3FC !important; }
+
+/* BLUE */
+[data-theme="dark"] .bg-blue-100,
+[data-theme="dark"] [class*="bg-blue-50/"],
+[data-theme="dark"] [class*="bg-blue-100/"] { background-color: rgba(59, 130, 246, .14) !important; }
+[data-theme="dark"] .border-blue-200 { border-color: rgba(59, 130, 246, .28) !important; }
+[data-theme="dark"] .from-blue-50 { --tw-gradient-from: rgba(59, 130, 246, .12) !important; }
+[data-theme="dark"] .to-blue-100 { --tw-gradient-to: rgba(59, 130, 246, .16) !important; }
+[data-theme="dark"] .text-blue-500 { color: #60A5FA !important; }
+[data-theme="dark"] .text-blue-800 { color: #93C5FD !important; }
+
+/* INDIGO */
+[data-theme="dark"] .bg-indigo-50,
+[data-theme="dark"] .bg-indigo-100 { background-color: rgba(99, 102, 241, .14) !important; }
+[data-theme="dark"] .border-indigo-100 { border-color: rgba(99, 102, 241, .25) !important; }
+[data-theme="dark"] .from-indigo-50 { --tw-gradient-from: rgba(99, 102, 241, .12) !important; }
+[data-theme="dark"] .text-indigo-700 { color: #A5B4FC !important; }
+
+/* VIOLET / PURPLE */
+[data-theme="dark"] .bg-purple-100,
+[data-theme="dark"] .bg-violet-50,
+[data-theme="dark"] [class*="bg-purple-50/"],
+[data-theme="dark"] [class*="bg-purple-100/"] { background-color: rgba(139, 92, 246, .14) !important; }
+[data-theme="dark"] .border-purple-200,
+[data-theme="dark"] .border-violet-200,
+[data-theme="dark"] [class*="border-purple-100/"] { border-color: rgba(139, 92, 246, .28) !important; }
+[data-theme="dark"] .from-purple-50 { --tw-gradient-from: rgba(139, 92, 246, .12) !important; }
+[data-theme="dark"] .to-purple-100,
+[data-theme="dark"] .to-purple-50 { --tw-gradient-to: rgba(139, 92, 246, .16) !important; }
+[data-theme="dark"] .text-purple-800 { color: #C4B5FD !important; }
+[data-theme="dark"] .text-violet-700 { color: #C4B5FD !important; }
+
+/* FUCHSIA */
+[data-theme="dark"] .bg-fuchsia-50 { background-color: rgba(217, 70, 239, .14) !important; }
+[data-theme="dark"] .border-fuchsia-200 { border-color: rgba(217, 70, 239, .28) !important; }
+[data-theme="dark"] .text-fuchsia-700 { color: #F0ABFC !important; }
+
+/* PINK */
+[data-theme="dark"] .bg-pink-50,
+[data-theme="dark"] .bg-pink-100 { background-color: rgba(236, 72, 153, .14) !important; }
+[data-theme="dark"] .text-pink-700 { color: #F9A8D4 !important; }
+
+/* --- Barra "Posición en favoritos" (serie): el 14% rojo quedaba casi invisible
+       para una barra que contiene controles. Se hace strip elevado legible. --- */
+[data-theme="dark"] .fav-position-bar {
+    background: var(--bg-tint) !important;            /* slate elevado, claramente visible */
+    border-bottom-color: var(--accent) !important;    /* acento rojo de favoritos */
+}
