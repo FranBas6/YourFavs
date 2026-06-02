@@ -283,12 +283,22 @@
         document.querySelectorAll('.hover-preview-host.is-previewing').forEach(function (h) { destroyOverlay(h); });
     }
 
-    function repurposeViewDetailsButton(host) {
-        // Reusamos el span "Ver detalles" de la card como trigger de preview en mobile.
-        var btn = host.querySelector('.view-details-btn');
-        if (!btn) return;
-        btn.classList.add('is-quickview');
+    function injectQuickviewButton(host) {
+        // El CTA "Ver detalles" se eliminó del diseño de las cards (refinamiento).
+        // En mobile inyectamos nuestro propio trigger de preview al pie de la card
+        // (la card entera ya navega al tocarla; este botón abre la vista rápida).
+        if (host.querySelector('.view-details-btn.is-quickview')) return;
+        var card = host.querySelector('a');
+        if (!card) return;
+        var content = card.lastElementChild; // columna de contenido (.p-3.5 flex-col)
+        if (!content) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'mt-auto pt-1';
+        var btn = document.createElement('span');
+        btn.className = 'view-details-btn is-quickview';
         btn.innerHTML = '<svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 3.3a1 1 0 0 1 1.5-.86l9 5.7a1 1 0 0 1 0 1.72l-9 5.7A1 1 0 0 1 6.3 14.7V3.3z"/></svg>Vista rápida';
+        wrap.appendChild(btn);
+        content.appendChild(wrap);
     }
 
     function init() {
@@ -296,8 +306,8 @@
             // Desktop: hover sobre cards
             document.querySelectorAll('.hover-preview-host').forEach(attach);
         } else {
-            // Mobile: rehúsa el span "Ver detalles" como trigger del preview
-            document.querySelectorAll('.hover-preview-host').forEach(repurposeViewDetailsButton);
+            // Mobile: inyecta el botón "Vista rápida" como trigger del preview
+            document.querySelectorAll('.hover-preview-host').forEach(injectQuickviewButton);
             document.addEventListener('click', function (e) {
                 var btn = e.target.closest('.view-details-btn.is-quickview');
                 if (!btn) return;

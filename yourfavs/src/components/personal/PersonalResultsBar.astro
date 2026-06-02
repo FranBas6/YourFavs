@@ -1,0 +1,48 @@
+---
+// Franja informativa para las listas personales: "MOSTRANDO X DE Y · N pelis ·
+// N series" (mono) + indicador de orden. Puramente informativa — no filtra ni
+// reordena (eso lo hace PersonalFilter). Va entre los stats y el grid.
+interface Props {
+    shown: number;
+    total: number;
+    movies: number;
+    series: number;
+    order?: string;
+}
+const { shown, total, movies, series, order = 'Añadidos recientes' } = Astro.props;
+---
+{total > 0 && (
+    <div class="yf-personal-bar">
+        <span class="yf-pb-count">
+            Mostrando <strong>{shown}</strong> de {total}
+            {(movies > 0 || series > 0) && <span class="yf-pb-sep">·</span>}
+            {movies > 0 && <span>{`${movies} ${movies === 1 ? 'película' : 'películas'}`}</span>}
+            {movies > 0 && series > 0 && <span class="yf-pb-sep">·</span>}
+            {series > 0 && <span>{`${series} ${series === 1 ? 'serie' : 'series'}`}</span>}
+        </span>
+        <span class="yf-pb-order">Orden: <strong>{order}</strong> ↓</span>
+    </div>
+)}
+
+<style>
+    .yf-personal-bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 20px;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--text-3);
+    }
+    @media (max-width: 640px) {
+        .yf-personal-bar { font-size: 9.5px; margin-bottom: 16px; }
+    }
+    .yf-pb-count strong,
+    .yf-pb-order strong { color: var(--text-2); font-weight: 700; }
+    .yf-pb-sep { margin: 0 6px; opacity: 0.6; }
+    .yf-pb-order { white-space: nowrap; }
+</style>

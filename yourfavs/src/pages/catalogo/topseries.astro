@@ -1,8 +1,9 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getTopRatedSeries} from "../../services/API/Series/tmdbSeries";
-import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams} from "../../services/API/shared/tmdbDiscoverService";
+import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
 
 const NETWORK_OPTIONS = [
@@ -31,10 +32,10 @@ const filtersActive = hasActiveFilters(filters);
 // Prioridad: si hay network O filtros avanzados, usamos /discover/tv
 // combinando ambos. Si no, usamos el endpoint top_rated por defecto.
 let popularSeries: Serie[];
-if (networkId || filtersActive) {
+if (networkId || filtersActive || filters.sort) {
     const params: Record<string, string> = {
         page: pageStr,
-        sort_by: 'vote_average.desc',
+        sort_by: sortByFor(filters.sort, 'tv') || 'vote_average.desc',
         'vote_count.gte': '100',
         ...buildDiscoverFilterParams(filters, 'tv'),
     };
@@ -59,16 +60,15 @@ function buildFilterUrl(changes: Record<string, string | null>) {
 ---
 <Layout title="Top Series">
     <section class="px-1 sm:py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-                {activeNetwork ? `Series de ${activeNetwork.name}` : 'Top Series'}
-            </h1>
-            <p class="text-gray-500 text-base">
-                {activeNetwork ? `Producciones originales y destacadas de ${activeNetwork.name}` : 'Las series mejor valoradas por la crítica y el público'}
-            </p>
-        </header>
+        <CatalogHeader
+            title={activeNetwork ? `Series de ${activeNetwork.name}` : 'Top Series'}
+            subtitle={activeNetwork ? `Producciones originales y destacadas de ${activeNetwork.name}` : 'Las series mejor valoradas por la crítica y el público'}
+            color="blue"
+            icon="trophy"
+        />
 
-        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} showStatus>
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} showStatus order="Nota"
+                         sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'recent', label: 'Más recientes' }]}>
             <div slot="before">
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Cadena TV</p>
                 <div class="flex flex-wrap gap-2">

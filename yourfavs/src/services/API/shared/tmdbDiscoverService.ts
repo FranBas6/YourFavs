@@ -61,12 +61,25 @@ export async function fetchByProvider<T>(
 // === Filtros avanzados (C1) ===
 
 export interface AdvancedFilters {
-    decade?: string;       // '2020', '2010', '2000', '1990', '1980', '1970'
+    decade?: string;       // '2020', '2010', '2000', '1990', '1980', '1970' (legacy)
     year?: string;         // año concreto (tiene prioridad sobre decade)
-    rating?: string;       // '7', '8', '9'
+    yearFrom?: string;     // rango de años: desde (nuevo panel)
+    yearTo?: string;       // rango de años: hasta
+    rating?: string;       // nota mínima (vote_average.gte): '7', '7.5', '8'…
     runtime?: 'short' | 'medium' | 'long'; // solo movies
     language?: string;     // código ISO 639-1: 'en', 'es', 'ja', 'ko', 'fr'...
     status?: string;       // solo series: '0' returning, '3' ended, '4' canceled
+    cert?: string;         // certificación máxima (solo movies, país ES): 'APTA','7','12','16','18'
+    sort?: string;         // orden abstracto: 'popular' | 'rating' | 'recent'
+}
+
+/** Mapea un orden abstracto al sort_by correcto de TMDB según el tipo de medio. */
+export function sortByFor(sort: string | undefined, mediaType: MediaType): string | undefined {
+    if (!sort) return undefined;
+    if (sort === 'popular') return 'popularity.desc';
+    if (sort === 'rating') return 'vote_average.desc';
+    if (sort === 'recent') return mediaType === 'movie' ? 'primary_release_date.desc' : 'first_air_date.desc';
+    return undefined;
 }
 
 /**
@@ -76,21 +89,30 @@ export function parseAdvancedFilters(params: URLSearchParams): AdvancedFilters {
     const f: AdvancedFilters = {};
     const decade = params.get('decade');
     const year = params.get('year');
+    const yearFrom = params.get('yearFrom');
+    const yearTo = params.get('yearTo');
     const rating = params.get('rating');
     const runtime = params.get('runtime');
     const language = params.get('language');
     const status = params.get('status');
+    const cert = params.get('cert');
+    const sort = params.get('sort');
     if (decade) f.decade = decade;
     if (year) f.year = year;
+    if (yearFrom) f.yearFrom = yearFrom;
+    if (yearTo) f.yearTo = yearTo;
     if (rating) f.rating = rating;
     if (runtime === 'short' || runtime === 'medium' || runtime === 'long') f.runtime = runtime;
     if (language) f.language = language;
     if (status) f.status = status;
+    if (cert) f.cert = cert;
+    if (sort) f.sort = sort;
     return f;
 }
 
+// 'sort' es un orden, no un filtro que reduzca resultados → no cuenta como activo.
 export function hasActiveFilters(f: AdvancedFilters): boolean {
-    return !!(f.decade || f.year || f.rating || f.runtime || f.language || f.status);
+    return !!(f.decade || f.year || f.yearFrom || f.yearTo || f.rating || f.runtime || f.language || f.status || f.cert);
 }
 
 /**
@@ -105,6 +127,11 @@ function buildDiscoverParams(f: AdvancedFilters, mediaType: MediaType): Record<s
     if (f.year) {
         out[`${dateField}.gte`] = `${f.year}-01-01`;
         out[`${dateField}.lte`] = `${f.year}-12-31`;
+    } else if (f.yearFrom || f.yearTo) {
+        const from = f.yearFrom || '1900';
+        const to = f.yearTo || String(new Date().getFullYear() + 1);
+        out[`${dateField}.gte`] = `${from}-01-01`;
+        out[`${dateField}.lte`] = `${to}-12-31`;
     } else if (f.decade) {
         const d = Number(f.decade);
         if (!Number.isNaN(d)) {
@@ -135,6 +162,12 @@ function buildDiscoverParams(f: AdvancedFilters, mediaType: MediaType): Record<s
         out['with_status'] = f.status;
     }
 
+    // Certificación por edad — solo /discover/movie, país España.
+    if (mediaType === 'movie' && f.cert) {
+        out['certification_country'] = 'ES';
+        out['certification.lte'] = f.cert;
+    }
+
     return out;
 }
 
@@ -154,6 +187,10 @@ export function applyClientFilters<T extends { release_date?: string; first_air_
 
         if (filters.year) {
             if (year !== Number(filters.year)) return false;
+        } else if (filters.yearFrom || filters.yearTo) {
+            const from = filters.yearFrom ? Number(filters.yearFrom) : -Infinity;
+            const to = filters.yearTo ? Number(filters.yearTo) : Infinity;
+            if (year === null || year < from || year > to) return false;
         } else if (filters.decade) {
             const d = Number(filters.decade);
             if (year === null || year < d || year > d + 9) return false;

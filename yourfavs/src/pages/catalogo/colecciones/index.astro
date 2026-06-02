@@ -1,5 +1,6 @@
 ---
 import Layout from "../../../layouts/Layout.astro";
+import CatalogHeader from "../../../components/CatalogHeader.astro";
 import { searchCollections, type MovieCollectionInfo, type CollectionSearchResponse } from "../../../services/API/Movies/InfoMovies";
 import { getUserCollections, getPopularCollections, invalidateCollectionsCache } from "../../../services/API/shared/collectionsDiscovery";
 import { safeFetch } from "../../../utils/safeFetch";
@@ -41,11 +42,13 @@ function searchUrl(p: number): string {
 ---
 <Layout title="Sagas y colecciones">
     <section class="px-1 sm:py-8">
-        <header class="mb-6">
-            <p class="text-sm text-gray-4000 mb-1">Explora</p>
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Sagas y colecciones</h1>
-            <p class="text-gray-500 text-base mt-2">Franquicias del cine agrupadas cronológicamente</p>
-        </header>
+        <CatalogHeader
+            kicker="Explora"
+            title="Sagas y colecciones"
+            subtitle="Franquicias del cine agrupadas cronológicamente"
+            color="amber"
+            icon="tag"
+        />
 
         <!-- Buscador -->
         <form method="GET" class="mb-8">

@@ -1,8 +1,9 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import {getTopRatedMovies} from "../../services/API/Movies/tmdbMovies";
-import {discoverContent, parseAdvancedFilters, hasActiveFilters} from "../../services/API/shared/tmdbDiscoverService";
+import {discoverContent, parseAdvancedFilters, hasActiveFilters, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
@@ -18,9 +19,10 @@ const pageStr = page.toString();
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
+const useDiscover = filtersActive || !!filters.sort;
 
-const popularMovies = filtersActive
-    ? await discoverContent<Movie>('movie', filters, { sort_by: 'vote_average.desc', voteCountMin: '300', page: pageStr })
+const popularMovies = useDiscover
+    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'vote_average.desc', voteCountMin: '300', page: pageStr })
     : await getTopRatedMovies({page: pageStr});
 
 const totalPages = 500;
@@ -37,12 +39,15 @@ function buildFilterUrl(changes: Record<string, string | null>) {
 ---
 <Layout title="Top Películas">
     <section class="px-1 sm:py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Top Películas</h1>
-            <p class="text-gray-500 text-base">Las películas mejor valoradas por la crítica y el público</p>
-        </header>
+        <CatalogHeader
+            title="Top Películas"
+            subtitle="Las películas mejor valoradas por la crítica y el público"
+            color="amber"
+            icon="star"
+        />
 
-        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} />
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showCert order="Nota"
+                         sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>

@@ -10,6 +10,7 @@ import {fetchPersonalPageData} from "../../utils/personalPageHelper";
 import StatsPanel from "../../components/personal/StatsPanel.astro";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import PersonalFilter from "../../components/personal/PersonalFilter.astro";
+import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
@@ -52,6 +53,13 @@ const {
             <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} />
         </div>
         <StatsPanel stats={stats} />
+
+        <PersonalResultsBar
+            shown={seriesPaginadas.length + peliculasPaginadas.length}
+            total={filteredSeries.length + filteredMovies.length}
+            movies={filteredMovies.length}
+            series={filteredSeries.length}
+        />
 
         <div class="space-y-10">
             {/* Series */}

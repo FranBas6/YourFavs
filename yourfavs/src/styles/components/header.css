@@ -35,7 +35,7 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     letter-spacing: 0.05em;
-    animation: logoShine 6s ease-in-out infinite;
+    animation: logoShine 12s ease-in-out infinite;  /* más sutil (antes 6s) */
 }
 
 @keyframes logoShine {
@@ -198,7 +198,7 @@
     border: none;
     color: white;
     cursor: pointer;
-    margin-left: auto;
+    margin-left: 0;   /* el auto vive ahora en .header-mobile-user (grupo a la derecha) */
     transition: background 0.2s;
 }
 
@@ -480,24 +480,25 @@
 .cal-cell.cal-has-events { cursor: pointer; }
 .cal-cell.cal-has-events:hover { background: #F3F4F6; }
 .cal-cell.cal-today {
-    background: #EFF6FF;
-    outline: 2px solid #3B82F6;
+    background: var(--primary-soft);
+    outline: 2px solid var(--primary);
     outline-offset: -2px;
 }
 .cal-cell.cal-selected {
-    outline: 2px solid #EF4444;
+    outline: 2px solid var(--accent);
     outline-offset: -2px;
-    background: #FEF2F2;
+    background: var(--accent-soft);
 }
 .cal-cell.cal-today.cal-selected {
-    background: #FEF2F2;
+    background: var(--accent-soft);
 }
 .cal-day-num {
+    font-family: var(--font-mono);
     font-size: 11px;
     font-weight: 500;
     color: #374151;
 }
-.cal-today .cal-day-num { color: #2563EB; font-weight: 700; }
+.cal-today .cal-day-num { color: var(--primary-dark); font-weight: 700; }
 .cal-dots {
     display: flex;
     gap: 2px;
@@ -508,8 +509,8 @@
     height: 5px;
     border-radius: 50%;
 }
-.cal-dot-movie { background: #EF4444; }
-.cal-dot-serie { background: #3B82F6; }
+.cal-dot-movie { background: var(--accent); }
+.cal-dot-serie { background: var(--primary); }
 .cal-dot-season { background: #8B5CF6; }
 
 /* Day detail popup */
@@ -717,6 +718,120 @@
 .cal-notif-subdate {
     color: #9CA3AF;
     flex-shrink: 0;
+}
+
+/* --- Botón icono genérico (usuario) en acciones desktop --- */
+.header-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: white;
+    text-decoration: none;
+    transition: background 0.2s ease;
+    flex-shrink: 0;
+}
+.header-icon-btn:hover { background: rgba(255, 255, 255, 0.18); }
+.header-icon-btn.is-active {
+    background: rgba(255, 255, 255, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+/* --- Usuario (móvil): visible <1024, junto a la hamburguesa --- */
+.header-mobile-user {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    padding: 0.25rem;
+    border-radius: 0.5rem;
+    transition: background 0.2s ease;
+    margin-left: auto;   /* empuja el grupo usuario+hamburguesa a la derecha */
+}
+.header-mobile-user:hover { background: rgba(255, 255, 255, 0.12); }
+@media (min-width: 1024px) {
+    .header-mobile-user { display: none; }
+}
+
+/* --- Descubrir: botón + dropdown (panel oscuro sobre el header azul) --- */
+.header-discover { position: relative; }
+.header-discover-btn {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+}
+.header-discover-chev {
+    width: 0.7rem;
+    height: 0.7rem;
+    opacity: 0.7;
+    transition: transform 0.2s ease;
+}
+.header-discover.is-open .header-discover-chev { transform: rotate(180deg); }
+
+.header-discover-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 520px;
+    max-width: calc(100vw - 2rem);
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--r-lg, 14px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+    padding: 18px;
+    backdrop-filter: blur(20px);
+    z-index: 60;
+}
+.header-discover.is-open .header-discover-panel { display: block; }
+
+.header-discover-kicker {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 0 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    margin-bottom: 8px;
+}
+.header-discover-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+}
+.header-discover-item {
+    display: flex;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: var(--r-sm, 6px);
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+.header-discover-item:hover { background: rgba(255, 255, 255, 0.06); }
+.header-discover-item .hd-body {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.header-discover-item .hd-t { font-size: 14px; font-weight: 600; color: #fff; }
+.header-discover-item .hd-s { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+
+/* --- Etiquetas de sección en el panel móvil (NAVEGAR / DESCUBRIR) --- */
+.mobile-section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 1rem 0 0.5rem 0.4rem;
 }
 
 /* --- Reduced motion --- */

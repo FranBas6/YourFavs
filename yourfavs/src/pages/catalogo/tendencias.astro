@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getTrending, getTrendingPeople, parseAdvancedFilters, hasActiveFilters, applyClientFilters} from "../../services/API/shared/tmdbDiscoverService";
@@ -50,10 +51,12 @@ function buildFilterUrl(changes: Record<string, string | null>) {
 ---
 <Layout title="Tendencias">
     <div class="px-1 sm:py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Tendencias</h1>
-            <p class="text-gray-500 text-base mb-4">Lo más trending {timeWindow === 'day' ? 'de hoy' : 'de la semana'} en películas y series</p>
-        </header>
+        <CatalogHeader
+            title="Tendencias"
+            subtitle={`Lo más trending ${timeWindow === 'day' ? 'de hoy' : 'de la semana'} en películas y series`}
+            color="red"
+            icon="trending-up"
+        />
 
         <FilterBar currentType={type} buildUrl={(t) => buildFilterUrl({ type: t })} showPeople />
 

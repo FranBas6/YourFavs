@@ -1,10 +1,11 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getMoviesByCategory} from "../../services/API/Movies/tmdbMovies";
 import {getSeriesByCategory} from "../../services/API/Series/tmdbSeries";
-import {parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams} from "../../services/API/shared/tmdbDiscoverService";
+import {parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
 import {MOVIE_GENRE_SLUGS, SERIE_GENRE_SLUGS} from "../../utils/constants/genreSlugs";
 import {getGenreName} from "../../utils/constants/genres";
@@ -30,6 +31,10 @@ const type = urlParams.get('type') || 'all';
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
+const useDiscover = filtersActive || !!filters.sort;
+// Las categorías especiales (Próximamente, En emisión…) usan endpoints propios
+// que NO admiten orden → ahí ocultamos el selector y el indicador de orden.
+const supportsSort = typeof MOVIE_GENRE_SLUGS[category] === 'number' || typeof SERIE_GENRE_SLUGS[category] === 'number';
 
 // Cuando hay filtros avanzados, construimos /discover directo combinando
 // with_genres del slug + params de filtros. Si el slug es "upcoming"/"on_the_air",
@@ -40,7 +45,7 @@ async function fetchMoviesWithFilters(): Promise<Movie[]> {
     if (typeof g !== 'number') return getMoviesByCategory(category, pageStr);
     const params: Record<string, string> = {
         page: pageStr,
-        sort_by: 'popularity.desc',
+        sort_by: sortByFor(filters.sort, 'movie') || 'popularity.desc',
         'vote_count.gte': '100',
         with_genres: g.toString(),
         ...buildDiscoverFilterParams(filters, 'movie'),
@@ -53,7 +58,7 @@ async function fetchSeriesWithFilters(): Promise<Serie[]> {
     if (typeof g !== 'number') return getSeriesByCategory(category, pageStr);
     const params: Record<string, string> = {
         page: pageStr,
-        sort_by: 'popularity.desc',
+        sort_by: sortByFor(filters.sort, 'tv') || 'popularity.desc',
         'vote_count.gte': '100',
         with_genres: g.toString(),
         ...buildDiscoverFilterParams(filters, 'tv'),
@@ -61,7 +66,7 @@ async function fetchSeriesWithFilters(): Promise<Serie[]> {
     return tmdbFetchList<Serie>('/discover/tv', params);
 }
 
-const [latestMovies, latestSeries] = filtersActive
+const [latestMovies, latestSeries] = useDiscover
     ? await Promise.all([
         safeFetch(fetchMoviesWithFilters(), 'categorias/moviesFiltered', [] as Movie[]),
         safeFetch(fetchSeriesWithFilters(), 'categorias/seriesFiltered', [] as Serie[]),
@@ -101,10 +106,12 @@ function buildCategoryUrl(slug: string) {
 ---
 <Layout title={`Categoría: ${categoryLabel}`}>
     <section class="px-1 sm:py-8">
-        <header class="mb-6">
-            <p class="text-sm text-gray-4000 mb-1">Categoría</p>
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{categoryLabel}</h1>
-        </header>
+        <CatalogHeader
+            kicker="Categoría"
+            title={categoryLabel}
+            color="purple"
+            icon="layers"
+        />
 
         <!-- Categorías: desplegable en móvil, pills en desktop -->
         <details class="mb-6 sm:hidden group">
@@ -117,22 +124,22 @@ function buildCategoryUrl(slug: string) {
             <div class="flex flex-wrap gap-2 mt-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
                 {allCategories.map((cat) => (
                     <a href={buildCategoryUrl(cat.slug)}
-                       class={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border
+                       class={`px-3 py-1.5 rounded-full text-[13px] font-medium transition-all border
                            ${category === cat.slug
-                               ? 'bg-red-500 text-white border-red-500'
-                               : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
+                               ? 'bg-[#E63946] text-white border-[#E63946]'
+                               : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'}`}>
                         {cat.label}
                     </a>
                 ))}
             </div>
         </details>
-        <div class="hidden sm:flex flex-wrap gap-2 mb-6">
+        <div class="hidden sm:flex flex-wrap gap-1.5 mb-6">
             {allCategories.map((cat) => (
                 <a href={buildCategoryUrl(cat.slug)}
-                   class={`px-3.5 py-2 rounded-full text-sm font-medium transition-all border
+                   class={`px-3 py-1.5 rounded-full text-[13px] font-medium transition-all border
                        ${category === cat.slug
-                           ? 'bg-red-500 text-white border-red-500 shadow-sm shadow-red-200'
-                           : 'bg-white text-gray-600 border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-sm'}`}>
+                           ? 'bg-[#E63946] text-white border-[#E63946] shadow-sm'
+                           : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'}`}>
                     {cat.label}
                 </a>
             ))}
@@ -140,7 +147,9 @@ function buildCategoryUrl(slug: string) {
 
         <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
-        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'} />
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
+                         showCert={type === 'movies'} order={supportsSort ? 'Popularidad' : undefined}
+                         sortOptions={supportsSort ? [{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }] : []} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages} · <strong class="text-gray-700">{categoryLabel}</strong></span>

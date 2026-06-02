@@ -1,0 +1,62 @@
+---
+// Cabecera de página de catálogo: stamp grande (56×56) + título (Poppins 800,
+// 36px) + subtítulo. Kicker mono opcional (Plataforma / Categoría / Explora).
+// Patrón único para las páginas de /catalogo. Ver docs/design_handoff.
+import Stamp from './Stamp.astro';
+
+interface Props {
+    title: string;
+    subtitle?: string;
+    kicker?: string;
+    color?: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
+    icon: string;   // icono Lucide
+}
+const { title, subtitle, kicker, color = 'slate', icon } = Astro.props;
+---
+<header class="yf-page-head">
+    <Stamp color={color} icon={icon} size={56} />
+    <div class="yf-page-head-text">
+        {kicker && <p class="yf-page-kicker">{kicker}</p>}
+        <h1 class="yf-page-title">{title}</h1>
+        {subtitle && <p class="yf-page-sub">{subtitle}</p>}
+    </div>
+</header>
+
+<style>
+    .yf-page-head {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 28px;
+    }
+    .yf-page-head-text { min-width: 0; }
+    .yf-page-kicker {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-3);
+        margin: 0 0 2px;
+    }
+    .yf-page-title {
+        font-family: var(--font);
+        font-weight: 800;
+        font-size: 36px;
+        letter-spacing: -0.02em;
+        line-height: 1.05;
+        color: var(--text);
+        margin: 0;
+    }
+    .yf-page-sub {
+        color: var(--text-3);
+        font-size: 15px;
+        line-height: 1.5;
+        margin: 4px 0 0;
+    }
+    @media (max-width: 640px) {
+        .yf-page-head { gap: 12px; margin-bottom: 18px; }
+        .yf-page-head :global(.yf-stamp) { --st-size: 40px; }
+        .yf-page-title { font-size: 24px; }
+        .yf-page-sub { font-size: 13px; }
+    }
+</style>

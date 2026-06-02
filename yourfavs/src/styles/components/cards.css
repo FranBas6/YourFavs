@@ -9,9 +9,13 @@
 }
 
 .media-card:hover {
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    transform: translateY(-2px);          /* lift suave (antes: sin lift) */
+    box-shadow: var(--sh-card);
     z-index: 1;
 }
+/* Nota: NO cambiamos el fondo de la card en hover. El degradado del pie del
+   póster funde a #0F172A; aclarar el contenido a --card-hover creaba un escalón
+   visible justo bajo la imagen. El lift + sombra es suficiente afordancia. */
 
 /* --- Colores de card --- */
 .bg-midnight-blue { background-color: #0F172A; }
@@ -39,6 +43,8 @@
 }
 
 /* --- Top badges (NUEVO, TRENDING, POPULAR) --- */
+/* Estáticos: sin badgePulse (eliminado en el refinamiento). Apilables vía el
+   contenedor flex-col de cada card cuando coinciden varios. */
 .top-badge {
     font-size: 0.65rem;
     font-weight: 700;
@@ -49,12 +55,12 @@
     display: flex;
     align-items: center;
     gap: 0.2rem;
-    animation: badgePulse 3s ease-in-out infinite;
 }
 
-@keyframes badgePulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.85; }
+/* Badge de acento (TRENDING / POPULAR) — rojo único del sistema #E63946. */
+.badge-accent {
+    background-color: var(--accent);
+    color: #fff;
 }
 
 /* --- Genre tag --- */

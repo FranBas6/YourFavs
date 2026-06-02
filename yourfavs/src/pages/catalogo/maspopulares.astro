@@ -1,10 +1,11 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getMostPopularMovies} from "../../services/API/Movies/tmdbMovies";
 import {getMostPopularSeries} from "../../services/API/Series/tmdbSeries";
-import {discoverContent, parseAdvancedFilters, hasActiveFilters} from "../../services/API/shared/tmdbDiscoverService";
+import {discoverContent, parseAdvancedFilters, hasActiveFilters, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import FilterBar from "../../components/FilterBar.astro";
@@ -24,13 +25,15 @@ const pageStr = page.toString();
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
+// Si hay filtros O un orden seleccionado, vamos por discover (que respeta sort_by).
+const useDiscover = filtersActive || !!filters.sort;
 
-const popularMovies = filtersActive
-    ? await discoverContent<Movie>('movie', filters, { sort_by: 'popularity.desc', page: pageStr })
+const popularMovies = useDiscover
+    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'popularity.desc', page: pageStr })
     : await getMostPopularMovies({page: pageStr});
 
-const popularSeries = filtersActive
-    ? await discoverContent<Serie>('tv', filters, { sort_by: 'popularity.desc', page: pageStr })
+const popularSeries = useDiscover
+    ? await discoverContent<Serie>('tv', filters, { sort_by: sortByFor(filters.sort, 'tv') || 'popularity.desc', page: pageStr })
     : await getMostPopularSeries({page: pageStr});
 
 const totalPages = 250;
@@ -60,14 +63,18 @@ function buildTypeUrl(t: string) {
 ---
 <Layout title="Más Populares">
     <div class="px-1 sm:py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Más Populares</h1>
-            <p class="text-gray-500 text-base">Las películas y series más populares del momento</p>
-        </header>
+        <CatalogHeader
+            title="Más Populares"
+            subtitle="Las películas y series más populares del momento"
+            color="pink"
+            icon="flame"
+        />
 
         <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
-        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'} />
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
+                         showCert={type === 'movies'} order="Popularidad"
+                         sortOptions={[{ value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>

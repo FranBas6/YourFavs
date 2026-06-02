@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import CardActor from "../../components/Cards/CardActor.astro";
@@ -39,10 +40,14 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
 ---
 <Layout title={`Búsqueda: ${title}`}>
     <section class="px-1 sm:py-8">
-        <header class="mb-6">
-            <p class="text-sm text-gray-4000 mb-1">Resultados para</p>
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-3">"{title}"</h1>
+        <CatalogHeader
+            kicker="Resultados para"
+            title={`"${title}"`}
+            color="slate"
+            icon="search"
+        />
 
+        <div class="-mt-4 mb-6">
             {totalResults > 0 ? (
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="text-sm text-gray-500">{totalResults} resultados</span>
@@ -60,7 +65,7 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
             ) : (
                 <p class="text-gray-500">No se encontraron resultados</p>
             )}
-        </header>
+        </div>
 
         <!-- Navegación por secciones -->
         {totalResults > 0 && (

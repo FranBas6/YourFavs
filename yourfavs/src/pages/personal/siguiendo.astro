@@ -8,6 +8,7 @@ import {buildUrl} from "../../utils/buildUrl";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {processBatch} from "../../utils/processBatch";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
@@ -168,6 +169,14 @@ const pageUrl = Astro.url;
                 <a href={pageUrl.pathname} class="ml-2 text-blue-500 hover:underline">Limpiar</a>
             </div>
         )}
+
+        <PersonalResultsBar
+            shown={seriesPaginadas.length}
+            total={filteredSeries.length}
+            movies={0}
+            series={filteredSeries.length}
+            order="Último episodio"
+        />
 
         <div class="space-y-10">
             {/* C13 + C26 — A un paso de terminar (carrusel horizontal) */}

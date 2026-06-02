@@ -1,0 +1,153 @@
+---
+// Cabecera de sección refinada. Desktop: stamp 40 + título 22px (--primary) +
+// contador mono inline + tag "Destacado" + pill "Ver más". Móvil: fila compacta
+// (stamp 32, título 14px, contador inline, sin tag, "Ver más" como link plano)
+// replicando el MobileSection del prototipo. Ver docs/design_handoff.
+import Stamp from './Stamp.astro';
+
+interface Props {
+    title: string;
+    link?: string;
+    count?: number;       // nº total de títulos de la sección
+    featured?: boolean;   // muestra el tag "Destacado" (oculto en móvil)
+    color?: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
+    icon: string;         // icono Lucide del stamp
+}
+const { title, link, count, featured = false, color = 'slate', icon } = Astro.props;
+const countLabel = count != null && count > 0
+    ? `${count} ${count === 1 ? 'título' : 'títulos'}`
+    : null;
+---
+<header class="yf-section-header">
+    <div class="yf-sh-left">
+        <Stamp color={color} icon={icon} />
+        <h2 class="yf-sh-title">{title}{countLabel && <span class="yf-sh-count">{countLabel}</span>}</h2>
+        {featured && <span class="yf-sh-tag">Destacado</span>}
+    </div>
+    {link && (
+        <a href={link} class="yf-sh-more">
+            <span>Ver más</span>
+            <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+            </svg>
+        </a>
+    )}
+</header>
+
+<style>
+    .yf-section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        padding-bottom: 18px;
+        border-bottom: 2px solid var(--border);
+        margin-bottom: 24px;
+    }
+    .yf-sh-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        min-width: 0;
+    }
+    .yf-sh-title {
+        margin: 0;
+        font-family: var(--font);
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: -0.02em;
+        color: var(--primary);
+        line-height: 1.1;
+    }
+    .yf-sh-count {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-3);
+        letter-spacing: 0;
+        margin-left: 8px;
+        white-space: nowrap;
+    }
+    .yf-sh-tag {
+        font-family: var(--font);
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border: 1px solid var(--accent-light);
+        padding: 4px 10px;
+        border-radius: var(--r-full);
+    }
+    .yf-sh-more {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex-shrink: 0;
+        padding: 6px 12px;
+        font-size: 13px;
+        font-weight: 500;
+        text-decoration: none;
+        color: var(--primary);
+        background: var(--primary-soft);
+        border-radius: var(--r-sm);
+        border: 1px solid transparent;
+        transition: all 0.15s ease;
+    }
+    .yf-sh-more svg {
+        width: 13px;
+        height: 13px;
+        transition: transform 0.15s ease;
+    }
+    .yf-sh-more:hover {
+        background: var(--primary);
+        color: #fff;
+    }
+    .yf-sh-more:hover svg {
+        transform: translateX(2px);
+    }
+
+    /* Móvil: fila compacta de una sola línea (réplica del MobileSection) */
+    @media (max-width: 640px) {
+        .yf-section-header {
+            gap: 8px;
+            flex-wrap: nowrap;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+        .yf-sh-left {
+            gap: 10px;
+            flex-wrap: nowrap;
+        }
+        .yf-sh-left :global(.yf-stamp) {
+            --st-size: 32px;
+        }
+        .yf-sh-title {
+            font-size: 14px;
+            line-height: 1.2;
+            min-width: 0;
+        }
+        .yf-sh-count {
+            font-size: 10px;
+            margin-left: 6px;
+        }
+        .yf-sh-tag {
+            display: none;
+        }
+        .yf-sh-more {
+            background: transparent;
+            border: 0;
+            padding: 0;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .yf-sh-more:hover {
+            background: transparent;
+            color: var(--primary-dark);
+        }
+    }
+</style>

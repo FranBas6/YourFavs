@@ -15,7 +15,7 @@ const isLast = page === totalPages;
         <a href={buildUrl(Math.max(1, page - 1))}
            rel="prev"
            class={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-               ${isFirst ? 'opacity-40 pointer-events-none bg-gray-100 text-gray-4000' : 'bg-white text-gray-700 shadow-sm border border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-md active:scale-95'}`}
+               ${isFirst ? 'opacity-40 pointer-events-none bg-gray-100 text-gray-400' : 'bg-white text-gray-700 shadow-sm border border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-md active:scale-95'}`}
            aria-disabled={isFirst}>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
@@ -23,14 +23,12 @@ const isLast = page === totalPages;
             Anterior
         </a>
 
-        <span class="text-sm text-gray-500">
-            <span class="font-semibold text-gray-900">{page}</span> / {totalPages}
-        </span>
+        <span class="yf-pg-meta">PÁG <strong>{page}</strong> DE {totalPages}</span>
 
         <a href={buildUrl(Math.min(totalPages, page + 1))}
            rel="next"
            class={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-               ${isLast ? 'opacity-40 pointer-events-none bg-gray-100 text-gray-4000' : 'bg-white text-gray-700 shadow-sm border border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-md active:scale-95'}`}
+               ${isLast ? 'opacity-40 pointer-events-none bg-gray-100 text-gray-400' : 'bg-white text-gray-700 shadow-sm border border-gray-200 hover:border-red-300 hover:text-red-600 hover:shadow-md active:scale-95'}`}
            aria-disabled={isLast}>
             Siguiente
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -40,13 +38,13 @@ const isLast = page === totalPages;
     </div>
 
     <!-- Desktop -->
-    <div class="hidden sm:flex justify-center">
+    <div class="hidden sm:flex flex-col items-center gap-2">
         <div class="inline-flex items-center gap-1 bg-white rounded-xl p-1.5 shadow-sm border border-gray-100">
             <!-- Anterior -->
             <a href={buildUrl(Math.max(1, page - 1))}
                rel="prev"
                class={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all
-                   ${isFirst ? 'opacity-40 pointer-events-none text-gray-4000' : 'text-gray-600 hover:bg-red-50 hover:text-red-600 active:scale-95'}`}
+                   ${isFirst ? 'opacity-40 pointer-events-none text-gray-400' : 'text-gray-600 hover:bg-[#FEE2E2] hover:text-[#E63946] active:scale-95'}`}
                aria-disabled={isFirst}>
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
@@ -57,29 +55,29 @@ const isLast = page === totalPages;
             <!-- Primera página -->
             {page > 2 && (
                 <>
-                    <a href={buildUrl(1)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">1</a>
+                    <a href={buildUrl(1)} class="yf-pg-num w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-[#FEE2E2] hover:text-[#E63946] transition-all">1</a>
                     {page > 3 && <span class="w-9 h-9 flex items-center justify-center text-gray-300 text-sm">···</span>}
                 </>
             )}
 
             <!-- Anterior -->
             {page > 1 && (
-                <a href={buildUrl(page - 1)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">{page - 1}</a>
+                <a href={buildUrl(page - 1)} class="yf-pg-num w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-[#FEE2E2] hover:text-[#E63946] transition-all">{page - 1}</a>
             )}
 
             <!-- Actual -->
-            <span class="w-9 h-9 flex items-center justify-center rounded-lg text-sm font-semibold bg-red-500 text-white shadow-sm shadow-red-200" aria-current="page">{page}</span>
+            <span class="yf-pg-num w-9 h-9 flex items-center justify-center rounded-lg text-sm font-semibold bg-[#E63946] text-white shadow-sm" aria-current="page">{page}</span>
 
             <!-- Siguiente -->
             {page < totalPages && (
-                <a href={buildUrl(page + 1)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">{page + 1}</a>
+                <a href={buildUrl(page + 1)} class="yf-pg-num w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-[#FEE2E2] hover:text-[#E63946] transition-all">{page + 1}</a>
             )}
 
             <!-- Última página -->
             {page < totalPages - 1 && (
                 <>
                     {page < totalPages - 2 && <span class="w-9 h-9 flex items-center justify-center text-gray-300 text-sm">···</span>}
-                    <a href={buildUrl(totalPages)} class="w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-red-50 hover:text-red-600 transition-all">{totalPages}</a>
+                    <a href={buildUrl(totalPages)} class="yf-pg-num w-9 h-9 flex items-center justify-center rounded-lg text-sm text-gray-600 hover:bg-[#FEE2E2] hover:text-[#E63946] transition-all">{totalPages}</a>
                 </>
             )}
 
@@ -87,7 +85,7 @@ const isLast = page === totalPages;
             <a href={buildUrl(Math.min(totalPages, page + 1))}
                rel="next"
                class={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all
-                   ${isLast ? 'opacity-40 pointer-events-none text-gray-4000' : 'text-gray-600 hover:bg-red-50 hover:text-red-600 active:scale-95'}`}
+                   ${isLast ? 'opacity-40 pointer-events-none text-gray-400' : 'text-gray-600 hover:bg-[#FEE2E2] hover:text-[#E63946] active:scale-95'}`}
                aria-disabled={isLast}>
                 Siguiente
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -95,5 +93,26 @@ const isLast = page === totalPages;
                 </svg>
             </a>
         </div>
+        <p class="yf-pg-meta">PÁG <strong>{page}</strong> DE {totalPages}</p>
     </div>
 </nav>
+
+<style>
+    /* Números de paginación en mono (cifras tabulares) */
+    .yf-pg-num {
+        font-family: var(--font-mono);
+        font-variant-numeric: tabular-nums;
+    }
+    /* Texto auxiliar "PÁG X DE Y" en mono */
+    .yf-pg-meta {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-3);
+    }
+    .yf-pg-meta strong {
+        color: var(--text);
+        font-weight: 700;
+    }
+</style>

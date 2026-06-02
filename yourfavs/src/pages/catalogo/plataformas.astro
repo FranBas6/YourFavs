@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import type {Movie} from "../../types/ApiMovie";
@@ -7,7 +8,7 @@ import type {Serie} from "../../types/ApiSerie";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
-import {PROVIDERS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams} from "../../services/API/shared/tmdbDiscoverService";
+import {PROVIDERS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {platformList, fetchAllPlatforms, fetchPlatformBySlug} from "../../utils/constants/platforms";
 import FilterBar from "../../components/FilterBar.astro";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
@@ -40,8 +41,8 @@ const SLUG_TO_PROVIDER_ID: Record<string, number> = {
 let movies: Movie[] = [];
 let series: Serie[] = [];
 
-if (filtersActive) {
-    // Con filtros: discover directo combinando with_watch_providers + watch_region + filtros.
+if (filtersActive || filters.sort) {
+    // Con filtros u orden: discover directo combinando with_watch_providers + watch_region + filtros.
     // Si platform === 'all', combinamos TODOS los providers con OR (pipe).
     const providerIds = platformParam === 'all'
         ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
@@ -49,7 +50,7 @@ if (filtersActive) {
 
     const buildParams = (mt: 'movie' | 'tv') => ({
         page: pageStr,
-        sort_by: 'popularity.desc',
+        sort_by: sortByFor(filters.sort, mt) || 'popularity.desc',
         watch_region: 'ES',
         with_watch_providers: providerIds,
         ...buildDiscoverFilterParams(filters, mt),
@@ -104,10 +105,12 @@ function buildPlatformUrl(slug: string) {
 ---
 <Layout title="Plataformas">
     <section class="px-1 sm:py-8">
-        <header class="mb-6">
-            <p class="text-sm text-gray-4000 mb-1">Plataforma</p>
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{activePlatform}</h1>
-        </header>
+        <CatalogHeader
+            kicker="Plataforma"
+            title={activePlatform}
+            color="slate"
+            icon="layout-grid"
+        />
 
         <!-- Plataformas: desplegable en móvil, pills en desktop -->
         <details class="mb-6 sm:hidden group">
@@ -121,17 +124,17 @@ function buildPlatformUrl(slug: string) {
                 <a href={buildPlatformUrl('all')}
                    class={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border
                        ${platformParam === 'all'
-                           ? 'bg-blue-600 text-white border-blue-600'
-                           : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>
+                           ? 'bg-[#111827] text-white border-[#111827]'
+                           : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'}`}>
                     Todas
                 </a>
                 {platformList.map((platform) => (
                     <a href={buildPlatformUrl(platform.slug)}
                        class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border
                            ${platformParam === platform.slug
-                               ? 'bg-blue-600 text-white border-blue-600'
-                               : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'}`}>
-                        <img src={platform.logo} alt="" class="w-4 h-4 object-contain rounded" aria-hidden="true"/>
+                               ? 'bg-[#111827] text-white border-[#111827]'
+                               : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900'}`}>
+                        <img src={platform.logo} alt="" class={`w-4 h-4 object-contain rounded ${platformParam === platform.slug ? 'brightness-0 invert' : ''}`} aria-hidden="true"/>
                         {platform.name}
                     </a>
                 ))}
@@ -141,17 +144,17 @@ function buildPlatformUrl(slug: string) {
             <a href={buildPlatformUrl('all')}
                class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
                    ${platformParam === 'all'
-                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                       : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm'}`}>
+                       ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
+                       : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900 hover:shadow-sm'}`}>
                 Todas
             </a>
             {platformList.map((platform) => (
                 <a href={buildPlatformUrl(platform.slug)}
                    class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
                        ${platformParam === platform.slug
-                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                           : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600 hover:shadow-sm'}`}>
-                    <img src={platform.logo} alt="" class="w-5 h-5 object-contain rounded" aria-hidden="true"/>
+                           ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
+                           : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400 hover:text-gray-900 hover:shadow-sm'}`}>
+                    <img src={platform.logo} alt="" class={`w-5 h-5 object-contain rounded ${platformParam === platform.slug ? 'brightness-0 invert' : ''}`} aria-hidden="true"/>
                     {platform.name}
                 </a>
             ))}
@@ -159,7 +162,9 @@ function buildPlatformUrl(slug: string) {
 
         <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
-        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'} />
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
+                         showCert={type === 'movies'} order="Popularidad"
+                         sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages} · <strong class="text-gray-700">{activePlatform}</strong></span>

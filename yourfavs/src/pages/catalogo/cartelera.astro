@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import {getNowPlayingMoviesInSpain} from "../../services/API/Movies/tmdbMovies";
 import {getGenreName} from "../../utils/constants/genres";
@@ -22,10 +23,12 @@ const totalPages = 3;
 ---
 <Layout title="Cartelera">
     <section class="px-1 sm:py-8">
-        <header class="mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Cartelera</h1>
-            <p class="text-gray-500 text-base">Películas actualmente en los cines de España</p>
-        </header>
+        <CatalogHeader
+            title="Cartelera"
+            subtitle="Películas actualmente en los cines de España"
+            color="blue"
+            icon="clapperboard"
+        />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
             <span>Página <strong class="text-gray-900">{page}</strong> de {totalPages}</span>

@@ -10,5 +10,6 @@ export const allCategories = [
     {slug: 'terror', name: 'TERROR', label: 'Terror'},
     {slug: 'animacion', name: 'ANIMACIÓN', label: 'Animación'},
     {slug: 'familia', name: 'FAMILIA', label: 'Familia'},
+    {slug: 'romance', name: 'ROMANCE', label: 'Romance'},
     {slug: 'proximamente', name: 'PRÓXIMAMENTE', label: 'Próximo'},
 ];

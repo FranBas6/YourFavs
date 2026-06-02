@@ -10,6 +10,8 @@ import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCat
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getContinueWatchingData} from "../services/API/Series/continueWatching";
 import ContinueWatching from "../components/Sections/ContinueWatching.astro";
+import SectionHeader from "../components/SectionHeader.astro";
+import { Icon } from 'astro-icon/components';
 import {fetchAllPlatforms} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
@@ -73,7 +75,8 @@ const sections = [
         series: trendingSeries,
         link: "/catalogo/tendencias",
         priority: 'high',
-        icon: '📈'
+        color: 'red',
+        lucide: 'trending-up'
     },
     {
         title: "ÚLTIMOS LANZAMIENTOS",
@@ -81,7 +84,8 @@ const sections = [
         series: latestSeries,
         link: "/catalogo/ultimoslanzamientos",
         priority: 'high',
-        icon: '🆕'
+        color: 'green',
+        lucide: 'sparkles'
     },
     {
         title: "MÁS POPULARES",
@@ -89,7 +93,8 @@ const sections = [
         series: popularSeries,
         link: "/catalogo/maspopulares",
         priority: 'high',
-        icon: '🔥'
+        color: 'pink',
+        lucide: 'flame'
     },
     {
         title: "TOP PELÍCULAS",
@@ -97,7 +102,8 @@ const sections = [
         series: [],
         link: "/catalogo/topmovies",
         priority: 'medium',
-        icon: '⭐'
+        color: 'amber',
+        lucide: 'star'
     },
     {
         title: "TOP SERIES",
@@ -105,7 +111,8 @@ const sections = [
         series: topRatedSeries,
         link: "/catalogo/topseries",
         priority: 'medium',
-        icon: '🏆'
+        color: 'blue',
+        lucide: 'trophy'
     },
     {
         title: `PLATAFORMA DESTACADA: ${randomPlatform.name}`,
@@ -113,7 +120,8 @@ const sections = [
         series: randomPlatform.series as Serie[],
         link: `/catalogo/plataformas?platform=${randomPlatform.slug}&page=1`,
         priority: 'low',
-        icon: '📺'
+        color: 'slate',
+        lucide: 'tv'
     },
     {
         title: `CATEGORÍA DESTACADA: ${randomCategory.name}`,
@@ -121,7 +129,8 @@ const sections = [
         series: randomCategory.series as Serie[],
         link: `/catalogo/categorias?categoria=${randomCategory.slug}&page=1&type=all`,
         priority: 'low',
-        icon: '🎬'
+        color: 'purple',
+        lucide: 'layers'
     }
 ];
 ---
@@ -132,10 +141,10 @@ const sections = [
             <div class="hero-backdrop" style={`background-image: url(${backdropUrl(heroMovie.backdrop_path, 'w1280')})`}>
                 <div class="hero-backdrop-overlay">
                     <div class="hero-backdrop-content">
-                        <span class="hero-trending-badge">📈 Trending esta semana</span>
+                        <span class="hero-trending-badge"><Icon name="lucide:trending-up" />Trending esta semana</span>
                         <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
                         <div class="hero-backdrop-meta">
-                            <span class="hero-backdrop-rating">⭐ {heroMovie.vote_average?.toFixed(1)}</span>
+                            <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average?.toFixed(1)}</span>
                             <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
                         </div>
                         <p class="hero-backdrop-overview">{heroMovie.overview}</p>
@@ -152,7 +161,7 @@ const sections = [
             <div class="hero-section">
                 <div class="hero-content">
                     <h1 class="hero-title text-coral-red">
-                        <span class="hero-icon">🎬</span>
+                        <span class="hero-icon"><Icon name="lucide:clapperboard" /></span>
                         CATÁLOGO PRINCIPAL
                     </h1>
                     <div class="hero-divider"></div>
@@ -177,23 +186,14 @@ const sections = [
                 .filter((section) => section.movies.length > 0 || section.series.length > 0)
                 .map((section) => (
                         <article class={`section-card ${section.priority === 'high' ? 'featured-section' : ''}`}>
-                            <header class="section-header">
-                                <div class="section-title-wrapper">
-                                    <span class="section-icon" aria-hidden="true">{section.icon}</span>
-                                    <h2 class="section-title">{section.title}</h2>
-                                    {section.priority === 'high' && (
-                                            <span class="priority-badge">Destacado</span>
-                                    )}
-                                </div>
-                                <a href={section.link} class="view-more-btn">
-                                    <span>Ver más</span>
-                                    <svg class="arrow-icon" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd"
-                                            d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
-                                            clip-rule="evenodd"/>
-                                    </svg>
-                                </a>
-                            </header>
+                            <SectionHeader
+                                title={section.title}
+                                link={section.link}
+                                color={section.color as any}
+                                icon={section.lucide}
+                                count={section.movies.length + section.series.length}
+                                featured={section.priority === 'high'}
+                            />
 
                             <div class="section-content">
                                 {section.movies.length > 0 && (

@@ -159,22 +159,22 @@ const notificationGroups = Array.from(groupsMap.entries())
                     return (
                         <div class={`calendar-cell min-h-[3rem] sm:min-h-[5rem] lg:min-h-[6rem] border-b border-r border-gray-50 p-1 sm:p-2 relative
                             ${!cell.day ? 'bg-gray-50/50' : ''}
-                            ${isToday ? 'bg-blue-50/50 ring-2 ring-inset ring-blue-400' : ''}
+                            ${isToday ? 'bg-blue-50/50 ring-2 ring-inset ring-blue-500' : ''}
                             ${hasEvents && cell.day ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
                             data-date={cell.date}
                             data-events={hasEvents ? JSON.stringify(cell.events) : undefined}>
                             {cell.day && (
                                 <>
-                                    <span class={`text-xs sm:text-sm font-medium ${isToday ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
+                                    <span class={`cal-num text-xs sm:text-sm font-medium ${isToday ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
                                         {cell.day}
                                     </span>
 
                                     {/* Dots indicadores */}
                                     {hasEvents && (
                                         <div class="flex gap-0.5 mt-0.5 sm:mt-1 flex-wrap">
-                                            {hasMovies && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500" title="Película"></span>}
-                                            {hasSeries && !hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500" title="Episodio"></span>}
-                                            {hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-purple-500" title="Temporada completa"></span>}
+                                            {hasMovies && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#E63946]" title="Película"></span>}
+                                            {hasSeries && !hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3B82F6]" title="Episodio"></span>}
+                                            {hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#8B5CF6]" title="Temporada completa"></span>}
                                         </div>
                                     )}
 
@@ -202,13 +202,13 @@ const notificationGroups = Array.from(groupsMap.entries())
             <!-- Leyenda -->
             <div class="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-red-500"></span> Películas
+                    <span class="w-2 h-2 rounded-full bg-[#E63946]"></span> Películas
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-blue-500"></span> Episodios
+                    <span class="w-2 h-2 rounded-full bg-[#3B82F6]"></span> Episodios
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-purple-500"></span> Temporada completa
+                    <span class="w-2 h-2 rounded-full bg-[#8B5CF6]"></span> Temporada completa
                 </span>
             </div>
         </div>
@@ -256,7 +256,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                                     <div class="space-y-2">
                                         {day.events.map(ev => {
                                             const link = ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`;
-                                            const colorClass = ev.media_type === 'movie' ? 'text-red-600' : (ev.event_type === 'season_premiere' ? 'text-purple-600' : 'text-blue-600');
+                                            const colorClass = ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-blue-600');
                                             const bgClass = ev.media_type === 'movie' ? 'bg-red-50 border-red-100' : (ev.event_type === 'season_premiere' ? 'bg-purple-50 border-purple-100' : 'bg-blue-50 border-blue-100');
                                             return (
                                                 <a href={link} class={`flex items-center gap-3 p-2.5 rounded-xl border ${bgClass} hover:shadow-md transition`}>
@@ -355,9 +355,9 @@ const notificationGroups = Array.from(groupsMap.entries())
                                         <li>
                                             <a href={detailLink} class="flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 transition-colors min-w-0">
                                                 <span class={`text-xs font-medium truncate min-w-0 flex-1
-                                                    ${ev.media_type === 'movie' ? 'text-red-500' : ''}
-                                                    ${ev.event_type === 'season_premiere' ? 'text-purple-500' : ''}
-                                                    ${ev.event_type === 'episode' ? 'text-blue-500' : ''}`}>
+                                                    ${ev.media_type === 'movie' ? 'text-[#E63946]' : ''}
+                                                    ${ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : ''}
+                                                    ${ev.event_type === 'episode' ? 'text-[#3B82F6]' : ''}`}>
                                                     {ev.label}
                                                 </span>
                                                 <span class="text-xs text-gray-4000 whitespace-nowrap flex-shrink-0">
@@ -411,7 +411,7 @@ const notificationGroups = Array.from(groupsMap.entries())
             var html = '';
             events.forEach(function (ev) {
                 var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
-                var colorClass = ev.media_type === 'movie' ? 'text-red-500' : (ev.event_type === 'season_premiere' ? 'text-purple-500' : 'text-blue-500');
+                var colorClass = ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-[#3B82F6]');
                 var borderClass = ev.media_type === 'movie' ? 'border-red-100' : (ev.event_type === 'season_premiere' ? 'border-purple-100' : 'border-blue-100');
                 html += '<a href="' + link + '" class="flex items-center gap-3 p-3 bg-white rounded-xl border ' + borderClass + ' shadow-sm hover:shadow-md transition-all">';
                 if (ev.poster_path) {
@@ -461,9 +461,11 @@ const notificationGroups = Array.from(groupsMap.entries())
 </script>
 
 <style>
+    /* Dígitos del calendario en mono (igual que el widget del header) */
+    .cal-num { font-family: var(--font-mono); }
     .calendar-cell[data-selected="true"] {
-        background-color: rgb(254 242 242); /* red-50 */
-        box-shadow: inset 0 0 0 2px rgb(239 68 68); /* ring red-500 */
+        background-color: var(--accent-soft);
+        box-shadow: inset 0 0 0 2px var(--accent); /* ring accent #E63946 */
     }
     .notification-group > summary::-webkit-details-marker { display: none; }
     .notification-group > summary { list-style: none; }

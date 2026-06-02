@@ -1,0 +1,44 @@
+---
+// "Stamp": cuadrado coloreado con un icono SVG (Lucide) dentro. El fondo usa
+// --stamp-{color} y el icono hereda --stamp-{color}-ink (currentColor). Es el
+// bloque base de las cabeceras de sección y del dropdown "Descubrir".
+// El tamaño por defecto (40px) vive en CSS (no inline) para que un contenedor
+// pueda reducirlo de forma responsive vía --st-size.
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+    color?: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
+    icon: string;        // nombre de icono Lucide, p.ej. 'trending-up'
+    size?: number;       // lado del cuadrado en px (si se omite, usa el def. CSS = 40)
+    class?: string;
+}
+const { color = 'slate', icon, size, class: cls } = Astro.props;
+const sizeVar = size != null ? `--st-size: ${size}px;` : '';
+---
+<span
+    class:list={["yf-stamp", cls]}
+    style={`--st-bg: var(--stamp-${color}); --st-ink: var(--stamp-${color}-ink); ${sizeVar}`}
+    aria-hidden="true"
+>
+    <Icon name={`lucide:${icon}`} />
+</span>
+
+<style>
+    .yf-stamp {
+        --st-size: 40px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: var(--st-size);
+        height: var(--st-size);
+        border-radius: var(--r-md);
+        background: var(--st-bg);
+        color: var(--st-ink);
+        flex-shrink: 0;
+    }
+    .yf-stamp :global(svg) {
+        width: calc(var(--st-size) * 0.5);
+        height: calc(var(--st-size) * 0.5);
+        stroke-width: 2;
+    }
+</style>
