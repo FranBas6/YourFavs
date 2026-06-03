@@ -1,0 +1,34 @@
+---
+/**
+ * ActivityHeatmap — racha de actividad estilo GitHub para /personal/actividad.
+ * Recibe las celdas ya derivadas (nivel l1-l4 por nº de eventos del día);
+ * grid 7 filas × N semanas en flujo de columnas (cada columna = una semana L-D).
+ */
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+    cells: { level: string; off: boolean }[];
+    weeks: number;
+    streak: number;
+}
+
+const { cells, weeks, streak } = Astro.props;
+---
+<div class="act-heat">
+    <div class="top">
+        <h3><Icon name="lucide:play" /> Tu racha en pantalla</h3>
+        <span class="streak"><b>{streak} {streak === 1 ? 'día' : 'días'}</b> {streak === 1 ? 'seguido' : 'seguidos'}</span>
+    </div>
+    <div class="heat-grid" style={`grid-template-columns: repeat(${weeks}, 1fr);`}>
+        {cells.map(c => <div class:list={["heat-cell", c.level, { off: c.off }]}></div>)}
+    </div>
+    <div class="heat-legend">
+        menos
+        <span class="sw heat-cell"></span>
+        <span class="sw heat-cell l1"></span>
+        <span class="sw heat-cell l2"></span>
+        <span class="sw heat-cell l3"></span>
+        <span class="sw heat-cell l4"></span>
+        más
+    </div>
+</div>

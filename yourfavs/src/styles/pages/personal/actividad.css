@@ -1,0 +1,149 @@
+/* ============================================================================
+   actividad.css — /personal/actividad · "Timeline con momentum"
+   Adaptación del handoff docs/design_handoff_actividad (referencia 1:1 en
+   actividad/styles.css). Todo sobre tokens (tokens.css + dark-mode.css):
+   los colores por acción son los --a-* / --a-*-bg.
+   ============================================================================ */
+
+/* ---- Cabecera ---- */
+.act-head { margin-bottom: 22px; }
+.act-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.act-head p { margin: 0; color: var(--text-3); font-size: 14px; }
+.act-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); font-family: var(--font-mono); letter-spacing: .04em; }
+.act-live .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--rating-high); animation: act-pulse 2.4s ease-out infinite; }
+@keyframes act-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, .5); }
+    70%  { box-shadow: 0 0 0 7px rgba(16, 185, 129, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* ---- Banda de resumen (KPIs del periodo) ---- */
+.act-summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 18px; }
+.stat-tile { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.stat-tile .ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--tile-bg); color: var(--tile-ink); }
+.stat-tile .ico svg { width: 18px; height: 18px; }
+.stat-tile .n { font-size: 24px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--tile-ink); }
+.stat-tile .l { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+
+/* ---- Heatmap de racha (estilo GitHub) ---- */
+.act-heat { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px 20px; margin-bottom: 18px; }
+.act-heat .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.act-heat .top h3 { margin: 0; font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 8px; color: var(--text); }
+.act-heat .top h3 svg { width: 15px; height: 15px; }
+.act-heat .streak { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); letter-spacing: .04em; }
+.act-heat .streak b { color: var(--accent); }
+.heat-grid { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: 1fr; gap: 3px; }
+.heat-cell { aspect-ratio: 1; border-radius: 3px; background: var(--bg-tint); min-width: 9px; }
+[data-theme="dark"] .heat-cell { background: #1A2436; }
+.heat-cell.l1 { background: rgba(59, 130, 246, .28); }
+.heat-cell.l2 { background: rgba(59, 130, 246, .5); }
+.heat-cell.l3 { background: rgba(59, 130, 246, .72); }
+.heat-cell.l4 { background: var(--primary); }
+.heat-cell.off { visibility: hidden; }
+.heat-legend { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 10px; font-family: var(--font-mono); font-size: 10px; color: var(--text-4); }
+.heat-legend .sw { width: 10px; height: 10px; border-radius: 2px; min-width: 0; aspect-ratio: auto; }
+
+/* ---- Filtros por acción ---- */
+.act-filters { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.act-filters .chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: var(--r-full); font-size: 12.5px; font-weight: 600; color: var(--text-3); background: var(--bg-elev); border: 1px solid var(--border); cursor: pointer; transition: all .15s; font-family: var(--font); }
+.act-filters .chip:hover { border-color: var(--border-strong); color: var(--text); }
+.act-filters .chip.active { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+.act-filters .chip .dot { width: 7px; height: 7px; border-radius: 50%; }
+.act-filters .chip.active .dot { filter: brightness(1.4); }
+
+/* ---- Timeline con spine vertical ---- */
+.act-timeline { position: relative; padding-left: 30px; margin-top: 20px; }
+.act-timeline::before { content: ""; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 2px; background: var(--border); }
+.tl-day { position: relative; margin-bottom: 8px; }
+.tl-day-head { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; position: relative; }
+.tl-day-head::before { content: ""; position: absolute; left: -26px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
+.tl-day-head .d { font-size: 15px; font-weight: 700; text-transform: capitalize; color: var(--text); }
+.tl-day-head .c { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
+.tl-day-head .sum { margin-left: auto; display: flex; gap: 5px; }
+.tl-day-head .sum .b { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-full); }
+.tl-day-head .sum .b svg { width: 11px; height: 11px; }
+
+/* Fila de evento */
+.ev { display: flex; align-items: center; gap: 12px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px; text-decoration: none; color: inherit; transition: all .15s; position: relative; }
+.ev:hover { border-color: var(--border-strong); box-shadow: var(--sh-sm); transform: translateX(2px); }
+.ev::before { content: ""; position: absolute; left: -21px; top: 50%; width: 10px; height: 2px; background: var(--border); }
+.ev .act-ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.ev .act-ico svg { width: 17px; height: 17px; }
+.ev .poster { width: 38px; height: 54px; border-radius: 5px; object-fit: cover; flex-shrink: 0; background: var(--bg-tint); }
+.ev .meta, .ev .body { flex: 1; min-width: 0; }
+.ev .t { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; margin: 0 0 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+.ev .sub { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
+.ev .sub .verb { font-weight: 500; }
+.ev .sub .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
+.ev .time { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex-shrink: 0; letter-spacing: .02em; }
+.ev .chev { color: var(--text-4); flex-shrink: 0; width: 16px; height: 16px; }
+
+/* Fila "atracón" de episodios (agregada) */
+.ev.binge { align-items: flex-start; }
+.ev .ep-chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 7px; }
+.ev .ep-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 5px; background: var(--a-ep-bg); color: var(--a-ep); }
+.ev .ep-chip.season { background: transparent; border: 1px dashed var(--border-strong); color: var(--text-3); }
+.ev .ep-chip.season.done { background: var(--a-ep-bg); color: var(--a-ep); border: none; }
+
+/* Nivel resumen (serie entera / ≥2 temporadas / muchos sueltos): barra + desglose */
+/* flex-wrap: en pantallas estrechas la barra+% saltan a una segunda línea;
+   sin él, meta (nowrap) + barra (min-width 60) desbordan el viewport móvil. */
+.ev-roll { display: flex; align-items: center; gap: 6px 10px; margin-top: 8px; flex-wrap: wrap; }
+.ev-roll .roll-meta { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.ev-roll .roll-bar { flex: 1; height: 5px; border-radius: 3px; background: var(--bg-tint); overflow: hidden; min-width: 60px; }
+.ev-roll .roll-bar i { display: block; height: 100%; background: var(--a-ep); border-radius: 3px; }
+.ev-roll .roll-pct { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--a-ep); }
+.ev-disclose { margin-top: 8px; display: inline-flex; align-items: center; gap: 5px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-3); letter-spacing: .02em; }
+.ev-disclose:hover { color: var(--text); }
+.ev-disclose svg { width: 12px; height: 12px; transition: transform .25s; }
+.ev-grid { display: none; gap: 4px; flex-wrap: wrap; margin-top: 10px; }
+.ev.open .ev-grid { display: flex; }
+.ev.open .ev-disclose svg { transform: rotate(180deg); }
+
+/* Paginación */
+.act-more { display: flex; justify-content: center; gap: 12px; margin-top: 20px; }
+.act-more a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 18px; border-radius: var(--r-md); background: var(--bg-elev); border: 1px solid var(--border); font-size: 13px; font-weight: 600; color: var(--text-2); text-decoration: none; }
+.act-more a:hover { border-color: var(--border-strong); }
+.act-more svg { width: 15px; height: 15px; }
+
+/* ---- Layout: rail sticky (desktop) / apilado con colapsable (móvil) ---- */
+.act-grid { display: grid; grid-template-columns: 300px 1fr; gap: 28px; align-items: start; }
+/* Los grid items no encogen por debajo de su contenido (min-width:auto); con
+   nowrap dentro (chips, títulos con ellipsis) inflarían la columna y desbordarían
+   la página en horizontal. min-width:0 devuelve el control al ancho del viewport. */
+.act-grid > * { min-width: 0; }
+.act-rail { position: sticky; top: 20px; display: flex; flex-direction: column; gap: 16px; }
+.act-rail .act-heat, .act-collapse .panel .act-heat { margin-bottom: 0; }
+.act-collapse { display: none; }
+
+/* Colapsable de resumen (móvil) — mismo botón gradiente que el panel de stats */
+.act-collapse > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 9px; padding: 11px 18px; border-radius: var(--r-full); background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff; font-size: 13.5px; font-weight: 600; box-shadow: 0 4px 12px rgba(139, 92, 246, .35); }
+.act-collapse > summary::-webkit-details-marker { display: none; }
+.act-collapse > summary svg { width: 15px; height: 15px; }
+.act-collapse > summary .chev { display: inline-flex; transition: transform .3s; }
+.act-collapse[open] > summary .chev { transform: rotate(180deg); }
+.act-collapse .panel { margin-top: 14px; animation: act-slide-down .25s ease; }
+@keyframes act-slide-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@media (min-width: 861px) {
+    .act-filters.is-mobile { display: none; }
+}
+
+@media (max-width: 860px) {
+    .act-head h1 { font-size: 24px; }
+    .act-summary { grid-template-columns: repeat(2, 1fr); }
+    .ev .poster { width: 34px; height: 48px; }
+    .act-grid { grid-template-columns: 1fr; gap: 0; }
+    .act-rail { display: none; }
+    /* Los badges del día no pueden encoger; si no caben, bajan de línea */
+    .tl-day-head { flex-wrap: wrap; row-gap: 4px; }
+    .act-collapse { display: block; margin-bottom: 16px; }
+    .act-summary.is-desktop { display: none; }
+    /* Filtros con scroll horizontal sin barra */
+    .act-filters.is-mobile { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 6px; padding: 0 16px 4px; }
+    .act-filters.is-mobile::-webkit-scrollbar { display: none; }
+    .act-filters.is-mobile .chip { flex-shrink: 0; }
+}
