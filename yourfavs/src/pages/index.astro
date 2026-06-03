@@ -8,8 +8,8 @@ import type {Serie} from "../types/ApiSerie";
 import {getLatestMovies, getMostPopularMovies, getTopRatedMovies, getMoviesByCategory} from "../services/API/Movies/tmdbMovies";
 import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCategory} from "../services/API/Series/tmdbSeries";
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
-import {getContinueWatchingData} from "../services/API/Series/continueWatching";
-import ContinueWatching from "../components/Sections/ContinueWatching.astro";
+import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
+import NextEpisode from "../components/Sections/NextEpisode.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import { Icon } from 'astro-icon/components';
 import {fetchAllPlatforms} from "../utils/constants/platforms";
@@ -53,7 +53,7 @@ const [
     safeFetch(fetchAllPlatforms(pageStr), 'home/platforms', []),
     safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
     safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
-    safeFetch(getContinueWatchingData(), 'home/continueWatching', [] as any[]),
+    safeFetch(getNextEpisodesData(6), 'home/continueWatching', [] as any[]),
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
@@ -173,10 +173,10 @@ const sections = [
             </div>
         )}
 
-        <!-- Continuar viendo (solo si hay series con progreso pendiente) -->
+        <!-- Continuar viendo: siguiente episodio a ver (primer no visto y emitido) -->
         {continueWatching.length > 0 && (
             <div class="content-wrapper">
-                <ContinueWatching items={continueWatching} />
+                <NextEpisode items={continueWatching} />
             </div>
         )}
 

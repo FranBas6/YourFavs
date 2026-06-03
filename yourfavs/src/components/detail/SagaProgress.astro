@@ -1,0 +1,134 @@
+---
+/**
+ * "Tu progreso en la saga" — cruza las partes de una colección TMDB con las
+ * películas vistas del usuario (unión Vistas/Liked/Favs → getWatchedMovieIds).
+ *
+ * Dos variantes:
+ * - showParts=true (ficha de película): <details> colapsable con el progreso
+ *   visible en el summary + barra + grid de pósters con badges ✓ / TE FALTA.
+ * - showParts=false (página de colección): solo cabecera + barra, en panel.
+ *
+ * Las partes SIN estrenar no cuentan en el % (ni ✓ ni TE FALTA: badge PRÓX.).
+ */
+import Stamp from "../Stamp.astro";
+import type { WatchedTier } from "../../services/BD/movies/yourfavsMovie";
+
+interface Part {
+    id: number;
+    title: string;
+    /** URL completa del póster (getMovieCollectionInfo ya la mapea) o null. */
+    poster_path: string | null;
+    release_date: string | null;
+}
+
+interface Props {
+    name: string;
+    overview?: string | null;
+    parts: Part[];
+    /** id → nivel (visto/like/fav). Vista = está en el mapa. */
+    watchedTiers: Map<number, WatchedTier>;
+    /** Película actual (ficha): se marca con anillo + "Actual". */
+    currentId?: number;
+    showParts?: boolean;
+}
+
+const { name, overview = null, parts, watchedTiers, currentId, showParts = true } = Astro.props;
+
+// Mismo lenguaje de color que el feed de actividad: visto verde, like rosa, fav ámbar
+const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
+    visto: { bg: 'bg-emerald-500', label: 'Vista' },
+    like:  { bg: 'bg-pink-500',    label: 'Me gusta' },
+    fav:   { bg: 'bg-amber-400',   label: 'En favoritos' },
+};
+
+const today = new Date();
+const sorted = [...parts].sort((a, b) => {
+    if (!a.release_date) return 1;
+    if (!b.release_date) return -1;
+    return new Date(a.release_date).getTime() - new Date(b.release_date).getTime();
+});
+
+const isReleased = (p: Part) => !!p.release_date && new Date(p.release_date) <= today;
+const released = sorted.filter(isReleased);
+const seenCount = released.filter((p) => watchedTiers.has(p.id)).length;
+const totalReleased = released.length;
+const pct = totalReleased > 0 ? Math.round((seenCount / totalReleased) * 100) : 0;
+
+const summaryText = totalReleased > 0
+    ? `Has visto ${seenCount} de ${totalReleased} película${totalReleased === 1 ? '' : 's'}`
+    : 'Aún sin estrenos';
+---
+{showParts ? (
+    <details class="bg-white rounded-xl border border-gray-200 group">
+        <summary class="p-5 cursor-pointer flex items-center gap-3">
+            <Stamp color="amber" icon="layers" size={38} />
+            <div class="flex-1 min-w-0">
+                <h2 class="text-lg font-semibold text-gray-800 truncate">{name}</h2>
+                <p class="text-sm text-gray-500">{summaryText}</p>
+            </div>
+            <span class="font-mono text-xl font-extrabold text-[#E63946]">{pct}%</span>
+            <svg class="w-5 h-5 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+
+        <div class="px-5 pb-2">
+            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full rounded-full" style={`width:${pct}%;background:linear-gradient(90deg,var(--accent),#F59E0B)`}></div>
+            </div>
+        </div>
+
+        {overview && <p class="text-sm text-gray-500 px-5 pt-2 pb-1">{overview}</p>}
+
+        <div class="px-5 pb-5 pt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {sorted.map((part) => {
+                const tier = watchedTiers.get(part.id);
+                const released = isReleased(part);
+                return (
+                    <a href={`/movie/${part.id}`} class={`text-center group/part rounded-xl overflow-hidden ${part.id === currentId ? 'ring-2 ring-red-500 bg-red-50' : 'hover:bg-gray-50'} transition-colors`}>
+                        <div class="relative">
+                            <img
+                                src={part.poster_path || '/placeholder.jpg'}
+                                alt={part.title}
+                                class={`w-full aspect-[2/3] object-cover group-hover/part:scale-[1.02] transition-transform ${released && !tier ? 'opacity-60' : !released ? 'opacity-50' : ''}`}
+                                loading="lazy"
+                            />
+                            {tier ? (
+                                <span class={`absolute top-2 right-2 w-6 h-6 rounded-full ${TIER_BADGE[tier].bg} text-white flex items-center justify-center shadow-md`} aria-label={TIER_BADGE[tier].label} title={TIER_BADGE[tier].label}>
+                                    {tier === 'fav' ? (
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                    ) : tier === 'like' ? (
+                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                                    ) : (
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                    )}
+                                </span>
+                            ) : released ? (
+                                <span class="absolute top-2 right-2 font-mono text-[9px] font-bold text-white px-2 py-0.5 rounded-full shadow-md" style="background:var(--accent)">TE FALTA</span>
+                            ) : (
+                                <span class="absolute top-2 right-2 font-mono text-[9px] font-bold text-white bg-gray-600/90 px-2 py-0.5 rounded-full shadow-md">PRÓX.</span>
+                            )}
+                        </div>
+                        <div class="p-2">
+                            <p class="text-sm font-medium text-gray-800 line-clamp-2">{part.title}</p>
+                            <p class="text-xs text-gray-400 font-mono">{part.release_date ? new Date(part.release_date).getFullYear() : '?'}</p>
+                            {part.id === currentId && <span class="text-xs font-bold text-red-500">Actual</span>}
+                        </div>
+                    </a>
+                );
+            })}
+        </div>
+    </details>
+) : (
+    <div class="bg-white rounded-xl border border-gray-200 p-5">
+        <div class="flex items-center gap-3 mb-3">
+            <Stamp color="amber" icon="layers" size={38} />
+            <div class="flex-1 min-w-0">
+                <h2 class="text-lg font-semibold text-gray-800">Tu progreso en la saga</h2>
+                <p class="text-sm text-gray-500">{summaryText}</p>
+            </div>
+            <span class="font-mono text-xl font-extrabold text-[#E63946]">{pct}%</span>
+        </div>
+        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full rounded-full" style={`width:${pct}%;background:linear-gradient(90deg,var(--accent),#F59E0B)`}></div>
+        </div>
+    </div>
+)}

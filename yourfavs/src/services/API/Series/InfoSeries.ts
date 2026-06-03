@@ -7,6 +7,7 @@ import {
     getDirectorsAndRoles as sharedGetDirectorsAndRoles,
     mapAndDeduplicateProviders,
     buildProvidersByCountry,
+    buildProviderLinksByCountry,
     getRecommendationsOrSimilar as sharedGetRecommendationsOrSimilar,
 } from '../shared/tmdbInfoService';
 
@@ -56,6 +57,7 @@ export const getSeriesById = async ({ id }: { id: string }) => {
     serie.availableInSpain = await checkSeriesSpanishAvailability(id);
     serie.providers = mapAndDeduplicateProviders(esProviders);
     (serie as any).providersByCountry = buildProvidersByCountry(providersData.results);
+    (serie as any).providerLinksByCountry = buildProviderLinksByCountry(providersData.results);
 
     return serie;
 };

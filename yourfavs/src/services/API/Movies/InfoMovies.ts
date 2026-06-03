@@ -7,6 +7,7 @@ import {
     getDirectorsAndRoles as sharedGetDirectorsAndRoles,
     mapAndDeduplicateProviders,
     buildProvidersByCountry,
+    buildProviderLinksByCountry,
     getRecommendationsOrSimilar as sharedGetRecommendationsOrSimilar,
 } from '../shared/tmdbInfoService';
 
@@ -52,6 +53,7 @@ export const getMovieById = async ({ id }: { id: string }) => {
     const esProviders = providersData.results?.ES || {};
     movie.providers = mapAndDeduplicateProviders(esProviders);
     movie.providersByCountry = buildProvidersByCountry(providersData.results);
+    movie.providerLinksByCountry = buildProviderLinksByCountry(providersData.results);
 
     return movie;
 };

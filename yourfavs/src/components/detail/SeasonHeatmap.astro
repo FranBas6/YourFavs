@@ -1,0 +1,114 @@
+---
+/**
+ * "Calidad por episodio" — rejilla temporada × episodio coloreada por la nota
+ * TMDB (rojo→verde). De un vistazo: qué temporadas/episodios valen la pena.
+ *
+ * CERO fetches: recibe los episodios que serie/[id].astro ya carga para el
+ * acordeón de temporadas (allSeasonEpisodes). Se oculta si hay <6 episodios
+ * con nota (sin datos el mapa no aporta).
+ */
+import Stamp from "../Stamp.astro";
+import '../../styles/components/season-heatmap.css';
+
+interface Props {
+    /** Temporadas regulares (season_number > 0), ya filtradas por la ficha. */
+    seasons: { season_number: number; name?: string }[];
+    /** season_number → episodios (getEpisodesBySeasonNumber). */
+    episodesBySeason: Record<number, any[]>;
+}
+
+const { seasons, episodesBySeason } = Astro.props;
+
+// Escala fija del handoff (6 colores, peor→mejor)
+const SCALE = ['#f46d43', '#fdae61', '#fee08b', '#a6d96a', '#66bd63', '#1a9850'];
+function color(v: number): string {
+    if (v >= 9) return SCALE[5];
+    if (v >= 8.2) return SCALE[4];
+    if (v >= 7.4) return SCALE[3];
+    if (v >= 6.6) return SCALE[2];
+    if (v >= 6) return SCALE[1];
+    return SCALE[0];
+}
+// Tinta legible sobre el color de la celda (verdes → tinta verde oscura)
+const ink = (v: number) => (v >= 7.4 ? '#1a3d1a' : '#5a2d0a');
+
+const rated = (ep: any) => typeof ep?.vote_average === 'number' && ep.vote_average > 0 && (ep.vote_count ?? 0) > 0;
+
+// Filas: temporadas regulares con episodios; nota media por temporada
+const rows = seasons
+    .map((s) => {
+        const eps = (episodesBySeason[s.season_number] || [])
+            .slice()
+            .sort((a: any, b: any) => a.episode_number - b.episode_number);
+        const ratedEps = eps.filter(rated);
+        const avg = ratedEps.length
+            ? ratedEps.reduce((sum: number, e: any) => sum + e.vote_average, 0) / ratedEps.length
+            : null;
+        return { season: s.season_number, eps, ratedCount: ratedEps.length, avg };
+    })
+    .filter((r) => r.eps.length > 0);
+
+const totalRated = rows.reduce((sum, r) => sum + r.ratedCount, 0);
+const show = totalRated >= 6;
+
+const maxEp = Math.max(0, ...rows.map((r) => r.eps.length));
+
+// Subtítulo: mejor temporada (si hay comparación posible)
+const ratedRows = rows.filter((r) => r.avg !== null);
+const best = ratedRows.length > 1
+    ? ratedRows.reduce((a, b) => (b.avg! > a.avg! ? b : a))
+    : null;
+const note = best
+    ? `La T${best.season} es la mejor valorada (★ ${best.avg!.toFixed(1)} de media)`
+    : ratedRows.length === 1
+        ? `Nota media ★ ${ratedRows[0].avg!.toFixed(1)}`
+        : '';
+---
+{show && (
+    <details class="shm-panel">
+        <summary class="shm-head">
+            <Stamp color="purple" icon="layout-grid" size={38} />
+            <div class="shm-head-text">
+                <h2>Calidad por episodio</h2>
+                {note && <p class="shm-note">{note}</p>}
+            </div>
+            <svg class="shm-chev" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+        </summary>
+
+        <div class="shm-scroll">
+            <div class="shm-grid" style={`--shm-cols:${maxEp}`}>
+                <span></span>
+                {Array.from({ length: maxEp }, (_, i) => (
+                    <span class="shm-ep-head">{i + 1}</span>
+                ))}
+
+                {rows.map((row) => (
+                    <>
+                        <span class="shm-season-label">T{row.season}</span>
+                        {Array.from({ length: maxEp }, (_, i) => {
+                            const ep = row.eps[i];
+                            if (!ep) return <span></span>;
+                            if (!rated(ep)) {
+                                return <span class="shm-cell is-empty" title={`T${row.season}·E${ep.episode_number} — sin nota`}>·</span>;
+                            }
+                            const v = ep.vote_average as number;
+                            return (
+                                <span
+                                    class="shm-cell"
+                                    style={`background:${color(v)};color:${ink(v)}`}
+                                    title={`T${row.season}·E${ep.episode_number} — ${ep.name || ''} · ★ ${v.toFixed(1)}`}
+                                >{v.toFixed(1)}</span>
+                            );
+                        })}
+                    </>
+                ))}
+            </div>
+        </div>
+
+        <div class="shm-legend" aria-hidden="true">
+            peor
+            {SCALE.map((c) => <i style={`background:${c}`}></i>)}
+            mejor
+        </div>
+    </details>
+)}

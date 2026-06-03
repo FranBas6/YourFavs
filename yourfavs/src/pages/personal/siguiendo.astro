@@ -8,6 +8,8 @@ import {buildUrl} from "../../utils/buildUrl";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {processBatch} from "../../utils/processBatch";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
+import NextEpisode from "../../components/Sections/NextEpisode.astro";
+import {getNextEpisodesData, type NextEpisodeItem} from "../../services/API/Series/nextEpisode";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
@@ -39,6 +41,14 @@ try {
 }
 
 const watchedMap = await getWatchedProgressBatch(seriesSiguiendo.map((s: any) => String(s.id)));
+
+// Panel "Continuar viendo": siguiente episodio no visto y emitido por serie
+let nextEpisodes: NextEpisodeItem[] = [];
+try {
+    nextEpisodes = await getNextEpisodesData(6);
+} catch (error) {
+    console.error("Error al cargar siguiente episodio:", error);
+}
 
 const searchQuery = Astro.url.searchParams.get("search") || "";
 const seriesPage = parseInt(Astro.url.searchParams.get("seriesPage") || "1");
@@ -179,6 +189,11 @@ const pageUrl = Astro.url;
         />
 
         <div class="space-y-10">
+            {/* Continuar viendo — siguiente episodio a ver con "✓ Marcar visto" */}
+            {!searchQuery && nextEpisodes.length > 0 && (
+                <NextEpisode items={nextEpisodes} showLink={false} />
+            )}
+
             {/* C13 + C26 — A un paso de terminar (carrusel horizontal) */}
             {!searchQuery && (almostDone.length + almostDoneSeason.length) > 0 && (
                 <section class="scroll-mt-20">
@@ -297,6 +312,7 @@ const pageUrl = Astro.url;
                                 genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                 status={item.status}
                                 watchedEpisodes={watchedMap[String(item.id)]?.watched}
+                                followed={true}
                             /></HoverPreview>
                         ))}
                     </div>

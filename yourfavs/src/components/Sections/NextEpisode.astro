@@ -1,0 +1,181 @@
+---
+/**
+ * Panel "Continuar viendo" — siguiente episodio a ver por serie en seguimiento.
+ *
+ * Cada card muestra el PRIMER episodio no visto y emitido (still, T·E, título,
+ * sinopsis, fecha, nota) con "✓ Marcar visto" que registra el episodio vía
+ * POST /api/episodes/watched y avanza al siguiente (GET /api/series/:id/
+ * next-episode) sin recargar la página.
+ */
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import type { NextEpisodeItem } from "../../services/API/Series/nextEpisode";
+import Stamp from "../Stamp.astro";
+import '../../styles/components/next-episode.css';
+
+interface Props {
+    items: NextEpisodeItem[];
+    /** Oculta la cabecera de sección (p. ej. dentro de /personal/siguiendo). */
+    showLink?: boolean;
+}
+
+const { items, showLink = true } = Astro.props;
+
+function fmtDate(d: string | null): string {
+    if (!d) return '';
+    return 'Estrenado ' + new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function posterSrc(item: NextEpisodeItem): string | null {
+    return item.poster_path ? posterUrl(item.poster_path, 'w154') : null;
+}
+
+function pct(item: NextEpisodeItem): number {
+    if (!item.total_count) return 0;
+    return Math.min(100, Math.round((item.watched_count / item.total_count) * 100));
+}
+---
+{items.length > 0 && (
+    <section class="next-episode-section mb-8" data-nep>
+        <header class="flex items-center justify-between mb-4 px-1">
+            <div class="flex items-center gap-2">
+                <Stamp color="green" icon="play" size={32} />
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 uppercase tracking-wide whitespace-nowrap">Continuar viendo</h2>
+                <span class="text-xs text-gray-400 font-mono whitespace-nowrap hidden sm:inline">{items.length} en curso</span>
+            </div>
+            {showLink && (
+                <a href="/personal/siguiendo" class="text-sm text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap">Mi seguimiento →</a>
+            )}
+        </header>
+
+        <div class="nep-scroll">
+            {items.map((item) => (
+                <article
+                    class="nep-card"
+                    data-serie-id={item.id}
+                    data-season={item.next_season}
+                    data-episode={item.next_episode}
+                >
+                    <a class="nep-poster" href={`/serie/${item.id}#season-${item.next_season}`} aria-label={`Ver ficha de ${item.name}`}>
+                        {posterSrc(item) ? (
+                            <img src={posterSrc(item)} alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+                        ) : (
+                            <span class="nep-poster-empty" aria-hidden="true">
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
+                            </span>
+                        )}
+                        <span class="nep-progress" aria-hidden="true"><i style={`width:${pct(item)}%`}></i></span>
+                    </a>
+                    <div class="nep-body">
+                        <p class="nep-kicker">SIGUIENTE · {item.name.toUpperCase()}</p>
+                        <h3 class="nep-title">T{item.next_season} · E{item.next_episode} — {item.next_episode_name}</h3>
+                        <p class="nep-meta">
+                            {fmtDate(item.air_date)}{item.vote_average != null && ` · ★ ${item.vote_average.toFixed(1)}`}
+                        </p>
+                        {item.overview && <p class="nep-overview">{item.overview}</p>}
+                        <div class="nep-actions">
+                            <button type="button" class="nep-mark">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                Marcar visto
+                            </button>
+                            <a class="nep-ghost" href={`/serie/${item.id}#season-${item.next_season}`}>Ver ficha</a>
+                        </div>
+                    </div>
+                </article>
+            ))}
+        </div>
+    </section>
+)}
+
+<script is:inline>
+(function () {
+    var IMG_BASE = 'https://image.tmdb.org/t/p/w154';
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function fmtDate(d) {
+        if (!d) return '';
+        return 'Estrenado ' + new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+    }
+
+    // Reconstruye el contenido de una card con el siguiente episodio
+    // (espejo del markup SSR de arriba).
+    function cardHTML(it) {
+        var poster = it.poster_path;
+        var pct = it.total_count ? Math.min(100, Math.round((it.watched_count / it.total_count) * 100)) : 0;
+        var href = '/serie/' + it.id + '#season-' + it.next_season;
+        var meta = fmtDate(it.air_date) + (it.vote_average != null ? ' · ★ ' + it.vote_average.toFixed(1) : '');
+
+        var html = '<a class="nep-poster" href="' + href + '" aria-label="Ver ficha de ' + escapeHtml(it.name) + '">';
+        html += poster
+            ? '<img src="' + IMG_BASE + poster + '" alt="" onerror="this.style.visibility=\'hidden\'"/>'
+            : '<span class="nep-poster-empty" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg></span>';
+        html += '<span class="nep-progress" aria-hidden="true"><i style="width:' + pct + '%"></i></span></a>';
+        html += '<div class="nep-body">';
+        html += '<p class="nep-kicker">SIGUIENTE · ' + escapeHtml(it.name.toUpperCase()) + '</p>';
+        html += '<h3 class="nep-title">T' + it.next_season + ' · E' + it.next_episode + ' — ' + escapeHtml(it.next_episode_name) + '</h3>';
+        html += '<p class="nep-meta">' + escapeHtml(meta) + '</p>';
+        if (it.overview) html += '<p class="nep-overview">' + escapeHtml(it.overview) + '</p>';
+        html += '<div class="nep-actions">';
+        html += '<button type="button" class="nep-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Marcar visto</button>';
+        html += '<a class="nep-ghost" href="' + href + '">Ver ficha</a>';
+        html += '</div></div>';
+        return html;
+    }
+
+    function doneHTML(name) {
+        return '<div class="nep-done">'
+            + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            + '<span><strong>' + escapeHtml(name) + '</strong> — al día. Nada pendiente.</span>'
+            + '</div>';
+    }
+
+    document.querySelectorAll('[data-nep]').forEach(function (root) {
+        root.addEventListener('click', function (e) {
+            var btn = e.target.closest('.nep-mark');
+            if (!btn) return;
+            var card = btn.closest('.nep-card');
+            if (!card || card.dataset.busy) return;
+
+            var serieId = card.dataset.serieId;
+            var season = Number(card.dataset.season);
+            var episode = Number(card.dataset.episode);
+            var name = (card.querySelector('.nep-kicker') || {}).textContent || '';
+            name = name.replace(/^SIGUIENTE · /, '');
+
+            card.dataset.busy = '1';
+            btn.disabled = true;
+            btn.innerHTML = 'Marcando…';
+
+            fetch('/api/episodes/watched', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serieId: serieId, season: season, episode: episode }),
+            })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('save failed');
+                    return fetch('/api/series/' + serieId + '/next-episode').then(function (r) { return r.json(); });
+                })
+                .then(function (data) {
+                    if (data.next) {
+                        card.dataset.season = data.next.next_season;
+                        card.dataset.episode = data.next.next_episode;
+                        card.innerHTML = cardHTML(data.next);
+                    } else {
+                        card.innerHTML = doneHTML(name);
+                    }
+                })
+                .catch(function () {
+                    // Revertir: el episodio puede no haberse guardado
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Marcar visto';
+                })
+                .finally(function () {
+                    delete card.dataset.busy;
+                });
+        });
+    });
+})();
+</script>

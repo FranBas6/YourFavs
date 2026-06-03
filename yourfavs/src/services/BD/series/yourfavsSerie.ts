@@ -421,6 +421,29 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
     }
 }
 
+/**
+ * Marca un episodio como visto de forma IDEMPOTENTE (si ya está, no hace nada).
+ * Para acciones tipo "✓ Marcar visto" fuera de la ficha: un doble click sobre
+ * toggleWatchedEpisode lo desmarcaría.
+ */
+export async function markWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
+    const ref = doc(db, 'WatchedEpisodes', serieId);
+    const snap = await getDoc(ref);
+    const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
+
+    if (!snap.exists()) {
+        await setDoc(ref, { id: serieId, watched_episodes: [ep], last_watched: ep });
+        return;
+    }
+
+    const data = snap.data() as WatchedProgress;
+    const episodes = data.watched_episodes || [];
+    if (episodes.some(e => e.season === season && e.episode === episode)) return; // ya visto
+
+    episodes.push(ep);
+    await updateDoc(ref, { watched_episodes: episodes, last_watched: ep });
+}
+
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
     const ref = doc(db, 'WatchedEpisodes', serieId);
     const snap = await getDoc(ref);

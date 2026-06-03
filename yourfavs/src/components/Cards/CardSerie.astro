@@ -26,9 +26,11 @@ interface Props {
     character?: string;
     favoriteNumber?: number;
     watchedEpisodes?: number;
+    /** Contexto de seguimiento: activa la cuenta atrás de estreno (≤14 días). */
+    followed?: boolean;
 }
 
-const { id, name, img, vote_average, overview, first_air_date, seasons, last_episode_to_air, next_episode_to_air, genres, status, character, favoriteNumber, watchedEpisodes } = Astro.props;
+const { id, name, img, vote_average, overview, first_air_date, seasons, last_episode_to_air, next_episode_to_air, genres, status, character, favoriteNumber, watchedEpisodes, followed } = Astro.props;
 
 const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(first_air_date);
@@ -47,6 +49,23 @@ const endYear = (status === 'Ended' || status === 'Canceled')
 const airPeriod = startYear
     ? (endYear && endYear !== startYear ? `${startYear} - ${endYear}` : endYear === startYear ? `${startYear}` : `${startYear} - Presente`)
     : null;
+
+// Cuenta atrás de estreno (solo en contexto de seguimiento): next_episode_to_air
+// ya llega en la prop; si faltan ≤14 días, badge "EN N DÍAS" + overlay PRÓXIMO.
+const COUNTDOWN_MAX_DAYS = 14;
+let countdownLabel: string | null = null;
+let nextEpTag: string | null = null;
+if (followed && next_episode_to_air?.air_date) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const air = new Date(next_episode_to_air.air_date + 'T00:00:00');
+    // Math.round absorbe el desfase de ±1h si el rango cruza un cambio DST
+    const days = Math.round((air.getTime() - today.getTime()) / 86400000);
+    if (days >= 0 && days <= COUNTDOWN_MAX_DAYS) {
+        countdownLabel = days === 0 ? '● HOY' : days === 1 ? '● MAÑANA' : `● EN ${days} DÍAS`;
+        nextEpTag = `PRÓXIMO · T${next_episode_to_air.season_number}·E${next_episode_to_air.episode_number}`;
+    }
+}
 ---
 <div class="media-card group">
     <a href={`/serie/${id}`}
@@ -54,7 +73,11 @@ const airPeriod = startYear
 
         <!-- Badges -->
         <div class="absolute top-2 left-2 z-10 flex flex-col gap-1">
-            {isNew && <span class="top-badge bg-teal-500 text-white">NUEVO</span>}
+            {countdownLabel ? (
+                <span class="top-badge badge-accent font-mono tracking-wide">{countdownLabel}</span>
+            ) : (
+                isNew && <span class="top-badge bg-teal-500 text-white">NUEVO</span>
+            )}
             {isTrending && <span class="top-badge badge-accent">TRENDING</span>}
             {favoriteNumber && (
                 <span class="top-badge bg-gradient-to-r from-amber-400 to-orange-500 text-white">
@@ -80,6 +103,10 @@ const airPeriod = startYear
             </div>
 
             <div class="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#0F172A] to-transparent"></div>
+
+            {nextEpTag && (
+                <span class="absolute bottom-1.5 left-2.5 z-10 font-mono text-[9.5px] font-bold tracking-wider text-blue-300">{nextEpTag}</span>
+            )}
         </div>
 
         <!-- Content -->

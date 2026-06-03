@@ -1,0 +1,121 @@
+/* Heatmap de calidad por episodio (temporada × episodio, nota TMDB).
+   La escala de 6 colores es FIJA por diseño (handoff §⑥): legible en ambos
+   temas. El chrome del panel usa tokens → dark mode automático. */
+
+.shm-panel {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 20px;
+}
+
+/* Summary del desplegable: cerrado solo ocupa la cabecera, pero la conclusión
+   ("La Tn es la mejor valorada") ya se lee sin abrir. */
+.shm-head {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    cursor: pointer;
+    list-style: none; /* sin marcador nativo del summary */
+}
+
+.shm-head::-webkit-details-marker { display: none; }
+
+details[open] .shm-head { margin-bottom: 18px; }
+
+.shm-head-text { flex: 1; min-width: 0; }
+
+.shm-head h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.shm-head .shm-note {
+    font-size: 12.5px;
+    color: var(--text-3);
+    margin: 0;
+}
+
+.shm-chev {
+    width: 20px;
+    height: 20px;
+    color: var(--text-4);
+    flex-shrink: 0;
+    transition: transform .2s ease;
+}
+
+details[open] .shm-chev { transform: rotate(180deg); }
+
+/* Scroll horizontal para series largas (la rejilla no se comprime) */
+.shm-scroll {
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) var(--bg-tint);
+}
+
+.shm-scroll::-webkit-scrollbar { height: 8px; }
+.shm-scroll::-webkit-scrollbar-track { background: var(--bg-tint); border-radius: 4px; }
+.shm-scroll::-webkit-scrollbar-thumb { background-color: var(--border-strong); border-radius: 4px; }
+
+.shm-grid {
+    display: grid;
+    /* --shm-cols la pone el componente: nº de episodios de la temporada más larga */
+    grid-template-columns: 34px repeat(var(--shm-cols), minmax(26px, 1fr));
+    gap: 5px;
+    min-width: calc(34px + var(--shm-cols) * 31px);
+}
+
+.shm-ep-head {
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    color: var(--text-4);
+    align-self: end;
+}
+
+.shm-season-label {
+    display: flex;
+    align-items: center;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-3);
+}
+
+.shm-cell {
+    height: 26px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+}
+
+/* Episodio sin nota (sin votos o sin emitir) */
+.shm-cell.is-empty {
+    background: var(--bg-tint);
+    color: var(--text-4);
+}
+
+.shm-legend {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-4);
+}
+
+.shm-legend i {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    display: inline-block;
+}

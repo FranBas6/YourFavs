@@ -6,7 +6,8 @@ import {
     formatDate, getRatingStars, formatTrailerUrl, providerLinks
 } from "../../utils/constants/helpers/media-helpers";
 import {formatCurrency} from "../../utils/constants/helpers/movie-helpers";
-import {handleMovieFavAction} from "../../services/BD/movies/yourfavsMovie";
+import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/BD/movies/yourfavsMovie";
+import SagaProgress from "../../components/detail/SagaProgress.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/movie/movie.css';
 import {
@@ -174,6 +175,14 @@ const [
     id ? getMovieVideos(id) : Promise.resolve([]),
     tmdbId ? tmdbFetch<{ results: any[] }>(`/movie/${tmdbId}/reviews`).catch(() => ({ results: [] })) : Promise.resolve({ results: [] }),
 ]);
+
+// Saga con progreso: solo si la película pertenece a colección (evita la
+// lectura de Firestore en el resto de fichas). "Vista" = Vistas ∪ Liked ∪ Favs,
+// con nivel (✓/♥/★) para indicar en qué lista está cada parte.
+let watchedMovieTiers = new Map<number, WatchedTier>();
+if (collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1) {
+    watchedMovieTiers = await getWatchedMovieTiers().catch(() => new Map<number, WatchedTier>());
+}
 
 const posters: PosterImage[] = allPosters.slice(0, 40);
 const moviesRecommendations = moviesRecommendationsData.success ? moviesRecommendationsData.recommendations : [];
@@ -456,7 +465,7 @@ const jsonLd = item ? {
                     })()}
 
                     <!-- Dónde ver -->
-                    <StreamingProviders providersByCountry={item?.providersByCountry || {}} />
+                    <StreamingProviders providersByCountry={item?.providersByCountry || {}} linkByCountry={item?.providerLinksByCountry || {}} />
 
                     <!-- Nota personal -->
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
@@ -574,31 +583,15 @@ const jsonLd = item ? {
                     <!-- Trailer + Videos extras -->
                     <VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} />
 
-                    <!-- Colección/Saga -->
+                    <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.) -->
                     {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
-                        <details class="bg-white rounded-xl border border-gray-200">
-                            <summary class="p-5 cursor-pointer flex items-center justify-between">
-                                <h2 class="text-lg font-semibold text-gray-800">{collectionInfo.name}</h2>
-                                <svg class="w-5 h-5 text-gray-400 flex-shrink-0 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            </summary>
-                            {collectionInfo.overview && <p class="text-sm text-gray-500 px-5 pb-3">{collectionInfo.overview}</p>}
-                            <div class="px-5 pb-5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                                {collectionInfo.parts.sort((a: { release_date?: string | null }, b: { release_date?: string | null }) => {
-                                    const dateA = a.release_date ? new Date(a.release_date).getTime() : 0;
-                                    const dateB = b.release_date ? new Date(b.release_date).getTime() : 0;
-                                    return dateA - dateB;
-                                }).map((part: { id: number; release_date?: string | null; poster_path?: string | null; title: string }) => (
-                                    <a href={`/movie/${part.id}`} class={`text-center group rounded-xl overflow-hidden ${part.id === item?.id ? 'ring-2 ring-red-500 bg-red-50' : 'hover:bg-gray-50'} transition-colors`}>
-                                        <img src={part.poster_path || '/placeholder.jpg'} alt={part.title} class="w-full aspect-[2/3] object-cover group-hover:scale-[1.02] transition-transform" loading="lazy" />
-                                        <div class="p-2">
-                                            <p class="text-sm font-medium text-gray-800 line-clamp-2">{part.title}</p>
-                                            <p class="text-xs text-gray-400">{part.release_date ? new Date(part.release_date).getFullYear() : '?'}</p>
-                                            {part.id === item?.id && <span class="text-xs font-bold text-red-500">Actual</span>}
-                                        </div>
-                                    </a>
-                                ))}
-                            </div>
-                        </details>
+                        <SagaProgress
+                            name={collectionInfo.name}
+                            overview={collectionInfo.overview}
+                            parts={collectionInfo.parts}
+                            watchedTiers={watchedMovieTiers}
+                            currentId={item?.id}
+                        />
                     )}
 
                     <!-- Pósters -->

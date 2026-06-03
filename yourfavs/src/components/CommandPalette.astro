@@ -1,0 +1,236 @@
+---
+/**
+ * Command palette ⌘K — búsqueda instantánea multi (películas/series/personas).
+ *
+ * Overlay global montado en Layout (fuera del Header para no pelear con el
+ * stacking del panel móvil). Se abre con ⌘K / Ctrl+K o con el evento
+ * `yf:open-palette` (lo dispara la lupa del header). Una llamada con debounce
+ * a /api/search/multi por tecleo; navegación ↑↓ + Enter; Esc cierra.
+ */
+import '../styles/components/command-palette.css';
+---
+<div class="cmdk-overlay" id="cmdk" role="dialog" aria-modal="true" aria-label="Buscar en YourFavs" hidden>
+    <div class="cmdk-panel">
+        <div class="cmdk-input-row">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <input
+                id="cmdk-input"
+                class="cmdk-input"
+                type="text"
+                placeholder="Buscar películas, series, personas..."
+                autocomplete="off"
+                spellcheck="false"
+                aria-label="Buscar"
+            />
+            <span class="cmdk-kbd">ESC</span>
+        </div>
+
+        <div class="cmdk-results" id="cmdk-results" role="listbox" aria-label="Resultados">
+            <p class="cmdk-hint">Escribe para buscar en todo el catálogo</p>
+        </div>
+
+        <div class="cmdk-footer">
+            <span class="cmdk-hint-keys"><span class="cmdk-kbd">↵</span> ver todos</span>
+            <span class="cmdk-hint-keys"><span class="cmdk-kbd">↑↓</span>+<span class="cmdk-kbd">↵</span> abrir</span>
+            <a class="cmdk-see-all" id="cmdk-see-all" href="/catalogo/busqueda" hidden>Ver todos los resultados</a>
+        </div>
+    </div>
+</div>
+
+<script is:inline>
+(function () {
+    var overlay = document.getElementById('cmdk');
+    if (!overlay) return;
+    var input = document.getElementById('cmdk-input');
+    var results = document.getElementById('cmdk-results');
+    var seeAll = document.getElementById('cmdk-see-all');
+
+    var items = [];          // items planos renderizados (en orden visual)
+    var selected = -1;       // índice seleccionado en `items`
+    var debounceTimer = null;
+    var controller = null;   // AbortController del fetch en vuelo
+    var lastFocus = null;    // foco previo, para restaurarlo al cerrar
+
+    var GROUP_LABELS = { movie: 'PELÍCULAS', tv: 'SERIES', person: 'PERSONAS' };
+    var GROUP_ORDER = ['movie', 'tv', 'person'];
+    var EMPTY_ICONS = {
+        movie: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M11 4v16"/></svg>',
+        tv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 3l4 3 4-3"/></svg>',
+        person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>'
+    };
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ---- apertura / cierre ----
+    function open() {
+        if (overlay.classList.contains('is-open')) return;
+        lastFocus = document.activeElement;
+        overlay.hidden = false;
+        overlay.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+        input.focus();
+        input.select();
+    }
+
+    function close() {
+        overlay.classList.remove('is-open');
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+        if (controller) controller.abort();
+        if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    // ⌘K / Ctrl+K global (el preventDefault evita el atajo nativo del navegador)
+    document.addEventListener('keydown', function (e) {
+        if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            if (overlay.classList.contains('is-open')) close(); else open();
+        }
+    });
+
+    // Trigger externo (lupa del header)
+    document.addEventListener('yf:open-palette', open);
+
+    // Click en el backdrop cierra (el panel hace stopPropagation implícito por target)
+    overlay.addEventListener('mousedown', function (e) {
+        if (e.target === overlay) close();
+    });
+
+    // ---- búsqueda ----
+    input.addEventListener('input', function () {
+        var q = input.value.trim();
+        if (debounceTimer) clearTimeout(debounceTimer);
+
+        // Tecleo nuevo invalida cualquier selección (p. ej. por hover casual):
+        // Enter inmediato debe ir a "todos los resultados", no a un item viejo.
+        if (selected >= 0) {
+            var sel = results.querySelector('.cmdk-item[aria-selected="true"]');
+            if (sel) sel.setAttribute('aria-selected', 'false');
+            selected = -1;
+        }
+
+        if (q.length < 2) {
+            renderHint('Escribe para buscar en todo el catálogo');
+            updateSeeAll('');
+            return;
+        }
+
+        debounceTimer = setTimeout(function () { search(q); }, 250);
+    });
+
+    function search(q) {
+        if (controller) controller.abort();
+        controller = new AbortController();
+
+        fetch('/api/search/multi?q=' + encodeURIComponent(q), { signal: controller.signal })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                // Descarta respuestas tardías de otra query
+                if (input.value.trim() !== data.query) return;
+                render(data.items || []);
+                updateSeeAll(q);
+            })
+            .catch(function (err) {
+                if (err && err.name === 'AbortError') return;
+                renderHint('No se pudo buscar. Inténtalo de nuevo.');
+            });
+    }
+
+    // ---- render ----
+    function renderHint(text) {
+        items = [];
+        selected = -1;
+        results.innerHTML = '<p class="cmdk-hint">' + escapeHtml(text) + '</p>';
+    }
+
+    function render(list) {
+        items = [];
+        selected = -1;
+
+        if (!list.length) {
+            renderHint('Sin resultados para «' + input.value.trim() + '»');
+            return;
+        }
+
+        var html = '';
+        GROUP_ORDER.forEach(function (type) {
+            var group = list.filter(function (it) { return it.media_type === type; });
+            if (!group.length) return;
+            html += '<div class="cmdk-group-label">' + GROUP_LABELS[type] + '</div>';
+            group.forEach(function (it) {
+                var idx = items.length;
+                items.push(it);
+                html += '<a class="cmdk-item" role="option" aria-selected="false" data-idx="' + idx + '" href="' + escapeHtml(it.href) + '">';
+                html += it.image
+                    ? '<img class="cmdk-thumb" src="' + escapeHtml(it.image) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'"/>'
+                    : '<span class="cmdk-thumb is-empty" aria-hidden="true">' + EMPTY_ICONS[type] + '</span>';
+                html += '<span class="cmdk-item-body">';
+                html += '<span class="cmdk-item-title">' + escapeHtml(it.title) + '</span>';
+                html += '<span class="cmdk-item-meta">' + escapeHtml(it.subtitle) + '</span>';
+                html += '</span>';
+                if (it.rating != null) html += '<span class="cmdk-item-rating">★ ' + it.rating.toFixed(1) + '</span>';
+                html += '</a>';
+            });
+        });
+
+        results.innerHTML = html;
+        // Sin preselección: Enter "a pelo" lleva a todos los resultados;
+        // solo ↑↓ (intención explícita) hace que Enter abra un item.
+    }
+
+    function updateSeeAll(q) {
+        if (!q) { seeAll.hidden = true; return; }
+        seeAll.hidden = false;
+        seeAll.href = '/catalogo/busqueda?query=' + encodeURIComponent(q);
+        seeAll.textContent = 'Ver todos los resultados de «' + q + '»';
+    }
+
+    // ---- navegación por teclado ----
+    function select(idx) {
+        var nodes = results.querySelectorAll('.cmdk-item');
+        if (!nodes.length) return;
+        if (selected >= 0 && nodes[selected]) nodes[selected].setAttribute('aria-selected', 'false');
+        selected = (idx + nodes.length) % nodes.length;
+        nodes[selected].setAttribute('aria-selected', 'true');
+        nodes[selected].scrollIntoView({ block: 'nearest' });
+    }
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); select(selected + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); select(selected - 1); }
+        else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (selected >= 0 && items[selected]) {
+                // Selección explícita con ↑↓ → abre esa ficha
+                location.href = items[selected].href;
+            } else if (!seeAll.hidden) {
+                // Enter directo → búsqueda completa (no arriesga ficha equivocada)
+                location.href = seeAll.href;
+            }
+        }
+    });
+
+    // Esc cierra desde cualquier punto del overlay; Tab queda atrapado input ↔ "ver todos"
+    overlay.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.preventDefault(); close(); }
+        else if (e.key === 'Tab') {
+            e.preventDefault();
+            if (document.activeElement === input && !seeAll.hidden) seeAll.focus();
+            else input.focus();
+        }
+    });
+
+    // Hover sincroniza la selección (evita dos "activos" a la vez)
+    results.addEventListener('mousemove', function (e) {
+        var item = e.target.closest('.cmdk-item');
+        if (item) {
+            var idx = parseInt(item.getAttribute('data-idx'), 10);
+            if (idx !== selected) select(idx);
+        }
+    });
+})();
+</script>

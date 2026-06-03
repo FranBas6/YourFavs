@@ -156,6 +156,37 @@
     background: rgba(255, 255, 255, 0.3);
 }
 
+/* --- Modo trigger del command palette (JS añade .is-palette-trigger) ---
+   El input deja de ser escribible: cursor de botón, sin expansión de foco,
+   el botón-lupa derecho se oculta y en su lugar aparece el hint ⌘K. */
+.header-search-form.is-palette-trigger .header-search-input {
+    cursor: pointer;
+}
+
+.header-search-form.is-palette-trigger .header-search-input:focus {
+    width: 180px; /* sin crecer: el foco abre el palette, no edita */
+}
+
+.header-search-form.is-palette-trigger .header-search-btn {
+    display: none;
+}
+
+.header-search-kbd {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.7);
+    pointer-events: none; /* el click cae en el input, que abre el palette */
+}
+
 /* --- Theme toggle --- */
 .theme-toggle {
     display: flex;

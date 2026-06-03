@@ -131,6 +131,20 @@ export function buildProvidersByCountry(rawResults: Record<string, any> | undefi
 }
 
 /**
+ * Enlace JustWatch por país (results.{code}.link de watch/providers): página
+ * del título con todos sus proveedores. Fallback de los enlaces por proveedor.
+ */
+export function buildProviderLinksByCountry(rawResults: Record<string, any> | undefined): Record<string, string> {
+    const out: Record<string, string> = {};
+    if (!rawResults) return out;
+    for (const { code } of SUPPORTED_COUNTRIES) {
+        const link = rawResults[code]?.link;
+        if (link) out[code] = link;
+    }
+    return out;
+}
+
+/**
  * Mapear y deduplicar proveedores de streaming (flatrate > rent > buy)
  */
 export function mapAndDeduplicateProviders(esProviders: any) {

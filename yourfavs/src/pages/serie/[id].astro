@@ -33,6 +33,7 @@ import LightboxGallery from "../../components/detail/LightboxGallery.astro";
 import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
+import SeasonHeatmap from "../../components/detail/SeasonHeatmap.astro";
 import StarRating from "../../components/detail/StarRating.astro";
 import {safeFetch} from "../../utils/safeFetch";
 
@@ -584,7 +585,7 @@ const jsonLd = item ? {
                     })()}
 
                     <!-- Dónde ver -->
-                    <StreamingProviders providersByCountry={(item as any)?.providersByCountry || {}} />
+                    <StreamingProviders providersByCountry={(item as any)?.providersByCountry || {}} linkByCountry={(item as any)?.providerLinksByCountry || {}} />
 
                     <!-- Nota personal -->
                     {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
@@ -784,6 +785,9 @@ const jsonLd = item ? {
                         </section>
                     )}
 
+
+                    <!-- Mapa de calidad por episodio (datos ya cargados, cero fetches) -->
+                    <SeasonHeatmap seasons={regularSeasons} episodesBySeason={allSeasonEpisodes} />
 
                     <!-- Temporadas con acordeón -->
                     <div class="bg-white rounded-xl border border-gray-200 p-5">

@@ -162,6 +162,28 @@ export const getMoviesVistas = () => getMovieCollection("MoviesVistas");
 export const getLikedMovies = () => getMovieCollection("LikedMovies");
 export const getMoviesVerPronto = () => getMovieCollection("MoviesVerPronto");
 
+/**
+ * Películas vistas con su NIVEL. Las listas son escalones excluyentes
+ * (Vistas = "y ya está" · Liked = gustó · Favs = top), así que "haber visto"
+ * = unión de las tres. Úsala siempre que la pregunta sea "¿la he visto?";
+ * el nivel permite además mostrar EN QUÉ lista está (✓ / ♥ / ★).
+ * Prioridad fav > like > visto por si un id apareciera duplicado.
+ */
+export type WatchedTier = 'visto' | 'like' | 'fav';
+
+export async function getWatchedMovieTiers(): Promise<Map<number, WatchedTier>> {
+    const [vistas, liked, favs] = await Promise.all([
+        getMoviesVistas(),
+        getLikedMovies(),
+        getMovieFav(),
+    ]);
+    const map = new Map<number, WatchedTier>();
+    for (const m of vistas) map.set(Number(m.id), 'visto');
+    for (const m of liked) map.set(Number(m.id), 'like');
+    for (const m of favs) map.set(Number(m.id), 'fav');
+    return map;
+}
+
 export async function clearAllMoviesVerPronto(): Promise<void> {
     const peliculasVerProntoRef = collection(db, 'MoviesVerPronto');
     const querySnapshot = await getDocs(peliculasVerProntoRef);

@@ -1,0 +1,183 @@
+/* Command palette ⌘K — overlay global de búsqueda instantánea.
+   Tokens en src/styles/tokens.css; dark mode automático vía [data-theme="dark"]. */
+
+.cmdk-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000; /* por encima del mobile-panel (9999) */
+    background: rgba(15, 23, 42, .55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 9vh 16px 16px;
+}
+
+.cmdk-overlay.is-open { display: flex; }
+
+.cmdk-panel {
+    width: 560px;
+    max-width: 100%;
+    max-height: 78vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+    overflow: hidden;
+    animation: cmdk-pop .14s ease-out;
+}
+
+@keyframes cmdk-pop {
+    from { opacity: 0; transform: translateY(-8px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* ---- input ---- */
+.cmdk-input-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.cmdk-input-row svg { width: 20px; height: 20px; color: var(--text-3); flex-shrink: 0; }
+
+.cmdk-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    font-size: 17px;
+    color: var(--text);
+    caret-color: var(--accent);
+}
+
+.cmdk-input::placeholder { color: var(--text-4); }
+
+/* ---- resultados ---- */
+.cmdk-results {
+    overflow-y: auto;
+    padding: 8px 0;
+    overscroll-behavior: contain;
+}
+
+.cmdk-group-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .14em;
+    color: var(--text-4);
+    padding: 10px 20px 6px;
+}
+
+.cmdk-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    margin: 0 8px;
+    border-radius: var(--r-sm);
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.cmdk-item[aria-selected="true"] { background: var(--primary-soft); }
+
+.cmdk-thumb {
+    width: 34px;
+    height: 48px;
+    border-radius: 5px;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: var(--bg-tint);
+}
+
+/* Placeholder sin imagen: mismo hueco, icono centrado */
+.cmdk-thumb.is-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-4);
+    border: 1px solid var(--border);
+}
+
+.cmdk-thumb.is-empty svg { width: 15px; height: 15px; }
+
+.cmdk-item-body { flex: 1; min-width: 0; }
+
+.cmdk-item-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cmdk-item-meta { font-size: 12px; color: var(--text-3); }
+
+.cmdk-item-rating {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--rating-high);
+    flex-shrink: 0;
+}
+
+/* Estados vacío / escribiendo */
+.cmdk-hint {
+    padding: 28px 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-3);
+}
+
+/* ---- footer ---- */
+.cmdk-footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-4);
+    flex-shrink: 0;
+}
+
+.cmdk-kbd {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: var(--bg-tint);
+    border: 1px solid var(--border);
+    border-bottom-width: 2px;
+    border-radius: 5px;
+    padding: 1px 6px;
+    color: var(--text-2);
+}
+
+.cmdk-see-all {
+    margin-left: auto;
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cmdk-see-all:hover { text-decoration: underline; }
+
+/* Móvil: pantalla casi completa, hints de teclado fuera */
+@media (max-width: 640px) {
+    .cmdk-overlay { padding: 12px; }
+    .cmdk-panel { max-height: 88vh; }
+    .cmdk-footer .cmdk-hint-keys { display: none; }
+}
