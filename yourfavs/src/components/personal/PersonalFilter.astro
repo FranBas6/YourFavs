@@ -60,7 +60,7 @@ const toggleTag = (tag: string) => {
 const hasActiveFilters = searchQuery || activeGenres.length > 0 || activePlatforms.length > 0 || activeTags.length > 0 || filter !== 'todos';
 const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatforms.length + activeTags.length + (filter !== 'todos' ? 1 : 0);
 ---
-<details class="group relative" open={hasActiveFilters ? true : undefined}>
+<details class="group relative" data-personal-filter>
     <summary class="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-all text-sm font-medium text-gray-600 whitespace-nowrap">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
@@ -177,3 +177,53 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
         )}
     </div>
 </details>
+
+<script is:inline>
+(function () {
+    if (window.__pfFilterInit) return; // una sola vez aunque haya varias instancias
+    window.__pfFilterInit = true;
+
+    var KEY = 'pf-reopen';
+
+    document.querySelectorAll('[data-personal-filter]').forEach(function (details) {
+        // Reapertura SOLO tras interactuar con un filtro (el click navega y
+        // recarga la página): flag efímero que se consume al usarse. Una carga
+        // normal o un hard refresh siempre arrancan con el panel cerrado.
+        try {
+            if (sessionStorage.getItem(KEY)) {
+                sessionStorage.removeItem(KEY);
+                details.open = true;
+            }
+        } catch {}
+
+        details.addEventListener('click', function (e) {
+            // Click en un chip/enlace del panel → recordar reabrir tras la recarga.
+            // "Limpiar filtros" no reabre: dejas de filtrar, el panel ya no interesa.
+            var link = e.target.closest('a[href]');
+            if (link && details.contains(link) && !/Limpiar filtros/.test(link.textContent)) {
+                try { sessionStorage.setItem(KEY, '1'); } catch {}
+            }
+        });
+
+        // La búsqueda interna también recarga → mismo trato
+        var form = details.querySelector('form');
+        if (form) form.addEventListener('submit', function () {
+            try { sessionStorage.setItem(KEY, '1'); } catch {}
+        });
+    });
+
+    // Cierre por click fuera y por Esc (el <details> nativo no lo trae)
+    document.addEventListener('click', function (e) {
+        document.querySelectorAll('[data-personal-filter][open]').forEach(function (details) {
+            if (!details.contains(e.target)) details.open = false;
+        });
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('[data-personal-filter][open]').forEach(function (details) {
+            details.open = false;
+        });
+    });
+})();
+</script>
