@@ -26,6 +26,7 @@ export interface PersonalPageData {
     showAll: boolean;
     seriesPage: number;
     moviesPage: number;
+    sort: string;
     pageUrl: URL;
     itemsPerPage: number;
     // Raw Firestore data
@@ -76,6 +77,7 @@ export async function fetchPersonalPageData(
     const showAll = filter === "todos";
     const seriesPage = parseInt(url.searchParams.get("seriesPage") || "1");
     const moviesPage = parseInt(url.searchParams.get("moviesPage") || "1");
+    const sort = url.searchParams.get("sort") || "";
 
     let seriesData: any[] = [];
     let moviesData: any[] = [];
@@ -91,6 +93,13 @@ export async function fetchPersonalPageData(
         ]);
         seriesItems = seriesResults.filter((s) => s !== null);
         moviesItems = moviesResults.filter((m) => m !== null);
+
+        // Los detalles vienen de TMDB sin la nota personal: reinyectarla desde
+        // los docs crudos de Firestore (campo `rating`, 1-10) para cards y sort.
+        const seriesRatingById = new Map(seriesData.map((s) => [String(s.id), s.rating]));
+        const moviesRatingById = new Map(moviesData.map((m) => [String(m.id), m.rating]));
+        seriesItems.forEach((s: any) => { s.userRating = seriesRatingById.get(String(s.id)) ?? null; });
+        moviesItems.forEach((m: any) => { m.userRating = moviesRatingById.get(String(m.id)) ?? null; });
     } catch (error) {
         console.error("Error al cargar contenido personal:", error);
         errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
@@ -182,6 +191,14 @@ export async function fetchPersonalPageData(
         });
     }
 
+    // Orden "Tu nota ↓": items con nota primero (desc), el resto conserva
+    // el orden por defecto (added_at desc). Solo lo expone la vista de vistos.
+    if (sort === "mi-nota") {
+        const byUserRating = (a: any, b: any) => (b.userRating ?? -1) - (a.userRating ?? -1);
+        filteredSeries = [...filteredSeries].sort(byUserRating);
+        filteredMovies = [...filteredMovies].sort(byUserRating);
+    }
+
     // Paginación
     const seriesItemsToShow = seriesPage * ITEMS_PER_PAGE;
     const moviesItemsToShow = moviesPage * ITEMS_PER_PAGE;
@@ -217,6 +234,7 @@ export async function fetchPersonalPageData(
         filter, searchQuery, genreFilter, platformFilter,
         showSeries, showMovies, showAll,
         seriesPage, moviesPage,
+        sort,
         pageUrl: url,
         itemsPerPage: ITEMS_PER_PAGE,
         seriesData, moviesData,

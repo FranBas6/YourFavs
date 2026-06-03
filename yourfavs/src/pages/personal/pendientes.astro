@@ -13,6 +13,7 @@ import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
+import WhatToWatch from "../../components/personal/WhatToWatch.astro";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
@@ -39,9 +40,12 @@ const {
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Pendientes</h1>
-            <p class="text-gray-500 text-base">Series y películas que quieres ver</p>
+        <header class="mb-6 flex items-start justify-between gap-3 flex-wrap">
+            <div>
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Pendientes</h1>
+                <p class="text-gray-500 text-base">Series y películas que quieres ver</p>
+            </div>
+            <WhatToWatch />
         </header>
 
         <div class="flex items-start gap-3 mb-6">
@@ -92,6 +96,7 @@ const {
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                     status={item.status}
                                     watchedEpisodes={watchedMap[String(item.id)]?.watched}
+                                    userRating={(item as any).userRating}
                                 /></HoverPreview>
                             ))}
                         </div>
@@ -141,6 +146,7 @@ const {
                                     overview={item.overview}
                                     release_date={item.release_date}
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                    userRating={(item as any).userRating}
                                 /></HoverPreview>
                             ))}
                         </div>

@@ -570,6 +570,50 @@ export async function getWatchStreak(): Promise<{ current: number; lastDay: stri
     }
 }
 
+/**
+ * Racha máxima histórica + actual, en una sola lectura de WatchedEpisodes.
+ * Cada día se reduce a un nº de día (ms/86400000 con Math.round, que absorbe
+ * el desfase ±1h de los cambios DST) y se busca la secuencia consecutiva más
+ * larga. La actual replica el criterio de getWatchStreak (hoy o ayer cuentan).
+ */
+export async function getMaxWatchStreak(): Promise<{ max: number; current: number }> {
+    try {
+        const snap = await getDocs(collection(db, "WatchedEpisodes"));
+        const dayNums = new Set<number>();
+        for (const docSnap of snap.docs) {
+            const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
+            for (const ep of data.watched_episodes || []) {
+                if (!ep.watched_at) continue;
+                const d = new Date(ep.watched_at);
+                if (isNaN(d.getTime())) continue;
+                dayNums.add(Math.round(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000));
+            }
+        }
+        if (dayNums.size === 0) return { max: 0, current: 0 };
+
+        const sorted = Array.from(dayNums).sort((a, b) => a - b);
+        let max = 0;
+        let run = 0;
+        let prev = NaN;
+        for (const n of sorted) {
+            run = n === prev + 1 ? run + 1 : 1;
+            if (run > max) max = run;
+            prev = n;
+        }
+
+        const today = new Date(); today.setHours(0, 0, 0, 0);
+        const todayNum = Math.round(today.getTime() / 86400000);
+        let cursor = dayNums.has(todayNum) ? todayNum : dayNums.has(todayNum - 1) ? todayNum - 1 : null;
+        let current = 0;
+        while (cursor !== null && dayNums.has(cursor)) { current++; cursor--; }
+
+        return { max, current };
+    } catch (error) {
+        console.error('Error al calcular racha máxima:', error);
+        return { max: 0, current: 0 };
+    }
+}
+
 export interface SerieYearActivity {
     id: string;
     lastWatchedAt: number;

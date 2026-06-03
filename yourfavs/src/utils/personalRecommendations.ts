@@ -2,8 +2,8 @@ import { processBatch } from './processBatch';
 import { tmdbFetch, tmdbFetchList } from '../services/API/shared/tmdbClient';
 import { calculateGenrePreferences } from './genrePreferences';
 import { getCached, setCached, invalidateCached } from './recsBlobCache';
-import { getMovieFav, getLikedMovies } from '../services/BD/movies/yourfavsMovie';
-import { getSerieFav, getLikedSeries, getSeriesSiguiendo } from '../services/BD/series/yourfavsSerie';
+import { getMovieFav, getLikedMovies, getMoviesVistas } from '../services/BD/movies/yourfavsMovie';
+import { getSerieFav, getLikedSeries, getSeriesSiguiendo, getSeriesVistas } from '../services/BD/series/yourfavsSerie';
 
 export interface SeedInfo {
     id: string;
@@ -29,7 +29,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v5';
+const BLOB_KEY = 'personalRecs_v6';
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 let cache: { data: PersonalRecResult; expires: number } | null = null;
@@ -57,6 +57,10 @@ function serializeRecs(r: PersonalRecResult): SerializedRecs {
 const SEED_WEIGHT_FAVS = 2;
 const SEED_WEIGHT_LIKE = 1.5;
 const SEED_WEIGHT_SIGUIENDO = 1.5;
+// Tu nota: lo que TÚ puntuaste alto pesa extra (aditivo: un fav con nota 9 suma
+// 2 + 1.75). Entre favs (2) y like (1.5) para no destronar a favoritos sin nota.
+const SEED_WEIGHT_RATING = 1.75;
+const RATING_SEED_MIN = 8;
 const SEED_LIMIT = 6;
 const RESULT_LIMIT = 20;
 // E: filtro vote_count mínimo para cortar nicho obscuro (pelis más exigente que series).
@@ -149,9 +153,9 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
 
     const prefs = await calculateGenrePreferences();
 
-    const [movFavs, movLike, tvFavs, tvLike, tvSig] = await Promise.all([
-        getMovieFav(), getLikedMovies(),
-        getSerieFav(), getLikedSeries(), getSeriesSiguiendo(),
+    const [movFavs, movLike, movVistas, tvFavs, tvLike, tvSig, tvVistas] = await Promise.all([
+        getMovieFav(), getLikedMovies(), getMoviesVistas(),
+        getSerieFav(), getLikedSeries(), getSeriesSiguiendo(), getSeriesVistas(),
     ]);
 
     const movieMap = new Map<string, number>();
@@ -162,6 +166,23 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     setSum(tvMap, tvFavs as any, SEED_WEIGHT_FAVS);
     setSum(tvMap, tvLike as any, SEED_WEIGHT_LIKE);
     setSum(tvMap, tvSig as any, SEED_WEIGHT_SIGUIENDO);
+
+    // Semilla por "Tu nota": cualquier título puntuado >= RATING_SEED_MIN en
+    // cualquiera de las listas entra (o se refuerza) como seed. Dedup por id:
+    // los tiers son excluyentes, pero por si un doc viviera en dos listas.
+    const highRated = (lists: any[][]) => {
+        const seen = new Set<string>();
+        const out: { id: string }[] = [];
+        for (const list of lists) for (const d of list) {
+            if (typeof d.rating === 'number' && d.rating >= RATING_SEED_MIN && !seen.has(String(d.id))) {
+                seen.add(String(d.id));
+                out.push({ id: String(d.id) });
+            }
+        }
+        return out;
+    };
+    setSum(movieMap, highRated([movFavs as any, movLike as any, movVistas as any]), SEED_WEIGHT_RATING);
+    setSum(tvMap, highRated([tvFavs as any, tvLike as any, tvSig as any, tvVistas as any]), SEED_WEIGHT_RATING);
 
     const movieEntries = Array.from(movieMap.entries());
     const tvEntries = Array.from(tvMap.entries());

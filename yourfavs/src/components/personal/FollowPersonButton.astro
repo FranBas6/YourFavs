@@ -1,0 +1,33 @@
+---
+/**
+ * Botón "Seguir" de una persona (handoff v2 §③): form POST SSR como el resto
+ * de acciones del proyecto. La página dueña enruta actionType=follow_person
+ * a handlePersonFollowAction antes de su handler habitual.
+ */
+interface Props {
+    personId: string;
+    name: string;
+    profilePath?: string | null;
+    isFollowing: boolean;
+}
+
+const { personId, name, profilePath = null, isFollowing } = Astro.props;
+---
+<form method="POST">
+    <input type="hidden" name="actionType" value="follow_person" />
+    <input type="hidden" name="person_id" value={personId} />
+    <input type="hidden" name="name" value={name} />
+    {profilePath && <input type="hidden" name="profile_path" value={profilePath} />}
+    <input type="hidden" name="action" value={isFollowing ? 'remove' : 'add'} />
+    <button type="submit"
+        class={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors
+            ${isFollowing
+                ? 'bg-[#E63946] text-white hover:bg-[#C7283A]'
+                : 'bg-white text-gray-700 border border-gray-300 hover:border-[#E63946] hover:text-[#E63946]'}`}
+        title={isFollowing ? 'Dejar de seguir: sus estrenos saldrán del calendario' : 'Seguir: te avisaremos de sus estrenos'}>
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 3h16z"/><path d="M10 21a2 2 0 0 0 4 0"/>
+        </svg>
+        {isFollowing ? 'Siguiendo' : 'Seguir'}
+    </button>
+</form>

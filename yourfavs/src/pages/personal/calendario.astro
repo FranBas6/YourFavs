@@ -152,8 +152,9 @@ const notificationGroups = Array.from(groupsMap.entries())
                 {calendarCells.map((cell) => {
                     const isToday = cell.date === today;
                     const hasEvents = cell.events.length > 0;
-                    const hasMovies = cell.events.some(e => e.media_type === 'movie');
-                    const hasSeries = cell.events.some(e => e.media_type === 'tv');
+                    const hasPersonRelease = cell.events.some(e => e.event_type === 'person_release');
+                    const hasMovies = cell.events.some(e => e.media_type === 'movie' && e.event_type !== 'person_release');
+                    const hasSeries = cell.events.some(e => e.media_type === 'tv' && e.event_type !== 'person_release');
                     const hasSeasonPremiere = cell.events.some(e => e.event_type === 'season_premiere');
 
                     return (
@@ -175,6 +176,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                                             {hasMovies && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#E63946]" title="Película"></span>}
                                             {hasSeries && !hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3B82F6]" title="Episodio"></span>}
                                             {hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#8B5CF6]" title="Temporada completa"></span>}
+                                            {hasPersonRelease && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#EC4899]" title="De quien sigues"></span>}
                                         </div>
                                     )}
 
@@ -182,7 +184,8 @@ const notificationGroups = Array.from(groupsMap.entries())
                                     <div class="hidden lg:block mt-1 space-y-0.5 overflow-hidden">
                                         {cell.events.slice(0, 2).map(event => (
                                             <div class={`text-[10px] leading-tight truncate px-1 py-0.5 rounded
-                                                ${event.media_type === 'movie' ? 'bg-red-50 text-red-700' : ''}
+                                                ${event.event_type === 'person_release' ? 'bg-pink-50 text-pink-700' : ''}
+                                                ${event.media_type === 'movie' && event.event_type !== 'person_release' ? 'bg-red-50 text-red-700' : ''}
                                                 ${event.event_type === 'season_premiere' ? 'bg-purple-50 text-purple-700' : ''}
                                                 ${event.event_type === 'episode' ? 'bg-blue-50 text-blue-700' : ''}`}>
                                                 {event.title}
@@ -209,6 +212,9 @@ const notificationGroups = Array.from(groupsMap.entries())
                 </span>
                 <span class="flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-[#8B5CF6]"></span> Temporada completa
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-[#EC4899]"></span> De quien sigues
                 </span>
             </div>
         </div>
@@ -256,8 +262,8 @@ const notificationGroups = Array.from(groupsMap.entries())
                                     <div class="space-y-2">
                                         {day.events.map(ev => {
                                             const link = ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`;
-                                            const colorClass = ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-blue-600');
-                                            const bgClass = ev.media_type === 'movie' ? 'bg-red-50 border-red-100' : (ev.event_type === 'season_premiere' ? 'bg-purple-50 border-purple-100' : 'bg-blue-50 border-blue-100');
+                                            const colorClass = ev.event_type === 'person_release' ? 'text-[#EC4899]' : ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-blue-600');
+                                            const bgClass = ev.event_type === 'person_release' ? 'bg-pink-50 border-pink-100' : ev.media_type === 'movie' ? 'bg-red-50 border-red-100' : (ev.event_type === 'season_premiere' ? 'bg-purple-50 border-purple-100' : 'bg-blue-50 border-blue-100');
                                             return (
                                                 <a href={link} class={`flex items-center gap-3 p-2.5 rounded-xl border ${bgClass} hover:shadow-md transition`}>
                                                     {ev.poster_path ? (
@@ -355,7 +361,8 @@ const notificationGroups = Array.from(groupsMap.entries())
                                         <li>
                                             <a href={detailLink} class="flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 transition-colors min-w-0">
                                                 <span class={`text-xs font-medium truncate min-w-0 flex-1
-                                                    ${ev.media_type === 'movie' ? 'text-[#E63946]' : ''}
+                                                    ${ev.event_type === 'person_release' ? 'text-[#EC4899]' : ''}
+                                                    ${ev.media_type === 'movie' && ev.event_type !== 'person_release' ? 'text-[#E63946]' : ''}
                                                     ${ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : ''}
                                                     ${ev.event_type === 'episode' ? 'text-[#3B82F6]' : ''}`}>
                                                     {ev.label}
@@ -411,8 +418,8 @@ const notificationGroups = Array.from(groupsMap.entries())
             var html = '';
             events.forEach(function (ev) {
                 var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
-                var colorClass = ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-[#3B82F6]');
-                var borderClass = ev.media_type === 'movie' ? 'border-red-100' : (ev.event_type === 'season_premiere' ? 'border-purple-100' : 'border-blue-100');
+                var colorClass = ev.event_type === 'person_release' ? 'text-[#EC4899]' : ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-[#3B82F6]');
+                var borderClass = ev.event_type === 'person_release' ? 'border-pink-100' : ev.media_type === 'movie' ? 'border-red-100' : (ev.event_type === 'season_premiere' ? 'border-purple-100' : 'border-blue-100');
                 html += '<a href="' + link + '" class="flex items-center gap-3 p-3 bg-white rounded-xl border ' + borderClass + ' shadow-sm hover:shadow-md transition-all">';
                 if (ev.poster_path) {
                     html += '<img src="' + ev.poster_path + '" alt="" class="w-12 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy"/>';

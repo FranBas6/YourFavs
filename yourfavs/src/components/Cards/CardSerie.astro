@@ -28,9 +28,11 @@ interface Props {
     watchedEpisodes?: number;
     /** Contexto de seguimiento: activa la cuenta atrás de estreno (≤14 días). */
     followed?: boolean;
+    /** Nota personal (1-10) guardada en Firestore; pinta el badge ámbar "★ N". */
+    userRating?: number;
 }
 
-const { id, name, img, vote_average, overview, first_air_date, seasons, last_episode_to_air, next_episode_to_air, genres, status, character, favoriteNumber, watchedEpisodes, followed } = Astro.props;
+const { id, name, img, vote_average, overview, first_air_date, seasons, last_episode_to_air, next_episode_to_air, genres, status, character, favoriteNumber, watchedEpisodes, followed, userRating } = Astro.props;
 
 const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(first_air_date);
@@ -72,7 +74,7 @@ if (followed && next_episode_to_air?.air_date) {
        class="flex flex-col rounded-xl overflow-hidden bg-midnight-blue hover:bg-dark-blue transition-all duration-300 h-full border border-white/5 hover:border-white/15 relative">
 
         <!-- Badges -->
-        <div class="absolute top-2 left-2 z-10 flex flex-col gap-1">
+        <div class="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
             {countdownLabel ? (
                 <span class="top-badge badge-accent font-mono tracking-wide">{countdownLabel}</span>
             ) : (
@@ -101,6 +103,8 @@ if (followed && next_episode_to_air?.air_date) {
                 </svg>
                 {vote_average ? vote_average.toFixed(1) : "N/A"}
             </div>
+
+            {userRating && <div class="user-rating-badge">★ {userRating}</div>}
 
             <div class="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#0F172A] to-transparent"></div>
 

@@ -1,0 +1,280 @@
+---
+/**
+ * Ruleta "¿Qué veo?" — botón + modal que propone UN título de tus Pendientes
+ * según tiempo disponible y plataformas (handoff v2 §①).
+ *
+ * Los candidatos llegan de /api/roulette/candidates (fetch lazy en el primer
+ * open; el endpoint cachea 30min). El filtrado y el azar son 100% cliente:
+ * "Otra" no repite hasta agotar (barajado Fisher-Yates + cursor). Las
+ * plataformas elegidas persisten en localStorage (yf_roulette_platforms).
+ * También se abre vía CustomEvent `yf:open-roulette` (⌘K, F3) o `?roulette=1`.
+ */
+import '../../styles/components/roulette.css';
+
+// Mismas 7 plataformas (ids TMDB) que el filtro de /personal
+const PLATFORM_OPTIONS = [
+    { id: 8, label: 'Netflix' },
+    { id: 119, label: 'Amazon' },
+    { id: 337, label: 'Disney+' },
+    { id: 1899, label: 'HBO' },
+    { id: 350, label: 'Apple TV+' },
+    { id: 2241, label: 'Movistar+' },
+    { id: 63, label: 'Filmin' },
+];
+
+const TIME_OPTIONS = [
+    { key: '60', label: '< 1 h' },
+    { key: '150', label: '~2 h' },
+    { key: 'any', label: 'Lo que sea' },
+];
+---
+<button type="button" class="wtw-trigger" data-wtw-open>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="3"/>
+        <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
+        <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
+        <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>
+        <circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/>
+        <circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/>
+    </svg>
+    No sé qué ver
+</button>
+
+<div class="wtw-overlay" id="wtw" role="dialog" aria-modal="true" aria-label="¿Qué veo?" hidden>
+    <div class="wtw-panel">
+        <div class="wtw-head">
+            <span class="wtw-head-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="3"/>
+                    <circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
+                    <circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/>
+                    <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>
+                    <circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/>
+                    <circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/>
+                </svg>
+            </span>
+            <div class="wtw-head-text">
+                <h2>¿Qué veo?</h2>
+                <p id="wtw-subtitle">De tus pendientes, según tu momento</p>
+            </div>
+            <span class="cmdk-kbd wtw-esc-hint" aria-hidden="true">ESC</span>
+            <button type="button" class="wtw-close" data-wtw-close aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+                    <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+
+        <div class="wtw-filters">
+            <div class="wtw-filter-group">
+                <div class="wtw-filter-label">TENGO TIEMPO PARA</div>
+                <div class="wtw-chips" id="wtw-time">
+                    {TIME_OPTIONS.map((t) => (
+                        <button type="button" class={`wtw-chip${t.key === 'any' ? ' is-active' : ''}`} data-time={t.key}>{t.label}</button>
+                    ))}
+                </div>
+            </div>
+            <div class="wtw-filter-group">
+                <div class="wtw-filter-label">DONDE PUEDO VERLO</div>
+                <div class="wtw-chips" id="wtw-platforms">
+                    {PLATFORM_OPTIONS.map((p) => (
+                        <button type="button" class="wtw-chip" data-platform={p.id}>{p.label}</button>
+                    ))}
+                </div>
+            </div>
+        </div>
+
+        <div class="wtw-body">
+            <div class="wtw-kicker">● TU PLAN DE HOY</div>
+            <div id="wtw-result">
+                <p class="wtw-empty">Cargando tus pendientes…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script is:inline>
+(function () {
+    if (window.__wtwInit) return; // una sola instancia gana (botón + modal por página)
+    window.__wtwInit = true;
+
+    var overlay = document.getElementById('wtw');
+    if (!overlay) return;
+    var result = document.getElementById('wtw-result');
+    var subtitle = document.getElementById('wtw-subtitle');
+    var timeChips = document.getElementById('wtw-time');
+    var platformChips = document.getElementById('wtw-platforms');
+
+    var IMG = 'https://image.tmdb.org/t/p/w185';
+    var LS_KEY = 'yf_roulette_platforms';
+
+    var all = null;        // candidatos del endpoint (null = sin cargar)
+    var order = [];        // candidatos filtrados, barajados
+    var cursor = -1;       // posición en `order`
+    var timeFilter = 'any';
+    var platforms = [];    // ids seleccionados (vacío = da igual)
+    var lastFocus = null;
+
+    function escapeHtml(s) {
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ---- plataformas persistidas ----
+    try { platforms = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { platforms = []; }
+    platformChips.querySelectorAll('.wtw-chip').forEach(function (chip) {
+        if (platforms.indexOf(parseInt(chip.dataset.platform, 10)) >= 0) chip.classList.add('is-active');
+    });
+
+    // ---- apertura / cierre ----
+    function openModal() {
+        if (overlay.classList.contains('is-open')) return;
+        lastFocus = document.activeElement;
+        overlay.hidden = false;
+        overlay.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+        if (all === null) load(); else reroll();
+    }
+
+    function closeModal() {
+        overlay.classList.remove('is-open');
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+        if (lastFocus && lastFocus.focus) lastFocus.focus();
+    }
+
+    document.addEventListener('click', function (e) {
+        if (e.target.closest('[data-wtw-open]')) openModal();
+        else if (e.target.closest('[data-wtw-close]')) closeModal();
+    });
+    document.addEventListener('yf:open-roulette', openModal);
+    overlay.addEventListener('mousedown', function (e) { if (e.target === overlay) closeModal(); });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) { e.preventDefault(); closeModal(); }
+    });
+    // Llegada desde otra página (acción del ⌘K): ?roulette=1 abre directo
+    if (new URLSearchParams(location.search).get('roulette') === '1') openModal();
+
+    // ---- datos ----
+    function load() {
+        result.innerHTML = '<p class="wtw-empty">Cargando tus pendientes…</p>';
+        fetch('/api/roulette/candidates')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                all = data.candidates || [];
+                subtitle.textContent = all.length
+                    ? 'De tus ' + all.length + ' pendientes, según tu momento'
+                    : 'No tienes pendientes todavía';
+                reroll();
+            })
+            .catch(function () {
+                result.innerHTML = '<p class="wtw-empty">No se pudieron cargar tus pendientes. Cierra y reintenta.</p>';
+            });
+    }
+
+    // ---- filtros ----
+    function passes(c) {
+        if (timeFilter !== 'any' && c.runtime > parseInt(timeFilter, 10)) return false;
+        if (platforms.length && !c.providers.some(function (p) { return platforms.indexOf(p.id) >= 0; })) return false;
+        return true;
+    }
+
+    function shuffle(arr) {
+        for (var i = arr.length - 1; i > 0; i--) {
+            var j = Math.floor(Math.random() * (i + 1));
+            var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+        }
+        return arr;
+    }
+
+    // Re-baraja el pool filtrado y muestra el primero (cambio de filtro o 1ª carga)
+    function reroll() {
+        if (all === null) return;
+        order = shuffle(all.filter(passes));
+        cursor = -1;
+        next();
+    }
+
+    // "Otra": avanza sin repetir; al agotar el pool, re-baraja y vuelve a empezar
+    function next() {
+        if (!order.length) { renderEmpty(); return; }
+        cursor++;
+        if (cursor >= order.length) { shuffle(order); cursor = 0; }
+        renderCard(order[cursor]);
+    }
+
+    timeChips.addEventListener('click', function (e) {
+        var chip = e.target.closest('.wtw-chip');
+        if (!chip) return;
+        timeFilter = chip.dataset.time;
+        timeChips.querySelectorAll('.wtw-chip').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+        reroll();
+    });
+
+    platformChips.addEventListener('click', function (e) {
+        var chip = e.target.closest('.wtw-chip');
+        if (!chip) return;
+        var id = parseInt(chip.dataset.platform, 10);
+        var idx = platforms.indexOf(id);
+        if (idx >= 0) platforms.splice(idx, 1); else platforms.push(id);
+        chip.classList.toggle('is-active', idx < 0);
+        try { localStorage.setItem(LS_KEY, JSON.stringify(platforms)); } catch {}
+        reroll();
+    });
+
+    // ---- render ----
+    function fmtRuntime(min) {
+        var h = Math.floor(min / 60), m = min % 60;
+        return h ? h + ' h' + (m ? ' ' + ('0' + m).slice(-2) : '') : m + ' min';
+    }
+
+    function renderEmpty() {
+        result.innerHTML = '<p class="wtw-empty">Nada de tus pendientes encaja con esos filtros.<br/>Prueba a quitar alguna plataforma o ampliar el tiempo.</p>';
+    }
+
+    function renderCard(c) {
+        var href = (c.media_type === 'movie' ? '/movie/' : '/serie/') + c.id;
+        var meta = [c.year, fmtRuntime(c.runtime) + (c.media_type === 'tv' ? '/ep' : ''), c.vote_average ? '★ ' + c.vote_average.toFixed(1) : null, c.genres[0] || null]
+            .filter(Boolean).join(' · ');
+
+        // Proveedor a mostrar: el que casa con tu filtro; si no filtras, el primero
+        var prov = null;
+        if (platforms.length) {
+            prov = c.providers.find(function (p) { return platforms.indexOf(p.id) >= 0; }) || null;
+        }
+        if (!prov) prov = c.providers[0] || null;
+
+        var where = '';
+        if (prov) {
+            where += '<span class="wtw-provider-pill">' +
+                (prov.logo ? '<img src="https://image.tmdb.org/t/p/w45' + escapeHtml(prov.logo) + '" alt=""/>' : '') +
+                'En ' + escapeHtml(prov.name) + '</span>';
+        }
+        if (timeFilter !== 'any') {
+            where += '<span class="wtw-fits">· encaja en tu tiempo</span>';
+        }
+
+        var watchHref = c.provider_link || href;
+        var external = !!c.provider_link;
+
+        var html = '<div class="wtw-card is-rolling">' +
+            '<img class="wtw-poster" src="' + (c.poster_path ? IMG + escapeHtml(c.poster_path) : '/placeholder.jpg') + '" alt="" onerror="this.onerror=null;this.src=\'/placeholder.jpg\'"/>' +
+            '<div class="wtw-card-body">' +
+            '<a class="wtw-card-title" href="' + escapeHtml(href) + '">' + escapeHtml(c.title) + '</a>' +
+            '<div class="wtw-card-meta">' + escapeHtml(meta) + '</div>' +
+            (where ? '<div class="wtw-where">' + where + '</div>' : '') +
+            '<div class="wtw-actions">' +
+            '<a class="wtw-btn wtw-btn-primary" href="' + escapeHtml(watchHref) + '"' + (external ? ' target="_blank" rel="noopener"' : '') + '>' +
+            '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20"/></svg> Ver ahora</a>' +
+            '<button type="button" class="wtw-btn wtw-btn-ghost" data-wtw-next>' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></svg>' +
+            ' Otra</button>' +
+            '</div></div></div>';
+
+        result.innerHTML = html;
+    }
+
+    result.addEventListener('click', function (e) {
+        if (e.target.closest('[data-wtw-next]')) next();
+    });
+})();
+</script>

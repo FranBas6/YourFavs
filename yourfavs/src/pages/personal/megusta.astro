@@ -23,7 +23,7 @@ const data = await fetchPersonalPageData(
 );
 
 const {
-    filter, searchQuery, genreFilter, platformFilter,
+    filter, searchQuery, genreFilter, platformFilter, sort,
     showSeries, showMovies, showAll,
     seriesPage, moviesPage, pageUrl, itemsPerPage,
     filteredSeries, filteredMovies,
@@ -61,6 +61,25 @@ const {
             series={filteredSeries.length}
         />
 
+        {/* Orden: por defecto (recientes) o por tu nota personal */}
+        <div class="flex items-center justify-end gap-1.5 mb-5">
+            <span class="font-mono text-[10px] tracking-widest text-gray-400 mr-1">ORDEN</span>
+            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: '' })}
+               class={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all border
+                   ${sort !== 'mi-nota'
+                       ? 'bg-gray-800 text-white border-gray-800'
+                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
+                Recientes
+            </a>
+            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: 'mi-nota' })}
+               class={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all border
+                   ${sort === 'mi-nota'
+                       ? 'bg-amber-400 text-amber-950 border-amber-400'
+                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
+                ★ Tu nota ↓
+            </a>
+        </div>
+
         <div class="space-y-10">
             {/* Series */}
             {(showSeries || showAll) && (
@@ -94,6 +113,7 @@ const {
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                     status={item.status}
                                     watchedEpisodes={watchedMap[String(item.id)]?.watched}
+                                    userRating={(item as any).userRating}
                                 /></HoverPreview>
                             ))}
                         </div>
@@ -101,7 +121,7 @@ const {
                     {hasMoreSeries && (
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
+                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, sort,
                                     seriesPage: Math.ceil(filteredSeries.length / itemsPerPage).toString(),
                                     moviesPage: moviesPage.toString()
                                 }) + '#series-section'}
@@ -143,6 +163,7 @@ const {
                                     overview={item.overview}
                                     release_date={item.release_date}
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
+                                    userRating={(item as any).userRating}
                                 /></HoverPreview>
                             ))}
                         </div>
@@ -150,7 +171,7 @@ const {
                     {hasMoreMovies && (
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
+                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, sort,
                                     seriesPage: seriesPage.toString(),
                                     moviesPage: Math.ceil(filteredMovies.length / itemsPerPage).toString()
                                 }) + '#movies-section'}

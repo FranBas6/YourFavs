@@ -1,0 +1,280 @@
+/* Ruleta "¿Qué veo?" — modal que propone un título de tus Pendientes según
+   tiempo disponible y plataformas. Tokens → dark mode automático. */
+
+/* Botón disparador */
+.wtw-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 15px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--border);
+    background: var(--bg-elev);
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--s-1);
+    transition: all .2s ease;
+    white-space: nowrap;
+}
+
+.wtw-trigger:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    box-shadow: var(--s-2);
+}
+
+.wtw-trigger svg { width: 16px; height: 16px; }
+
+/* Overlay (mismo patrón que el command palette) */
+.wtw-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(15, 23, 42, .55);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+    display: none;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 7vh 16px 16px;
+}
+
+.wtw-overlay.is-open { display: flex; }
+
+.wtw-panel {
+    width: 620px;
+    max-width: 100%;
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-xl);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+    animation: wtw-pop .14s ease-out;
+}
+
+@keyframes wtw-pop {
+    from { opacity: 0; transform: translateY(-8px) scale(.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Cabecera */
+.wtw-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+}
+
+.wtw-head-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.wtw-head-icon svg { width: 22px; height: 22px; }
+
+.wtw-head-text { flex: 1; min-width: 0; }
+
+.wtw-head h2 { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); }
+
+.wtw-head p { margin: 0; font-size: 12.5px; color: var(--text-3); }
+
+/* Botón cerrar: imprescindible en móvil (sin Esc y casi sin backdrop visible) */
+.wtw-close {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--r-full);
+    border: 1px solid var(--border);
+    background: var(--bg-tint);
+    color: var(--text-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all .15s ease;
+}
+
+.wtw-close:hover { color: var(--text); border-color: var(--border-strong); }
+
+.wtw-close svg { width: 16px; height: 16px; }
+
+/* Filtros */
+.wtw-filters {
+    display: flex;
+    gap: 24px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+}
+
+.wtw-filter-group { flex: 1; min-width: 220px; }
+
+.wtw-filter-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--text-4);
+    margin-bottom: 9px;
+}
+
+.wtw-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.wtw-chip {
+    padding: 7px 12px;
+    border-radius: var(--r-full);
+    font-size: 12.5px;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all .15s ease;
+}
+
+.wtw-chip:hover { border-color: var(--border-strong); color: var(--text-2); }
+
+.wtw-chip.is-active {
+    background: var(--text);
+    color: var(--bg-elev);
+    border-color: var(--text);
+}
+
+/* Resultado */
+.wtw-body { padding: 22px 24px 24px; }
+
+.wtw-kicker {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: .12em;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.wtw-card {
+    display: flex;
+    gap: 18px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px;
+}
+
+.wtw-card.is-rolling { animation: wtw-roll .45s ease; }
+
+@keyframes wtw-roll {
+    0%   { opacity: .25; transform: translateX(10px); }
+    100% { opacity: 1; transform: none; }
+}
+
+.wtw-poster {
+    width: 90px;
+    aspect-ratio: 2 / 3;
+    border-radius: 8px;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: var(--bg-tint);
+}
+
+.wtw-card-body { flex: 1; min-width: 0; color: var(--card-text); }
+
+.wtw-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 4px;
+    color: var(--card-text);
+    text-decoration: none;
+    display: block;
+}
+
+.wtw-card-title:hover { text-decoration: underline; }
+
+.wtw-card-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--card-text-3);
+    margin-bottom: 9px;
+}
+
+.wtw-where {
+    display: flex;
+    gap: 7px;
+    align-items: center;
+    margin-bottom: 13px;
+    flex-wrap: wrap;
+}
+
+.wtw-provider-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    background: rgba(16, 185, 129, .15);
+    color: #34d399;
+    padding: 4px 9px;
+    border-radius: var(--r-full);
+    font-weight: 600;
+}
+
+.wtw-provider-pill img { width: 16px; height: 16px; border-radius: 4px; }
+
+.wtw-fits { font-size: 11.5px; color: var(--card-text-3); }
+
+.wtw-actions { display: flex; gap: 9px; }
+
+.wtw-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: var(--r-full);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+    transition: all .15s ease;
+}
+
+.wtw-btn svg { width: 14px; height: 14px; }
+
+.wtw-btn-primary { background: var(--accent); color: #fff; }
+
+.wtw-btn-primary:hover { background: var(--accent-dark); }
+
+.wtw-btn-ghost {
+    background: rgba(255, 255, 255, .1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, .15);
+}
+
+.wtw-btn-ghost:hover { background: rgba(255, 255, 255, .18); }
+
+/* Estados vacío / cargando */
+.wtw-empty {
+    padding: 26px 10px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-3);
+}
+
+/* Móvil */
+@media (max-width: 640px) {
+    .wtw-overlay { padding: 12px; }
+    .wtw-esc-hint { display: none; } /* en táctil no hay Esc: manda la X */
+    .wtw-filters { gap: 14px; }
+    .wtw-card { flex-direction: row; }
+    .wtw-poster { width: 76px; }
+    .wtw-card-title { font-size: 16px; }
+}

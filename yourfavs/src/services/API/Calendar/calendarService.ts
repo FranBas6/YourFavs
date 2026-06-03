@@ -1,6 +1,7 @@
 import { tmdbFetch, tmdbFetchList, posterUrl } from '../shared/tmdbClient';
 import { getSeriesSiguiendo } from '../../BD/series/yourfavsSerie';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
+import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
 import { fetchSerieDetails } from '../Series/tmdbSeries';
 import { fetchMovieDetails } from '../Movies/tmdbMovies';
 import { processBatch } from '../../../utils/processBatch';
@@ -10,10 +11,12 @@ export interface CalendarEvent {
     media_type: 'movie' | 'tv';
     title: string;
     poster_path: string;
-    event_type: 'movie_premiere' | 'episode' | 'season_premiere';
+    event_type: 'movie_premiere' | 'episode' | 'season_premiere' | 'person_release';
     label: string;
     is_subscribed: boolean;
     is_following: boolean;
+    /** Solo person_release: a quién sigues que te trae este estreno. */
+    person_name?: string;
 }
 
 export interface CalendarDay {
@@ -48,8 +51,8 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
     const { start, end } = getMonthRange(year, month);
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
 
-    // Fetch en paralelo: películas, series populares en emisión, series siguiendo, suscripciones
-    const [upcomingMoviesP1, upcomingMoviesP2, popularSeriesP1, popularSeriesP2, followedSeriesIds, notifSubs] = await Promise.all([
+    // Fetch en paralelo: películas, series populares en emisión, series siguiendo, suscripciones, estrenos de personas seguidas
+    const [upcomingMoviesP1, upcomingMoviesP2, popularSeriesP1, popularSeriesP2, followedSeriesIds, notifSubs, personUpcoming] = await Promise.all([
         tmdbFetchList<any>('/discover/movie', {
             'primary_release_date.gte': start,
             'primary_release_date.lte': end,
@@ -81,6 +84,7 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
         }),
         getSeriesSiguiendo().then(series => series.map(s => s.id)),
         getAllNotificationSubs(),
+        getUpcomingFromFollowedPeople().catch(() => []),
     ]);
 
     // Filtrar películas: umbral bajo para no estrenadas, estricto para estrenadas
@@ -133,6 +137,24 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
         if (!eventsMap.has(date)) eventsMap.set(date, []);
         eventsMap.get(date)!.push(event);
     };
+
+    // 0. Estrenos de personas seguidas — van ANTES que las películas populares:
+    // si un título coincide, el dedup conserva esta versión (atribuida a la
+    // persona, "porque sigues a X"), que es la que te importa.
+    for (const u of personUpcoming) {
+        if (!isInMonth(u.release_date, year, month)) continue;
+        addEvent(u.release_date, {
+            tmdb_id: u.tmdb_id,
+            media_type: u.media_type,
+            title: u.title,
+            poster_path: posterUrl(u.poster_path),
+            event_type: 'person_release',
+            label: `Estreno · porque sigues a ${u.person_name}`,
+            is_subscribed: true, // seguir a la persona = aviso explícito
+            is_following: false,
+            person_name: u.person_name,
+        });
+    }
 
     // 1. Películas relevantes
     for (const movie of allUpcoming) {

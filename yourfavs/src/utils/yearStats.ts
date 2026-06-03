@@ -31,8 +31,11 @@ export interface SeriesEpsRanking {
     episodesWatched: number;
 }
 
+/** Ámbito del cálculo: un año concreto o 'all' (acumulado de por vida). */
+export type StatsScope = number | 'all';
+
 export interface YearStats {
-    year: number;
+    year: StatsScope;
     moviesAdded: number;
     seriesAdded: number;
     episodesWatched: number;
@@ -61,7 +64,7 @@ export interface YearStats {
     hasData: boolean;
 }
 
-const cache = new Map<number, { data: YearStats; expires: number }>();
+const cache = new Map<StatsScope, { data: YearStats; expires: number }>();
 
 const COLLECTION_LABELS: Record<string, string> = {
     favs: 'Favoritos', siguiendo: 'Siguiendo', like: 'Me gusta',
@@ -112,7 +115,10 @@ function buildRawMap(groups: { items: any[]; key: string }[]): Map<string, RawIt
     return map;
 }
 
-export async function calculateYearStats(year: number): Promise<YearStats> {
+/** Acumulado de por vida: el mismo cálculo sin filtrar por año. */
+export const calculateLifetimeStats = () => calculateYearStats('all');
+
+export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const now = Date.now();
     const cached = cache.get(year);
     if (cached && cached.expires > now) return cached.data;
@@ -148,8 +154,9 @@ export async function calculateYearStats(year: number): Promise<YearStats> {
     const allRaw = [...movieMap.values(), ...tvMap.values()];
     for (const r of allRaw) allYears.add(yearOf(r.addedAt));
 
-    const itemsOfYear = allRaw.filter(r => yearOf(r.addedAt) === year);
-    const itemsOfPrev = allRaw.filter(r => yearOf(r.addedAt) === year - 1);
+    // 'all' = sin filtro de año (y sin "año anterior" con el que comparar)
+    const itemsOfYear = year === 'all' ? allRaw : allRaw.filter(r => yearOf(r.addedAt) === year);
+    const itemsOfPrev = year === 'all' ? [] : allRaw.filter(r => yearOf(r.addedAt) === year - 1);
 
     // Fetch detalles TMDB para items del año
     const enriched = await processBatch(
@@ -260,7 +267,7 @@ export async function calculateYearStats(year: number): Promise<YearStats> {
                 const d = new Date(ep.watched_at);
                 if (isNaN(d.getTime())) continue;
                 const y = d.getFullYear();
-                if (y === year) {
+                if (year === 'all' || y === year) {
                     episodesWatched++;
                     const k = dayKey(d);
                     heatmapMap.set(k, (heatmapMap.get(k) || 0) + 1);

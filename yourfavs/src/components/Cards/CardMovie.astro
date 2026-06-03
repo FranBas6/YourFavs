@@ -11,9 +11,11 @@ interface Props {
     release_date?: string;
     genres?: { id: number, name: string }[];
     character?: string;
+    /** Nota personal (1-10) guardada en Firestore; pinta el badge ámbar "★ N". */
+    userRating?: number;
 }
 
-const { id, title, img, vote_average, overview, release_date, genres, character } = Astro.props;
+const { id, title, img, vote_average, overview, release_date, genres, character, userRating } = Astro.props;
 
 const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(release_date);
@@ -25,7 +27,7 @@ const isTrending = vote_average >= 8.0;
 
         <!-- Badges -->
         {(isNew || isTrending) && (
-            <div class="absolute top-2 left-2 z-10 flex flex-col gap-1">
+            <div class="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
                 {isNew && <span class="top-badge bg-teal-500 text-white">NUEVO</span>}
                 {isTrending && <span class="top-badge badge-accent">TRENDING</span>}
             </div>
@@ -46,6 +48,8 @@ const isTrending = vote_average >= 8.0;
                 </svg>
                 {vote_average ? vote_average.toFixed(1) : "N/A"}
             </div>
+
+            {userRating && <div class="user-rating-badge">★ {userRating}</div>}
 
             <div class="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#0F172A] to-transparent"></div>
         </div>

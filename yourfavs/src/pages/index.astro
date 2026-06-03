@@ -10,6 +10,7 @@ import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCat
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
+import WhatToWatch from "../components/personal/WhatToWatch.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import { Icon } from 'astro-icon/components';
 import {fetchAllPlatforms} from "../utils/constants/platforms";
@@ -179,6 +180,13 @@ const sections = [
                 <NextEpisode items={continueWatching} />
             </div>
         )}
+
+        <!-- Ruleta "¿Qué veo?": propone un pendiente según tiempo/plataforma -->
+        <div class="content-wrapper">
+            <div class="flex justify-end mb-2">
+                <WhatToWatch />
+            </div>
+        </div>
 
         <!-- Contenido principal -->
         <div class="content-wrapper">

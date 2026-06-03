@@ -28,7 +28,7 @@ import '../styles/components/command-palette.css';
         </div>
 
         <div class="cmdk-results" id="cmdk-results" role="listbox" aria-label="Resultados">
-            <p class="cmdk-hint">Escribe para buscar en todo el catálogo</p>
+            <!-- El JS pinta aquí recientes + acciones al abrir (renderEmpty) -->
         </div>
 
         <div class="cmdk-footer">
@@ -55,6 +55,34 @@ import '../styles/components/command-palette.css';
 
     var GROUP_LABELS = { movie: 'PELÍCULAS', tv: 'SERIES', person: 'PERSONAS' };
     var GROUP_ORDER = ['movie', 'tv', 'person'];
+
+    // ---- estado vacío: recientes (localStorage) + acciones rápidas ----
+    var LS_RECENT = 'yf_cmdk_recent';
+    var RECENT_MAX = 5;
+    var ICON_CLOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+    var ACTIONS = [
+        { label: 'Ir a mis favoritos', href: '/personal/favoritos',
+          icon: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z"/></svg>' },
+        { label: 'Abrir calendario', href: '/personal/calendario',
+          icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>' },
+        { label: 'Tendencias de hoy', href: '/catalogo/tendencias',
+          icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>' },
+        { label: '¿Qué veo? — ruleta', href: '/personal/pendientes?roulette=1', action: 'roulette',
+          icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="8.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor" stroke="none"/></svg>' },
+    ];
+
+    function getRecents() {
+        try { return JSON.parse(localStorage.getItem(LS_RECENT) || '[]'); } catch { return []; }
+    }
+
+    function saveRecent(it) {
+        try {
+            var entry = { title: it.title, subtitle: it.subtitle || '', href: it.href, media_type: it.media_type };
+            var list = getRecents().filter(function (r) { return r.href !== entry.href; });
+            list.unshift(entry);
+            localStorage.setItem(LS_RECENT, JSON.stringify(list.slice(0, RECENT_MAX)));
+        } catch {}
+    }
     var EMPTY_ICONS = {
         movie: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M11 4v16"/></svg>',
         tv: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 3l4 3 4-3"/></svg>',
@@ -74,6 +102,7 @@ import '../styles/components/command-palette.css';
         document.body.style.overflow = 'hidden';
         input.focus();
         input.select();
+        if (input.value.trim().length < 2) renderEmpty();
     }
 
     function close() {
@@ -114,7 +143,7 @@ import '../styles/components/command-palette.css';
         }
 
         if (q.length < 2) {
-            renderHint('Escribe para buscar en todo el catálogo');
+            renderEmpty();
             updateSeeAll('');
             return;
         }
@@ -145,6 +174,52 @@ import '../styles/components/command-palette.css';
         items = [];
         selected = -1;
         results.innerHTML = '<p class="cmdk-hint">' + escapeHtml(text) + '</p>';
+    }
+
+    // Input vacío: recientes + acciones, en el MISMO items[] que la búsqueda
+    // → ↑↓/Enter/hover funcionan sin código de navegación nuevo.
+    function renderEmpty() {
+        items = [];
+        selected = -1;
+        var html = '';
+
+        var recents = getRecents();
+        if (recents.length) {
+            html += '<div class="cmdk-group-label">BÚSQUEDAS RECIENTES</div>';
+            recents.forEach(function (it) {
+                var idx = items.length;
+                items.push(it);
+                html += '<a class="cmdk-item" role="option" aria-selected="false" data-idx="' + idx + '" href="' + escapeHtml(it.href) + '">';
+                html += '<span class="cmdk-recent-icon" aria-hidden="true">' + ICON_CLOCK + '</span>';
+                html += '<span class="cmdk-item-body"><span class="cmdk-item-title">' + escapeHtml(it.title) + '</span>';
+                if (it.subtitle) html += '<span class="cmdk-item-meta">' + escapeHtml(it.subtitle) + '</span>';
+                html += '</span></a>';
+            });
+        }
+
+        html += '<div class="cmdk-group-label">ACCIONES RÁPIDAS</div>';
+        ACTIONS.forEach(function (it) {
+            var idx = items.length;
+            items.push(it);
+            html += '<a class="cmdk-item" role="option" aria-selected="false" data-idx="' + idx + '" href="' + escapeHtml(it.href) + '"' + (it.action ? ' data-action="' + it.action + '"' : '') + '>';
+            html += '<span class="cmdk-action-icon" aria-hidden="true">' + it.icon + '</span>';
+            html += '<span class="cmdk-item-body"><span class="cmdk-item-title">' + escapeHtml(it.label) + '</span></span>';
+            html += '</a>';
+        });
+
+        results.innerHTML = html;
+    }
+
+    // Abrir un item (Enter o click): la ruleta se abre en la propia página si
+    // su modal existe; si no, navega a pendientes con auto-open (?roulette=1).
+    function openItem(it) {
+        if (it.action === 'roulette' && document.getElementById('wtw')) {
+            close();
+            document.dispatchEvent(new CustomEvent('yf:open-roulette'));
+            return;
+        }
+        if (it.media_type) saveRecent(it);
+        location.href = it.href;
     }
 
     function render(list) {
@@ -205,8 +280,8 @@ import '../styles/components/command-palette.css';
         else if (e.key === 'Enter') {
             e.preventDefault();
             if (selected >= 0 && items[selected]) {
-                // Selección explícita con ↑↓ → abre esa ficha
-                location.href = items[selected].href;
+                // Selección explícita con ↑↓ → abre ese item (ficha o acción)
+                openItem(items[selected]);
             } else if (!seeAll.hidden) {
                 // Enter directo → búsqueda completa (no arriesga ficha equivocada)
                 location.href = seeAll.href;
@@ -231,6 +306,23 @@ import '../styles/components/command-palette.css';
             var idx = parseInt(item.getAttribute('data-idx'), 10);
             if (idx !== selected) select(idx);
         }
+    });
+
+    // Click: guarda el reciente antes de navegar; la ruleta se intercepta
+    // (si el modal vive en esta página) en vez de navegar a pendientes.
+    results.addEventListener('click', function (e) {
+        var node = e.target.closest('.cmdk-item');
+        if (!node) return;
+        var it = items[parseInt(node.getAttribute('data-idx'), 10)];
+        if (!it) return;
+        if (it.action === 'roulette' && document.getElementById('wtw')) {
+            e.preventDefault();
+            close();
+            document.dispatchEvent(new CustomEvent('yf:open-roulette'));
+            return;
+        }
+        if (it.media_type) saveRecent(it);
+        // navegación: el <a> sigue su curso
     });
 })();
 </script>
