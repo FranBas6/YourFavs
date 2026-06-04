@@ -109,11 +109,12 @@ export async function getNextEpisode(serieId: string): Promise<NextEpisodeItem |
 }
 
 /**
- * Panel "Continuar viendo": series en seguimiento CON progreso, ordenadas por
- * última actividad, limitadas a `limit` (acota fetches: detalle + 1 temporada
- * por serie).
+ * Panel "Continuar viendo": TODAS las series en seguimiento CON progreso,
+ * ordenadas por última actividad. Sin límite (como antes): el panel solo lo
+ * acotan los filtros reales — serie al día / siguiente episodio sin emitir.
+ * Coste: 1 detalle + 1 temporada por serie en seguimiento con progreso.
  */
-export async function getNextEpisodesData(limit = 6): Promise<NextEpisodeItem[]> {
+export async function getNextEpisodesData(): Promise<NextEpisodeItem[]> {
     const ids = (await getSeriesSiguiendo()).map((s: any) => String(s.id));
     if (ids.length === 0) return [];
 
@@ -125,8 +126,7 @@ export async function getNextEpisodesData(limit = 6): Promise<NextEpisodeItem[]>
         .sort((a, b) =>
             new Date(b.progress.last_watched!.watched_at).getTime() -
             new Date(a.progress.last_watched!.watched_at).getTime()
-        )
-        .slice(0, limit);
+        );
 
     if (candidates.length === 0) return [];
 

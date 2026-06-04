@@ -47,9 +47,10 @@ const {
     <script is:inline>
         (function () {
             try {
+                // Default = claro (ignora el modo oscuro del SO). Solo se usa
+                // oscuro si el usuario lo eligió explícitamente con el toggle.
                 var saved = localStorage.getItem('theme');
-                var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                var theme = saved || (systemDark ? 'dark' : 'light');
+                var theme = saved || 'light';
                 document.documentElement.setAttribute('data-theme', theme);
             } catch {}
         })();
