@@ -138,21 +138,29 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
         eventsMap.get(date)!.push(event);
     };
 
-    // 0. Estrenos de personas seguidas — van ANTES que las películas populares:
-    // si un título coincide, el dedup conserva esta versión (atribuida a la
-    // persona, "porque sigues a X"), que es la que te importa.
+    // 0. Estrenos de personas seguidas. Prioridad de atribución de un título:
+    //    1º campana en el título  >  2º varios actores seguidos  >  3º un actor.
+    // Si tienes la campana en este título, NO lo atribuimos a la persona aquí:
+    // dejamos que el loop de películas/series lo añada como "suscrito" (la campana
+    // gana el dedup). Solo atribuimos a personas cuando NO hay campana.
     for (const u of personUpcoming) {
         if (!isInMonth(u.release_date, year, month)) continue;
+        if (notifSet.has(`${u.media_type}_${u.tmdb_id}`)) continue; // campana → gana la suscripción
+
+        const names = u.person_names?.length ? u.person_names : [u.person_name];
+        const label = names.length > 1
+            ? `Estreno · sigues a ${names[0]} y ${names.length - 1} más`
+            : `Estreno · porque sigues a ${names[0]}`;
         addEvent(u.release_date, {
             tmdb_id: u.tmdb_id,
             media_type: u.media_type,
             title: u.title,
             poster_path: posterUrl(u.poster_path),
             event_type: 'person_release',
-            label: `Estreno · porque sigues a ${u.person_name}`,
-            is_subscribed: true, // seguir a la persona = aviso explícito
+            label,
+            is_subscribed: true, // seguir a la persona = aviso (sale en la barra de avisos)
             is_following: false,
-            person_name: u.person_name,
+            person_name: names[0],
         });
     }
 

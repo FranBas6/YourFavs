@@ -11,7 +11,8 @@ import { getAllFollowedPeople } from '../../BD/people/yourfavsPeople';
  */
 export interface PersonUpcoming {
     person_id: string;
-    person_name: string;
+    person_name: string;       // primera persona seguida (compat / atribución principal)
+    person_names: string[];    // TODAS las personas seguidas que salen en este título
     tmdb_id: string;
     media_type: 'movie' | 'tv';
     title: string;
@@ -46,6 +47,7 @@ export async function getUpcomingFromFollowedPeople(): Promise<PersonUpcoming[]>
                 out.push({
                     person_id: person.id,
                     person_name: person.name,
+                    person_names: [person.name],
                     tmdb_id: String(c.id),
                     media_type: c.media_type === 'movie' ? 'movie' : 'tv',
                     title: c.media_type === 'movie' ? c.title : c.name,
@@ -59,17 +61,22 @@ export async function getUpcomingFromFollowedPeople(): Promise<PersonUpcoming[]>
         }
     }, 8);
 
-    // Dedup por título (varias personas seguidas pueden compartir estreno)
-    const seen = new Set<string>();
-    const all: PersonUpcoming[] = [];
+    // Agrupar por título: varias personas seguidas pueden compartir un estreno.
+    // En vez de quedarnos con la primera, acumulamos TODAS (para distinguir
+    // "sigues a X y N más" de "sigues solo a X" y priorizar en el calendario).
+    const byTitle = new Map<string, PersonUpcoming>();
     for (const list of perPerson) {
         for (const u of list || []) {
             const key = `${u.media_type}_${u.tmdb_id}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            all.push(u);
+            const existing = byTitle.get(key);
+            if (existing) {
+                if (!existing.person_names.includes(u.person_name)) existing.person_names.push(u.person_name);
+            } else {
+                byTitle.set(key, { ...u, person_names: [...u.person_names] });
+            }
         }
     }
+    const all = [...byTitle.values()];
     all.sort((a, b) => a.release_date.localeCompare(b.release_date));
 
     memCache = { data: all, expires: now + TTL_MS };
