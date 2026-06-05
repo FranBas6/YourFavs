@@ -2,6 +2,7 @@
 import '../styles/components/header.css';
 import { Icon } from 'astro-icon/components';
 import Stamp from './Stamp.astro';
+import { SUPPORTED_COUNTRIES } from '../services/API/shared/tmdbInfoService';
 
 const currentPath = Astro.url.pathname;
 
@@ -42,6 +43,7 @@ function computeInitials(u: { name: string | null; email: string | null }): stri
     return (u.email || '').slice(0, 2).toUpperCase() || '??';
 }
 const avatarInitials = user ? computeInitials(user) : '';
+const currentRegion = user?.region ?? 'ES';
 
 // Dropdown "Mis listas" (solo con sesión). Replica el patrón de "Descubrir".
 const myListsItems = [
@@ -185,16 +187,18 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </div>
             </div>
 
-            <button class="theme-toggle" aria-label="Cambiar tema">
-                <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                </svg>
-                <svg class="theme-icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                </svg>
-            </button>
+            {!user && (
+                <button class="theme-toggle" aria-label="Cambiar tema">
+                    <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    <svg class="theme-icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                </button>
+            )}
 
-            <!-- Usuario: sin sesión → "Entrar"; con sesión → avatar + menú de cuenta -->
+            <!-- Usuario: sin sesión → "Entrar"; con sesión → avatar + menú de cuenta (Tema vive ahí) -->
             {user ? (
                 <div class="header-account" id="account">
                     <button type="button" class="header-avatar-btn" id="account-btn" aria-haspopup="true" aria-expanded="false" aria-label="Tu cuenta" title={displayName}>
@@ -214,11 +218,12 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                 <span class="account-menu-email">{user.email}</span>
                             </span>
                         </div>
-                        <a href="/perfil" class="account-menu-item" role="menuitem">
-                            <Icon name="lucide:settings" /> Configuración del perfil
-                        </a>
-                        <a href="/mislistas/favoritos" class="account-menu-item" role="menuitem">
-                            <Icon name="lucide:heart" /> Mis listas
+                        <a href="/perfil" class="account-menu-item account-menu-item-2l" role="menuitem">
+                            <Icon name="lucide:settings" />
+                            <span class="ami-body">
+                                <span class="ami-title">Configuración del perfil</span>
+                                <span class="ami-sub">Nombre, avatar, región</span>
+                            </span>
                         </a>
                         <a href="/mislistas/actividad" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:activity" /> Tu actividad
@@ -226,6 +231,22 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                         <a href="/mislistas/year" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:bar-chart-3" /> Tu año en cine
                         </a>
+                        <div class="account-menu-sep"></div>
+                        <div class="account-menu-row">
+                            <span class="amr-label"><Icon name="lucide:globe" /> Región</span>
+                            <select class="amr-region" id="acc-region" aria-label="Región de streaming">
+                                {SUPPORTED_COUNTRIES.map((c) => (
+                                    <option value={c.code} selected={c.code === currentRegion}>{c.code}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div class="account-menu-row">
+                            <span class="amr-label"><Icon name="lucide:sun" /> Tema</span>
+                            <span class="amr-theme" role="group" aria-label="Tema">
+                                <button type="button" data-theme-set="light">Claro</button>
+                                <button type="button" data-theme-set="dark">Oscuro</button>
+                            </span>
+                        </div>
                         <div class="account-menu-sep"></div>
                         <button type="button" class="account-menu-item is-danger" data-auth-logout role="menuitem">
                             <Icon name="lucide:log-out" /> Cerrar sesión
@@ -484,6 +505,35 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
     btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!open); });
     document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
+
+    // Región inline: guarda y recarga (para que los proveedores SSR usen la nueva región).
+    var accRegion = document.getElementById('acc-region');
+    if (accRegion) accRegion.addEventListener('change', function () {
+        fetch('/api/profile/preferences', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ region: accRegion.value }),
+        }).then(function () { location.reload(); }).catch(function () {});
+    });
+
+    // Tema segmentado: aplica al instante (data-theme + localStorage) y guarda en el perfil.
+    var themeBtns = wrap.querySelectorAll('[data-theme-set]');
+    function syncThemeSeg() {
+        var cur = document.documentElement.getAttribute('data-theme') || 'light';
+        themeBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-theme-set') === cur); });
+    }
+    themeBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+            var v = b.getAttribute('data-theme-set');
+            document.documentElement.setAttribute('data-theme', v);
+            try { localStorage.setItem('theme', v); } catch (e) {}
+            syncThemeSeg();
+            fetch('/api/profile/preferences', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme: v }),
+            }).catch(function () {});
+        });
+    });
+    syncThemeSeg();
 })();
 
 // Calendar dropdown
@@ -840,6 +890,32 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
     .account-menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
     .account-menu-item.is-danger { color: #ef4444; }
     .account-menu-item.is-danger:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    /* Item de dos líneas (Configuración + subtítulo) */
+    .account-menu-item-2l { align-items: flex-start; }
+    .account-menu-item-2l .ami-body { display: flex; flex-direction: column; gap: 1px; }
+    .ami-title { font-size: 13.5px; color: var(--text-2); }
+    .account-menu-item-2l:hover .ami-title { color: var(--text); }
+    .ami-sub { font-size: 11.5px; color: var(--text-4); }
+
+    /* Filas con control inline (Región / Tema) */
+    .account-menu-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 10px; padding: 7px 10px;
+    }
+    .amr-label { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text-2); }
+    .amr-label :global(svg) { width: 17px; height: 17px; color: var(--text-3); }
+    .amr-region {
+        border: 1px solid var(--border); background: var(--bg); color: var(--text);
+        border-radius: 7px; padding: 3px 6px; font-size: 12.5px; font-weight: 600;
+        font-family: var(--font-mono, inherit); cursor: pointer;
+    }
+    .amr-theme { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+    .amr-theme button {
+        border: none; background: none; color: var(--text-3);
+        font-size: 12px; font-weight: 600; padding: 4px 11px; cursor: pointer; font-family: inherit;
+    }
+    .amr-theme button.is-active { background: var(--accent); color: #fff; }
 
     /* Pie "Tu año en cine" del dropdown Mis listas (panel oscuro) */
     .header-mylists-foot {

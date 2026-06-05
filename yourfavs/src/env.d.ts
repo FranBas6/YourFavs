@@ -5,6 +5,7 @@ interface SessionUser {
     email: string | null;
     name: string | null;
     picture: string | null;
+    region?: string;   // preferencia del perfil (para el menú de cuenta)
 }
 
 declare namespace App {
