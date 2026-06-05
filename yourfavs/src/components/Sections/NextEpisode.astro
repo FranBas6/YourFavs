@@ -153,7 +153,10 @@ function pct(item: NextEpisodeItem): number {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ serieId: serieId, season: season, episode: episode }),
             })
-                .then(function (r) { return r.json(); })
+                .then(function (r) {
+                    if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                    return r.json();
+                })
                 .then(function (res) {
                     if (!res.ok) throw new Error('save failed');
                     return fetch('/api/series/' + serieId + '/next-episode').then(function (r) { return r.json(); });

@@ -306,13 +306,18 @@
             (overlay!.querySelector('[data-auth-forgot]') as HTMLElement).hidden = !isLogin;
         }
 
-        function open() {
+        function open(gating = false) {
             if (overlay!.classList.contains('is-open')) return;
             lastFocus = document.activeElement as HTMLElement;
             overlay!.hidden = false;
             overlay!.classList.add('is-open');
             document.body.style.overflow = 'hidden';
             setMode('login');
+            if (gating) {
+                // Abierto desde una acción de guardar de un invitado (gating).
+                titleEl.textContent = 'Inicia sesión para guardar';
+                subEl.textContent = 'Entra o crea tu cuenta y guardamos esto en tus listas al instante.';
+            }
             clearMsg();
             emailInput.focus();
         }
@@ -321,7 +326,37 @@
             overlay!.hidden = true;
             document.body.style.overflow = '';
             form.reset();
+            // Si cierra sin loguearse, descarta la intención pendiente (no la
+            // queremos disparar en un login posterior no relacionado).
+            try { sessionStorage.removeItem('yf_pending_action'); } catch { /* noop */ }
             if (lastFocus && lastFocus.focus) lastFocus.focus();
+        }
+
+        // Tras login: si había una acción de guardar pendiente (gating), la
+        // completamos reenviando el form; si no, recarga normal.
+        function completeOrReload() {
+            let pending: string | null = null;
+            try { pending = sessionStorage.getItem('yf_pending_action'); } catch { /* noop */ }
+            if (pending) {
+                try { sessionStorage.removeItem('yf_pending_action'); } catch { /* noop */ }
+                try {
+                    const { action, fields } = JSON.parse(pending) as { action: string; fields: Record<string, string> };
+                    const f = document.createElement('form');
+                    f.method = 'POST';
+                    f.action = action;
+                    for (const [k, v] of Object.entries(fields)) {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = k;
+                        input.value = v;
+                        f.appendChild(input);
+                    }
+                    document.body.appendChild(f);
+                    f.submit();
+                    return;
+                } catch { /* cae a reload */ }
+            }
+            location.reload();
         }
 
         // ---- disparadores globales ----
@@ -333,6 +368,32 @@
                 getActions().then((a) => a.logout()).then(() => location.reload());
             }
         });
+
+        // ---- GATING: invitado que intenta guardar (cualquier form POST) ----
+        // En esta app todos los POST son acciones de guardar → si no hay sesión,
+        // interceptamos, guardamos la intención y abrimos el modal. Tras login se
+        // reenvía el form (completeOrReload). Capture para adelantarnos a otros handlers.
+        document.addEventListener('submit', (e) => {
+            const formEl = e.target;
+            if (!(formEl instanceof HTMLFormElement)) return;
+            if ((formEl.method || '').toLowerCase() !== 'post') return;
+            if (formEl.closest('#auth-modal')) return; // el form del propio modal, no
+            const loggedIn = document.cookie.split('; ').some((c) => c.startsWith('has_session='));
+            if (loggedIn) return; // con sesión → submit normal (y deja correr el optimista)
+            e.preventDefault();
+            // Captura + stopImmediatePropagation: corta también el listener optimista
+            // del propio form (optimistic-actions.js), que si no haría su fetch POST.
+            e.stopImmediatePropagation();
+            const fields: Record<string, string> = {};
+            new FormData(formEl).forEach((v, k) => { if (typeof v === 'string') fields[k] = v; });
+            try {
+                sessionStorage.setItem('yf_pending_action', JSON.stringify({ action: formEl.action, fields }));
+            } catch { /* noop */ }
+            open(true);
+        }, true);
+
+        // Acciones que no son form (fetch) piden login disparando este evento (p.ej. 401).
+        document.addEventListener('yf:require-auth', () => open(true));
 
         // ---- cierre ----
         overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
@@ -373,7 +434,7 @@
             setLoading(true);
             const a = await getActions();
             const res = await a.loginGoogle();
-            if (res.ok) location.reload();
+            if (res.ok) completeOrReload();
             else { showMsg(res.error); setLoading(false); }
         });
 
@@ -389,7 +450,7 @@
             setLoading(true);
             const a = await getActions();
             const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
-            if (res.ok) location.reload();
+            if (res.ok) completeOrReload();
             else { showMsg(res.error); setLoading(false); }
         });
 
