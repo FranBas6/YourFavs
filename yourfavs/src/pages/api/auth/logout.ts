@@ -22,8 +22,9 @@ export const POST: APIRoute = async ({ cookies }) => {
         }
     }
 
-    // Borrar la cookie pase lo que pase.
+    // Borrar ambas cookies pase lo que pase.
     cookies.delete('session', { path: '/' });
+    cookies.delete('has_session', { path: '/' });
 
     return new Response(JSON.stringify({ ok: true }), {
         status: 200,

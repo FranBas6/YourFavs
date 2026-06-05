@@ -43,6 +43,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
             maxAge: EXPIRES_IN_MS / 1000,            // en segundos
         });
 
+        // Flag LEGIBLE por JS (no es secreto): le dice al cliente que hay sesión
+        // sin exponer la cookie HttpOnly → así el invitado no descarga firebase/auth.
+        cookies.set('has_session', '1', {
+            httpOnly: false,
+            secure: import.meta.env.PROD,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: EXPIRES_IN_MS / 1000,
+        });
+
         return json({ ok: true }, 200);
     } catch (err) {
         console.error('[api/auth/session] error:', (err as Error).message);

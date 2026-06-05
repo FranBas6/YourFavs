@@ -11,6 +11,8 @@ import { getAuth, GoogleAuthProvider, setPersistence, browserLocalPersistence } 
 import { app } from './firebaseConfig';
 
 export const clientAuth = getAuth(app);
+// Emails de Firebase (reset de contraseña, verificación) en español.
+clientAuth.languageCode = 'es';
 export const googleProvider = new GoogleAuthProvider();
 
 // "Sesión continua" (plug & play): el client SDK persiste al usuario en el

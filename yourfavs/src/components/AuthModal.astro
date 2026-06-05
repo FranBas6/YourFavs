@@ -1,0 +1,411 @@
+---
+/**
+ * Modal de login / registro — Fase B.2.
+ *
+ * Montado en Layout (global). Se abre con cualquier disparador `[data-auth-open]`
+ * y se cierra con Esc / backdrop / ✕. Login y registro comparten tarjeta y
+ * alternan con un toggle. Google + email/contraseña + "¿olvidaste?".
+ *
+ * `firebase/auth` se carga en DIFERIDO (import dinámico de ../utils/authActions):
+ * un invitado solo lo descarga al abrir el modal; un usuario logueado al cargar
+ * (gracias a la cookie legible has_session) para renovar la sesión (rolling).
+ */
+---
+<div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
+    <div class="auth-card" role="document">
+        <button type="button" class="auth-close" data-auth-close aria-label="Cerrar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+
+        <h2 class="auth-title" id="auth-title">Entra en YourFavs</h2>
+        <p class="auth-sub" id="auth-sub">Guarda tus pelis y series, sigue actores y más.</p>
+
+        <button type="button" class="auth-google" data-auth-google>
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
+            </svg>
+            Continuar con Google
+        </button>
+
+        <div class="auth-divider"><span>o</span></div>
+
+        <form class="auth-form" id="auth-form" novalidate>
+            <label class="auth-field">
+                <span>Email</span>
+                <input type="email" name="email" id="auth-email" required autocomplete="email" placeholder="tu@email.com"/>
+            </label>
+            <label class="auth-field">
+                <span>Contraseña</span>
+                <div class="auth-pass-wrap">
+                    <input type="password" name="password" id="auth-password" required autocomplete="current-password" minlength="6" placeholder="Mínimo 6 caracteres"/>
+                    <button type="button" class="auth-pass-toggle" id="auth-pass-toggle" aria-label="Mostrar contraseña" aria-pressed="false">
+                        <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                    </button>
+                </div>
+            </label>
+
+            <p class="auth-msg" id="auth-msg" role="alert" hidden></p>
+
+            <button type="submit" class="auth-submit" id="auth-submit">Entrar</button>
+        </form>
+
+        <button type="button" class="auth-forgot" data-auth-forgot>¿Olvidaste la contraseña?</button>
+
+        <p class="auth-toggle">
+            <span data-mode="login">¿No tienes cuenta? <button type="button" class="auth-link" data-auth-switch="register">Regístrate</button></span>
+            <span data-mode="register" hidden>¿Ya tienes cuenta? <button type="button" class="auth-link" data-auth-switch="login">Entra</button></span>
+        </p>
+    </div>
+</div>
+
+<style>
+    .auth-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 10001;
+        background: rgba(15, 23, 42, .55);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 8vh 16px 16px;
+    }
+    .auth-overlay.is-open { display: flex; }
+
+    .auth-card {
+        position: relative;
+        width: 420px;
+        max-width: 100%;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: var(--r-xl, 16px);
+        box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
+        padding: 28px 28px 22px;
+        animation: auth-pop .14s ease-out;
+    }
+    @keyframes auth-pop {
+        from { opacity: 0; transform: translateY(-8px) scale(.98); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    .auth-close {
+        position: absolute;
+        top: 14px;
+        right: 14px;
+        width: 32px;
+        height: 32px;
+        border-radius: var(--r-full, 999px);
+        border: 1px solid var(--border);
+        background: var(--bg-tint);
+        color: var(--text-3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+    }
+    .auth-close:hover { color: var(--text); border-color: var(--border-strong); }
+    .auth-close svg { width: 15px; height: 15px; }
+
+    .auth-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: var(--text); }
+    .auth-sub { margin: 0 0 22px; font-size: 13.5px; color: var(--text-3); }
+
+    .auth-google {
+        width: 100%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 11px 16px;
+        border-radius: var(--r-full, 999px);
+        border: 1px solid var(--border-strong, var(--border));
+        background: var(--bg-elev);
+        color: var(--text);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .15s ease, border-color .15s ease;
+    }
+    .auth-google:hover { background: var(--bg-tint); }
+
+    .auth-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin: 18px 0;
+        color: var(--text-4);
+        font-size: 12px;
+    }
+    .auth-divider::before, .auth-divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+    }
+
+    .auth-form { display: flex; flex-direction: column; gap: 13px; }
+    .auth-field { display: flex; flex-direction: column; gap: 5px; }
+    .auth-field span { font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .auth-field input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+        font-family: inherit;
+    }
+    .auth-field input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .auth-pass-wrap { position: relative; }
+    .auth-pass-wrap input { padding-right: 42px; } /* hueco para el ojo */
+    .auth-pass-toggle {
+        position: absolute;
+        top: 50%;
+        right: 8px;
+        transform: translateY(-50%);
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: none;
+        color: var(--text-4);
+        cursor: pointer;
+        border-radius: 6px;
+    }
+    .auth-pass-toggle:hover { color: var(--text-2); }
+    .auth-pass-toggle svg { width: 17px; height: 17px; }
+    .auth-pass-toggle .eye-off { display: none; }
+    .auth-pass-toggle[aria-pressed="true"] .eye { display: none; }
+    .auth-pass-toggle[aria-pressed="true"] .eye-off { display: block; }
+
+    .auth-msg {
+        margin: 0;
+        font-size: 12.5px;
+        padding: 9px 11px;
+        border-radius: 8px;
+        background: rgba(239, 68, 68, .12);
+        color: #ef4444;
+    }
+    .auth-msg.is-ok { background: rgba(16, 185, 129, .14); color: #10b981; }
+
+    .auth-submit {
+        margin-top: 3px;
+        width: 100%;
+        padding: 11px 16px;
+        border-radius: var(--r-full, 999px);
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background .15s ease;
+    }
+    .auth-submit:hover { background: var(--accent-dark, var(--accent)); }
+    .auth-submit:disabled, .auth-google:disabled { opacity: .6; cursor: progress; }
+
+    .auth-forgot {
+        display: block;
+        margin: 14px auto 0;
+        background: none;
+        border: none;
+        color: var(--text-3);
+        font-size: 12.5px;
+        cursor: pointer;
+        text-decoration: underline;
+    }
+    .auth-forgot:hover { color: var(--accent); }
+
+    .auth-toggle {
+        margin: 16px 0 0;
+        text-align: center;
+        font-size: 13px;
+        color: var(--text-3);
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+    }
+    .auth-link {
+        background: none;
+        border: none;
+        color: var(--accent);
+        font-weight: 600;
+        font-size: 13px;
+        cursor: pointer;
+        padding: 0;
+    }
+    .auth-link:hover { text-decoration: underline; }
+
+    @media (max-width: 480px) {
+        .auth-overlay { padding: 5vh 12px 12px; }
+        .auth-card { padding: 24px 20px 18px; }
+    }
+</style>
+
+<script>
+    import type * as AuthActions from '../utils/authActions';
+
+    const overlay = document.getElementById('auth-modal') as HTMLElement | null;
+    if (overlay) {
+        const card = overlay.querySelector('.auth-card') as HTMLElement;
+        const form = document.getElementById('auth-form') as HTMLFormElement;
+        const emailInput = document.getElementById('auth-email') as HTMLInputElement;
+        const passInput = document.getElementById('auth-password') as HTMLInputElement;
+        const submitBtn = document.getElementById('auth-submit') as HTMLButtonElement;
+        const googleBtn = overlay.querySelector('[data-auth-google]') as HTMLButtonElement;
+        const msgEl = document.getElementById('auth-msg') as HTMLElement;
+        const titleEl = document.getElementById('auth-title') as HTMLElement;
+        const subEl = document.getElementById('auth-sub') as HTMLElement;
+
+        let mode: 'login' | 'register' = 'login';
+        let lastFocus: HTMLElement | null = null;
+        let actions: typeof AuthActions | null = null;
+
+        // Carga firebase/auth bajo demanda (una sola vez).
+        async function getActions(): Promise<typeof AuthActions> {
+            if (!actions) actions = await import('../utils/authActions');
+            return actions;
+        }
+
+        function showMsg(text: string, ok = false) {
+            msgEl.textContent = text;
+            msgEl.classList.toggle('is-ok', ok);
+            msgEl.hidden = false;
+        }
+        function clearMsg() { msgEl.hidden = true; msgEl.textContent = ''; }
+
+        function setLoading(on: boolean) {
+            submitBtn.disabled = on;
+            googleBtn.disabled = on;
+            submitBtn.textContent = on ? 'Un momento…' : (mode === 'login' ? 'Entrar' : 'Crear cuenta');
+        }
+
+        function setMode(next: 'login' | 'register') {
+            mode = next;
+            clearMsg();
+            const isLogin = next === 'login';
+            titleEl.textContent = isLogin ? 'Entra en YourFavs' : 'Crea tu cuenta';
+            subEl.textContent = isLogin
+                ? 'Guarda tus pelis y series, sigue actores y más.'
+                : 'Es gratis y guardas tus listas en un minuto.';
+            submitBtn.textContent = isLogin ? 'Entrar' : 'Crear cuenta';
+            passInput.setAttribute('autocomplete', isLogin ? 'current-password' : 'new-password');
+            (overlay!.querySelector('[data-mode="login"]') as HTMLElement).hidden = !isLogin;
+            (overlay!.querySelector('[data-mode="register"]') as HTMLElement).hidden = isLogin;
+            (overlay!.querySelector('[data-auth-forgot]') as HTMLElement).hidden = !isLogin;
+        }
+
+        function open() {
+            if (overlay!.classList.contains('is-open')) return;
+            lastFocus = document.activeElement as HTMLElement;
+            overlay!.hidden = false;
+            overlay!.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+            setMode('login');
+            clearMsg();
+            emailInput.focus();
+        }
+        function close() {
+            overlay!.classList.remove('is-open');
+            overlay!.hidden = true;
+            document.body.style.overflow = '';
+            form.reset();
+            if (lastFocus && lastFocus.focus) lastFocus.focus();
+        }
+
+        // ---- disparadores globales ----
+        document.addEventListener('click', (e) => {
+            const t = e.target as HTMLElement;
+            if (t.closest('[data-auth-open]')) { e.preventDefault(); open(); }
+            else if (t.closest('[data-auth-logout]')) {
+                e.preventDefault();
+                getActions().then((a) => a.logout()).then(() => location.reload());
+            }
+        });
+
+        // ---- cierre ----
+        overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+        overlay.querySelector('[data-auth-close]')!.addEventListener('click', close);
+
+        // ---- focus-trap + Esc ----
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+            if (e.key !== 'Tab') return;
+            const focusables = card.querySelectorAll<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            const list = Array.from(focusables).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+            if (!list.length) return;
+            const first = list[0], last = list[list.length - 1];
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        });
+
+        // ---- toggle login/registro ----
+        overlay.querySelectorAll('[data-auth-switch]').forEach((btn) => {
+            btn.addEventListener('click', () => setMode(btn.getAttribute('data-auth-switch') as 'login' | 'register'));
+        });
+
+        // ---- ver/ocultar contraseña ----
+        const passToggle = document.getElementById('auth-pass-toggle') as HTMLButtonElement;
+        passToggle.addEventListener('click', () => {
+            const show = passInput.type === 'password';
+            passInput.type = show ? 'text' : 'password';
+            passToggle.setAttribute('aria-pressed', String(show));
+            passToggle.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            passInput.focus();
+        });
+
+        // ---- Google ----
+        googleBtn.addEventListener('click', async () => {
+            clearMsg();
+            setLoading(true);
+            const a = await getActions();
+            const res = await a.loginGoogle();
+            if (res.ok) location.reload();
+            else { showMsg(res.error); setLoading(false); }
+        });
+
+        // ---- email/contraseña (login o registro) ----
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearMsg();
+            const email = emailInput.value.trim();
+            const password = passInput.value;
+            if (!email || !password) { showMsg('Rellena email y contraseña.'); return; }
+            if (mode === 'register' && password.length < 6) { showMsg('La contraseña debe tener al menos 6 caracteres.'); return; }
+
+            setLoading(true);
+            const a = await getActions();
+            const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
+            if (res.ok) location.reload();
+            else { showMsg(res.error); setLoading(false); }
+        });
+
+        // ---- reset de contraseña ----
+        overlay.querySelector('[data-auth-forgot]')!.addEventListener('click', async () => {
+            const email = emailInput.value.trim();
+            if (!email) { showMsg('Escribe tu email arriba y vuelve a pulsar.'); emailInput.focus(); return; }
+            const a = await getActions();
+            const res = await a.resetPassword(email);
+            if (res.ok) showMsg('Te enviamos un email para restablecer la contraseña.', true);
+            else showMsg(res.error);
+        });
+
+        // ---- "sesión continua": si ya hay sesión, renueva la cookie al cargar ----
+        if (document.cookie.split('; ').some((c) => c.startsWith('has_session='))) {
+            getActions().then((a) => a.rollingSync());
+        }
+    }
+</script>

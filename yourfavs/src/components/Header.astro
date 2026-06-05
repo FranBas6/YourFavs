@@ -28,6 +28,33 @@ const discoverItems = [
     { href: "/catalogo/colecciones",         color: "purple", icon: "tag",       title: "Sagas",                desc: "Colecciones y franquicias" },
 ];
 const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href));
+
+// Sesión (la rellena el middleware). Header en dos estados: invitado → "Entrar";
+// con sesión → avatar + menú de cuenta.
+const user = Astro.locals.user;
+const displayName = user ? (user.name || user.email?.split('@')[0] || 'Tú') : '';
+function computeInitials(u: { name: string | null; email: string | null }): string {
+    const name = u.name?.trim();
+    if (name) {
+        const parts = name.split(/\s+/);
+        return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+    }
+    return (u.email || '').slice(0, 2).toUpperCase() || '??';
+}
+const avatarInitials = user ? computeInitials(user) : '';
+
+// Dropdown "Mis listas" (solo con sesión). Replica el patrón de "Descubrir".
+const myListsItems = [
+    { href: "/personal/favoritos",  color: "red",    icon: "heart",    title: "Favoritos",  desc: "Tus imprescindibles" },
+    { href: "/personal/megusta",    color: "amber",  icon: "star",     title: "Me gusta",   desc: "Lo que te gustó" },
+    { href: "/personal/vistos",     color: "green",  icon: "eye",      title: "Vistos",     desc: "Ya las viste" },
+    { href: "/personal/pendientes", color: "blue",   icon: "bookmark", title: "Pendientes", desc: "Para ver pronto" },
+    { href: "/personal/verpronto",  color: "purple", icon: "clock",    title: "Ver pronto", desc: "En tu radar" },
+    { href: "/personal/siguiendo",  color: "pink",   icon: "tv",       title: "Siguiendo",  desc: "Series al día" },
+    { href: "/personal/actores",    color: "slate",  icon: "user",     title: "Actores",    desc: "Quienes sigues" },
+    { href: "/personal/actividad",  color: "green",  icon: "activity", title: "Actividad",  desc: "Tu historial" },
+];
+const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
 ---
 <header class="header-main">
     <div class="header-inner">
@@ -72,6 +99,39 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
                     </div>
                 </div>
             </div>
+
+            <!-- Mis listas + dropdown (solo con sesión) -->
+            {user && (
+                <div class="header-discover" id="mislistas">
+                    <button type="button"
+                            class={`header-nav-link header-discover-btn ${myListsActive ? 'is-active' : ''}`}
+                            id="mislistas-btn" aria-haspopup="true" aria-expanded="false">
+                        <Icon name="lucide:bookmark" class="w-4 h-4" />
+                        Mis listas
+                        <svg class="header-discover-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div class="header-discover-panel" id="mislistas-panel">
+                        <div class="header-discover-kicker">Tus colecciones</div>
+                        <div class="header-discover-grid">
+                            {myListsItems.map(it => (
+                                <a href={it.href} class="header-discover-item">
+                                    <Stamp color={it.color as any} icon={it.icon} size={32} />
+                                    <span class="hd-body">
+                                        <span class="hd-t">{it.title}</span>
+                                        <span class="hd-s">{it.desc}</span>
+                                    </span>
+                                </a>
+                            ))}
+                        </div>
+                        <a href="/personal/year" class="header-mylists-foot">
+                            <Icon name="lucide:bar-chart-3" class="w-4 h-4" />
+                            Tu año en cine
+                        </a>
+                    </div>
+                </div>
+            )}
 
             <a href={navPlatforms.href}
                class={`header-nav-link ${isActive(navPlatforms.href) ? 'is-active' : ''}`}>
@@ -134,16 +194,60 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
                 </svg>
             </button>
 
-            <!-- Usuario → área personal (no hay login: Personal vive aquí) -->
-            <a href="/personal/favoritos" class={`header-icon-btn ${currentPath.startsWith('/personal') ? 'is-active' : ''}`} aria-label="Mi área personal" title="Personal">
-                <Icon name="lucide:user" class="w-5 h-5" />
-            </a>
+            <!-- Usuario: sin sesión → "Entrar"; con sesión → avatar + menú de cuenta -->
+            {user ? (
+                <div class="header-account" id="account">
+                    <button type="button" class="header-avatar-btn" id="account-btn" aria-haspopup="true" aria-expanded="false" aria-label="Tu cuenta" title={displayName}>
+                        {user.picture
+                            ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
+                            : <span class="header-avatar-initials">{avatarInitials}</span>}
+                    </button>
+                    <div class="account-menu" id="account-menu" role="menu" aria-label="Menú de cuenta">
+                        <div class="account-menu-head">
+                            <span class="account-menu-avatar">
+                                {user.picture
+                                    ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
+                                    : avatarInitials}
+                            </span>
+                            <span class="account-menu-id">
+                                <span class="account-menu-name">{displayName}</span>
+                                <span class="account-menu-email">{user.email}</span>
+                            </span>
+                        </div>
+                        <a href="/personal/favoritos" class="account-menu-item" role="menuitem">
+                            <Icon name="lucide:heart" /> Mis listas
+                        </a>
+                        <a href="/personal/actividad" class="account-menu-item" role="menuitem">
+                            <Icon name="lucide:activity" /> Tu actividad
+                        </a>
+                        <a href="/personal/year" class="account-menu-item" role="menuitem">
+                            <Icon name="lucide:bar-chart-3" /> Tu año en cine
+                        </a>
+                        <div class="account-menu-sep"></div>
+                        <button type="button" class="account-menu-item is-danger" data-auth-logout role="menuitem">
+                            <Icon name="lucide:log-out" /> Cerrar sesión
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <button type="button" class="header-entrar-btn" data-auth-open>
+                    <Icon name="lucide:user" class="w-4 h-4" /> Entrar
+                </button>
+            )}
         </div>
 
-        <!-- Usuario (móvil) -->
-        <a href="/personal/favoritos" class="header-mobile-user" aria-label="Mi área personal" title="Personal">
-            <Icon name="lucide:user" class="w-6 h-6" />
-        </a>
+        <!-- Usuario (móvil): con sesión → abre el panel (sección Cuenta); sin sesión → modal -->
+        {user ? (
+            <button type="button" class="header-mobile-user" id="mobile-user-btn" aria-label="Tu cuenta">
+                {user.picture
+                    ? <img class="header-mobile-avatar" src={user.picture} alt="" referrerpolicy="no-referrer" />
+                    : <span class="header-mobile-avatar">{avatarInitials}</span>}
+            </button>
+        ) : (
+            <button type="button" class="header-mobile-user" data-auth-open aria-label="Entrar">
+                <Icon name="lucide:user" class="w-6 h-6" />
+            </button>
+        )}
 
         <!-- Hamburger mobile -->
         <button class="header-hamburger" id="menu-open-btn" aria-label="Abrir menú de navegación">
@@ -192,11 +296,26 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
             <Icon name="lucide:calendar" class="w-5 h-5" />
             Calendario
         </a>
-        <a href="/personal/favoritos" class={`mobile-nav-link ${currentPath.startsWith('/personal') && !currentPath.startsWith('/personal/calendario') ? 'is-active' : ''}`}>
-            <Icon name="lucide:user" class="w-5 h-5" />
-            Personal
-        </a>
     </nav>
+
+    <!-- MIS LISTAS (solo con sesión) -->
+    {user && (
+        <>
+            <p class="mobile-section-label">Mis listas</p>
+            <nav class="mobile-nav" aria-label="Mis listas">
+                {myListsItems.map(it => (
+                    <a href={it.href} class={`mobile-nav-link ${isActive(it.href) ? 'is-active' : ''}`}>
+                        <Icon name={`lucide:${it.icon}`} class="w-5 h-5" />
+                        {it.title}
+                    </a>
+                ))}
+                <a href="/personal/year" class={`mobile-nav-link ${isActive('/personal/year') ? 'is-active' : ''}`}>
+                    <Icon name="lucide:bar-chart-3" class="w-5 h-5" />
+                    Tu año en cine
+                </a>
+            </nav>
+        </>
+    )}
 
     <!-- DESCUBRIR -->
     <p class="mobile-section-label">Descubrir</p>
@@ -208,6 +327,37 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
             </a>
         ))}
     </nav>
+
+    <!-- CUENTA -->
+    <p class="mobile-section-label">Cuenta</p>
+    {user ? (
+        <div class="mobile-account">
+            <div class="mobile-account-id">
+                <span class="mobile-account-avatar">
+                    {user.picture
+                        ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
+                        : avatarInitials}
+                </span>
+                <span class="mobile-account-text">
+                    <span class="mobile-account-name">{displayName}</span>
+                    <span class="mobile-account-email">{user.email}</span>
+                </span>
+            </div>
+            <a href="/personal/actividad" class="mobile-nav-link">
+                <Icon name="lucide:activity" class="w-5 h-5" /> Tu actividad
+            </a>
+            <a href="/personal/year" class="mobile-nav-link">
+                <Icon name="lucide:bar-chart-3" class="w-5 h-5" /> Tu año en cine
+            </a>
+            <button type="button" class="mobile-nav-link mobile-logout" data-auth-logout>
+                <Icon name="lucide:log-out" class="w-5 h-5" /> Cerrar sesión
+            </button>
+        </div>
+    ) : (
+        <button type="button" class="mobile-entrar-btn" data-auth-open>
+            <Icon name="lucide:user" class="w-5 h-5" /> Entrar o registrarse
+        </button>
+    )}
 
     <!-- Theme toggle mobile -->
     <div class="mobile-panel-footer">
@@ -245,6 +395,9 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
     if (openBtn) openBtn.addEventListener('click', openMenu);
     if (closeBtn) closeBtn.addEventListener('click', closeMenu);
     if (overlay) overlay.addEventListener('click', closeMenu);
+    // Avatar móvil (con sesión) → abre el mismo panel deslizante
+    var mobileUserBtn = document.getElementById('mobile-user-btn');
+    if (mobileUserBtn) mobileUserBtn.addEventListener('click', openMenu);
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && panel.classList.contains('is-open')) closeMenu();
@@ -285,6 +438,39 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
 (function () {
     var wrap = document.getElementById('discover');
     var btn = document.getElementById('discover-btn');
+    if (!wrap || !btn) return;
+    var open = false;
+    function setOpen(v) {
+        open = v;
+        wrap.classList.toggle('is-open', v);
+        btn.setAttribute('aria-expanded', v ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!open); });
+    document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
+})();
+
+// Dropdown "Mis listas" (desktop): mismo patrón que "Descubrir".
+(function () {
+    var wrap = document.getElementById('mislistas');
+    var btn = document.getElementById('mislistas-btn');
+    if (!wrap || !btn) return;
+    var open = false;
+    function setOpen(v) {
+        open = v;
+        wrap.classList.toggle('is-open', v);
+        btn.setAttribute('aria-expanded', v ? 'true' : 'false');
+    }
+    btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!open); });
+    document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
+})();
+
+// Menú de cuenta (desktop): click abre/cierra; cierra con click fuera o Esc.
+// Mismo patrón que "Descubrir".
+(function () {
+    var wrap = document.getElementById('account');
+    var btn = document.getElementById('account-btn');
     if (!wrap || !btn) return;
     var open = false;
     function setOpen(v) {
@@ -526,3 +712,204 @@ const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href))
     }
 })();
 </script>
+
+<style>
+    /* === Auth en el header (B.3) === */
+
+    /* "Entrar" (sin sesión) — píldora blanca sobre el header azul */
+    .header-entrar-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 15px;
+        border-radius: 0.5rem;
+        background: #fff;
+        color: #1e40af;
+        border: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.2s ease;
+    }
+    .header-entrar-btn:hover { background: rgba(255, 255, 255, 0.88); }
+
+    /* Avatar (con sesión) */
+    .header-account { position: relative; }
+    .header-avatar-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        flex-shrink: 0;
+        transition: background 0.2s ease;
+    }
+    .header-avatar-btn:hover { background: rgba(255, 255, 255, 0.28); }
+    .header-avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+    .header-avatar-initials { font-size: 13px; font-weight: 700; }
+
+    /* Menú de cuenta (dropdown, adapta a tema con tokens) */
+    .account-menu {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 264px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+        padding: 8px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-6px);
+        transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+        z-index: 1000;
+    }
+    .header-account.is-open .account-menu { opacity: 1; visibility: visible; transform: none; }
+
+    .account-menu-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 8px 12px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 6px;
+    }
+    .account-menu-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: #3b82f6;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .account-menu-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .account-menu-id { min-width: 0; display: flex; flex-direction: column; }
+    .account-menu-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .account-menu-email {
+        font-size: 12px;
+        color: var(--text-3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .account-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 9px 10px;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 13.5px;
+        color: var(--text-2);
+        text-decoration: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+    }
+    .account-menu-item:hover { background: var(--bg-tint); color: var(--text); }
+    .account-menu-item :global(svg) { width: 17px; height: 17px; flex-shrink: 0; }
+    .account-menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
+    .account-menu-item.is-danger { color: #ef4444; }
+    .account-menu-item.is-danger:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    /* Pie "Tu año en cine" del dropdown Mis listas (panel oscuro) */
+    .header-mylists-foot {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 11px 12px 4px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        border-radius: 0 0 6px 6px;
+        transition: color 0.15s ease;
+    }
+    .header-mylists-foot:hover { color: #fff; }
+
+    /* Avatar móvil */
+    .header-mobile-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        object-fit: cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.22);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    /* Sección Cuenta (panel móvil) */
+    .mobile-account-id { display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px; }
+    .mobile-account-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: #3b82f6;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .mobile-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .mobile-account-text { min-width: 0; display: flex; flex-direction: column; }
+    .mobile-account-name { font-weight: 600; color: var(--text); }
+    .mobile-account-email {
+        font-size: 12px;
+        color: var(--text-3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mobile-logout { color: #ef4444; cursor: pointer; }
+    .mobile-entrar-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+</style>
