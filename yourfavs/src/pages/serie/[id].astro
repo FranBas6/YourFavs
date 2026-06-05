@@ -6,7 +6,7 @@ import {
 } from "../../utils/constants/helpers/media-helpers";
 import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
 import type { GuestStar } from "../../types/Media";
-import {handleSerieFavAction, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/BD/series/yourfavsSerie";
+import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/BD/series/yourfavsSerie";
 import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
@@ -17,9 +17,6 @@ import {
     getSeriesVideos
 } from "../../services/API/Series/InfoSeries";
 import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
-import {initializeApp} from "firebase/app";
-import {getFirestore, doc, getDoc, collection, getDocs, query, orderBy} from "firebase/firestore";
-import {firebaseConfig} from '../../utils/firebaseConfig';
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
@@ -36,9 +33,6 @@ import StreamingProviders from "../../components/detail/StreamingProviders.astro
 import SeasonHeatmap from "../../components/detail/SeasonHeatmap.astro";
 import StarRating from "../../components/detail/StarRating.astro";
 import {safeFetch} from "../../utils/safeFetch";
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 
@@ -206,11 +200,10 @@ const inAnyCollection = isInFavorites || isInPendientes || isInVistas || isInSig
 let currentFavPosition: number | null = null;
 let totalFavorites = 0;
 {
-    const favsSnap = await getDocs(query(collection(db, 'SeriesFavs'), orderBy('position')));
-    totalFavorites = favsSnap.size;
-    favsSnap.forEach((d: any) => {
-        if (d.id === id) currentFavPosition = (d.data()?.position ?? null);
-    });
+    const favs = await getSerieFav();
+    totalFavorites = favs.length;
+    const mine = favs.find((s) => s.id === id);
+    currentFavPosition = mine?.position ?? null;
 }
 
 // Verificar suscripción de notificación

@@ -1,6 +1,7 @@
 import { tmdbFetch } from '../shared/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { getAllFollowedPeople } from '../../BD/people/yourfavsPeople';
+import { getCurrentUid } from '../../BD/shared/userScope';
 
 /**
  * Estrenos futuros de las personas que sigues (handoff v2 §③).
@@ -21,17 +22,26 @@ export interface PersonUpcoming {
 }
 
 const TTL_MS = 6 * 60 * 60 * 1000;
-let memCache: { data: PersonUpcoming[]; expires: number } | null = null;
+// Caché POR USUARIO: con multiusuario una caché global filtraría los estrenos
+// de las personas que sigue un usuario a otro. Clave = uid de la sesión.
+const memCache = new Map<string, { data: PersonUpcoming[]; expires: number }>();
 
-export function invalidateUpcomingPeopleCache() { memCache = null; }
+export function invalidateUpcomingPeopleCache() {
+    const uid = getCurrentUid();
+    if (uid) memCache.delete(uid); else memCache.clear();
+}
 
 export async function getUpcomingFromFollowedPeople(): Promise<PersonUpcoming[]> {
+    const uid = getCurrentUid();
+    if (!uid) return []; // invitado: no sigue a nadie
+
     const now = Date.now();
-    if (memCache && memCache.expires > now) return memCache.data;
+    const cached = memCache.get(uid);
+    if (cached && cached.expires > now) return cached.data;
 
     const people = await getAllFollowedPeople();
     if (!people.length) {
-        memCache = { data: [], expires: now + TTL_MS };
+        memCache.set(uid, { data: [], expires: now + TTL_MS });
         return [];
     }
 
@@ -79,6 +89,6 @@ export async function getUpcomingFromFollowedPeople(): Promise<PersonUpcoming[]>
     const all = [...byTitle.values()];
     all.sort((a, b) => a.release_date.localeCompare(b.release_date));
 
-    memCache = { data: all, expires: now + TTL_MS };
+    memCache.set(uid, { data: all, expires: now + TTL_MS });
     return all;
 }

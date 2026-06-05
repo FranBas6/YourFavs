@@ -10,6 +10,7 @@
  */
 import { defineMiddleware } from 'astro:middleware';
 import { adminAuth } from './utils/firebaseAdmin';
+import { runWithUser } from './services/BD/shared/userScope';
 
 export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = null;
@@ -30,5 +31,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
     }
 
-    return next();
+    // Guard de invitado: las páginas /personal/* requieren sesión. Sin ella,
+    // de vuelta a inicio (la UX fina del gating — modal "regístrate" — es Fase D).
+    if (!context.locals.user && context.url.pathname.startsWith('/personal')) {
+        return context.redirect('/');
+    }
+
+    // Envolvemos el resto del request en el store de usuario: cualquier llamada a
+    // services/BD/** durante este render leerá el uid de aquí (AsyncLocalStorage).
+    return runWithUser(context.locals.user?.uid ?? null, () => next());
 });

@@ -1,8 +1,7 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from './firebaseConfig';
+import { userCol, getCurrentUid } from '../services/BD/shared/userScope';
 import {
     getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
 } from '../services/BD/movies/yourfavsMovie';
@@ -258,8 +257,8 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     let episodesPrev = 0;
     let hoursFromEpisodes = 0;
     try {
-        const snap = await getDocs(collection(db, 'WatchedEpisodes'));
-        for (const docSnap of snap.docs) {
+        const watchedDocs = getCurrentUid() ? (await userCol('WatchedEpisodes').get()).docs : [];
+        for (const docSnap of watchedDocs) {
             const data = docSnap.data() as { id?: string; watched_episodes?: { watched_at?: string }[] };
             const serieId = data.id || docSnap.id;
             for (const ep of data.watched_episodes || []) {

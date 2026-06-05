@@ -11,8 +11,10 @@ import { markWatchedEpisode } from '../../../services/BD/series/yourfavsSerie';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, locals }) => {
     try {
+        if (!locals.user) return json({ ok: false, error: 'Inicia sesión para guardar' }, 401);
+
         const body = await request.json();
         const serieId = String(body?.serieId || '');
         const season = Number(body?.season);

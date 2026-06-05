@@ -1,5 +1,4 @@
-import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, getDoc, setDoc} from "firebase/firestore";
-import { db } from "../../../utils/firebaseConfig";
+import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 
 interface ActorsFavs {
     id: string;
@@ -15,14 +14,12 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
     const action = String(formData.get('action'));
     const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
 
-    const docRef = doc(db, 'ActorsFavs', actorId);
-    const docSnap = await getDoc(docRef);
-    const actorExiste = docSnap.exists();
+    const docRef = userDoc('ActorsFavs', actorId);
+    const docSnap = await docRef.get();
+    const actorExiste = docSnap.exists;
 
     if (action === 'add' && !actorExiste) {
-        const actorsFavsRef = collection(db, 'ActorsFavs');
-        const favsQuery = query(actorsFavsRef, orderBy('position'));
-        const favsSnapshot = await getDocs(favsQuery);
+        const favsSnapshot = await userCol('ActorsFavs').orderBy('position').get();
         const currentFavorites: ActorsFavs[] = [];
         favsSnapshot.forEach((d) => {
             currentFavorites.push({id: d.id, ...d.data()} as ActorsFavs);
@@ -32,7 +29,7 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
         if (customPosition !== null) {
             const actorsToUpdate = currentFavorites.filter(fav => fav.position >= customPosition);
             for (const fav of actorsToUpdate.sort((a, b) => b.position - a.position)) {
-                await updateDoc(doc(db, 'ActorsFavs', fav.id), { position: fav.position + 1 });
+                await userDoc('ActorsFavs', fav.id).update({ position: fav.position + 1 });
             }
             newPosition = customPosition;
         } else {
@@ -41,25 +38,23 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
                 : 1;
         }
 
-        await setDoc(docRef, {
+        await docRef.set({
             id: actorId,
             added_at: new Date(),
             position: newPosition,
         });
 
     } else if (action === 'remove' && actorExiste) {
-        await deleteDoc(docRef);
+        await docRef.delete();
 
-        const actorsFavsRef = collection(db, 'ActorsFavs');
-        const favsQuery = query(actorsFavsRef, orderBy('position'));
-        const favsSnapshot = await getDocs(favsQuery);
+        const favsSnapshot = await userCol('ActorsFavs').orderBy('position').get();
         const remainingFavorites: ActorsFavs[] = [];
         favsSnapshot.forEach((d) => {
             remainingFavorites.push({id: d.id, ...d.data()} as ActorsFavs);
         });
 
         for (let i = 0; i < remainingFavorites.length; i++) {
-            await updateDoc(doc(db, 'ActorsFavs', remainingFavorites[i].id), { position: i + 1 });
+            await userDoc('ActorsFavs', remainingFavorites[i].id).update({ position: i + 1 });
         }
 
     } else if (action === 'update' && actorExiste) {
@@ -69,9 +64,7 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
             throw new Error('Nueva posición inválida');
         }
 
-        const actorsFavsRef = collection(db, 'ActorsFavs');
-        const favsQuery = query(actorsFavsRef, orderBy('position'));
-        const favsSnapshot = await getDocs(favsQuery);
+        const favsSnapshot = await userCol('ActorsFavs').orderBy('position').get();
         const favorites: ActorsFavs[] = [];
         favsSnapshot.forEach((d) => {
             favorites.push({id: d.id, ...d.data()} as ActorsFavs);
@@ -92,17 +85,17 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
             if (requestedPosition < currentPos) {
                 for (const fav of favorites) {
                     if (fav.position >= requestedPosition && fav.position < currentPos) {
-                        await updateDoc(doc(db, 'ActorsFavs', fav.id), { position: fav.position + 1 });
+                        await userDoc('ActorsFavs', fav.id).update({ position: fav.position + 1 });
                     }
                 }
             } else {
                 for (const fav of favorites) {
                     if (fav.position > currentPos && fav.position <= requestedPosition) {
-                        await updateDoc(doc(db, 'ActorsFavs', fav.id), { position: fav.position - 1 });
+                        await userDoc('ActorsFavs', fav.id).update({ position: fav.position - 1 });
                     }
                 }
             }
-            await updateDoc(doc(db, 'ActorsFavs', actorId), { position: requestedPosition });
+            await userDoc('ActorsFavs', actorId).update({ position: requestedPosition });
         }
     }
 
@@ -110,10 +103,9 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
 }
 
 export const getActorsFav = async (): Promise<ActorsFavs[]> => {
+    if (!getCurrentUid()) return [];
     try {
-        const actorsFavsRef = collection(db, "ActorsFavs");
-        const q = query(actorsFavsRef, orderBy("position"));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await userCol("ActorsFavs").orderBy("position").get();
 
         if (querySnapshot.empty) return [];
 
@@ -127,10 +119,7 @@ export const getActorsFav = async (): Promise<ActorsFavs[]> => {
 // Función para actualizar la posición de un actor en favoritos
 export const updateActorPosition = async (actorId: string, newPosition: number): Promise<void> => {
     try {
-        const actorRef = doc(db, "ActorsFavs", actorId);
-        await updateDoc(actorRef, {
-            position: newPosition
-        });
+        await userDoc("ActorsFavs", actorId).update({ position: newPosition });
         console.log(`Posición del actor ${actorId} actualizada a ${newPosition}`);
     } catch (error) {
         console.error("Error al actualizar la posición del actor:", error);
@@ -141,8 +130,7 @@ export const updateActorPosition = async (actorId: string, newPosition: number):
 // Función para eliminar un actor de favoritos
 export const removeActorFromFavorites = async (actorId: string): Promise<void> => {
     try {
-        const actorRef = doc(db, "ActorsFavs", actorId);
-        await deleteDoc(actorRef);
+        await userDoc("ActorsFavs", actorId).delete();
         console.log(`Actor ${actorId} eliminado de favoritos`);
     } catch (error) {
         console.error("Error al eliminar el actor de favoritos:", error);

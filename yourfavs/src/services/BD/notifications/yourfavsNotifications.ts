@@ -1,5 +1,4 @@
-import { collection, getDocs, deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../../../utils/firebaseConfig";
+import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 
 const COLLECTION = 'NotificationSubs';
 
@@ -12,7 +11,7 @@ export interface NotificationSub {
 
 export async function addNotificationSub(mediaType: 'movie' | 'tv', tmdbId: string): Promise<void> {
     const docId = `${mediaType}_${tmdbId}`;
-    await setDoc(doc(db, COLLECTION, docId), {
+    await userDoc(COLLECTION, docId).set({
         id: docId,
         media_type: mediaType,
         tmdb_id: tmdbId,
@@ -22,16 +21,18 @@ export async function addNotificationSub(mediaType: 'movie' | 'tv', tmdbId: stri
 
 export async function removeNotificationSub(mediaType: 'movie' | 'tv', tmdbId: string): Promise<void> {
     const docId = `${mediaType}_${tmdbId}`;
-    await deleteDoc(doc(db, COLLECTION, docId));
+    await userDoc(COLLECTION, docId).delete();
 }
 
 export async function getNotificationSub(mediaType: 'movie' | 'tv', tmdbId: string): Promise<NotificationSub | null> {
+    if (!getCurrentUid()) return null;
     const docId = `${mediaType}_${tmdbId}`;
-    const snap = await getDoc(doc(db, COLLECTION, docId));
-    return snap.exists() ? (snap.data() as NotificationSub) : null;
+    const snap = await userDoc(COLLECTION, docId).get();
+    return snap.exists ? (snap.data() as NotificationSub) : null;
 }
 
 export async function getAllNotificationSubs(): Promise<NotificationSub[]> {
-    const snap = await getDocs(collection(db, COLLECTION));
+    if (!getCurrentUid()) return [];
+    const snap = await userCol(COLLECTION).get();
     return snap.docs.map(d => d.data() as NotificationSub);
 }

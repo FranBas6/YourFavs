@@ -1,5 +1,5 @@
-import {collection, getDocs, query, orderBy, updateDoc, doc, deleteDoc, getDoc, setDoc, deleteField} from "firebase/firestore";
-import { db } from "../../../utils/firebaseConfig";
+import { FieldValue } from "firebase-admin/firestore";
+import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 
@@ -22,12 +22,12 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     // Guardar opinión en todas las colecciones
     if (action === 'save_opinion' || actionType === 'opinion') {
         const opinionText = String(formData.get('opinion') || '').trim();
-        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
-        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
+        const snaps = await Promise.all(refs.map(ref => ref.get()));
         await Promise.all(
             snaps
-                .filter(snap => snap.exists())
-                .map(snap => updateDoc(snap.ref, { opinion: opinionText }))
+                .filter(snap => snap.exists)
+                .map(snap => snap.ref.update({ opinion: opinionText }))
         );
         return `/serie/${serieId}`;
     }
@@ -36,36 +36,36 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     if (action === 'save_rating' || actionType === 'rating') {
         const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
         if (!ratingNum) return `/serie/${serieId}`;
-        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
-        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
+        const snaps = await Promise.all(refs.map(ref => ref.get()));
         await Promise.all(
             snaps
-                .filter(snap => snap.exists())
-                .map(snap => updateDoc(snap.ref, { rating: ratingNum }))
+                .filter(snap => snap.exists)
+                .map(snap => snap.ref.update({ rating: ratingNum }))
         );
         return `/serie/${serieId}`;
     }
 
     // Eliminar rating
     if (action === 'delete_rating') {
-        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
-        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
+        const snaps = await Promise.all(refs.map(ref => ref.get()));
         await Promise.all(
             snaps
-                .filter(snap => snap.exists())
-                .map(snap => updateDoc(snap.ref, { rating: deleteField() }))
+                .filter(snap => snap.exists)
+                .map(snap => snap.ref.update({ rating: FieldValue.delete() }))
         );
         return `/serie/${serieId}`;
     }
 
     // Eliminar opinión
     if (action === 'delete_opinion') {
-        const refs = SERIE_COLLECTIONS.map(col => doc(db, col, serieId));
-        const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
+        const snaps = await Promise.all(refs.map(ref => ref.get()));
         await Promise.all(
             snaps
-                .filter(snap => snap.exists())
-                .map(snap => updateDoc(snap.ref, { opinion: deleteField() }))
+                .filter(snap => snap.exists)
+                .map(snap => snap.ref.update({ opinion: FieldValue.delete() }))
         );
         return `/serie/${serieId}`;
     }
@@ -74,9 +74,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     const coleccion = ACTION_TYPE_MAP[actionType];
     if (!coleccion) throw new Error(`Tipo de acción no válido: ${actionType}`);
 
-    const docRef = doc(db, coleccion, serieId);
-    const docSnap = await getDoc(docRef);
-    const serieExiste = docSnap.exists();
+    const docRef = userDoc(coleccion, serieId);
+    const docSnap = await docRef.get();
+    const serieExiste = docSnap.exists;
     const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
 
     if (action === 'add' && !serieExiste) {
@@ -87,9 +87,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
         // Buscar opinión existente (lectura paralela)
         const opinionSnaps = await Promise.all(
-            SERIE_COLLECTIONS.map(col => getDoc(doc(db, col, serieId)))
+            SERIE_COLLECTIONS.map(col => userDoc(col, serieId).get())
         );
-        const foundOpinion = opinionSnaps.find(s => s.exists() && s.data()?.opinion);
+        const foundOpinion = opinionSnaps.find(s => s.exists && s.data()?.opinion);
         const existingOpinion: string = foundOpinion?.data()?.opinion || '';
 
         const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
@@ -97,8 +97,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
         // Manejo de posición para favoritos
         if (coleccion === 'SeriesFavs') {
-            const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
-            const favsSnapshot = await getDocs(favsQuery);
+            const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
             const currentFavorites: SeriesFavs[] = [];
             favsSnapshot.forEach((d) => {
                 currentFavorites.push({id: d.id, ...d.data()} as SeriesFavs);
@@ -108,7 +107,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             if (customPosition !== null) {
                 const seriesToUpdate = currentFavorites.filter(fav => fav.position >= customPosition);
                 for (const fav of seriesToUpdate.sort((a, b) => b.position - a.position)) {
-                    await updateDoc(doc(db, 'SeriesFavs', fav.id), { position: fav.position + 1 });
+                    await userDoc('SeriesFavs', fav.id).update({ position: fav.position + 1 });
                 }
                 newPosition = customPosition;
             } else {
@@ -119,20 +118,19 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             newEntry.position = newPosition;
         }
 
-        await setDoc(docRef, newEntry);
+        await docRef.set(newEntry);
 
     } else if (action === 'remove' && serieExiste) {
-        await deleteDoc(docRef);
+        await docRef.delete();
 
         if (coleccion === 'SeriesFavs') {
-            const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
-            const favsSnapshot = await getDocs(favsQuery);
+            const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
             const remainingFavorites: SeriesFavs[] = [];
             favsSnapshot.forEach((d) => {
                 remainingFavorites.push({id: d.id, ...d.data()} as SeriesFavs);
             });
             for (let i = 0; i < remainingFavorites.length; i++) {
-                await updateDoc(doc(db, 'SeriesFavs', remainingFavorites[i].id), { position: i + 1 });
+                await userDoc('SeriesFavs', remainingFavorites[i].id).update({ position: i + 1 });
             }
         }
 
@@ -140,8 +138,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         const requestedPosition = customPosition !== null ? customPosition : Number(formData.get('custom_position'));
         if (!requestedPosition || Number.isNaN(requestedPosition)) throw new Error('Nueva posición inválida');
 
-        const favsQuery = query(collection(db, 'SeriesFavs'), orderBy('position'));
-        const favsSnapshot = await getDocs(favsQuery);
+        const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
         const favorites: SeriesFavs[] = [];
         favsSnapshot.forEach((d) => {
             favorites.push({id: d.id, ...d.data()} as SeriesFavs);
@@ -159,14 +156,14 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         if (newPos !== oldPos) {
             if (newPos > oldPos) {
                 for (const fav of favorites.filter(f => (f.position || 0) > oldPos && (f.position || 0) <= newPos)) {
-                    await updateDoc(doc(db, 'SeriesFavs', fav.id), { position: (fav.position || 0) - 1 });
+                    await userDoc('SeriesFavs', fav.id).update({ position: (fav.position || 0) - 1 });
                 }
             } else {
                 for (const fav of favorites.filter(f => (f.position || 0) >= newPos && (f.position || 0) < oldPos)) {
-                    await updateDoc(doc(db, 'SeriesFavs', fav.id), { position: (fav.position || 0) + 1 });
+                    await userDoc('SeriesFavs', fav.id).update({ position: (fav.position || 0) + 1 });
                 }
             }
-            await updateDoc(docRef, { position: newPos });
+            await docRef.update({ position: newPos });
         }
     }
 
@@ -194,10 +191,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
 // Helper para obtener documentos de una colección ordenados por fecha
 async function getSeriesCollection<T>(collectionName: string, orderField: string = "added_at", orderDirection: "asc" | "desc" = "desc"): Promise<T[]> {
+    if (!getCurrentUid()) return [];
     try {
-        const ref = collection(db, collectionName);
-        const q = query(ref, orderBy(orderField, orderDirection));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await userCol(collectionName).orderBy(orderField, orderDirection).get();
 
         if (querySnapshot.empty) return [];
 
@@ -221,10 +217,9 @@ export const getSerieFav = async (): Promise<SeriesFavs[]> => {
 
         if (seriesWithOrder.every(series => series.position === null || series.position === undefined)) {
             await Promise.all(
-                seriesWithOrder.map((series, index) => {
-                    const serieRef = doc(db, "SeriesFavs", series.id);
-                    return updateDoc(serieRef, { position: index });
-                })
+                seriesWithOrder.map((series, index) =>
+                    userDoc("SeriesFavs", series.id).update({ position: index })
+                )
             );
         }
 
@@ -242,19 +237,18 @@ export const getLikedSeries = () => getSeriesCollection<SeriesInterface>("LikedS
 export const getSeriesVerPronto = () => getSeriesCollection<SeriesInterface>("SeriesVerPronto");
 
 export async function clearAllSeriesVerPronto(): Promise<void> {
-    const seriesVerProntoRef = collection(db, 'SeriesVerPronto');
-    const querySnapshot = await getDocs(seriesVerProntoRef);
+    const querySnapshot = await userCol('SeriesVerPronto').get();
 
-    const deletePromises: Promise<void>[] = [];
+    const deletePromises: Promise<unknown>[] = [];
     querySnapshot.forEach((docSnapshot) => {
-        deletePromises.push(deleteDoc(doc(db, 'SeriesVerPronto', docSnapshot.id)));
+        deletePromises.push(userDoc('SeriesVerPronto', docSnapshot.id).delete());
     });
 
     await Promise.all(deletePromises);
 }
 
 export async function deleteSerieVerProntoById(serieId: string): Promise<void> {
-    await deleteDoc(doc(db, 'SeriesVerPronto', serieId));
+    await userDoc('SeriesVerPronto', serieId).delete();
 }
 
 import { processBatch } from '../../../utils/processBatch';
@@ -374,9 +368,10 @@ const removeDuplicatesAndCalculateScores = (recommendations: RecommendedSeries[]
 // === Watched Episodes ===
 
 export async function getWatchedProgress(serieId: string): Promise<WatchedProgress | null> {
+    if (!getCurrentUid()) return null;
     try {
-        const snap = await getDoc(doc(db, 'WatchedEpisodes', serieId));
-        if (!snap.exists()) return null;
+        const snap = await userDoc('WatchedEpisodes', serieId).get();
+        if (!snap.exists) return null;
         return snap.data() as WatchedProgress;
     } catch (error) {
         console.error('Error al obtener progreso:', error);
@@ -385,13 +380,13 @@ export async function getWatchedProgress(serieId: string): Promise<WatchedProgre
 }
 
 export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
-    const ref = doc(db, 'WatchedEpisodes', serieId);
-    const snap = await getDoc(ref);
+    const ref = userDoc('WatchedEpisodes', serieId);
+    const snap = await ref.get();
 
-    if (!snap.exists()) {
+    if (!snap.exists) {
         // Primer episodio marcado — crear documento
         const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
-        await setDoc(ref, {
+        await ref.set({
             id: serieId,
             watched_episodes: [ep],
             last_watched: ep,
@@ -406,7 +401,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
     if (idx >= 0) {
         // Ya visto — quitar
         episodes.splice(idx, 1);
-        await updateDoc(ref, {
+        await ref.update({
             watched_episodes: episodes,
             last_watched: episodes.length > 0 ? episodes[episodes.length - 1] : null,
         });
@@ -414,7 +409,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
         // No visto — añadir
         const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
         episodes.push(ep);
-        await updateDoc(ref, {
+        await ref.update({
             watched_episodes: episodes,
             last_watched: ep,
         });
@@ -427,12 +422,12 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
  * toggleWatchedEpisode lo desmarcaría.
  */
 export async function markWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
-    const ref = doc(db, 'WatchedEpisodes', serieId);
-    const snap = await getDoc(ref);
+    const ref = userDoc('WatchedEpisodes', serieId);
+    const snap = await ref.get();
     const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
 
-    if (!snap.exists()) {
-        await setDoc(ref, { id: serieId, watched_episodes: [ep], last_watched: ep });
+    if (!snap.exists) {
+        await ref.set({ id: serieId, watched_episodes: [ep], last_watched: ep });
         return;
     }
 
@@ -441,19 +436,19 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
     if (episodes.some(e => e.season === season && e.episode === episode)) return; // ya visto
 
     episodes.push(ep);
-    await updateDoc(ref, { watched_episodes: episodes, last_watched: ep });
+    await ref.update({ watched_episodes: episodes, last_watched: ep });
 }
 
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
-    const ref = doc(db, 'WatchedEpisodes', serieId);
-    const snap = await getDoc(ref);
+    const ref = userDoc('WatchedEpisodes', serieId);
+    const snap = await ref.get();
     const now = new Date().toISOString();
 
     const newEpisodes: WatchedEpisode[] = episodeNumbers.map(ep => ({ season, episode: ep, watched_at: now }));
 
-    if (!snap.exists()) {
+    if (!snap.exists) {
         const last = newEpisodes[newEpisodes.length - 1];
-        await setDoc(ref, { id: serieId, watched_episodes: newEpisodes, last_watched: last });
+        await ref.set({ id: serieId, watched_episodes: newEpisodes, last_watched: last });
         return;
     }
 
@@ -461,36 +456,35 @@ export async function markSeasonWatched(serieId: string, season: number, episode
     // Quitar episodios de esta temporada que ya estén y reemplazar con todos
     const otherEpisodes = (data.watched_episodes || []).filter(e => e.season !== season);
     const allEpisodes = [...otherEpisodes, ...newEpisodes];
-    await updateDoc(ref, {
+    await ref.update({
         watched_episodes: allEpisodes,
         last_watched: allEpisodes[allEpisodes.length - 1],
     });
 }
 
 export async function unmarkSeasonWatched(serieId: string, season: number): Promise<void> {
-    const ref = doc(db, 'WatchedEpisodes', serieId);
-    const snap = await getDoc(ref);
-    if (!snap.exists()) return;
+    const ref = userDoc('WatchedEpisodes', serieId);
+    const snap = await ref.get();
+    if (!snap.exists) return;
 
     const data = snap.data() as WatchedProgress;
     const remaining = (data.watched_episodes || []).filter(e => e.season !== season);
-    await updateDoc(ref, {
+    await ref.update({
         watched_episodes: remaining,
         last_watched: remaining.length > 0 ? remaining[remaining.length - 1] : null,
     });
 }
 
 export async function markAllWatched(serieId: string, allEpisodes: { season: number; episode: number }[]): Promise<void> {
-    const ref = doc(db, 'WatchedEpisodes', serieId);
+    const ref = userDoc('WatchedEpisodes', serieId);
     const now = new Date().toISOString();
     const episodes: WatchedEpisode[] = allEpisodes.map(e => ({ season: e.season, episode: e.episode, watched_at: now }));
     const last = episodes[episodes.length - 1];
-    await setDoc(ref, { id: serieId, watched_episodes: episodes, last_watched: last });
+    await ref.set({ id: serieId, watched_episodes: episodes, last_watched: last });
 }
 
 export async function unmarkAllWatched(serieId: string): Promise<void> {
-    const ref = doc(db, 'WatchedEpisodes', serieId);
-    await deleteDoc(ref);
+    await userDoc('WatchedEpisodes', serieId).delete();
 }
 
 export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }>> {
@@ -527,8 +521,9 @@ export async function getWatchedProgressBatch(serieIds: string[]): Promise<Recor
  * antes de la medianoche). Si el día más reciente es anterior a ayer, la racha es 0.
  */
 export async function getWatchStreak(): Promise<{ current: number; lastDay: string | null }> {
+    if (!getCurrentUid()) return { current: 0, lastDay: null };
     try {
-        const snap = await getDocs(collection(db, 'WatchedEpisodes'));
+        const snap = await userCol('WatchedEpisodes').get();
         const dayKeys = new Set<string>();
         for (const docSnap of snap.docs) {
             const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
@@ -577,8 +572,9 @@ export async function getWatchStreak(): Promise<{ current: number; lastDay: stri
  * larga. La actual replica el criterio de getWatchStreak (hoy o ayer cuentan).
  */
 export async function getMaxWatchStreak(): Promise<{ max: number; current: number }> {
+    if (!getCurrentUid()) return { max: 0, current: 0 };
     try {
-        const snap = await getDocs(collection(db, "WatchedEpisodes"));
+        const snap = await userCol("WatchedEpisodes").get();
         const dayNums = new Set<number>();
         for (const docSnap of snap.docs) {
             const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
@@ -630,8 +626,9 @@ export interface SerieYearActivity {
  * con Firestore porque watched_at vive dentro de un array, no en un campo top-level.
  */
 export async function getSeriesActivityByYear(year: number): Promise<SerieYearActivity[]> {
+    if (!getCurrentUid()) return [];
     try {
-        const snap = await getDocs(collection(db, 'WatchedEpisodes'));
+        const snap = await userCol('WatchedEpisodes').get();
         const yearStart = new Date(year, 0, 1).getTime();
         const yearEnd = new Date(year + 1, 0, 1).getTime();
         const out: SerieYearActivity[] = [];
@@ -668,5 +665,6 @@ export async function getSeriesActivityByYear(year: number): Promise<SerieYearAc
     }
 }
 
-// Exportar db para que pueda ser utilizada por otros módulos si es necesario
-export {db};
+// Re-export del client SDK db por compatibilidad con módulos que aún lo importan de aquí.
+// (El acceso a datos por usuario va por Admin SDK + userScope; esto solo es compat.)
+export { db } from "../../../utils/firebaseConfig";

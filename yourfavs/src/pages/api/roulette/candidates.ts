@@ -15,7 +15,8 @@ export const prerender = false;
  */
 const TTL_MS = 30 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
-let memCache: { data: RoulettePayload; expires: number } | null = null;
+// Caché POR USUARIO (los Pendientes son de cada uno). Clave = uid de la sesión.
+const memCache = new Map<string, { data: RoulettePayload; expires: number }>();
 
 interface RouletteCandidate {
     id: string;
@@ -63,9 +64,13 @@ async function enrich(id: string, type: 'movie' | 'tv'): Promise<RouletteCandida
     }
 }
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ locals }) => {
+    const uid = locals.user?.uid;
+    if (!uid) return json({ candidates: [] } satisfies RoulettePayload, 200); // invitado: sin pendientes
+
     const now = Date.now();
-    if (memCache && memCache.expires > now) return json(memCache.data, 200, true);
+    const cached = memCache.get(uid);
+    if (cached && cached.expires > now) return json(cached.data, 200, true);
 
     try {
         const [movies, series] = await Promise.all([getMoviesPendientes(), getSeriesPendientes()]);
@@ -77,7 +82,7 @@ export const GET: APIRoute = async () => {
         const payload: RoulettePayload = {
             candidates: enriched.filter((c): c is RouletteCandidate => c !== null && !!c.title),
         };
-        memCache = { data: payload, expires: now + TTL_MS };
+        memCache.set(uid, { data: payload, expires: now + TTL_MS });
         return json(payload, 200, true);
     } catch (err) {
         console.error('[api/roulette] error:', (err as Error).message);

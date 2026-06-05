@@ -10,6 +10,7 @@
  */
 import { initializeApp, getApps, getApp, cert, type ServiceAccount } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getFirestore } from 'firebase-admin/firestore';
 
 function loadServiceAccount(): ServiceAccount {
     // En Astro server import.meta.env expone las env privadas; en Netlify
@@ -37,4 +38,7 @@ function loadServiceAccount(): ServiceAccount {
 const adminApp = getApps().length ? getApp() : initializeApp({ credential: cert(loadServiceAccount()) });
 
 export const adminAuth = getAuth(adminApp);
+// Firestore vía Admin SDK — todo el acceso server-side a datos (Fase C).
+// Bypassa las reglas de seguridad; el scoping por usuario lo garantiza userScope.
+export const adminDb = getFirestore(adminApp);
 export { adminApp };

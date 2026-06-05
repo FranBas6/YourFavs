@@ -19,11 +19,15 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Las 13 colecciones
+// Las 16 colecciones globales (todas las que migra la Fase C)
 const COLLECTIONS = [
     "MovieFavs", "MoviesPendientes", "MoviesVistas", "MoviesVerPronto", "LikedMovies",
     "SeriesFavs", "SeriesPendiente", "SeriesVistas", "SeriesSiguiendo", "SeriesVerPronto", "LikedSeries",
+    "WatchedEpisodes",
     "ActorsFavs",
+    "FollowedPeople",
+    "MediaTags",
+    "NotificationSubs",
 ];
 
 async function backup() {

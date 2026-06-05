@@ -1,5 +1,5 @@
-import {collection, getDocs, query, orderBy, deleteDoc, doc, getDoc, setDoc, updateDoc, deleteField} from "firebase/firestore";
-import { db } from "../../../utils/firebaseConfig";
+import { FieldValue } from "firebase-admin/firestore";
+import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
 
@@ -22,13 +22,13 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     };
 
     // Refs y lectura paralela de todas las colecciones (reutilizada por los bloques de abajo)
-    const refs = MOVIE_COLLECTIONS.map(col => doc(db, col, movieId));
-    const snaps = await Promise.all(refs.map(ref => getDoc(ref)));
+    const refs = MOVIE_COLLECTIONS.map(col => userDoc(col, movieId));
+    const snaps = await Promise.all(refs.map(ref => ref.get()));
 
     // Buscar opinión existente en cualquier colección
     let existingOpinion = '';
     for (const snap of snaps) {
-        if (snap.exists() && snap.data()?.opinion) {
+        if (snap.exists && snap.data()?.opinion) {
             existingOpinion = snap.data()?.opinion;
             break;
         }
@@ -43,8 +43,8 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const updateExisting = (patch: Record<string, any>) =>
         Promise.all(
             snaps
-                .map((snap, i) => snap.exists() ? updateDoc(refs[i], patch) : null)
-                .filter(Boolean) as Promise<void>[]
+                .map((snap, i) => snap.exists ? refs[i].update(patch) : null)
+                .filter(Boolean) as Promise<unknown>[]
         );
 
     if (action === 'save_opinion') {
@@ -61,12 +61,12 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     }
 
     if (action === 'delete_rating') {
-        await updateExisting({ rating: deleteField() });
+        await updateExisting({ rating: FieldValue.delete() });
         return `/movie/${movieId}`;
     }
 
     if (action === 'delete_opinion') {
-        await updateExisting({ opinion: deleteField() });
+        await updateExisting({ opinion: FieldValue.delete() });
         return `/movie/${movieId}`;
     }
 
@@ -74,16 +74,16 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const collectionName = LIST_TYPE_MAP[listType];
     if (!collectionName) return `/movie/${movieId}`;
 
-    const docRef = doc(db, collectionName, movieId);
-    const docSnap = await getDoc(docRef);
-    const exists = docSnap.exists();
+    const docRef = userDoc(collectionName, movieId);
+    const docSnap = await docRef.get();
+    const exists = docSnap.exists;
 
     let mutated = false;
     if (action === 'add' && !exists) {
-        await setDoc(docRef, movieData);
+        await docRef.set(movieData);
         mutated = true;
     } else if (action === 'remove' && exists) {
-        await deleteDoc(docRef);
+        await docRef.delete();
         mutated = true;
     }
 
@@ -142,10 +142,9 @@ interface RecommendedMovie {
 
 // Helper para obtener documentos de una colección ordenados por fecha
 async function getMovieCollection(collectionName: string): Promise<MovieInterface[]> {
+    if (!getCurrentUid()) return [];
     try {
-        const ref = collection(db, collectionName);
-        const q = query(ref, orderBy("added_at", "desc"));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await userCol(collectionName).orderBy("added_at", "desc").get();
 
         if (querySnapshot.empty) return [];
 
@@ -185,19 +184,18 @@ export async function getWatchedMovieTiers(): Promise<Map<number, WatchedTier>> 
 }
 
 export async function clearAllMoviesVerPronto(): Promise<void> {
-    const peliculasVerProntoRef = collection(db, 'MoviesVerPronto');
-    const querySnapshot = await getDocs(peliculasVerProntoRef);
+    const querySnapshot = await userCol('MoviesVerPronto').get();
 
-    const deletePromises: Promise<void>[] = [];
+    const deletePromises: Promise<unknown>[] = [];
     querySnapshot.forEach((docSnapshot) => {
-        deletePromises.push(deleteDoc(doc(db, 'MoviesVerPronto', docSnapshot.id)));
+        deletePromises.push(userDoc('MoviesVerPronto', docSnapshot.id).delete());
     });
 
     await Promise.all(deletePromises);
 }
 
 export async function deleteMovieVerProntoById(movieId: string): Promise<void> {
-    await deleteDoc(doc(db, 'MoviesVerPronto', movieId));
+    await userDoc('MoviesVerPronto', movieId).delete();
 }
 
 import { processBatch } from '../../../utils/processBatch';

@@ -1,5 +1,4 @@
-import { collection, getDocs, deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "../../../utils/firebaseConfig";
+import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 
 const COLLECTION = 'FollowedPeople';
 
@@ -7,6 +6,8 @@ const COLLECTION = 'FollowedPeople';
  * Personas seguidas (handoff v2 §③ "Avísame de estrenos"): actores/directores
  * cuyos estrenos futuros se anuncian en el calendario. Se guarda nombre y foto
  * para pintar sin re-fetch de /person/{id} (la ficha ya los tiene al seguir).
+ *
+ * Fase C: datos por usuario (users/{uid}/FollowedPeople) vía Admin SDK + userScope.
  */
 export interface FollowedPerson {
     id: string;            // id TMDB de la persona
@@ -16,7 +17,7 @@ export interface FollowedPerson {
 }
 
 export async function addFollowedPerson(id: string, name: string, profilePath: string | null): Promise<void> {
-    await setDoc(doc(db, COLLECTION, id), {
+    await userDoc(COLLECTION, id).set({
         id,
         name,
         profile_path: profilePath ?? null,
@@ -25,16 +26,18 @@ export async function addFollowedPerson(id: string, name: string, profilePath: s
 }
 
 export async function removeFollowedPerson(id: string): Promise<void> {
-    await deleteDoc(doc(db, COLLECTION, id));
+    await userDoc(COLLECTION, id).delete();
 }
 
 export async function getFollowedPerson(id: string): Promise<FollowedPerson | null> {
-    const snap = await getDoc(doc(db, COLLECTION, id));
-    return snap.exists() ? (snap.data() as FollowedPerson) : null;
+    if (!getCurrentUid()) return null;
+    const snap = await userDoc(COLLECTION, id).get();
+    return snap.exists ? (snap.data() as FollowedPerson) : null;
 }
 
 export async function getAllFollowedPeople(): Promise<FollowedPerson[]> {
-    const snap = await getDocs(collection(db, COLLECTION));
+    if (!getCurrentUid()) return [];
+    const snap = await userCol(COLLECTION).get();
     return snap.docs.map(d => d.data() as FollowedPerson);
 }
 

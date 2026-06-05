@@ -1,5 +1,4 @@
-import { collection, getDocs, deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../../utils/firebaseConfig';
+import { userCol, userDoc, getCurrentUid } from './userScope';
 
 const COLLECTION = 'MediaTags';
 
@@ -32,21 +31,22 @@ export async function getMediaTags(
     mediaType: 'movie' | 'tv',
     tmdbId: string | number
 ): Promise<MediaTagsDoc | null> {
-    const snap = await getDoc(doc(db, COLLECTION, docIdFor(mediaType, tmdbId)));
-    return snap.exists() ? (snap.data() as MediaTagsDoc) : null;
+    if (!getCurrentUid()) return null;
+    const snap = await userDoc(COLLECTION, docIdFor(mediaType, tmdbId)).get();
+    return snap.exists ? (snap.data() as MediaTagsDoc) : null;
 }
 
 /** Lee todos los docs de tags para una lista de items. Devuelve mapa `${type}_${id}` → doc. */
 export async function getMediaTagsBatch(
     items: { mediaType: 'movie' | 'tv'; tmdbId: string | number }[]
 ): Promise<Record<string, MediaTagsDoc>> {
-    if (items.length === 0) return {};
+    if (items.length === 0 || !getCurrentUid()) return {};
     const snaps = await Promise.all(
-        items.map(it => getDoc(doc(db, COLLECTION, docIdFor(it.mediaType, it.tmdbId))))
+        items.map(it => userDoc(COLLECTION, docIdFor(it.mediaType, it.tmdbId)).get())
     );
     const map: Record<string, MediaTagsDoc> = {};
     for (let i = 0; i < snaps.length; i++) {
-        if (snaps[i].exists()) {
+        if (snaps[i].exists) {
             const data = snaps[i].data() as MediaTagsDoc;
             map[data.id] = data;
         }
@@ -56,7 +56,8 @@ export async function getMediaTagsBatch(
 
 /** Lee TODOS los docs de tags (para construir lista de tags únicos en filtro). */
 export async function getAllMediaTags(): Promise<MediaTagsDoc[]> {
-    const snap = await getDocs(collection(db, COLLECTION));
+    if (!getCurrentUid()) return [];
+    const snap = await userCol(COLLECTION).get();
     return snap.docs.map(d => d.data() as MediaTagsDoc);
 }
 
@@ -71,20 +72,20 @@ export async function setMediaTags(
 
     // Si todo queda vacío, borra el doc para no dejar basura
     if ((tags === undefined || tags.length === 0) && (notes === undefined || notes === '')) {
-        const existing = await getDoc(doc(db, COLLECTION, id));
-        if (existing.exists()) {
+        const existing = await userDoc(COLLECTION, id).get();
+        if (existing.exists) {
             const data = existing.data() as MediaTagsDoc;
             const newTags = tags ?? data.tags ?? [];
             const newNotes = notes ?? data.notes ?? '';
             if (newTags.length === 0 && newNotes === '') {
-                await deleteDoc(doc(db, COLLECTION, id));
+                await userDoc(COLLECTION, id).delete();
                 return;
             }
         }
     }
 
-    const existing = await getDoc(doc(db, COLLECTION, id));
-    const existingData = existing.exists() ? (existing.data() as MediaTagsDoc) : null;
+    const existing = await userDoc(COLLECTION, id).get();
+    const existingData = existing.exists ? (existing.data() as MediaTagsDoc) : null;
 
     const finalDoc: MediaTagsDoc = {
         id,
@@ -95,7 +96,7 @@ export async function setMediaTags(
         updated_at: new Date().toISOString(),
     };
 
-    await setDoc(doc(db, COLLECTION, id), finalDoc);
+    await userDoc(COLLECTION, id).set(finalDoc);
 }
 
 export async function handleMediaTagsAction(formData: FormData): Promise<string> {

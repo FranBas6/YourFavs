@@ -1,5 +1,4 @@
-import { collection, getDocs } from "firebase/firestore";
-import { db } from "../../../utils/firebaseConfig";
+import { userCol, getCurrentUid } from "./userScope";
 import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
 
 export interface ActivityEvent {
@@ -32,7 +31,7 @@ function dayKey(ts: number): string {
 
 async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
     try {
-        const snap = await getDocs(collection(db, 'WatchedEpisodes'));
+        const snap = await userCol('WatchedEpisodes').get();
         const events: ActivityEvent[] = [];
         for (const docSnap of snap.docs) {
             const data = docSnap.data() as { watched_episodes?: { season: number; episode: number; watched_at?: string }[] };
@@ -87,11 +86,12 @@ async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
 }
 
 export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
+    if (!getCurrentUid()) return [];
     const [collectionEvents, episodeEvents] = await Promise.all([
         Promise.all(
             COLLECTIONS.map(async (c) => {
                 try {
-                    const snap = await getDocs(collection(db, c.name));
+                    const snap = await userCol(c.name).get();
                     return snap.docs
                         .map(d => ({
                             type: c.type,
