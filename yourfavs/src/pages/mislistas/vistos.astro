@@ -2,8 +2,8 @@
 import Layout from '../../layouts/Layout.astro';
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getLikedSeries} from "../../services/BD/series/yourfavsSerie";
-import {getLikedMovies} from "../../services/BD/movies/yourfavsMovie";
+import {getSeriesVistas} from "../../services/BD/series/yourfavsSerie";
+import {getMoviesVistas} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
@@ -18,7 +18,7 @@ import type {Movie} from "../../types/ApiMovie";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
-    { getSeries: getLikedSeries, getMovies: getLikedMovies },
+    { getSeries: getSeriesVistas, getMovies: getMoviesVistas },
     Astro.url
 );
 
@@ -33,7 +33,7 @@ const {
     availableGenres, availableTags, tagsFilter, stats, watchedMap, errorMessage,
 } = data;
 ---
-<Layout title="Me gusta">
+<Layout title="Vistos">
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -42,13 +42,13 @@ const {
         )}
 
         <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Me gusta</h1>
-            <p class="text-gray-500 text-base">Contenido que te ha gustado</p>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Vistos</h1>
+            <p class="text-gray-500 text-base">Series y películas que ya has visto</p>
         </header>
 
         <div class="flex items-start gap-3 mb-6">
             <div class="flex-1 min-w-0">
-                <PersonalNav currentPage="/personal/megusta" />
+                <PersonalNav currentPage="/mislistas/vistos" />
             </div>
             <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} />
         </div>

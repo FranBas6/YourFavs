@@ -8,7 +8,7 @@ const now = new Date();
 const year = parseInt(Astro.url.searchParams.get("year") || String(now.getFullYear()));
 const month = parseInt(Astro.url.searchParams.get("month") || String(now.getMonth() + 1));
 const view = Astro.url.searchParams.get("view") === 'list' ? 'list' : 'grid';
-const buildViewUrl = (v: 'grid' | 'list') => `/personal/calendario?year=${year}&month=${month}&view=${v}`;
+const buildViewUrl = (v: 'grid' | 'list') => `/mislistas/calendario?year=${year}&month=${month}&view=${v}`;
 
 let calendarData;
 let errorMessage = "";
@@ -121,7 +121,7 @@ const notificationGroups = Array.from(groupsMap.entries())
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
             <!-- Header del mes -->
             <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
-                <a href={`/personal/calendario?year=${prevYear}&month=${prevMonth}`}
+                <a href={`/mislistas/calendario?year=${prevYear}&month=${prevMonth}`}
                    class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
@@ -130,7 +130,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                 <h2 class="text-lg sm:text-xl font-semibold text-gray-800">
                     {monthNames[month - 1]} {year}
                 </h2>
-                <a href={`/personal/calendario?year=${nextYear}&month=${nextMonth}`}
+                <a href={`/mislistas/calendario?year=${nextYear}&month=${nextMonth}`}
                    class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
@@ -224,14 +224,14 @@ const notificationGroups = Array.from(groupsMap.entries())
         {view === 'list' && (
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
                 <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
-                    <a href={`/personal/calendario?year=${prevYear}&month=${prevMonth}&view=list`}
+                    <a href={`/mislistas/calendario?year=${prevYear}&month=${prevMonth}&view=list`}
                        class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
                         </svg>
                     </a>
                     <h2 class="text-lg sm:text-xl font-semibold text-gray-800">{monthNames[month - 1]} {year}</h2>
-                    <a href={`/personal/calendario?year=${nextYear}&month=${nextMonth}&view=list`}
+                    <a href={`/mislistas/calendario?year=${nextYear}&month=${nextMonth}&view=list`}
                        class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>

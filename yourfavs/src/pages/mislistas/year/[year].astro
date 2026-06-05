@@ -17,7 +17,7 @@ const yearNum = Number(yearParam);
 const currentYear = new Date().getFullYear();
 
 if (!yearParam || isNaN(yearNum) || yearNum < 1900 || yearNum > currentYear + 1) {
-    return Astro.redirect(`/personal/year/${currentYear}`);
+    return Astro.redirect(`/mislistas/year/${currentYear}`);
 }
 
 const [stats, yearActivity] = await Promise.all([
@@ -141,13 +141,13 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
         </header>
 
         <div class="mb-6">
-            <PersonalNav currentPage="/personal/year" />
+            <PersonalNav currentPage="/mislistas/year" />
         </div>
 
         {/* Selector de año */}
         <div class="flex items-center justify-center gap-3 mb-8">
             {hasPrev ? (
-                <a href={`/personal/year/${prevYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                <a href={`/mislistas/year/${prevYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                     {prevYear}
                 </a>
@@ -156,7 +156,7 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
             )}
             <span class="text-2xl font-bold text-gray-900 px-4">{yearNum}</span>
             {hasNext ? (
-                <a href={`/personal/year/${nextYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                <a href={`/mislistas/year/${nextYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
                     {nextYear}
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
                 </a>
@@ -164,7 +164,7 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                 <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 text-sm font-medium text-gray-300 cursor-not-allowed">{nextYear}</span>
             )}
             {/* Ámbito de por vida (handoff v2 §⑤) */}
-            <a href="/personal/year/siempre" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-[#E63946] hover:text-[#E63946] transition ml-2">
+            <a href="/mislistas/year/siempre" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-[#E63946] hover:text-[#E63946] transition ml-2">
                 <Icon name="lucide:infinity" class="w-4 h-4" />
                 De siempre
             </a>
@@ -176,7 +176,7 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                 title={`Nada en ${yearNum}`}
                 description="No hay items añadidos ni episodios vistos en este año.">
                 {stats.availableYears.length > 0 && (
-                    <a slot="cta" href={`/personal/year/${stats.availableYears[0]}`} class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">
+                    <a slot="cta" href={`/mislistas/year/${stats.availableYears[0]}`} class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">
                         Ver tu {stats.availableYears[0]}
                     </a>
                 )}
@@ -460,7 +460,7 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                         <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Saltar a otro año</h2>
                         <div class="flex flex-wrap gap-2">
                             {stats.availableYears.map((y) => (
-                                <a href={`/personal/year/${y}`} class={`text-sm px-3 py-1.5 rounded-lg border font-medium transition ${y === yearNum ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
+                                <a href={`/mislistas/year/${y}`} class={`text-sm px-3 py-1.5 rounded-lg border font-medium transition ${y === yearNum ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
                                     {y}
                                 </a>
                             ))}

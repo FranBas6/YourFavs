@@ -1,9 +1,9 @@
 ---
-import Layout from "../../layouts/Layout.astro";
-import { getUserProfile, setUserProfile, type UserProfile } from "../../services/BD/profile/userProfile";
-import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
+import Layout from "../layouts/Layout.astro";
+import { getUserProfile, setUserProfile, type UserProfile } from "../services/BD/profile/userProfile";
+import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
 
-// Protegida por el middleware (/personal/* sin sesión → redirige). Aquí ya hay user.
+// Protegida por el middleware (/mislistas/* sin sesión → redirige). Aquí ya hay user.
 const user = Astro.locals.user!;
 
 // Idiomas de contenido soportados (subconjunto razonable de TMDB).
@@ -24,7 +24,7 @@ if (Astro.request.method === 'POST') {
     if (postAction === 'save_avatar') {
         const avatarUrl = String(fd.get('avatar_url') || '').trim();
         await setUserProfile({ avatar_url: avatarUrl || null });
-        return Astro.redirect('/personal/perfil?saved=1');
+        return Astro.redirect('/perfil?saved=1');
     }
     if (postAction === 'save_profile') {
         const patch: Partial<UserProfile> = {
@@ -34,7 +34,7 @@ if (Astro.request.method === 'POST') {
             theme: (String(fd.get('theme') || '') as UserProfile['theme']) || undefined,
         };
         await setUserProfile(patch);
-        return Astro.redirect('/personal/perfil?saved=1');
+        return Astro.redirect('/perfil?saved=1');
     }
 }
 
@@ -364,7 +364,7 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
             const res = await fetch('/api/auth/delete-account', { method: 'POST' });
             if (!res.ok) throw new Error();
             try {
-                const { clientAuth } = await import('../../utils/firebaseAuthClient');
+                const { clientAuth } = await import('../utils/firebaseAuthClient');
                 const { signOut } = await import('firebase/auth');
                 await signOut(clientAuth);
             } catch { /* la cuenta ya no existe; da igual */ }

@@ -1,9 +1,9 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import Layout from "../../layouts/Layout.astro"
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getSeriesPendientes} from "../../services/BD/series/yourfavsSerie";
-import {getMoviesPendientes} from "../../services/BD/movies/yourfavsMovie";
+import {getSerieFav} from "../../services/BD/series/yourfavsSerie";
+import {getMovieFav} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
@@ -13,18 +13,18 @@ import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
-import WhatToWatch from "../../components/personal/WhatToWatch.astro";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
-    { getSeries: getSeriesPendientes, getMovies: getMoviesPendientes },
+    { getSeries: getSerieFav, getMovies: getMovieFav },
     Astro.url
 );
 
 const {
-    filter, searchQuery, genreFilter, platformFilter,
+    filter, searchQuery, genreFilter, platformFilter, sort,
     showSeries, showMovies, showAll,
     seriesPage, moviesPage, pageUrl, itemsPerPage,
+    seriesItems: seriesFavoritas,
     filteredSeries, filteredMovies,
     seriesPaginadas, peliculasPaginadas,
     hasMoreSeries, hasMoreMovies,
@@ -32,7 +32,7 @@ const {
     availableGenres, availableTags, tagsFilter, stats, watchedMap, errorMessage,
 } = data;
 ---
-<Layout title="Pendientes">
+<Layout title="Favoritos">
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -40,17 +40,14 @@ const {
             </div>
         )}
 
-        <header class="mb-6 flex items-start justify-between gap-3 flex-wrap">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Pendientes</h1>
-                <p class="text-gray-500 text-base">Series y películas que quieres ver</p>
-            </div>
-            <WhatToWatch />
+        <header class="mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Favoritos</h1>
+            <p class="text-gray-500 text-base">Tu colección de películas y series favoritas</p>
         </header>
 
         <div class="flex items-start gap-3 mb-6">
             <div class="flex-1 min-w-0">
-                <PersonalNav currentPage="/personal/pendientes" />
+                <PersonalNav currentPage="/mislistas/favoritos" />
             </div>
             <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} />
         </div>
@@ -62,6 +59,26 @@ const {
             movies={filteredMovies.length}
             series={filteredSeries.length}
         />
+
+        {/* Orden: por defecto (recientes) o por tu nota personal. El #n de
+            favorito se calcula contra la lista original → no cambia al ordenar. */}
+        <div class="flex items-center justify-end gap-1.5 mb-5">
+            <span class="font-mono text-[10px] tracking-widest text-gray-400 mr-1">ORDEN</span>
+            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: '' })}
+               class={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all border
+                   ${sort !== 'mi-nota'
+                       ? 'bg-gray-800 text-white border-gray-800'
+                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
+                Recientes
+            </a>
+            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: 'mi-nota' })}
+               class={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all border
+                   ${sort === 'mi-nota'
+                       ? 'bg-amber-400 text-amber-950 border-amber-400'
+                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
+                ★ Tu nota ↓
+            </a>
+        </div>
 
         <div class="space-y-10">
             {/* Series */}
@@ -82,7 +99,9 @@ const {
                     )}
                     {seriesPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {seriesPaginadas.map((item: any) => (
+                            {seriesPaginadas.map((item) => {
+                                const realPos = seriesFavoritas.findIndex((s: any) => s.id === item.id) + 1;
+                                return (
                                 <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
                                     id={item.id.toString()}
                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -95,16 +114,17 @@ const {
                                     next_episode_to_air={item.next_episode_to_air}
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                     status={item.status}
+                                    favoriteNumber={realPos}
                                     watchedEpisodes={watchedMap[String(item.id)]?.watched}
                                     userRating={(item as any).userRating}
-                                /></HoverPreview>
-                            ))}
+                                /></HoverPreview>);
+                            })}
                         </div>
                     )}
                     {hasMoreSeries && (
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
+                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, sort,
                                     seriesPage: Math.ceil(filteredSeries.length / itemsPerPage).toString(),
                                     moviesPage: moviesPage.toString()
                                 }) + '#series-section'}
@@ -137,7 +157,7 @@ const {
                     )}
                     {peliculasPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {peliculasPaginadas.map((item: any) => (
+                            {peliculasPaginadas.map((item) => (
                                 <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
                                     id={item.id.toString()}
                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
@@ -154,7 +174,7 @@ const {
                     {hasMoreMovies && (
                         <div class="flex justify-center mt-6">
                             <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter,
+                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, sort,
                                     seriesPage: seriesPage.toString(),
                                     moviesPage: Math.ceil(filteredMovies.length / itemsPerPage).toString()
                                 }) + '#movies-section'}

@@ -32,9 +32,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
     }
 
-    // Guard de invitado: las páginas /personal/* requieren sesión. Sin ella,
+    // Guard de invitado: las páginas /mislistas/* requieren sesión. Sin ella,
     // de vuelta a inicio (la UX fina del gating — modal "regístrate" — es Fase D).
-    if (!context.locals.user && context.url.pathname.startsWith('/personal')) {
+    const path = context.url.pathname;
+    if (!context.locals.user && (path.startsWith('/mislistas') || path.startsWith('/perfil'))) {
         return context.redirect('/');
     }
 

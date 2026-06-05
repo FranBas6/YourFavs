@@ -45,14 +45,14 @@ const avatarInitials = user ? computeInitials(user) : '';
 
 // Dropdown "Mis listas" (solo con sesión). Replica el patrón de "Descubrir".
 const myListsItems = [
-    { href: "/personal/favoritos",  color: "red",    icon: "heart",    title: "Favoritos",  desc: "Tus imprescindibles" },
-    { href: "/personal/megusta",    color: "amber",  icon: "star",     title: "Me gusta",   desc: "Lo que te gustó" },
-    { href: "/personal/vistos",     color: "green",  icon: "eye",      title: "Vistos",     desc: "Ya las viste" },
-    { href: "/personal/pendientes", color: "blue",   icon: "bookmark", title: "Pendientes", desc: "Para ver pronto" },
-    { href: "/personal/verpronto",  color: "purple", icon: "clock",    title: "Ver pronto", desc: "En tu radar" },
-    { href: "/personal/siguiendo",  color: "pink",   icon: "tv",       title: "Siguiendo",  desc: "Series al día" },
-    { href: "/personal/actores",    color: "slate",  icon: "user",     title: "Actores",    desc: "Quienes sigues" },
-    { href: "/personal/actividad",  color: "green",  icon: "activity", title: "Actividad",  desc: "Tu historial" },
+    { href: "/mislistas/favoritos",  color: "red",    icon: "heart",    title: "Favoritos",  desc: "Tus imprescindibles" },
+    { href: "/mislistas/megusta",    color: "amber",  icon: "star",     title: "Me gusta",   desc: "Lo que te gustó" },
+    { href: "/mislistas/vistos",     color: "green",  icon: "eye",      title: "Vistos",     desc: "Ya las viste" },
+    { href: "/mislistas/pendientes", color: "blue",   icon: "bookmark", title: "Pendientes", desc: "Para ver pronto" },
+    { href: "/mislistas/verpronto",  color: "purple", icon: "clock",    title: "Ver pronto", desc: "En tu radar" },
+    { href: "/mislistas/siguiendo",  color: "pink",   icon: "tv",       title: "Siguiendo",  desc: "Series al día" },
+    { href: "/mislistas/actores",    color: "slate",  icon: "user",     title: "Actores",    desc: "Quienes sigues" },
+    { href: "/mislistas/actividad",  color: "green",  icon: "activity", title: "Actividad",  desc: "Tu historial" },
 ];
 const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
 ---
@@ -125,7 +125,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                 </a>
                             ))}
                         </div>
-                        <a href="/personal/year" class="header-mylists-foot">
+                        <a href="/mislistas/year" class="header-mylists-foot">
                             <Icon name="lucide:bar-chart-3" class="w-4 h-4" />
                             Tu año en cine
                         </a>
@@ -214,16 +214,16 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                 <span class="account-menu-email">{user.email}</span>
                             </span>
                         </div>
-                        <a href="/personal/perfil" class="account-menu-item" role="menuitem">
+                        <a href="/perfil" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:settings" /> Configuración del perfil
                         </a>
-                        <a href="/personal/favoritos" class="account-menu-item" role="menuitem">
+                        <a href="/mislistas/favoritos" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:heart" /> Mis listas
                         </a>
-                        <a href="/personal/actividad" class="account-menu-item" role="menuitem">
+                        <a href="/mislistas/actividad" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:activity" /> Tu actividad
                         </a>
-                        <a href="/personal/year" class="account-menu-item" role="menuitem">
+                        <a href="/mislistas/year" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:bar-chart-3" /> Tu año en cine
                         </a>
                         <div class="account-menu-sep"></div>
@@ -239,13 +239,13 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
             )}
         </div>
 
-        <!-- Usuario (móvil): con sesión → abre el panel (sección Cuenta); sin sesión → modal -->
+        <!-- Usuario (móvil): con sesión → atajo a tus listas (el menú de cuenta vive en la hamburguesa); sin sesión → modal -->
         {user ? (
-            <button type="button" class="header-mobile-user" id="mobile-user-btn" aria-label="Tu cuenta">
+            <a href="/mislistas/favoritos" class="header-mobile-user" aria-label="Mis listas">
                 {user.picture
                     ? <img class="header-mobile-avatar" src={user.picture} alt="" referrerpolicy="no-referrer" />
                     : <span class="header-mobile-avatar">{avatarInitials}</span>}
-            </button>
+            </a>
         ) : (
             <button type="button" class="header-mobile-user" data-auth-open aria-label="Entrar">
                 <Icon name="lucide:user" class="w-6 h-6" />
@@ -295,7 +295,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
             <Icon name={`lucide:${navPlatforms.icon}`} class="w-5 h-5" />
             {navPlatforms.label}
         </a>
-        <a href="/personal/calendario" class={`mobile-nav-link ${isActive('/personal/calendario') ? 'is-active' : ''}`}>
+        <a href="/mislistas/calendario" class={`mobile-nav-link ${isActive('/mislistas/calendario') ? 'is-active' : ''}`}>
             <Icon name="lucide:calendar" class="w-5 h-5" />
             Calendario
         </a>
@@ -312,7 +312,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                         {it.title}
                     </a>
                 ))}
-                <a href="/personal/year" class={`mobile-nav-link ${isActive('/personal/year') ? 'is-active' : ''}`}>
+                <a href="/mislistas/year" class={`mobile-nav-link ${isActive('/mislistas/year') ? 'is-active' : ''}`}>
                     <Icon name="lucide:bar-chart-3" class="w-5 h-5" />
                     Tu año en cine
                 </a>
@@ -346,13 +346,13 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                     <span class="mobile-account-email">{user.email}</span>
                 </span>
             </div>
-            <a href="/personal/perfil" class="mobile-nav-link">
+            <a href="/perfil" class="mobile-nav-link">
                 <Icon name="lucide:settings" class="w-5 h-5" /> Configuración del perfil
             </a>
-            <a href="/personal/actividad" class="mobile-nav-link">
+            <a href="/mislistas/actividad" class="mobile-nav-link">
                 <Icon name="lucide:activity" class="w-5 h-5" /> Tu actividad
             </a>
-            <a href="/personal/year" class="mobile-nav-link">
+            <a href="/mislistas/year" class="mobile-nav-link">
                 <Icon name="lucide:bar-chart-3" class="w-5 h-5" /> Tu año en cine
             </a>
             <button type="button" class="mobile-nav-link mobile-logout" data-auth-logout>
@@ -401,9 +401,6 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
     if (openBtn) openBtn.addEventListener('click', openMenu);
     if (closeBtn) closeBtn.addEventListener('click', closeMenu);
     if (overlay) overlay.addEventListener('click', closeMenu);
-    // Avatar móvil (con sesión) → abre el mismo panel deslizante
-    var mobileUserBtn = document.getElementById('mobile-user-btn');
-    if (mobileUserBtn) mobileUserBtn.addEventListener('click', openMenu);
 
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape' && panel.classList.contains('is-open')) closeMenu();
