@@ -1,3 +1,5 @@
+import { getCurrentLanguage } from '../../BD/shared/userScope';
+
 export const API_KEY = import.meta.env.TMDB_API_KEY;
 
 if (!API_KEY) {
@@ -19,12 +21,13 @@ export type MediaType = 'movie' | 'tv';
 
 /**
  * Fetch genérico a la API de TMDB con manejo de errores centralizado.
- * Añade automáticamente api_key y language=es-ES.
+ * Añade api_key y el idioma del usuario (perfil → contexto ALS; default es-ES).
+ * Un `language` explícito en `params` sigue teniendo prioridad.
  */
 export async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
     const allParams = new URLSearchParams({
         api_key: API_KEY,
-        language: 'es-ES',
+        language: getCurrentLanguage(),
         ...params,
     });
 

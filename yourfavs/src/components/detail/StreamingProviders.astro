@@ -2,6 +2,7 @@
 import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import { providerLinks } from "../../utils/constants/helpers/media-helpers";
+import { getCurrentRegion } from "../../services/BD/shared/userScope";
 
 interface RawProvider {
     provider_id: number;
@@ -24,9 +25,12 @@ const availableCountries = SUPPORTED_COUNTRIES.filter(
     (c) => providersByCountry[c.code] && providersByCountry[c.code].length > 0
 );
 
-const defaultCountry = availableCountries.some((c) => c.code === 'ES')
-    ? 'ES'
-    : availableCountries[0]?.code;
+const userRegion = getCurrentRegion();
+const defaultCountry = availableCountries.some((c) => c.code === userRegion)
+    ? userRegion
+    : availableCountries.some((c) => c.code === 'ES')
+        ? 'ES'
+        : availableCountries[0]?.code;
 
 /** Enlace por proveedor: homepage conocida o, si no, la página JustWatch del título. */
 function linkFor(p: RawProvider, countryCode: string): string {

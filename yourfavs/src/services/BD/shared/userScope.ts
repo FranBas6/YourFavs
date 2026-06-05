@@ -12,15 +12,35 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { adminDb } from '../../../utils/firebaseAdmin';
 import type { CollectionReference, DocumentReference } from 'firebase-admin/firestore';
 
-interface UserContext {
+interface RequestContext {
     uid: string | null;
+    language: string;   // idioma de contenido TMDB (perfil) — default es-ES
+    region: string;     // región de streaming (perfil) — default ES
 }
 
-const als = new AsyncLocalStorage<UserContext>();
+const als = new AsyncLocalStorage<RequestContext>();
 
 /** Lo invoca el middleware una vez por request, envolviendo a `next()`. */
 export function runWithUser<T>(uid: string | null, fn: () => T): T {
-    return als.run({ uid }, fn);
+    return als.run({ uid, language: 'es-ES', region: 'ES' }, fn);
+}
+
+/** El middleware fija idioma/región del perfil tras leerlo (mutando el store). */
+export function setRequestPrefs(prefs: { language?: string | null; region?: string | null }): void {
+    const s = als.getStore();
+    if (!s) return;
+    if (prefs.language) s.language = prefs.language;
+    if (prefs.region) s.region = prefs.region;
+}
+
+/** Idioma de contenido del request (perfil) — default es-ES fuera de contexto. */
+export function getCurrentLanguage(): string {
+    return als.getStore()?.language ?? 'es-ES';
+}
+
+/** Región de streaming del request (perfil) — default ES fuera de contexto. */
+export function getCurrentRegion(): string {
+    return als.getStore()?.region ?? 'ES';
 }
 
 /** ¿Estamos dentro de un request con store? (distingue invitado de "sin contexto"). */
@@ -48,4 +68,9 @@ export function userCol(name: string): CollectionReference {
 /** Documento del usuario actual: users/{uid}/{name}/{id}. */
 export function userDoc(name: string, id: string): DocumentReference {
     return userCol(name).doc(id);
+}
+
+/** Documento RAÍZ del usuario: users/{uid} (perfil/preferencias). Lanza sin sesión. */
+export function userRootDoc(): DocumentReference {
+    return adminDb.collection('users').doc(requireUid());
 }

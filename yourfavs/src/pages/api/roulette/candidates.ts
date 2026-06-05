@@ -4,6 +4,7 @@ import { mapAndDeduplicateProviders } from '../../../services/API/shared/tmdbInf
 import { getMoviesPendientes } from '../../../services/BD/movies/yourfavsMovie';
 import { getSeriesPendientes } from '../../../services/BD/series/yourfavsSerie';
 import { processBatch } from '../../../utils/processBatch';
+import { getCurrentRegion } from '../../../services/BD/shared/userScope';
 
 export const prerender = false;
 
@@ -41,7 +42,7 @@ interface RoulettePayload {
 async function enrich(id: string, type: 'movie' | 'tv'): Promise<RouletteCandidate | null> {
     try {
         const detail = await tmdbFetch<any>(`/${type}/${id}`, { append_to_response: 'watch/providers' });
-        const rawES = detail['watch/providers']?.results?.ES || {};
+        const rawES = detail['watch/providers']?.results?.[getCurrentRegion()] || detail['watch/providers']?.results?.ES || {};
         const runtime = type === 'movie'
             ? (detail.runtime || 0)
             : (detail.episode_run_time?.[0] || detail.last_episode_to_air?.runtime || FALLBACK_EPISODE_RUNTIME);

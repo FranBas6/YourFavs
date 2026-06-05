@@ -1,4 +1,5 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
+import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
 import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
 import {
     getTrailer as sharedGetTrailer,
@@ -50,7 +51,7 @@ export const getMovieById = async ({ id }: { id: string }) => {
     movie.hasSpanishTranslation = await checkMovieSpanishTranslation(id);
 
     const providersData = await tmdbFetch<{ results: any }>(`/movie/${id}/watch/providers`, {});
-    const esProviders = providersData.results?.ES || {};
+    const esProviders = providersData.results?.[getCurrentRegion()] || providersData.results?.ES || {};
     movie.providers = mapAndDeduplicateProviders(esProviders);
     movie.providersByCountry = buildProvidersByCountry(providersData.results);
     movie.providerLinksByCountry = buildProviderLinksByCountry(providersData.results);
@@ -109,7 +110,7 @@ export interface PosterImage {
 
 export const fetchAllMoviePosters = async (
     movieId: string | number,
-    language: string = "es-ES"
+    language: string = getCurrentLanguage()
 ): Promise<PosterImage[]> => {
     const numericId = typeof movieId === 'string' ? parseInt(movieId, 10) : movieId;
     const fullImagePath = (path: string) => originalUrl(path);

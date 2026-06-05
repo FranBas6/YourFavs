@@ -10,7 +10,8 @@
  */
 import { defineMiddleware } from 'astro:middleware';
 import { adminAuth } from './utils/firebaseAdmin';
-import { runWithUser } from './services/BD/shared/userScope';
+import { runWithUser, setRequestPrefs } from './services/BD/shared/userScope';
+import { getUserProfile } from './services/BD/profile/userProfile';
 
 export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = null;
@@ -39,5 +40,18 @@ export const onRequest = defineMiddleware(async (context, next) => {
 
     // Envolvemos el resto del request en el store de usuario: cualquier llamada a
     // services/BD/** durante este render leerá el uid de aquí (AsyncLocalStorage).
-    return runWithUser(context.locals.user?.uid ?? null, () => next());
+    return runWithUser(context.locals.user?.uid ?? null, async () => {
+        // Perfil: si personalizó nombre/avatar, prevalecen sobre los de Google
+        // (así el header y el menú reflejan la edición del perfil).
+        if (context.locals.user) {
+            try {
+                const profile = await getUserProfile();
+                if (profile?.display_name) context.locals.user.name = profile.display_name;
+                if (profile?.avatar_url) context.locals.user.picture = profile.avatar_url;
+                // Idioma/región del perfil → contexto del request (los leen tmdbFetch y providers).
+                setRequestPrefs({ language: profile?.language, region: profile?.region });
+            } catch { /* perfil opcional */ }
+        }
+        return next();
+    });
 });

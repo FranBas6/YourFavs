@@ -1,5 +1,6 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
 import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
+import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
 import {
     getTrailer as sharedGetTrailer,
     getVideos as sharedGetVideos,
@@ -23,7 +24,7 @@ async function checkSeriesSpanishAvailability(seriesId: string): Promise<boolean
         if (!providersRes.ok) return false;
 
         const providersData = await providersRes.json();
-        const esProviders = providersData.results?.ES || {};
+        const esProviders = providersData.results?.[getCurrentRegion()] || providersData.results?.ES || {};
         const hasProvider = esProviders.flatrate?.length > 0 ||
             esProviders.rent?.length > 0 ||
             esProviders.buy?.length > 0;
@@ -53,7 +54,7 @@ export const getSeriesById = async ({ id }: { id: string }) => {
         tmdbFetch<{ results: any }>(`/tv/${id}/watch/providers`, {}),
     ]);
 
-    const esProviders = providersData.results?.ES || {};
+    const esProviders = providersData.results?.[getCurrentRegion()] || providersData.results?.ES || {};
     serie.availableInSpain = await checkSeriesSpanishAvailability(id);
     serie.providers = mapAndDeduplicateProviders(esProviders);
     (serie as any).providersByCountry = buildProvidersByCountry(providersData.results);
@@ -145,7 +146,7 @@ export interface PosterImage {
 
 export const fetchAllSeriesPosters = async (
     serieId: string | number,
-    language: string = "es-ES"
+    language: string = getCurrentLanguage()
 ): Promise<PosterImage[]> => {
     const numericId = typeof serieId === 'string' ? parseInt(serieId, 10) : serieId;
     const fullImagePath = (path: string) => originalUrl(path);

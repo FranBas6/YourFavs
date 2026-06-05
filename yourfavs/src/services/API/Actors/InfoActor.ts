@@ -1,6 +1,7 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
 import { type Movie } from "../../../types/ApiMovie.ts";
 import { tmdbFetch, originalUrl } from '../shared/tmdbClient';
+import { getCurrentLanguage } from "../../BD/shared/userScope";
 
 const sortByPopularityAndRating = (a: any, b: any) => {
     const popDiff = b.popularity - a.popularity;
@@ -172,7 +173,7 @@ export const fetchTaggedImages = async (actorId: number | string): Promise<Tagge
 
 export const fetchActorImages = async (
     actorId: number | string,
-    language: string = "es-ES"
+    language: string = getCurrentLanguage()
 ): Promise<ActorImage[]> => {
     const numericId = typeof actorId === 'string' ? parseInt(actorId, 10) : actorId;
 
