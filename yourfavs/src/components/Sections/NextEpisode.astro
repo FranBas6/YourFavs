@@ -131,54 +131,87 @@ function pct(item: NextEpisodeItem): number {
             + '</div>';
     }
 
+    function markWatched(card, btn, serieId, season, episode, name) {
+        if (!card || card.dataset.busy) return;
+        card.dataset.busy = '1';
+        if (btn) { btn.disabled = true; btn.innerHTML = 'Marcando…'; }
+
+        fetch('/api/episodes/watched', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ serieId: serieId, season: season, episode: episode }),
+        })
+            .then(function (r) {
+                if (r.status === 401) {
+                    // Invitado: guardamos la intención y pedimos login. Tras loguearse
+                    // (la página recarga) el replay de abajo la reejecuta sola.
+                    try {
+                        sessionStorage.setItem('yf_pending_fetch', JSON.stringify({
+                            kind: 'episode-watched', serieId: serieId, season: season, episode: episode,
+                        }));
+                    } catch (e) { /* noop */ }
+                    document.dispatchEvent(new CustomEvent('yf:require-auth'));
+                    throw new Error('auth');
+                }
+                return r.json();
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error('save failed');
+                return fetch('/api/series/' + serieId + '/next-episode').then(function (r) { return r.json(); });
+            })
+            .then(function (data) {
+                if (data.next) {
+                    card.dataset.season = data.next.next_season;
+                    card.dataset.episode = data.next.next_episode;
+                    card.innerHTML = cardHTML(data.next);
+                } else {
+                    card.innerHTML = doneHTML(name);
+                }
+            })
+            .catch(function () {
+                // Revertir: el episodio puede no haberse guardado
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Marcar visto';
+                }
+            })
+            .finally(function () {
+                delete card.dataset.busy;
+            });
+    }
+
     document.querySelectorAll('[data-nep]').forEach(function (root) {
         root.addEventListener('click', function (e) {
             var btn = e.target.closest('.nep-mark');
             if (!btn) return;
             var card = btn.closest('.nep-card');
-            if (!card || card.dataset.busy) return;
+            if (!card) return;
 
-            var serieId = card.dataset.serieId;
-            var season = Number(card.dataset.season);
-            var episode = Number(card.dataset.episode);
             var name = (card.querySelector('.nep-kicker') || {}).textContent || '';
             name = name.replace(/^SIGUIENTE · /, '');
-
-            card.dataset.busy = '1';
-            btn.disabled = true;
-            btn.innerHTML = 'Marcando…';
-
-            fetch('/api/episodes/watched', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ serieId: serieId, season: season, episode: episode }),
-            })
-                .then(function (r) {
-                    if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
-                    return r.json();
-                })
-                .then(function (res) {
-                    if (!res.ok) throw new Error('save failed');
-                    return fetch('/api/series/' + serieId + '/next-episode').then(function (r) { return r.json(); });
-                })
-                .then(function (data) {
-                    if (data.next) {
-                        card.dataset.season = data.next.next_season;
-                        card.dataset.episode = data.next.next_episode;
-                        card.innerHTML = cardHTML(data.next);
-                    } else {
-                        card.innerHTML = doneHTML(name);
-                    }
-                })
-                .catch(function () {
-                    // Revertir: el episodio puede no haberse guardado
-                    btn.disabled = false;
-                    btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Marcar visto';
-                })
-                .finally(function () {
-                    delete card.dataset.busy;
-                });
+            markWatched(card, btn, card.dataset.serieId, Number(card.dataset.season), Number(card.dataset.episode), name);
         });
     });
+
+    // Replay tras login: si un invitado pulsó "Marcar visto", se guardó la intención
+    // (yf_pending_fetch) y se abrió el modal. Tras loguearse la página recarga; aquí,
+    // si ya hay sesión y queda una intención, la reejecutamos sola (sin segundo clic).
+    (function replayPendingFetch() {
+        var hasSession = document.cookie.split('; ').some(function (c) { return c.indexOf('has_session=') === 0; });
+        if (!hasSession) return;
+        var raw;
+        try { raw = sessionStorage.getItem('yf_pending_fetch'); } catch (e) { return; }
+        if (!raw) return;
+        try { sessionStorage.removeItem('yf_pending_fetch'); } catch (e) { /* noop */ }
+        var intent;
+        try { intent = JSON.parse(raw); } catch (e) { return; }
+        if (!intent || intent.kind !== 'episode-watched') return;
+        var card = document.querySelector('.nep-card[data-serie-id="' + intent.serieId + '"]');
+        if (!card) return;
+        var btn = card.querySelector('.nep-mark');
+        var name = (card.querySelector('.nep-kicker') || {}).textContent || '';
+        name = name.replace(/^SIGUIENTE · /, '');
+        markWatched(card, btn, intent.serieId, Number(intent.season), Number(intent.episode), name);
+    })();
 })();
 </script>
