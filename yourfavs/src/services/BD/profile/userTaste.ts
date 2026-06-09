@@ -31,8 +31,13 @@ export interface TastePerson {
 }
 
 export interface UserTaste {
-    genres: number[];        // IDs de género TMDB · mín 3 · máx 10
-    titles: TasteTitle[];    // mín 3 · máx 10
+    // Géneros elegidos en el onboarding, partidos por tipo (Fase F.7). Cada
+    // género elegido aporta su ID de cine y, si existe, su equivalente de TV.
+    movieGenres: number[];   // IDs de género de cine · ≥3
+    tvGenres: number[];      // IDs de género de TV (subconjunto mapeado)
+    /** @deprecated pre-F.7: lista única con IDs de cine. Se lee como fallback. */
+    genres?: number[];
+    titles: TasteTitle[];    // pelis + series (cada una con su media_type) · cada lista 0 ó ≥3 · máx 10
     people: TastePerson[];   // opcional · si entra, mín 3 · máx 10
     updated_at?: unknown;
 }

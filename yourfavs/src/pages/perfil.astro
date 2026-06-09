@@ -59,8 +59,11 @@ const saved = Astro.url.searchParams.get('saved') === '1';
 
 // Gustos (Fase F · Acceso B): resumen para la sección "Tus gustos".
 const taste = await getUserTaste();
-const tasteGenres = (taste?.genres ?? []).map((id) => genresMap[id]).filter(Boolean);
+// Géneros por nombre (F.7: movieGenres; retrocompat con `genres` pre-F.7).
+const tasteGenres = ((taste?.movieGenres ?? taste?.genres) ?? []).map((id) => genresMap[id]).filter(Boolean);
 const tasteTitles = taste?.titles ?? [];
+const tasteMovies = tasteTitles.filter((t) => t.media_type === 'movie');
+const tasteSeries = tasteTitles.filter((t) => t.media_type === 'tv');
 const tastePeople = taste?.people ?? [];
 const hasTaste = tasteGenres.length > 0 || tasteTitles.length > 0 || tastePeople.length > 0;
 
@@ -172,11 +175,23 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                             </div>
                         </div>
                     )}
-                    {tasteTitles.length > 0 && (
+                    {tasteMovies.length > 0 && (
                         <div class="perfil-taste-cell">
-                            <div class="perfil-taste-cell-h">Títulos <span>{tasteTitles.length}</span></div>
+                            <div class="perfil-taste-cell-h">Películas <span>{tasteMovies.length}</span></div>
                             <div class="perfil-taste-posters">
-                                {tasteTitles.map((t) => (
+                                {tasteMovies.map((t) => (
+                                    t.poster_path
+                                        ? <img src={posterUrl(t.poster_path, 'w92')} alt={t.title} title={t.title} loading="lazy" />
+                                        : <span class="perfil-taste-noimg" title={t.title}>{t.title.slice(0, 2)}</span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {tasteSeries.length > 0 && (
+                        <div class="perfil-taste-cell">
+                            <div class="perfil-taste-cell-h">Series <span>{tasteSeries.length}</span></div>
+                            <div class="perfil-taste-posters">
+                                {tasteSeries.map((t) => (
                                     t.poster_path
                                         ? <img src={posterUrl(t.poster_path, 'w92')} alt={t.title} title={t.title} loading="lazy" />
                                         : <span class="perfil-taste-noimg" title={t.title}>{t.title.slice(0, 2)}</span>

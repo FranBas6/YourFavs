@@ -5,27 +5,33 @@
  *   B) "Editar" desde el perfil (prerrellenado leyendo el taste actual),
  *   C) la pista post-guardado enlaza aquí.
  *
- * Wizard de 3 pasos: géneros (estáticos) · títulos · actores (opcional).
- * Reglas mín 3 / máx 10 por paso. Móvil: tarjeta a ancho completo.
+ * Wizard de 4 pasos: géneros · películas · series · actores (opcional).
+ * Géneros requerido (mín 3); pelis/series/actores opcionales (0 ó mín 3) · máx 10.
+ * Móvil: tarjeta a ancho completo.
  */
 import Layout from "../layouts/Layout.astro";
 import { getUserTaste } from "../services/BD/profile/userTaste";
-import { genresMap } from "../utils/constants/genres";
+import { TASTE_GENRES } from "../utils/constants/tasteGenres";
 
 // Onboarding es para usuarios con sesión. (Esta ruta no está en el guard del
 // middleware, así que protegemos aquí.)
 if (!Astro.locals.user) return Astro.redirect('/');
 
 const welcome = Astro.url.searchParams.get('welcome') === '1';
-const taste = (await getUserTaste()) ?? { genres: [], titles: [], people: [] };
+const taste = (await getUserTaste()) ?? { movieGenres: [], titles: [], people: [] };
 
-// Géneros curados (subconjunto con buena señal de gusto; IDs reales de TMDB).
-const GENRE_IDS = [18, 878, 35, 53, 28, 27, 10749, 16, 80, 14, 99, 9648, 12, 10752, 10751, 10402, 36, 37];
-const genres = GENRE_IDS.map((id) => ({ id, name: genresMap[id] })).filter((g) => g.name);
-const selectedGenres = new Set(taste.genres ?? []);
+// Géneros curados (chips por nombre; el data-id es el ID de cine que identifica
+// cada chip — al guardar se parte en cine/TV con splitGenreIds). Prefill: F.7
+// usa movieGenres; retrocompat con `genres` (pre-F.7).
+const selectedGenres = new Set((taste.movieGenres ?? taste.genres) ?? []);
 
-// Prefill para el cliente (títulos/personas ya elegidos).
-const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
+// Prefill para el cliente: títulos partidos por tipo + personas.
+const allTitles = taste.titles ?? [];
+const prefill = {
+    movies: allTitles.filter((t) => t.media_type === 'movie'),
+    series: allTitles.filter((t) => t.media_type === 'tv'),
+    people: taste.people ?? [],
+};
 ---
 <Layout title="Tus gustos — YourFavs">
     <div class="tw-shell">
@@ -36,7 +42,8 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
                     <span class="tw-dot" data-dot="1"></span>
                     <span class="tw-dot" data-dot="2"></span>
                     <span class="tw-dot" data-dot="3"></span>
-                    <span class="tw-step-num" data-step-num>1/3</span>
+                    <span class="tw-dot" data-dot="4"></span>
+                    <span class="tw-step-num" data-step-num>1/4</span>
                 </div>
                 <button type="button" class="tw-skip" data-tw-skip>Omitir por ahora</button>
             </div>
@@ -62,27 +69,38 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
                 </div>
                 <p class="tw-sub">Elige al menos 3. Nos ayuda a entender por dónde empezar con tus recomendaciones.</p>
                 <div class="tw-chips" data-tw-genres>
-                    {genres.map((g) => (
-                        <button type="button" class:list={["tw-chip", selectedGenres.has(g.id) && "is-on"]} data-genre-id={g.id}>
+                    {TASTE_GENRES.map((g) => (
+                        <button type="button" class:list={["tw-chip", selectedGenres.has(g.movie) && "is-on"]} data-genre-id={g.movie}>
                             <span class="tw-chip-check">✓</span>{g.name}
                         </button>
                     ))}
                 </div>
             </section>
 
-            <!-- Paso 2 · Títulos -->
+            <!-- Paso 2 · Películas -->
             <section class="tw-step" data-step="2" hidden>
                 <div class="tw-step-head">
-                    <h2 class="tw-h2">Marca lo que te encanta</h2>
-                    <span class="tw-count" data-count="titles">0 / 10</span>
+                    <h2 class="tw-h2">Películas que te encantan</h2>
+                    <span class="tw-count" data-count="movies">0 / 10</span>
                 </div>
-                <p class="tw-sub">Películas y series que te gustan. Da igual si ya las viste — nos dicen qué recomendarte.</p>
-                <input type="search" class="tw-search" data-search="titles" placeholder="Buscar una película o serie…" autocomplete="off" />
-                <div class="tw-grid tw-grid-titles" data-grid="titles"><p class="tw-state">Cargando tendencias…</p></div>
+                <p class="tw-sub">Da igual si ya las viste — nos dicen qué recomendarte. Opcional, pero ayuda.</p>
+                <input type="search" class="tw-search" data-search="movies" placeholder="Buscar una película…" autocomplete="off" />
+                <div class="tw-grid tw-grid-titles" data-grid="movies"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
 
-            <!-- Paso 3 · Actores (opcional) -->
+            <!-- Paso 3 · Series -->
             <section class="tw-step" data-step="3" hidden>
+                <div class="tw-step-head">
+                    <h2 class="tw-h2">Series que te encantan</h2>
+                    <span class="tw-count" data-count="series">0 / 10</span>
+                </div>
+                <p class="tw-sub">Tus series favoritas. Opcional, pero afina mucho tus recomendaciones de TV.</p>
+                <input type="search" class="tw-search" data-search="series" placeholder="Buscar una serie…" autocomplete="off" />
+                <div class="tw-grid tw-grid-titles" data-grid="series"><p class="tw-state">Cargando tendencias…</p></div>
+            </section>
+
+            <!-- Paso 4 · Actores (opcional) -->
+            <section class="tw-step" data-step="4" hidden>
                 <div class="tw-step-head">
                     <h2 class="tw-h2">Actores y directores</h2>
                     <span class="tw-count" data-count="people">0 / 10</span>
@@ -92,8 +110,8 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
                 <div class="tw-grid tw-grid-people" data-grid="people"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
 
-            <!-- Paso 4 · Confirmación -->
-            <section class="tw-step tw-center" data-step="4" hidden>
+            <!-- Paso 5 · Confirmación -->
+            <section class="tw-step tw-center" data-step="5" hidden>
                 <span class="tw-hero-ic tw-ok">✓</span>
                 <h1 class="tw-title-xl">¡Listo, ya te conocemos!</h1>
                 <p class="tw-lead">Tu sección <strong>Para ti</strong> ya está personalizada con tus gustos. Puedes ajustarlos cuando quieras desde tu perfil.</p>
@@ -267,6 +285,8 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
     const IMG = (p) => (p ? 'https://image.tmdb.org/t/p/w342' + p : '');
     const tkey = (t) => t.media_type + ':' + t.id;
     const MIN = 3, MAX = 10;
+    // Paso → tipo de contenido (2 pelis · 3 series · 4 personas).
+    const LAST = 4;
 
     const card = document.querySelector('.tw-card');
     if (!card) return;
@@ -274,21 +294,23 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
     // Estado de selección
     const selGenres = new Set();
     card.querySelectorAll('.tw-chip.is-on').forEach((c) => selGenres.add(Number(c.dataset.genreId)));
-    const selTitles = new Map();
-    (prefill.titles || []).forEach((t) => selTitles.set(tkey(t), t));
+    const selMovies = new Map();
+    (prefill.movies || []).forEach((t) => selMovies.set(tkey(t), t));
+    const selSeries = new Map();
+    (prefill.series || []).forEach((t) => selSeries.set(tkey(t), t));
     const selPeople = new Map();
     (prefill.people || []).forEach((p) => selPeople.set(p.id, p));
+    const selOf = (kind) => (kind === 'movies' ? selMovies : selSeries);
 
-    // Diccionarios de datos completos de lo renderizado (para resolver el clic
-    // sin parsear URLs): tkey/id → objeto con poster_path/profile_path, title…
+    // Diccionarios de datos completos de lo renderizado (resuelven el clic sin
+    // parsear URLs). titleData es compartido: las claves m:/t: ya distinguen tipo.
     const titleData = new Map();
-    (prefill.titles || []).forEach((t) => titleData.set(tkey(t), t));
+    [...(prefill.movies || []), ...(prefill.series || [])].forEach((t) => titleData.set(tkey(t), t));
     const peopleData = new Map();
     (prefill.people || []).forEach((p) => peopleData.set(p.id, p));
 
-    // Cachés de tendencias por paso (para volver tras buscar)
-    let trendTitles = null, trendPeople = null;
-    let loadedTitles = false, loadedPeople = false;
+    // Tendencias: una sola llamada trae pelis + series + personas; se cachea.
+    let trend = null;
 
     // Refs
     const dots = card.querySelectorAll('.tw-dot');
@@ -306,8 +328,8 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
     let step = welcome ? 0 : 1;
 
     // ── Render de grids ───────────────────────────────────────────────────
-    function titleCard(t) {
-        const on = selTitles.has(tkey(t));
+    function titleCard(t, sel) {
+        const on = sel.has(tkey(t));
         const src = t.image || IMG(t.poster_path);
         return '<button type="button" class="tw-poster' + (on ? ' is-on' : '') + '" data-tkey="' + tkey(t) + '">'
             + '<span class="tw-poster-img"><img src="' + src + '" alt="" loading="lazy"></span>'
@@ -324,17 +346,17 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
     }
     function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    // `pin`: en la vista de tendencias mostramos los elegidos primero (para que
-    // sigan visibles); en una búsqueda NO, así no contaminamos los resultados con
-    // selecciones ajenas al término buscado (se siguen marcando con tick si salen).
-    function renderTitles(results, pin) {
-        const grid = card.querySelector('[data-grid="titles"]');
+    // `pin`: en tendencias mostramos los elegidos primero (siguen visibles); en
+    // una búsqueda NO, así no contaminamos los resultados con selecciones ajenas.
+    function renderTitles(kind, results, pin) {
+        const sel = selOf(kind);
+        const grid = card.querySelector('[data-grid="' + kind + '"]');
         const merged = new Map();
-        if (pin) selTitles.forEach((t) => merged.set(tkey(t), t));
+        if (pin) sel.forEach((t) => merged.set(tkey(t), t));
         (results || []).forEach((t) => { if (!merged.has(tkey(t))) merged.set(tkey(t), t); });
         const items = [...merged.values()];
         items.forEach((t) => titleData.set(tkey(t), t));
-        grid.innerHTML = items.length ? items.map(titleCard).join('') : '<p class="tw-state">Sin resultados.</p>';
+        grid.innerHTML = items.length ? items.map((t) => titleCard(t, sel)).join('') : '<p class="tw-state">Sin resultados.</p>';
     }
     function renderPeople(results, pin) {
         const grid = card.querySelector('[data-grid="people"]');
@@ -349,37 +371,37 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
     // ── Carga de opciones (tendencias + búsqueda) ─────────────────────────
     async function fetchOptions(q) {
         const res = await fetch('/api/taste/options' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
-        if (!res.ok) return { titles: [], people: [] };
+        if (!res.ok) return { movieTitles: [], tvTitles: [], people: [] };
         return res.json();
     }
-    async function ensureTrendTitles() {
-        if (loadedTitles) { renderTitles(trendTitles, true); return; }
-        const d = await fetchOptions('');
-        trendTitles = d.titles || []; loadedTitles = true;
-        renderTitles(trendTitles, true);
+    async function loadTrend() {
+        if (!trend) trend = await fetchOptions('');
+        return trend;
     }
-    async function ensureTrendPeople() {
-        if (loadedPeople) { renderPeople(trendPeople, true); return; }
-        const d = await fetchOptions('');
-        trendPeople = d.people || []; loadedPeople = true;
-        renderPeople(trendPeople, true);
+    // Pinta el grid de un paso desde las tendencias cacheadas.
+    async function showTrend(kind) {
+        const d = await loadTrend();
+        if (kind === 'movies') renderTitles('movies', d.movieTitles || [], true);
+        else if (kind === 'series') renderTitles('series', d.tvTitles || [], true);
+        else renderPeople(d.people || [], true);
     }
 
     // ── Navegación / cabecera ─────────────────────────────────────────────
     function showStep(n) {
         step = n;
         Object.entries(sections).forEach(([k, el]) => { el.hidden = Number(k) !== n; });
-        const wizardUI = (n >= 1 && n <= 3);
+        const wizardUI = (n >= 1 && n <= LAST);
         head.hidden = !wizardUI;
         foot.hidden = !wizardUI;
         if (wizardUI) {
             dots.forEach((d) => { d.classList.toggle('is-on', Number(d.dataset.dot) <= n); });
-            stepNum.textContent = n + '/3';
+            stepNum.textContent = n + '/' + LAST;
             backBtn.hidden = (n === 1);
-            skipStep.hidden = (n !== 3);
-            nextBtn.textContent = (n === 3) ? 'Finalizar ✓' : 'Continuar →';
-            if (n === 2) ensureTrendTitles();
-            if (n === 3) ensureTrendPeople();
+            skipStep.hidden = (n !== LAST);
+            nextBtn.textContent = (n === LAST) ? 'Finalizar ✓' : 'Continuar →';
+            if (n === 2) showTrend('movies');
+            if (n === 3) showTrend('series');
+            if (n === 4) showTrend('people');
         }
         updateCounts();
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -387,18 +409,20 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
 
     function countFor(n) {
         if (n === 1) return selGenres.size;
-        if (n === 2) return selTitles.size;
-        if (n === 3) return selPeople.size;
+        if (n === 2) return selMovies.size;
+        if (n === 3) return selSeries.size;
+        if (n === 4) return selPeople.size;
         return 0;
     }
     function updateCounts() {
         card.querySelector('[data-count="genres"]').textContent = selGenres.size + ' / ' + MAX;
-        card.querySelector('[data-count="titles"]').textContent = selTitles.size + ' / ' + MAX;
+        card.querySelector('[data-count="movies"]').textContent = selMovies.size + ' / ' + MAX;
+        card.querySelector('[data-count="series"]').textContent = selSeries.size + ' / ' + MAX;
         card.querySelector('[data-count="people"]').textContent = selPeople.size + ' / ' + MAX;
-        if (step >= 1 && step <= 3) {
+        if (step >= 1 && step <= LAST) {
             const c = countFor(step);
-            // Paso 3 es opcional: válido con 0 o con >=MIN.
-            const ok = step === 3 ? (c === 0 || c >= MIN) : (c >= MIN);
+            // Géneros (paso 1) requerido; el resto opcional: válido con 0 o >=MIN.
+            const ok = step === 1 ? (c >= MIN) : (c === 0 || c >= MIN);
             nextBtn.disabled = !ok;
             updateMinnote(step, c);
         }
@@ -406,20 +430,22 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
 
     // Texto guía dinámico en el pie: cuánto falta / si ya puede avanzar.
     function updateMinnote(n, c) {
-        const noun = n === 1 ? 'género' : (n === 2 ? 'título' : 'persona');
+        const nouns = { 1: 'género', 2: 'película', 3: 'serie', 4: 'persona' };
+        const plurals = { 1: 'géneros', 2: 'películas', 3: 'series', 4: 'personas' };
+        const optional = (n !== 1);
         let txt;
         if (c >= MAX) txt = 'Máximo ' + MAX + ' alcanzado';
-        else if (n === 3 && c === 0) txt = 'Opcional · puedes saltar este paso';
-        else if (c < MIN) { const k = MIN - c; txt = 'Elige ' + k + ' ' + noun + (k === 1 ? '' : 's') + ' más' + (n === 3 ? ' (o ninguno)' : ''); }
-        else txt = '✓ ' + (n === 3 ? 'Puedes finalizar' : 'Puedes continuar');
+        else if (optional && c === 0) txt = 'Opcional · puedes saltar este paso';
+        else if (c < MIN) { const k = MIN - c; txt = 'Elige ' + k + ' ' + (k === 1 ? nouns[n] : plurals[n]) + ' más' + (optional ? ' (o ninguna)' : ''); }
+        else txt = '✓ ' + (n === LAST ? 'Puedes finalizar' : 'Puedes continuar');
         minnote.textContent = txt;
-        minnote.classList.toggle('is-ok', c >= MIN || (n === 3 && c === 0));
+        minnote.classList.toggle('is-ok', c >= MIN || (optional && c === 0));
     }
 
     function flash(text) { msg.textContent = text; msg.hidden = false; setTimeout(() => { msg.hidden = true; }, 2600); }
 
     // ── Eventos ───────────────────────────────────────────────────────────
-    // Géneros (delegación)
+    // Géneros (delegación) — data-genre-id = ID de cine que identifica el chip.
     card.querySelector('[data-tw-genres]').addEventListener('click', (e) => {
         const chip = e.target.closest('.tw-chip'); if (!chip) return;
         const id = Number(chip.dataset.genreId);
@@ -431,20 +457,25 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
         updateCounts();
     });
 
-    // Títulos (delegación)
-    card.querySelector('[data-grid="titles"]').addEventListener('click', (e) => {
-        const btn = e.target.closest('.tw-poster'); if (!btn) return;
-        const k = btn.dataset.tkey;
-        if (selTitles.has(k)) { selTitles.delete(k); btn.classList.remove('is-on'); }
-        else {
-            if (selTitles.size >= MAX) { flash('Máximo ' + MAX + ' títulos'); return; }
-            const d = titleData.get(k);
-            if (!d) return;
-            selTitles.set(k, { id: d.id, media_type: d.media_type, title: d.title || '', poster_path: d.poster_path ?? null });
-            btn.classList.add('is-on');
-        }
-        updateCounts();
-    });
+    // Pelis y series: misma lógica, distinta selección/grid.
+    function wireTitleGrid(kind, nounPlural) {
+        const sel = selOf(kind);
+        card.querySelector('[data-grid="' + kind + '"]').addEventListener('click', (e) => {
+            const btn = e.target.closest('.tw-poster'); if (!btn) return;
+            const k = btn.dataset.tkey;
+            if (sel.has(k)) { sel.delete(k); btn.classList.remove('is-on'); }
+            else {
+                if (sel.size >= MAX) { flash('Máximo ' + MAX + ' ' + nounPlural); return; }
+                const d = titleData.get(k);
+                if (!d) return;
+                sel.set(k, { id: d.id, media_type: d.media_type, title: d.title || '', poster_path: d.poster_path ?? null });
+                btn.classList.add('is-on');
+            }
+            updateCounts();
+        });
+    }
+    wireTitleGrid('movies', 'películas');
+    wireTitleGrid('series', 'series');
 
     // Personas (delegación)
     card.querySelector('[data-grid="people"]').addEventListener('click', (e) => {
@@ -461,43 +492,50 @@ const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
         updateCounts();
     });
 
-    // Búsqueda (debounce) por paso
-    function wireSearch(kind, render, ensureTrend) {
+    // Búsqueda (debounce) por paso. `kind` = movies | series | people.
+    function wireSearch(kind) {
         const input = card.querySelector('[data-search="' + kind + '"]');
         let t;
         input.addEventListener('input', () => {
             clearTimeout(t);
             const q = input.value.trim();
             t = setTimeout(async () => {
-                if (q.length < 2) { ensureTrend(); return; }
+                if (q.length < 2) { showTrend(kind); return; }
                 const d = await fetchOptions(q);
-                render(kind === 'titles' ? d.titles : d.people, false);
+                if (kind === 'movies') renderTitles('movies', d.movieTitles || [], false);
+                else if (kind === 'series') renderTitles('series', d.tvTitles || [], false);
+                else renderPeople(d.people || [], false);
             }, 280);
         });
     }
-    wireSearch('titles', renderTitles, ensureTrendTitles);
-    wireSearch('people', renderPeople, ensureTrendPeople);
+    wireSearch('movies');
+    wireSearch('series');
+    wireSearch('people');
 
     // Navegación
     backBtn.addEventListener('click', () => { if (step > 1) showStep(step - 1); });
     nextBtn.addEventListener('click', () => {
         if (nextBtn.disabled) return;
-        if (step < 3) showStep(step + 1);
+        if (step < LAST) showStep(step + 1);
         else save();
     });
-    skipStep.addEventListener('click', () => save());   // paso 3 saltable → finaliza igual
+    skipStep.addEventListener('click', () => save());   // último paso saltable → finaliza igual
     card.querySelector('[data-tw-begin]')?.addEventListener('click', () => showStep(1));
     card.querySelectorAll('[data-tw-skip]').forEach((b) => b.addEventListener('click', skip));
 
     async function save() {
         nextBtn.disabled = true;
-        const payload = { genres: [...selGenres], titles: [...selTitles.values()], people: [...selPeople.values()] };
+        const payload = {
+            genres: [...selGenres],
+            titles: [...selMovies.values(), ...selSeries.values()],
+            people: [...selPeople.values()],
+        };
         try {
             const res = await fetch('/api/taste/save', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
             });
             const data = await res.json();
-            if (data.ok) { showStep(4); }
+            if (data.ok) { showStep(5); }
             else { flash(data.error || 'No se pudo guardar.'); nextBtn.disabled = false; }
         } catch { flash('Error de red.'); nextBtn.disabled = false; }
     }

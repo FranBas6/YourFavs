@@ -152,7 +152,10 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const [movFavs, tvFavs, taste] = await Promise.all([
         getMovieFav(), getSerieFav(), getUserTaste(),
     ]);
-    const tasteGenres = taste?.genres ?? [];
+    // Géneros del onboarding, ya partidos por tipo (F.7). Retrocompat: docs
+    // pre-F.7 traen `genres` (IDs de cine) → alimentan cine; TV tira de favoritos.
+    const movieTasteGenres = taste?.movieGenres ?? taste?.genres ?? [];
+    const tvTasteGenres = taste?.tvGenres ?? [];
     const tasteTitles = taste?.titles ?? [];
     const tasteMovies = tasteTitles.filter((t) => t.media_type === 'movie');
     const tasteTv = tasteTitles.filter((t) => t.media_type === 'tv');
@@ -184,15 +187,15 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     tvEntries.forEach(([id], i) => { tvGenresById[id] = tvDetails[i]?.genres || []; });
 
     const data: GenrePrefs = {
-        movies: aggregateGenres(movieDetails, TOP_N_MOVIES, tasteGenres),
-        tv: aggregateGenres(tvDetails, TOP_N_TV, tasteGenres),
+        movies: aggregateGenres(movieDetails, TOP_N_MOVIES, movieTasteGenres),
+        tv: aggregateGenres(tvDetails, TOP_N_TV, tvTasteGenres),
         libraryIds: {
             movies: new Set(movieEntries.map(([id]) => id)),
             tv: new Set(tvEntries.map(([id]) => id)),
         },
         genresById: { movies: movieGenresById, tv: tvGenresById },
         seeds: { movies: movieEntries, tv: tvEntries },
-        tasteGenres,
+        tasteGenres: movieTasteGenres,
         breakdown: {
             movies: { favs: movFavs.length, taste: tasteMovies.length },
             tv: { favs: tvFavs.length, taste: tasteTv.length },

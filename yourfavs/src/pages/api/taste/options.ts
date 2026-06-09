@@ -1,15 +1,14 @@
 /**
- * GET /api/taste/options?q=...  — datos para los grids del onboarding (Fase F).
+ * GET /api/taste/options?q=...  — datos para los grids del onboarding (Fase F.7).
  *
- * Sin `q`: tendencias de la semana (títulos peli/serie interleaved + personas)
- * para poblar los grids iniciales de los pasos 2 y 3.
- * Con `q` (>=2): búsqueda en vivo (TMDB /search/multi) mapeada a la MISMA forma,
- * para que el cliente pinte resultados en el mismo grid.
- *
- * Devuelve los campos que el wizard necesita para mostrar Y para guardar:
- *  - titles: { id, media_type, title, poster_path, image }
+ * Pelis y series van SEPARADAS (pasos distintos del wizard):
+ *  - movieTitles / tvTitles: { id, media_type, title, poster_path, image }
  *  - people: { id, name, profile_path, image }
  * (`image` = URL w342 lista para <img>; los demás campos se persisten en taste.)
+ *
+ * Sin `q`: tendencias de la semana (cine, TV y personas). Con `q` (>=2):
+ * búsqueda en vivo (TMDB /search/multi) repartida por media_type. Mismas
+ * llamadas TMDB que antes (getTrending movie+tv + getTrendingPeople).
  *
  * Patrón de endpoint como avatar-options.ts: prerender=false, guard locals.user.
  */
@@ -47,7 +46,7 @@ const toPerson = (raw: RawMedia): PersonOpt => ({
 });
 
 export const GET: APIRoute = async ({ locals, url }) => {
-    if (!locals.user) return json({ titles: [], people: [] }, 401);
+    if (!locals.user) return json({ movieTitles: [], tvTitles: [], people: [] }, 401);
 
     const q = (url.searchParams.get('q') || '').trim();
 
@@ -58,16 +57,19 @@ export const GET: APIRoute = async ({ locals, url }) => {
                 query: q, page: '1', include_adult: 'false',
             }).catch(() => ({ results: [] }));
 
-            const titles: TitleOpt[] = [];
+            const movieTitles: TitleOpt[] = [];
+            const tvTitles: TitleOpt[] = [];
             const people: PersonOpt[] = [];
             for (const raw of data.results || []) {
-                if ((raw.media_type === 'movie' || raw.media_type === 'tv') && raw.poster_path) {
-                    titles.push(toTitle(raw, raw.media_type));
-                } else if (raw.media_type === 'person' && raw.profile_path) {
-                    people.push(toPerson(raw));
-                }
+                if (raw.media_type === 'movie' && raw.poster_path) movieTitles.push(toTitle(raw, 'movie'));
+                else if (raw.media_type === 'tv' && raw.poster_path) tvTitles.push(toTitle(raw, 'tv'));
+                else if (raw.media_type === 'person' && raw.profile_path) people.push(toPerson(raw));
             }
-            return json({ titles: titles.slice(0, CAP_TITLES), people: people.slice(0, CAP_PEOPLE) });
+            return json({
+                movieTitles: movieTitles.slice(0, CAP_TITLES),
+                tvTitles: tvTitles.slice(0, CAP_TITLES),
+                people: people.slice(0, CAP_PEOPLE),
+            });
         }
 
         // ── Tendencias (grids iniciales) ──────────────────────────────────
@@ -77,19 +79,12 @@ export const GET: APIRoute = async ({ locals, url }) => {
             getTrendingPeople('week').catch(() => []),
         ]);
 
-        // Interleave pelis/series para variedad visual; solo con póster.
-        const mt = movies.filter((m) => m.poster_path).map((m) => toTitle(m, 'movie'));
-        const tt = series.filter((s) => s.poster_path).map((s) => toTitle(s, 'tv'));
-        const titles: TitleOpt[] = [];
-        for (let i = 0; i < Math.max(mt.length, tt.length) && titles.length < CAP_TITLES; i++) {
-            if (mt[i]) titles.push(mt[i]);
-            if (tt[i]) titles.push(tt[i]);
-        }
-
+        const movieTitles = movies.filter((m) => m.poster_path).slice(0, CAP_TITLES).map((m) => toTitle(m, 'movie'));
+        const tvTitles = series.filter((s) => s.poster_path).slice(0, CAP_TITLES).map((s) => toTitle(s, 'tv'));
         const people = ppl.slice(0, CAP_PEOPLE).map(toPerson);
-        return json({ titles: titles.slice(0, CAP_TITLES), people });
+        return json({ movieTitles, tvTitles, people });
     } catch (err) {
         console.error('[api/taste/options] error:', (err as Error).message);
-        return json({ titles: [], people: [] });
+        return json({ movieTitles: [], tvTitles: [], people: [] });
     }
 };
