@@ -359,6 +359,16 @@
             location.reload();
         }
 
+        // Tras autenticarse: el replay del gating SIEMPRE manda (si había una
+        // acción pendiente, se completa). Si no la hay y es una cuenta NUEVA,
+        // arranca el onboarding de gustos (Fase F · Acceso A). Resto → reload.
+        function afterAuth(res: { isNewUser?: boolean }) {
+            let pending: string | null = null;
+            try { pending = sessionStorage.getItem('yf_pending_action'); } catch { /* noop */ }
+            if (res.isNewUser && !pending) { location.href = '/gustos?welcome=1'; return; }
+            completeOrReload();
+        }
+
         // ---- disparadores globales ----
         document.addEventListener('click', (e) => {
             const t = e.target as HTMLElement;
@@ -434,7 +444,7 @@
             setLoading(true);
             const a = await getActions();
             const res = await a.loginGoogle();
-            if (res.ok) completeOrReload();
+            if (res.ok) afterAuth(res);
             else { showMsg(res.error); setLoading(false); }
         });
 
@@ -450,7 +460,7 @@
             setLoading(true);
             const a = await getActions();
             const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
-            if (res.ok) completeOrReload();
+            if (res.ok) afterAuth(res);
             else { showMsg(res.error); setLoading(false); }
         });
 

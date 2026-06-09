@@ -26,6 +26,11 @@ const {
     ogImage = "/og-image.png",
     ogType = "website",
 } = Astro.props;
+
+// Pista post-guardado (Fase F · Acceso C): elegible si hay sesión y el usuario
+// NO ha completado el onboarding (undefined o 'skipped' → se le puede invitar;
+// 'done' → no molestar). El JS decide cuándo mostrarla (tras guardar, 1 vez).
+const tasteHintEligible = !!Astro.locals.user && Astro.locals.user.onboarding !== 'done';
 ---
 <!DOCTYPE html>
 <html lang="es">
@@ -61,7 +66,7 @@ const {
     <meta property="og:type" content={ogType}/>
     <title>{title}</title>
 </head>
-<body id="top" class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins">
+<body id="top" class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins" data-taste-hint={tasteHintEligible ? 'eligible' : ''}>
 <a href="#content" class="skip-link">Saltar al contenido</a>
 <Header/>
 <CommandPalette/>

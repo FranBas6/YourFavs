@@ -14,6 +14,7 @@ export interface UserProfile {
     language?: string;          // p.ej. 'es-ES'
     theme?: 'light' | 'dark' | 'system';
     email?: string;             // espejo del email (informativo)
+    onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     updated_at?: unknown;
 }
 

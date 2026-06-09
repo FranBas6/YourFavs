@@ -1,9 +1,9 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch, tmdbFetchList } from '../services/API/shared/tmdbClient';
+import { getTrending } from '../services/API/shared/tmdbDiscoverService';
 import { calculateGenrePreferences } from './genrePreferences';
 import { getCached, setCached, invalidateCached } from './recsBlobCache';
-import { getMovieFav, getLikedMovies, getMoviesVistas } from '../services/BD/movies/yourfavsMovie';
-import { getSerieFav, getLikedSeries, getSeriesSiguiendo, getSeriesVistas } from '../services/BD/series/yourfavsSerie';
+import { getCurrentUid } from '../services/BD/shared/userScope';
 
 export interface SeedInfo {
     id: string;
@@ -29,10 +29,10 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v6';
+const BLOB_KEY = 'personalRecs_v7';     // v7: semillas favs+taste, keyed por uid, fallback a tendencias
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
-let cache: { data: PersonalRecResult; expires: number } | null = null;
+const l1 = new Map<string, { data: PersonalRecResult; expires: number }>();
 
 function deserializeRecs(s: SerializedRecs): PersonalRecResult {
     return {
@@ -54,36 +54,19 @@ function serializeRecs(r: PersonalRecResult): SerializedRecs {
     };
 }
 
-const SEED_WEIGHT_FAVS = 2;
-const SEED_WEIGHT_LIKE = 1.5;
-const SEED_WEIGHT_SIGUIENDO = 1.5;
-// Tu nota: lo que TÚ puntuaste alto pesa extra (aditivo: un fav con nota 9 suma
-// 2 + 1.75). Entre favs (2) y like (1.5) para no destronar a favoritos sin nota.
-const SEED_WEIGHT_RATING = 1.75;
-const RATING_SEED_MIN = 8;
 const SEED_LIMIT = 6;
 const RESULT_LIMIT = 20;
 // E: filtro vote_count mínimo para cortar nicho obscuro (pelis más exigente que series).
 const MIN_VOTE_COUNT_MOVIE = 300;
 const MIN_VOTE_COUNT_TV = 150;
 // H: cap por seed → 1 seed nicho no puede monopolizar el pool con 10 recos cerradas.
-// Asimétrico: series 6 (biblioteca ecléctica, necesita más muestras para que haya solape
-// entre seeds dispares); pelis 3 (universo más cohesivo, basta con top-rated por seed).
 const MAX_ITEMS_PER_SEED_MOVIE = 3;
 const MAX_ITEMS_PER_SEED_TV = 6;
-
-function setSum(map: Map<string, number>, items: { id: string }[], weight: number) {
-    for (const it of items) {
-        map.set(it.id, (map.get(it.id) ?? 0) + weight);
-    }
-}
 
 const AFFINITY_BOOST_SCALE = 2;
 
 /**
  * Filtra candidatos que tocan al menos 1 género top y boostea por afinidad ponderada.
- * Boost = (Σ peso_real_género_usuario) / nº_géneros_seed / max_peso → 0..1 × scale.
- * Penaliza seeds multi-etiqueta (anime/familia) frente a seeds limpios en géneros top.
  */
 function filterByGenreAffinity(
     entries: Array<[string, number]>,
@@ -112,8 +95,6 @@ function filterByGenreAffinity(
 
 /**
  * Si dos candidatos tienen el mismo set ordenado de géneros, mantener solo el de mayor peso.
- * Mata cosas tipo "3 Guardianes de la Galaxia con [Sci-Fi, Aventura, Acción]" → solo el mejor.
- * Empuja diversidad sin fetch extra.
  */
 function diversifyByGenreProfile(
     items: Array<[string, number, number[]]>,
@@ -139,53 +120,41 @@ function topSeedsFiltered(
         .map(([id, weight, genres]) => ({ id, weight, genres }));
 }
 
+/** Cuando no hay semillas ni género (usuario sin favs ni onboarding): tendencias. */
+async function trendingFallback(
+    mediaType: 'movie' | 'tv',
+    libIds: Set<string>,
+    minVotes: number,
+): Promise<any[]> {
+    const list = await getTrending<any>(mediaType, 'week').catch(() => [] as any[]);
+    return list
+        .filter((m) => !libIds.has(String(m.id)) && (m.vote_count ?? 0) >= minVotes)
+        .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
+        .slice(0, RESULT_LIMIT)
+        .map((m) => ({ ...m, _recScore: 0, _recSources: 0, _fallback: true }));
+}
+
 export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
+    const uidKey = getCurrentUid() ?? 'guest';
+    const blobKey = `${BLOB_KEY}:${uidKey}`;
     const now = Date.now();
-    if (cache && cache.expires > now) return cache.data;
+
+    const hit = l1.get(uidKey);
+    if (hit && hit.expires > now) return hit.data;
 
     // L2: si la Lambda es fría pero hay un cómputo reciente en Blobs, lo usamos.
-    const cachedL2 = await getCached<SerializedRecs>(BLOB_KEY);
+    const cachedL2 = await getCached<SerializedRecs>(blobKey);
     if (cachedL2) {
         const data = deserializeRecs(cachedL2);
-        cache = { data, expires: now + L1_TTL_MS };
+        l1.set(uidKey, { data, expires: now + L1_TTL_MS });
         return data;
     }
 
     const prefs = await calculateGenrePreferences();
 
-    const [movFavs, movLike, movVistas, tvFavs, tvLike, tvSig, tvVistas] = await Promise.all([
-        getMovieFav(), getLikedMovies(), getMoviesVistas(),
-        getSerieFav(), getLikedSeries(), getSeriesSiguiendo(), getSeriesVistas(),
-    ]);
-
-    const movieMap = new Map<string, number>();
-    setSum(movieMap, movFavs as any, SEED_WEIGHT_FAVS);
-    setSum(movieMap, movLike as any, SEED_WEIGHT_LIKE);
-
-    const tvMap = new Map<string, number>();
-    setSum(tvMap, tvFavs as any, SEED_WEIGHT_FAVS);
-    setSum(tvMap, tvLike as any, SEED_WEIGHT_LIKE);
-    setSum(tvMap, tvSig as any, SEED_WEIGHT_SIGUIENDO);
-
-    // Semilla por "Tu nota": cualquier título puntuado >= RATING_SEED_MIN en
-    // cualquiera de las listas entra (o se refuerza) como seed. Dedup por id:
-    // los tiers son excluyentes, pero por si un doc viviera en dos listas.
-    const highRated = (lists: any[][]) => {
-        const seen = new Set<string>();
-        const out: { id: string }[] = [];
-        for (const list of lists) for (const d of list) {
-            if (typeof d.rating === 'number' && d.rating >= RATING_SEED_MIN && !seen.has(String(d.id))) {
-                seen.add(String(d.id));
-                out.push({ id: String(d.id) });
-            }
-        }
-        return out;
-    };
-    setSum(movieMap, highRated([movFavs as any, movLike as any, movVistas as any]), SEED_WEIGHT_RATING);
-    setSum(tvMap, highRated([tvFavs as any, tvLike as any, tvSig as any, tvVistas as any]), SEED_WEIGHT_RATING);
-
-    const movieEntries = Array.from(movieMap.entries());
-    const tvEntries = Array.from(tvMap.entries());
+    // Semillas = favoritos + títulos del onboarding (ya calculadas en prefs, sin re-leer BD).
+    const movieEntries = prefs.seeds.movies;
+    const tvEntries = prefs.seeds.tv;
 
     const movieFiltered = filterByGenreAffinity(movieEntries, prefs.genresById.movies, prefs.movies.topGenres, prefs.movies.weighted);
     const tvFiltered = filterByGenreAffinity(tvEntries, prefs.genresById.tv, prefs.tv.topGenres, prefs.tv.weighted);
@@ -193,8 +162,7 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const movieDiversified = diversifyByGenreProfile(movieFiltered);
     const tvDiversified = diversifyByGenreProfile(tvFiltered);
 
-    // Completar hasta SEED_LIMIT: diversified como prioridad, rellenar con los descartados
-    // (incluyendo perfiles duplicados o sin afinidad) si no llegamos al límite.
+    // Completar hasta SEED_LIMIT: diversified como prioridad, rellenar con los descartados.
     function completeSeeds(
         primary: Array<[string, number, number[]]>,
         all: Array<[string, number]>,
@@ -222,8 +190,6 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const tvAgg = new Map<string, Agg>();
 
     // Discover endurecido por géneros top: corre EN PARALELO con recommendations.
-    // Sus resultados se mergean al pool con score base bajo (DISCOVER_BOOST), boosteando
-    // candidatos que ya venían de seeds y rellenando el long tail con joyas del género.
     const movieGenresParam = prefs.movies.topGenres.join('|');
     const tvGenresParam = prefs.tv.topGenres.join('|');
     const discoverMoviePromise = movieGenresParam
@@ -282,9 +248,8 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         discoverTvPromise,
     ]);
 
-    // Booster conservador: candidatos que solo vienen de discover entran con score 0.5 y
-    // sources 0, así nunca superan a un seed real en el ranking; los que coinciden con un
-    // seed reciben +0.5 al score (sources no se incrementa: solo seeds cuentan como fuente).
+    // Booster conservador: candidatos solo-discover entran con score bajo; los que coinciden
+    // con un seed reciben +0.5 (sources no se incrementa: solo seeds cuentan como fuente).
     const DISCOVER_BOOST = 0.5;
     for (const m of discoverMoviesList) {
         const k = String(m.id);
@@ -304,8 +269,6 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     }
 
     // I: score híbrido. sources×1.5 + score×0.5 + (rating/10)×2.
-    // sources sigue siendo la señal dominante, pero rating evita que pelis 2-seeds mediocres
-    // entierren a pelis 1-seed con rating excepcional (Matrix ⭐8.2 vs Tomb Raider ⭐6.4).
     const hybridScore = (a: Agg) =>
         a.sources * 1.5 + a.score * 0.5 + ((a.item.vote_average ?? 0) / 10) * 2;
     const sortAgg = (m: Map<string, Agg>) => Array.from(m.values())
@@ -317,9 +280,17 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         .slice(0, RESULT_LIMIT)
         .map(r => ({ ...r.item, _recScore: r.score, _recSources: r.sources }));
 
+    let movies = sortAgg(movieAgg);
+    let tv = sortAgg(tvAgg);
+
+    // Fallback: sin semillas ni género (usuario nuevo sin favs ni onboarding) el pool queda
+    // vacío → mostramos tendencias en vez de un hueco. También cubre cobertura parcial.
+    if (movies.length === 0) movies = await trendingFallback('movie', prefs.libraryIds.movies, MIN_VOTE_COUNT_MOVIE);
+    if (tv.length === 0) tv = await trendingFallback('tv', prefs.libraryIds.tv, MIN_VOTE_COUNT_TV);
+
     const data: PersonalRecResult = {
-        movies: sortAgg(movieAgg),
-        tv: sortAgg(tvAgg),
+        movies,
+        tv,
         seedsMovies: movieSeeds,
         seedsTv: tvSeeds,
         libraryIds: prefs.libraryIds,
@@ -329,12 +300,13 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         },
     };
 
-    cache = { data, expires: now + L1_TTL_MS };
-    setCached(BLOB_KEY, serializeRecs(data), L2_TTL_MS).catch(() => {});
+    l1.set(uidKey, { data, expires: now + L1_TTL_MS });
+    setCached(blobKey, serializeRecs(data), L2_TTL_MS).catch(() => {});
     return data;
 }
 
 export function invalidatePersonalRecsCache() {
-    cache = null;
-    invalidateCached(BLOB_KEY).catch(() => {});
+    const uidKey = getCurrentUid() ?? 'guest';
+    l1.delete(uidKey);
+    invalidateCached(`${BLOB_KEY}:${uidKey}`).catch(() => {});
 }

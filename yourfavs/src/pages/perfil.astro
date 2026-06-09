@@ -1,7 +1,10 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import { getUserProfile, setUserProfile, type UserProfile } from "../services/BD/profile/userProfile";
+import { getUserTaste, clearUserTaste } from "../services/BD/profile/userTaste";
 import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
+import { genresMap } from "../utils/constants/genres";
+import { posterUrl } from "../services/API/shared/tmdbClient";
 
 // Protegida por el middleware (/mislistas/* sin sesión → redirige). Aquí ya hay user.
 const user = Astro.locals.user!;
@@ -36,10 +39,30 @@ if (Astro.request.method === 'POST') {
         await setUserProfile(patch);
         return Astro.redirect('/perfil?saved=1');
     }
+    if (postAction === 'reset_taste') {
+        await clearUserTaste();
+        // Los gustos alimentan el motor → invalidar cachés (de este uid).
+        try {
+            const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
+                import('../utils/genrePreferences'),
+                import('../utils/personalRecommendations'),
+            ]);
+            invalidateGenrePreferencesCache();
+            invalidatePersonalRecsCache();
+        } catch { /* la caché caduca sola igualmente */ }
+        return Astro.redirect('/perfil?saved=1');
+    }
 }
 
 const profile = (await getUserProfile()) ?? {};
 const saved = Astro.url.searchParams.get('saved') === '1';
+
+// Gustos (Fase F · Acceso B): resumen para la sección "Tus gustos".
+const taste = await getUserTaste();
+const tasteGenres = (taste?.genres ?? []).map((id) => genresMap[id]).filter(Boolean);
+const tasteTitles = taste?.titles ?? [];
+const tastePeople = taste?.people ?? [];
+const hasTaste = tasteGenres.length > 0 || tasteTitles.length > 0 || tastePeople.length > 0;
 
 const displayName = profile.display_name || user.name || (user.email ? user.email.split('@')[0] : 'Tú');
 const region = profile.region || 'ES';
@@ -128,6 +151,70 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                 <button type="submit" class="perfil-save">Guardar cambios</button>
             </div>
         </form>
+
+        <!-- Tus gustos (Fase F · Acceso B) -->
+        <section class="perfil-card">
+            <div class="perfil-taste-head">
+                <div>
+                    <h2 class="perfil-h2">Tus gustos</h2>
+                    <p class="perfil-muted">Lo que usamos para personalizar tus recomendaciones «Para ti».</p>
+                </div>
+                <a href="/gustos" class="perfil-avatar-btn">{hasTaste ? 'Editar' : 'Configurar'}</a>
+            </div>
+
+            {hasTaste ? (
+                <div class="perfil-taste-grid">
+                    {tasteGenres.length > 0 && (
+                        <div class="perfil-taste-cell">
+                            <div class="perfil-taste-cell-h">Géneros <span>{tasteGenres.length}</span></div>
+                            <div class="perfil-taste-chips">
+                                {tasteGenres.map((g) => <span class="perfil-taste-chip">{g}</span>)}
+                            </div>
+                        </div>
+                    )}
+                    {tasteTitles.length > 0 && (
+                        <div class="perfil-taste-cell">
+                            <div class="perfil-taste-cell-h">Títulos <span>{tasteTitles.length}</span></div>
+                            <div class="perfil-taste-posters">
+                                {tasteTitles.map((t) => (
+                                    t.poster_path
+                                        ? <img src={posterUrl(t.poster_path, 'w92')} alt={t.title} title={t.title} loading="lazy" />
+                                        : <span class="perfil-taste-noimg" title={t.title}>{t.title.slice(0, 2)}</span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {tastePeople.length > 0 && (
+                        <div class="perfil-taste-cell">
+                            <div class="perfil-taste-cell-h">Actores <span>{tastePeople.length}</span></div>
+                            <div class="perfil-taste-people">
+                                {tastePeople.map((p) => (
+                                    p.profile_path
+                                        ? <img src={posterUrl(p.profile_path, 'w92')} alt={p.name} title={p.name} loading="lazy" />
+                                        : <span class="perfil-taste-noimg round" title={p.name}>{p.name.slice(0, 1)}</span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    <div class="perfil-taste-foot">
+                        <span>«Editar» reabre el mismo flujo, ya prerrellenado.</span>
+                        <button type="button" class="perfil-taste-reset" id="taste-reset">Reiniciar gustos</button>
+                    </div>
+                </div>
+            ) : (
+                <p class="perfil-muted">Aún no nos has contado tus gustos. <a href="/gustos" class="perfil-taste-link">Cuéntanoslos →</a> y «Para ti» arrancará personalizado.</p>
+            )}
+        </section>
+        <form method="POST" id="taste-reset-form" hidden>
+            <input type="hidden" name="action" value="reset_taste" />
+        </form>
+        <script>
+            document.getElementById('taste-reset')?.addEventListener('click', () => {
+                if (confirm('¿Reiniciar tus gustos? Se borrarán los géneros, títulos y actores elegidos. Podrás volver a configurarlos.')) {
+                    (document.getElementById('taste-reset-form') as HTMLFormElement)?.submit();
+                }
+            });
+        </script>
 
         <!-- Calendario ICS -->
         <section class="perfil-card">
@@ -251,6 +338,37 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
         font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
     }
     .perfil-avatar-btn:hover { border-color: var(--border-strong); color: var(--text); }
+
+    /* Tus gustos (Fase F) */
+    .perfil-taste-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+    .perfil-taste-head .perfil-h2 { margin-bottom: 4px; }
+    .perfil-taste-head .perfil-muted { margin: 0; }
+    .perfil-taste-head .perfil-avatar-btn { align-self: center; text-decoration: none; white-space: nowrap; }
+    .perfil-taste-grid { display: flex; flex-direction: column; gap: 16px; }
+    .perfil-taste-cell-h { font-size: 12px; font-weight: 700; color: var(--text-2); margin-bottom: 9px; display: flex; align-items: center; gap: 7px; }
+    .perfil-taste-cell-h span { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--accent); }
+    .perfil-taste-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .perfil-taste-chip { padding: 5px 11px; border-radius: var(--r-full); background: var(--bg-tint); border: 1px solid var(--border); font-size: 12.5px; color: var(--text-2); }
+    .perfil-taste-posters, .perfil-taste-people { display: flex; flex-wrap: wrap; gap: 8px; }
+    .perfil-taste-posters img { width: 46px; height: 69px; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--border); display: block; }
+    .perfil-taste-people img { width: 48px; height: 48px; object-fit: cover; border-radius: var(--r-full); border: 1px solid var(--border); display: block; }
+    .perfil-taste-noimg {
+        width: 46px; height: 69px; display: inline-flex; align-items: center; justify-content: center;
+        background: var(--bg-tint); border: 1px solid var(--border); border-radius: var(--r-sm);
+        font-size: 13px; font-weight: 700; color: var(--text-3);
+    }
+    .perfil-taste-noimg.round { width: 48px; height: 48px; border-radius: var(--r-full); }
+    .perfil-taste-foot {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+        padding-top: 14px; border-top: 1px solid var(--border); font-size: 12.5px; color: var(--text-3);
+    }
+    .perfil-taste-reset {
+        background: none; border: 1px solid var(--border); color: var(--text-3);
+        padding: 7px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: inherit;
+    }
+    .perfil-taste-reset:hover { color: #ef4444; border-color: rgba(239, 68, 68, .3); }
+    .perfil-taste-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+    .perfil-taste-link:hover { text-decoration: underline; }
 
     /* Modal de avatar */
     .av-overlay {

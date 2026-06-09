@@ -15,11 +15,15 @@ import {
     sendPasswordResetEmail,
     signOut,
     onAuthStateChanged,
+    getAdditionalUserInfo,
     type AuthError,
+    type UserCredential,
 } from 'firebase/auth';
 import { clientAuth, googleProvider, syncSessionCookie } from './firebaseAuthClient';
 
-export type AuthResult = { ok: true } | { ok: false; error: string };
+// `isNewUser`: cuenta recién creada (registro). La usa el modal para llevar al
+// onboarding de gustos solo en el primer acceso (Fase F · Acceso A).
+export type AuthResult = { ok: true; isNewUser?: boolean } | { ok: false; error: string };
 
 /** Traduce los códigos de error de Firebase Auth a mensajes en español. */
 export function mapAuthError(code: string | undefined): string {
@@ -55,15 +59,18 @@ export function mapAuthError(code: string | undefined): string {
 
 // Tras un login correcto en el client SDK, emitimos la cookie de sesión del
 // servidor. Si eso falla, la sesión no quedaría reconocida por el SSR.
-async function finishLogin(): Promise<AuthResult> {
+async function finishLogin(isNewUser = false): Promise<AuthResult> {
     const ok = await syncSessionCookie();
-    return ok ? { ok: true } : { ok: false, error: 'No se pudo crear la sesión. Inténtalo de nuevo.' };
+    return ok ? { ok: true, isNewUser } : { ok: false, error: 'No se pudo crear la sesión. Inténtalo de nuevo.' };
 }
 
 export async function loginGoogle(): Promise<AuthResult> {
     try {
-        await signInWithPopup(clientAuth, googleProvider);
-        return await finishLogin();
+        const cred: UserCredential = await signInWithPopup(clientAuth, googleProvider);
+        // Google sirve tanto para entrar como para registrarse: si la cuenta es
+        // nueva, también arranca el onboarding.
+        const isNewUser = getAdditionalUserInfo(cred)?.isNewUser ?? false;
+        return await finishLogin(isNewUser);
     } catch (e) {
         return { ok: false, error: mapAuthError((e as AuthError).code) };
     }
@@ -72,7 +79,7 @@ export async function loginGoogle(): Promise<AuthResult> {
 export async function loginEmail(email: string, password: string): Promise<AuthResult> {
     try {
         await signInWithEmailAndPassword(clientAuth, email, password);
-        return await finishLogin();
+        return await finishLogin(false);
     } catch (e) {
         return { ok: false, error: mapAuthError((e as AuthError).code) };
     }
@@ -81,7 +88,7 @@ export async function loginEmail(email: string, password: string): Promise<AuthR
 export async function registerEmail(email: string, password: string): Promise<AuthResult> {
     try {
         await createUserWithEmailAndPassword(clientAuth, email, password);
-        return await finishLogin();
+        return await finishLogin(true);
     } catch (e) {
         return { ok: false, error: mapAuthError((e as AuthError).code) };
     }

@@ -6,6 +6,7 @@ interface SessionUser {
     name: string | null;
     picture: string | null;
     region?: string;   // preferencia del perfil (para el menú de cuenta)
+    onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
 }
 
 declare namespace App {

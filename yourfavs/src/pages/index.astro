@@ -10,6 +10,8 @@ import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCat
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
+import RecommendedForYou from "../components/Sections/RecommendedForYou.astro";
+import { getForYouRecommendations } from "../services/API/shared/forYouRecommendations";
 import WhatToWatch from "../components/personal/WhatToWatch.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import { Icon } from 'astro-icon/components';
@@ -42,6 +44,7 @@ const [
     categoriesMovies,
     categoriesSeries,
     continueWatching,
+    forYou,
 ] = await Promise.all([
     safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
     safeFetch(getTrending<Serie>('tv', 'week'), 'home/trendingSeries', [] as Serie[]),
@@ -55,6 +58,11 @@ const [
     safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
     safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
     safeFetch(getNextEpisodesData(), 'home/continueWatching', [] as any[]),
+    // "Para ti": solo con sesión. Cacheado por uid (L1/L2) y wrapeado en safeFetch:
+    // si el cómputo falla/tarda en frío, la home renderiza sin esta sección.
+    Astro.locals.user
+        ? safeFetch(getForYouRecommendations(12), 'home/forYou', [] as any[])
+        : Promise.resolve([] as any[]),
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
@@ -178,6 +186,13 @@ const sections = [
         {continueWatching.length > 0 && (
             <div class="content-wrapper">
                 <NextEpisode items={continueWatching} />
+            </div>
+        )}
+
+        <!-- Para ti: recomendaciones personalizadas (taste + favoritos). Solo con sesión. -->
+        {forYou.length > 0 && (
+            <div class="content-wrapper">
+                <RecommendedForYou items={forYou} />
             </div>
         )}
 

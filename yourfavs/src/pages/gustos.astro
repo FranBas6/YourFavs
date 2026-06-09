@@ -1,0 +1,511 @@
+---
+/**
+ * /gustos — Onboarding de gustos (Fase F). UNA pantalla, tres accesos:
+ *   A) tras registro (?welcome=1 muestra la bienvenida inline antes de los pasos),
+ *   B) "Editar" desde el perfil (prerrellenado leyendo el taste actual),
+ *   C) la pista post-guardado enlaza aquí.
+ *
+ * Wizard de 3 pasos: géneros (estáticos) · títulos · actores (opcional).
+ * Reglas mín 3 / máx 10 por paso. Móvil: tarjeta a ancho completo.
+ */
+import Layout from "../layouts/Layout.astro";
+import { getUserTaste } from "../services/BD/profile/userTaste";
+import { genresMap } from "../utils/constants/genres";
+
+// Onboarding es para usuarios con sesión. (Esta ruta no está en el guard del
+// middleware, así que protegemos aquí.)
+if (!Astro.locals.user) return Astro.redirect('/');
+
+const welcome = Astro.url.searchParams.get('welcome') === '1';
+const taste = (await getUserTaste()) ?? { genres: [], titles: [], people: [] };
+
+// Géneros curados (subconjunto con buena señal de gusto; IDs reales de TMDB).
+const GENRE_IDS = [18, 878, 35, 53, 28, 27, 10749, 16, 80, 14, 99, 9648, 12, 10752, 10751, 10402, 36, 37];
+const genres = GENRE_IDS.map((id) => ({ id, name: genresMap[id] })).filter((g) => g.name);
+const selectedGenres = new Set(taste.genres ?? []);
+
+// Prefill para el cliente (títulos/personas ya elegidos).
+const prefill = { titles: taste.titles ?? [], people: taste.people ?? [] };
+---
+<Layout title="Tus gustos — YourFavs">
+    <div class="tw-shell">
+        <div class="tw-card">
+            <!-- Cabecera: pasos + omitir -->
+            <div class="tw-head" data-tw-head hidden={welcome}>
+                <div class="tw-dots">
+                    <span class="tw-dot" data-dot="1"></span>
+                    <span class="tw-dot" data-dot="2"></span>
+                    <span class="tw-dot" data-dot="3"></span>
+                    <span class="tw-step-num" data-step-num>1/3</span>
+                </div>
+                <button type="button" class="tw-skip" data-tw-skip>Omitir por ahora</button>
+            </div>
+
+            <!-- Paso 0 · Bienvenida (solo ?welcome=1) -->
+            <section class="tw-step tw-center" data-step="0" hidden={!welcome}>
+                <span class="tw-hero-ic">✨</span>
+                <p class="tw-kicker">Bienvenido a YourFavs</p>
+                <h1 class="tw-title-xl">¿Personalizamos tu inicio?</h1>
+                <p class="tw-lead">Cuéntanos qué te gusta en <strong>menos de un minuto</strong> y tu sección «Para ti» arrancará llena, no vacía.</p>
+                <div class="tw-cta-row">
+                    <button type="button" class="tw-btn tw-btn-primary" data-tw-begin>Empezar →</button>
+                    <button type="button" class="tw-btn tw-btn-ghost" data-tw-skip>Ahora no</button>
+                </div>
+                <p class="tw-fineprint">Podrás hacerlo más tarde desde tu perfil</p>
+            </section>
+
+            <!-- Paso 1 · Géneros -->
+            <section class="tw-step" data-step="1" hidden>
+                <div class="tw-step-head">
+                    <h2 class="tw-h2">¿Qué géneros te gustan?</h2>
+                    <span class="tw-count" data-count="genres">0 / 10</span>
+                </div>
+                <p class="tw-sub">Elige al menos 3. Nos ayuda a entender por dónde empezar con tus recomendaciones.</p>
+                <div class="tw-chips" data-tw-genres>
+                    {genres.map((g) => (
+                        <button type="button" class:list={["tw-chip", selectedGenres.has(g.id) && "is-on"]} data-genre-id={g.id}>
+                            <span class="tw-chip-check">✓</span>{g.name}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            <!-- Paso 2 · Títulos -->
+            <section class="tw-step" data-step="2" hidden>
+                <div class="tw-step-head">
+                    <h2 class="tw-h2">Marca lo que te encanta</h2>
+                    <span class="tw-count" data-count="titles">0 / 10</span>
+                </div>
+                <p class="tw-sub">Películas y series que te gustan. Da igual si ya las viste — nos dicen qué recomendarte.</p>
+                <input type="search" class="tw-search" data-search="titles" placeholder="Buscar una película o serie…" autocomplete="off" />
+                <div class="tw-grid tw-grid-titles" data-grid="titles"><p class="tw-state">Cargando tendencias…</p></div>
+            </section>
+
+            <!-- Paso 3 · Actores (opcional) -->
+            <section class="tw-step" data-step="3" hidden>
+                <div class="tw-step-head">
+                    <h2 class="tw-h2">Actores y directores</h2>
+                    <span class="tw-count" data-count="people">0 / 10</span>
+                </div>
+                <p class="tw-sub">Opcional. Sigue a quienes te interesan y afinamos tus recomendaciones. Puedes saltar este paso.</p>
+                <input type="search" class="tw-search" data-search="people" placeholder="Buscar una persona…" autocomplete="off" />
+                <div class="tw-grid tw-grid-people" data-grid="people"><p class="tw-state">Cargando tendencias…</p></div>
+            </section>
+
+            <!-- Paso 4 · Confirmación -->
+            <section class="tw-step tw-center" data-step="4" hidden>
+                <span class="tw-hero-ic tw-ok">✓</span>
+                <h1 class="tw-title-xl">¡Listo, ya te conocemos!</h1>
+                <p class="tw-lead">Tu sección <strong>Para ti</strong> ya está personalizada con tus gustos. Puedes ajustarlos cuando quieras desde tu perfil.</p>
+                <div class="tw-cta-row">
+                    <a href="/" class="tw-btn tw-btn-primary">Ver mi inicio →</a>
+                </div>
+            </section>
+
+            <!-- Pie: navegación -->
+            <div class="tw-foot" data-tw-foot hidden={welcome}>
+                <button type="button" class="tw-btn tw-btn-ghost" data-tw-back hidden>← Atrás</button>
+                <span class="tw-minnote" data-minnote>Mínimo 3 · máximo 10</span>
+                <button type="button" class="tw-link" data-tw-skipstep hidden>Saltar y finalizar</button>
+                <button type="button" class="tw-btn tw-btn-primary" data-tw-next disabled>Continuar →</button>
+            </div>
+            <p class="tw-msg" data-tw-msg hidden></p>
+        </div>
+    </div>
+</Layout>
+
+<!--
+  is:global a propósito: los grids de títulos/personas se crean por JS con
+  innerHTML, y los estilos scoped de Astro NO alcanzan a elementos creados en
+  cliente (no llevan el data-astro-cid). Todas las clases van con prefijo `tw-`
+  y se acotan a .tw-shell/.tw-card, así que no se filtran a otras páginas.
+-->
+<style is:global>
+    /* `hidden` debe ganar a los display:flex de abajo (header/footer y pasos
+       centrados), si no se solapan la bienvenida y la confirmación. */
+    .tw-card [hidden] { display: none !important; }
+
+    .tw-shell { max-width: 760px; margin: 0 auto; }
+    .tw-card {
+        background: var(--bg-elev); border: 1px solid var(--border);
+        border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+        display: flex; flex-direction: column; min-height: 60vh; overflow: hidden;
+    }
+
+    /* Cabecera */
+    .tw-head { display: flex; align-items: center; gap: 14px; padding: 16px 22px; border-bottom: 1px solid var(--border); }
+    .tw-dots { display: flex; align-items: center; gap: 8px; }
+    .tw-dot { width: 22px; height: 6px; border-radius: var(--r-full); background: var(--border-strong); transition: background .2s; }
+    .tw-dot.is-on { background: var(--accent); }
+    .tw-step-num { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-left: 4px; }
+    .tw-skip { margin-left: auto; background: none; border: none; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 500; color: var(--text-3); }
+    .tw-skip:hover { color: var(--text-2); }
+
+    /* Cuerpo de paso */
+    .tw-step { padding: 24px 26px; flex: 1; }
+    .tw-step-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+    .tw-h2 { font-size: 23px; font-weight: 700; letter-spacing: -.01em; color: var(--text); margin: 0; }
+    .tw-count { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--accent); flex-shrink: 0; }
+    .tw-sub { font-size: 14px; color: var(--text-3); margin: 0 0 18px; max-width: 560px; }
+    .tw-search {
+        width: 100%; padding: 10px 14px; border-radius: var(--r-full);
+        border: 1px solid var(--border); background: var(--bg-tint); color: var(--text);
+        font-size: 14px; font-family: inherit; margin-bottom: 16px;
+    }
+    .tw-search:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--bg-elev); }
+
+    /* Chips (géneros) */
+    .tw-chips { display: flex; flex-wrap: wrap; gap: 9px; }
+    .tw-chip {
+        display: inline-flex; align-items: center; gap: 0; padding: 10px 16px; border-radius: var(--r-full);
+        font-size: 14px; font-weight: 500; cursor: pointer; font-family: inherit;
+        background: var(--bg-tint); color: var(--text-2); border: 1px solid var(--border); transition: all .12s;
+    }
+    .tw-chip:hover { border-color: var(--border-strong); }
+    .tw-chip:active { transform: scale(.96); }
+    .tw-chip-check { width: 0; overflow: hidden; color: var(--accent); font-weight: 700; transition: width .12s, margin .12s; }
+    .tw-chip.is-on { background: var(--text); color: #fff; border-color: var(--text); }
+    .tw-chip.is-on .tw-chip-check { width: 14px; margin-right: 6px; color: var(--accent); }
+
+    /* Grids (títulos / personas) */
+    .tw-grid { display: grid; gap: 14px; }
+    .tw-grid-titles { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+    .tw-grid-people { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+    .tw-state { grid-column: 1/-1; text-align: center; color: var(--text-3); font-size: 13px; padding: 24px 0; }
+
+    .tw-poster, .tw-person {
+        position: relative; display: block; width: 100%;
+        padding: 0; border: none; background: none; cursor: pointer; font-family: inherit; text-align: left;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .tw-poster-img, .tw-person-img {
+        display: block; width: 100%; position: relative; border-radius: var(--r-md); overflow: hidden;
+        background: var(--bg-tint); border: 2px solid var(--border);
+        transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    }
+    .tw-poster-img { aspect-ratio: 2/3; }
+    .tw-person-img { aspect-ratio: 1; border-radius: var(--r-full); }
+    .tw-poster-img img, .tw-person-img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
+
+    /* Hover: la tarjeta se eleva un poco y la imagen hace un zoom sutil. */
+    .tw-poster:hover .tw-poster-img, .tw-person:hover .tw-person-img {
+        border-color: var(--border-strong); transform: translateY(-3px); box-shadow: var(--sh-md);
+    }
+    .tw-poster:hover .tw-poster-img img, .tw-person:hover .tw-person-img img { transform: scale(1.05); }
+    /* Press: feedback táctil al pulsar. */
+    .tw-poster:active .tw-poster-img, .tw-person:active .tw-person-img { transform: scale(.97); }
+
+    /* Velo de acento sobre lo seleccionado (refuerza el estado "elegido").
+       Va dentro del wrapper con overflow:hidden → respeta la forma (también el círculo). */
+    .tw-poster-img::after, .tw-person-img::after {
+        content: ""; position: absolute; inset: 0; background: var(--accent);
+        opacity: 0; transition: opacity .16s ease; pointer-events: none;
+    }
+    /* El check es hijo del BOTÓN (no del wrapper), así no lo recorta el círculo. */
+    .tw-check {
+        position: absolute; top: 5px; right: 5px; width: 24px; height: 24px; border-radius: var(--r-full);
+        background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 700; border: 2px solid var(--bg-elev); box-shadow: var(--sh-sm);
+        transform: scale(0); transition: transform .2s cubic-bezier(.34, 1.56, .64, 1); z-index: 2;
+    }
+
+    /* Seleccionado: anillo de acento + velo + check pop. */
+    .is-on .tw-poster-img, .is-on .tw-person-img {
+        border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+    .is-on .tw-poster-img::after, .is-on .tw-person-img::after { opacity: .16; }
+    /* En avatares circulares, acercar el check al borde del círculo (no a la esquina). */
+    .tw-person .tw-check { top: 8%; right: 8%; }
+    .is-on .tw-check { transform: scale(1); }
+
+    .tw-label {
+        display: block; font-size: 12px; font-weight: 600; color: var(--text-2); margin-top: 7px;
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: color .16s ease;
+    }
+    .is-on .tw-label { color: var(--accent); }
+    .tw-person .tw-label { text-align: center; }
+
+    /* Pie */
+    .tw-foot { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--border); }
+    .tw-minnote { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-right: auto; transition: color .16s ease; }
+    .tw-minnote.is-ok { color: var(--rating-high); }
+    .tw-link { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-3); }
+    .tw-link:hover { color: var(--accent); }
+    .tw-btn {
+        display: inline-flex; align-items: center; gap: 8px; font-family: inherit;
+        font-size: 14px; font-weight: 700; padding: 11px 20px; border-radius: var(--r-md); cursor: pointer; border: 1px solid transparent;
+    }
+    .tw-btn-primary { background: var(--accent); color: #fff; }
+    .tw-btn-primary:hover { background: var(--accent-dark); }
+    .tw-btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+    .tw-btn-ghost { background: none; color: var(--text-2); border-color: var(--border); }
+    .tw-btn-ghost:hover { border-color: var(--border-strong); }
+
+    /* Pantallas centradas (bienvenida / confirmación) */
+    .tw-center { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 48px 32px; gap: 4px; }
+    .tw-hero-ic { width: 64px; height: 64px; border-radius: var(--r-lg); display: flex; align-items: center; justify-content: center; font-size: 30px; background: var(--accent-soft); margin-bottom: 12px; }
+    .tw-hero-ic.tw-ok { background: var(--stamp-green); color: var(--stamp-green-ink); }
+    .tw-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); margin: 0 0 6px; }
+    .tw-title-xl { font-size: 28px; font-weight: 800; letter-spacing: -.02em; color: var(--text); margin: 0 0 10px; }
+    .tw-lead { font-size: 15px; color: var(--text-3); max-width: 420px; margin: 0 0 22px; }
+    .tw-lead strong { color: var(--text); }
+    .tw-cta-row { display: flex; align-items: center; gap: 12px; }
+    .tw-fineprint { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); margin-top: 16px; }
+    .tw-msg { margin: 0; padding: 10px 22px 16px; color: var(--accent); font-size: 13px; font-weight: 600; text-align: right; }
+
+    @media (max-width: 560px) {
+        .tw-shell { max-width: 100%; }
+        .tw-card { min-height: calc(100vh - 120px); border-radius: 0; border-left: none; border-right: none; box-shadow: none; }
+        .tw-h2 { font-size: 20px; }
+        .tw-grid-titles { grid-template-columns: repeat(3, 1fr); }
+        .tw-grid-people { grid-template-columns: repeat(3, 1fr); }
+    }
+</style>
+
+<script is:inline define:vars={{ prefill, welcome }}>
+(function () {
+    const IMG = (p) => (p ? 'https://image.tmdb.org/t/p/w342' + p : '');
+    const tkey = (t) => t.media_type + ':' + t.id;
+    const MIN = 3, MAX = 10;
+
+    const card = document.querySelector('.tw-card');
+    if (!card) return;
+
+    // Estado de selección
+    const selGenres = new Set();
+    card.querySelectorAll('.tw-chip.is-on').forEach((c) => selGenres.add(Number(c.dataset.genreId)));
+    const selTitles = new Map();
+    (prefill.titles || []).forEach((t) => selTitles.set(tkey(t), t));
+    const selPeople = new Map();
+    (prefill.people || []).forEach((p) => selPeople.set(p.id, p));
+
+    // Diccionarios de datos completos de lo renderizado (para resolver el clic
+    // sin parsear URLs): tkey/id → objeto con poster_path/profile_path, title…
+    const titleData = new Map();
+    (prefill.titles || []).forEach((t) => titleData.set(tkey(t), t));
+    const peopleData = new Map();
+    (prefill.people || []).forEach((p) => peopleData.set(p.id, p));
+
+    // Cachés de tendencias por paso (para volver tras buscar)
+    let trendTitles = null, trendPeople = null;
+    let loadedTitles = false, loadedPeople = false;
+
+    // Refs
+    const dots = card.querySelectorAll('.tw-dot');
+    const stepNum = card.querySelector('[data-step-num]');
+    const backBtn = card.querySelector('[data-tw-back]');
+    const nextBtn = card.querySelector('[data-tw-next]');
+    const skipStep = card.querySelector('[data-tw-skipstep]');
+    const minnote = card.querySelector('[data-minnote]');
+    const head = card.querySelector('[data-tw-head]');
+    const foot = card.querySelector('[data-tw-foot]');
+    const msg = card.querySelector('[data-tw-msg]');
+    const sections = {};
+    card.querySelectorAll('.tw-step').forEach((s) => { sections[s.dataset.step] = s; });
+
+    let step = welcome ? 0 : 1;
+
+    // ── Render de grids ───────────────────────────────────────────────────
+    function titleCard(t) {
+        const on = selTitles.has(tkey(t));
+        const src = t.image || IMG(t.poster_path);
+        return '<button type="button" class="tw-poster' + (on ? ' is-on' : '') + '" data-tkey="' + tkey(t) + '">'
+            + '<span class="tw-poster-img"><img src="' + src + '" alt="" loading="lazy"></span>'
+            + '<span class="tw-check">✓</span>'
+            + '<span class="tw-label">' + escapeHtml(t.title || '') + '</span></button>';
+    }
+    function personCard(p) {
+        const on = selPeople.has(p.id);
+        const src = p.image || IMG(p.profile_path);
+        return '<button type="button" class="tw-person' + (on ? ' is-on' : '') + '" data-pid="' + p.id + '">'
+            + '<span class="tw-person-img"><img src="' + src + '" alt="" loading="lazy"></span>'
+            + '<span class="tw-check">✓</span>'
+            + '<span class="tw-label">' + escapeHtml(p.name || '') + '</span></button>';
+    }
+    function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // `pin`: en la vista de tendencias mostramos los elegidos primero (para que
+    // sigan visibles); en una búsqueda NO, así no contaminamos los resultados con
+    // selecciones ajenas al término buscado (se siguen marcando con tick si salen).
+    function renderTitles(results, pin) {
+        const grid = card.querySelector('[data-grid="titles"]');
+        const merged = new Map();
+        if (pin) selTitles.forEach((t) => merged.set(tkey(t), t));
+        (results || []).forEach((t) => { if (!merged.has(tkey(t))) merged.set(tkey(t), t); });
+        const items = [...merged.values()];
+        items.forEach((t) => titleData.set(tkey(t), t));
+        grid.innerHTML = items.length ? items.map(titleCard).join('') : '<p class="tw-state">Sin resultados.</p>';
+    }
+    function renderPeople(results, pin) {
+        const grid = card.querySelector('[data-grid="people"]');
+        const merged = new Map();
+        if (pin) selPeople.forEach((p) => merged.set(p.id, p));
+        (results || []).forEach((p) => { if (!merged.has(p.id)) merged.set(p.id, p); });
+        const items = [...merged.values()];
+        items.forEach((p) => peopleData.set(p.id, p));
+        grid.innerHTML = items.length ? items.map(personCard).join('') : '<p class="tw-state">Sin resultados.</p>';
+    }
+
+    // ── Carga de opciones (tendencias + búsqueda) ─────────────────────────
+    async function fetchOptions(q) {
+        const res = await fetch('/api/taste/options' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+        if (!res.ok) return { titles: [], people: [] };
+        return res.json();
+    }
+    async function ensureTrendTitles() {
+        if (loadedTitles) { renderTitles(trendTitles, true); return; }
+        const d = await fetchOptions('');
+        trendTitles = d.titles || []; loadedTitles = true;
+        renderTitles(trendTitles, true);
+    }
+    async function ensureTrendPeople() {
+        if (loadedPeople) { renderPeople(trendPeople, true); return; }
+        const d = await fetchOptions('');
+        trendPeople = d.people || []; loadedPeople = true;
+        renderPeople(trendPeople, true);
+    }
+
+    // ── Navegación / cabecera ─────────────────────────────────────────────
+    function showStep(n) {
+        step = n;
+        Object.entries(sections).forEach(([k, el]) => { el.hidden = Number(k) !== n; });
+        const wizardUI = (n >= 1 && n <= 3);
+        head.hidden = !wizardUI;
+        foot.hidden = !wizardUI;
+        if (wizardUI) {
+            dots.forEach((d) => { d.classList.toggle('is-on', Number(d.dataset.dot) <= n); });
+            stepNum.textContent = n + '/3';
+            backBtn.hidden = (n === 1);
+            skipStep.hidden = (n !== 3);
+            nextBtn.textContent = (n === 3) ? 'Finalizar ✓' : 'Continuar →';
+            if (n === 2) ensureTrendTitles();
+            if (n === 3) ensureTrendPeople();
+        }
+        updateCounts();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function countFor(n) {
+        if (n === 1) return selGenres.size;
+        if (n === 2) return selTitles.size;
+        if (n === 3) return selPeople.size;
+        return 0;
+    }
+    function updateCounts() {
+        card.querySelector('[data-count="genres"]').textContent = selGenres.size + ' / ' + MAX;
+        card.querySelector('[data-count="titles"]').textContent = selTitles.size + ' / ' + MAX;
+        card.querySelector('[data-count="people"]').textContent = selPeople.size + ' / ' + MAX;
+        if (step >= 1 && step <= 3) {
+            const c = countFor(step);
+            // Paso 3 es opcional: válido con 0 o con >=MIN.
+            const ok = step === 3 ? (c === 0 || c >= MIN) : (c >= MIN);
+            nextBtn.disabled = !ok;
+            updateMinnote(step, c);
+        }
+    }
+
+    // Texto guía dinámico en el pie: cuánto falta / si ya puede avanzar.
+    function updateMinnote(n, c) {
+        const noun = n === 1 ? 'género' : (n === 2 ? 'título' : 'persona');
+        let txt;
+        if (c >= MAX) txt = 'Máximo ' + MAX + ' alcanzado';
+        else if (n === 3 && c === 0) txt = 'Opcional · puedes saltar este paso';
+        else if (c < MIN) { const k = MIN - c; txt = 'Elige ' + k + ' ' + noun + (k === 1 ? '' : 's') + ' más' + (n === 3 ? ' (o ninguno)' : ''); }
+        else txt = '✓ ' + (n === 3 ? 'Puedes finalizar' : 'Puedes continuar');
+        minnote.textContent = txt;
+        minnote.classList.toggle('is-ok', c >= MIN || (n === 3 && c === 0));
+    }
+
+    function flash(text) { msg.textContent = text; msg.hidden = false; setTimeout(() => { msg.hidden = true; }, 2600); }
+
+    // ── Eventos ───────────────────────────────────────────────────────────
+    // Géneros (delegación)
+    card.querySelector('[data-tw-genres]').addEventListener('click', (e) => {
+        const chip = e.target.closest('.tw-chip'); if (!chip) return;
+        const id = Number(chip.dataset.genreId);
+        if (selGenres.has(id)) { selGenres.delete(id); chip.classList.remove('is-on'); }
+        else {
+            if (selGenres.size >= MAX) { flash('Máximo ' + MAX + ' géneros'); return; }
+            selGenres.add(id); chip.classList.add('is-on');
+        }
+        updateCounts();
+    });
+
+    // Títulos (delegación)
+    card.querySelector('[data-grid="titles"]').addEventListener('click', (e) => {
+        const btn = e.target.closest('.tw-poster'); if (!btn) return;
+        const k = btn.dataset.tkey;
+        if (selTitles.has(k)) { selTitles.delete(k); btn.classList.remove('is-on'); }
+        else {
+            if (selTitles.size >= MAX) { flash('Máximo ' + MAX + ' títulos'); return; }
+            const d = titleData.get(k);
+            if (!d) return;
+            selTitles.set(k, { id: d.id, media_type: d.media_type, title: d.title || '', poster_path: d.poster_path ?? null });
+            btn.classList.add('is-on');
+        }
+        updateCounts();
+    });
+
+    // Personas (delegación)
+    card.querySelector('[data-grid="people"]').addEventListener('click', (e) => {
+        const btn = e.target.closest('.tw-person'); if (!btn) return;
+        const id = Number(btn.dataset.pid);
+        if (selPeople.has(id)) { selPeople.delete(id); btn.classList.remove('is-on'); }
+        else {
+            if (selPeople.size >= MAX) { flash('Máximo ' + MAX + ' personas'); return; }
+            const d = peopleData.get(id);
+            if (!d) return;
+            selPeople.set(id, { id: d.id, name: d.name || '', profile_path: d.profile_path ?? null });
+            btn.classList.add('is-on');
+        }
+        updateCounts();
+    });
+
+    // Búsqueda (debounce) por paso
+    function wireSearch(kind, render, ensureTrend) {
+        const input = card.querySelector('[data-search="' + kind + '"]');
+        let t;
+        input.addEventListener('input', () => {
+            clearTimeout(t);
+            const q = input.value.trim();
+            t = setTimeout(async () => {
+                if (q.length < 2) { ensureTrend(); return; }
+                const d = await fetchOptions(q);
+                render(kind === 'titles' ? d.titles : d.people, false);
+            }, 280);
+        });
+    }
+    wireSearch('titles', renderTitles, ensureTrendTitles);
+    wireSearch('people', renderPeople, ensureTrendPeople);
+
+    // Navegación
+    backBtn.addEventListener('click', () => { if (step > 1) showStep(step - 1); });
+    nextBtn.addEventListener('click', () => {
+        if (nextBtn.disabled) return;
+        if (step < 3) showStep(step + 1);
+        else save();
+    });
+    skipStep.addEventListener('click', () => save());   // paso 3 saltable → finaliza igual
+    card.querySelector('[data-tw-begin]')?.addEventListener('click', () => showStep(1));
+    card.querySelectorAll('[data-tw-skip]').forEach((b) => b.addEventListener('click', skip));
+
+    async function save() {
+        nextBtn.disabled = true;
+        const payload = { genres: [...selGenres], titles: [...selTitles.values()], people: [...selPeople.values()] };
+        try {
+            const res = await fetch('/api/taste/save', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.ok) { showStep(4); }
+            else { flash(data.error || 'No se pudo guardar.'); nextBtn.disabled = false; }
+        } catch { flash('Error de red.'); nextBtn.disabled = false; }
+    }
+    async function skip() {
+        try { await fetch('/api/taste/skip', { method: 'POST' }); } catch {}
+        location.href = '/';
+    }
+
+    showStep(step);
+})();
+</script>

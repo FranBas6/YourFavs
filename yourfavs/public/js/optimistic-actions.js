@@ -57,6 +57,7 @@ function submitOptimistic(form, options) {
                 if (!res.ok && !res.redirected) throw new Error();
                 var msg = typeof options.successMsg === 'function' ? options.successMsg(formData) : options.successMsg;
                 if (msg) showToast(msg, 'success');
+                if (options.onSuccess) options.onSuccess(formData);
                 if (options.reload) {
                     setTimeout(function () { window.location.reload(); }, options.reloadDelay || 500);
                 }
@@ -235,6 +236,13 @@ function handleGenericFavAction(form) {
             var name = LIST_NAMES[listType] || listType;
             return (state.action === 'add') ? 'Añadido a ' + name : 'Quitado de ' + name;
         },
+        onSuccess: function () {
+            // Al guardar un título (add a una lista), dejamos pendiente la pista de
+            // onboarding; se mostrará tras el reload si el usuario es elegible (Fase F·C).
+            if (state.action === 'add') {
+                try { sessionStorage.setItem('yf_taste_hint_pending', '1'); } catch (e) {}
+            }
+        },
         errorMsg: 'Error al procesar la acción',
         reload: true,
         reloadDelay: 300,
@@ -269,3 +277,43 @@ function initOptimisticActions() {
 }
 
 initOptimisticActions();
+
+// ── Fase F · Acceso C — pista post-guardado (no bloqueante, nunca modal) ──────
+// Tras guardar un título, si el usuario es elegible (sesión + onboarding no hecho)
+// y aún no la descartó, le invitamos UNA vez a contar sus gustos. Banner cerrable.
+function dismissTasteHint() {
+    try { localStorage.setItem('yf_taste_hint_done', '1'); } catch (e) {}
+}
+function showTasteHintBanner() {
+    if (document.getElementById('yf-taste-hint')) return;
+    var el = document.createElement('div');
+    el.id = 'yf-taste-hint';
+    el.setAttribute('role', 'status');
+    el.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(8px);z-index:10050;' +
+        'width:min(460px,92vw);display:flex;align-items:center;gap:14px;background:var(--bg-elev);' +
+        'border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.35);' +
+        'padding:14px 16px;font-family:var(--font,sans-serif);opacity:0;transition:opacity .25s ease,transform .25s ease;';
+    el.innerHTML =
+        '<span style="width:40px;height:40px;border-radius:11px;background:var(--stamp-green,#D1FAE5);color:var(--stamp-green-ink,#047857);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;font-weight:700;">✓</span>' +
+        '<div style="flex:1;min-width:0;">' +
+            '<div style="font-size:14px;font-weight:700;color:var(--text,#111827);">Guardado</div>' +
+            '<div style="font-size:12.5px;color:var(--text-3,#6B7280);">¿Quieres mejores recomendaciones? <a href="/gustos" style="color:var(--accent,#E63946);font-weight:600;text-decoration:none;">Cuéntanos tus gustos →</a></div>' +
+        '</div>' +
+        '<button type="button" aria-label="Cerrar" style="width:28px;height:28px;flex-shrink:0;border-radius:8px;border:none;background:var(--bg-tint,#F9FAFB);color:var(--text-3,#6B7280);cursor:pointer;font-size:14px;">✕</button>';
+    document.body.appendChild(el);
+    requestAnimationFrame(function () { el.style.opacity = '1'; el.style.transform = 'translateX(-50%) translateY(0)'; });
+
+    var close = function () { dismissTasteHint(); el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 250); };
+    el.querySelector('button').addEventListener('click', close);
+    el.querySelector('a').addEventListener('click', dismissTasteHint); // al ir a /gustos, no volver a mostrar
+}
+function maybeShowTasteHint() {
+    try {
+        if (document.body.getAttribute('data-taste-hint') !== 'eligible') return;
+        if (localStorage.getItem('yf_taste_hint_done')) return;
+        if (sessionStorage.getItem('yf_taste_hint_pending') !== '1') return;
+        sessionStorage.removeItem('yf_taste_hint_pending');
+        showTasteHintBanner();
+    } catch (e) {}
+}
+maybeShowTasteHint();

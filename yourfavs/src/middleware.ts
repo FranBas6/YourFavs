@@ -50,6 +50,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 if (profile?.display_name) context.locals.user.name = profile.display_name;
                 if (profile?.avatar_url) context.locals.user.picture = profile.avatar_url;
                 context.locals.user.region = profile?.region ?? 'ES'; // para el menú de cuenta
+                context.locals.user.onboarding = profile?.onboarding; // gating onboarding (Fase F)
                 // Idioma/región del perfil → contexto del request (los leen tmdbFetch y providers).
                 setRequestPrefs({ language: profile?.language, region: profile?.region });
             } catch { /* perfil opcional */ }
