@@ -38,6 +38,11 @@ const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(first_air_date);
 const isTrending = vote_average >= 8.0;
 
+// "Guardar en…" es una acción de descubrimiento: en catálogo y en recomendaciones
+// (sugerencias que aún no tienes). Dentro de "Mis listas" la card ya está guardada → oculto.
+const _p = Astro.url.pathname;
+const showSaveBtn = !_p.startsWith('/mislistas') || _p.startsWith('/mislistas/recomendaciones');
+
 // Calcular info de temporadas/episodios
 const totalSeasons = seasons?.filter((s: any) => s.season_number > 0).length || 0;
 const totalEpisodes = seasons?.filter((s: any) => s.season_number > 0).reduce((sum: number, s: any) => sum + (s.episode_count || 0), 0) || 0;
@@ -110,6 +115,15 @@ if (followed && next_episode_to_air?.air_date) {
 
             {nextEpTag && (
                 <span class="absolute bottom-1.5 left-2.5 z-10 font-mono text-[9.5px] font-bold tracking-wider text-blue-300">{nextEpTag}</span>
+            )}
+
+            <!-- Quick-save "Guardar en…" (Fase L4): <span> válido dentro del <a>; el JS para la navegación -->
+            {showSaveBtn && (
+                <span role="button" tabindex="0"
+                      class="card-saveto js-saveto absolute bottom-2 right-2 z-20 w-9 h-9 rounded-full bg-black/60 hover:bg-[#E63946] backdrop-blur text-white inline-flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+                      data-mt="tv" data-id={id} data-title={name} data-poster={img} aria-label="Guardar en tus listas">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                </span>
             )}
         </div>
 

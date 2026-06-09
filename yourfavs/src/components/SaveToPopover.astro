@@ -1,0 +1,292 @@
+---
+/**
+ * Popover "Guardar en…" (Fase L4) — singleton montado una vez en el Layout.
+ *
+ * Cualquier disparador con `.js-saveto` + data-mt/data-id/data-title/data-poster
+ * lo abre (cards y fichas). Carga la pertenencia (GET /api/lists?media_type&tmdb_id)
+ * y permite togglear listas fijas (POST /api/lists/fixed) y colecciones propias
+ * (POST /api/lists/items), además de crear una colección nueva en el sitio.
+ *
+ * Invitado (sin cookie has_session) → abre el modal de registro (gating), sin fetch.
+ */
+---
+<div class="saveto-pop" id="saveto-pop" role="dialog" aria-label="Guardar en tus listas" hidden>
+    <div class="saveto-arrow" aria-hidden="true"></div>
+    <div class="saveto-inner" id="saveto-inner">
+        <p class="saveto-loading">Cargando…</p>
+    </div>
+</div>
+
+<style is:global>
+    .saveto-pop {
+        position: fixed; z-index: 1300; width: 270px; max-width: calc(100vw - 24px);
+        background: var(--bg-elev, #fff); color: var(--text, #16130f);
+        border: 1px solid var(--border, #e5e7eb); border-radius: 14px;
+        box-shadow: 0 20px 50px rgba(0,0,0,.25);
+        padding: 10px 0; max-height: 70vh; overflow-y: auto;
+    }
+    .saveto-pop[hidden] { display: none; }
+    .saveto-loading { font-size: 13px; color: var(--text-3, #9ca3af); padding: 8px 16px; margin: 0; }
+    .saveto-kicker {
+        font-family: var(--font-mono, monospace); font-size: 9.5px; letter-spacing: .13em;
+        color: var(--text-3, #9ca3af); padding: 4px 16px 6px; text-transform: uppercase;
+    }
+    .saveto-sep { height: 1px; background: var(--border, #efeae0); margin: 8px 14px; }
+    .saveto-row {
+        display: flex; align-items: center; gap: 11px; width: 100%;
+        padding: 9px 16px; background: none; border: none; cursor: pointer;
+        font-family: inherit; font-size: 14px; color: var(--text, #16130f); text-align: left;
+    }
+    .saveto-row:hover { background: var(--bg-tint, #f6f3ec); }
+    .saveto-row[disabled] { opacity: .6; cursor: default; }
+    .saveto-emoji { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+    .saveto-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .saveto-check {
+        width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+        border: 1.5px solid var(--border, #d4ccb9);
+        display: flex; align-items: center; justify-content: center; color: #fff;
+    }
+    .saveto-row.is-on .saveto-name { font-weight: 600; }
+    .saveto-row.is-on .saveto-check { background: #E63946; border-color: #E63946; }
+    .saveto-row .saveto-check svg { display: none; width: 13px; height: 13px; }
+    .saveto-row.is-on .saveto-check svg { display: block; }
+    .saveto-create { color: #E63946; font-weight: 600; font-size: 13.5px; }
+    .saveto-create .saveto-emoji { color: #E63946; }
+    .saveto-newform { padding: 8px 16px; display: flex; gap: 7px; }
+    .saveto-newform input {
+        flex: 1; min-width: 0; border: 1.5px solid var(--border, #e2dccd); border-radius: 8px;
+        padding: 7px 10px; font-size: 13px; font-family: inherit; background: var(--bg, #fff); color: var(--text, #16130f);
+    }
+    .saveto-newform input:focus { outline: none; border-color: #E63946; }
+    .saveto-newform button {
+        flex-shrink: 0; border: none; background: #E63946; color: #fff; border-radius: 8px;
+        padding: 0 12px; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+</style>
+
+<script is:inline>
+(function () {
+    var pop = document.getElementById('saveto-pop');
+    var inner = document.getElementById('saveto-inner');
+    if (!pop || !inner) return;
+
+    // El hover-preview (desktop) arma un timer de 1.25s al entrar en la card. Si el
+    // usuario va a por el botón ⊕, cancelamos ese preview (mouseleave al host) para
+    // que no salte el tráiler encima justo cuando quiere guardar.
+    document.addEventListener('mouseover', function (e) {
+        var t = e.target.closest && e.target.closest('.js-saveto');
+        if (!t) return;
+        var host = t.closest('.hover-preview-host');
+        if (host) host.dispatchEvent(new Event('mouseleave'));
+    });
+
+    var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    var FIXED = [
+        { key: 'favorites', emoji: '❤️', label: 'Favoritos' },
+        { key: 'pendientes', emoji: '🔖', label: 'Pendientes' },
+        { key: 'vistas', emoji: '👁️', label: 'Vistas' },
+    ];
+
+    var cur = null; // { mt, id, title, poster }
+    var busy = false;
+
+    function loggedIn() {
+        return document.cookie.split('; ').some(function (c) { return c.indexOf('has_session=') === 0; });
+    }
+    function normPoster(p) {
+        if (!p) return null;
+        var m = p.match(/\/t\/p\/w\d+(\/.+)$/);
+        if (m) return m[1];
+        if (p.charAt(0) === '/' && p.indexOf('.') > 0 && p.indexOf('placeholder') === -1) return p;
+        return null;
+    }
+    function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+    function close() { pop.hidden = true; cur = null; }
+    function isOpen() { return !pop.hidden; }
+
+    function position(trigger) {
+        pop.hidden = false; // medir con el real
+        var r = trigger.getBoundingClientRect();
+        var w = pop.offsetWidth, h = pop.offsetHeight;
+        var left = Math.min(Math.max(8, r.right - w), window.innerWidth - w - 8);
+        var top = r.bottom + 8;
+        if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 8);
+        pop.style.left = left + 'px';
+        pop.style.top = top + 'px';
+    }
+
+    function render(data) {
+        var memberIds = data.memberIds || [];
+        var fixed = data.fixed || {};
+        var lists = data.lists || [];
+        var html = '';
+        // En las fichas, las listas fijas ya tienen sus botones → el popover solo
+        // muestra colecciones (data-collections-only). En cards, muestra ambas.
+        if (!cur.collectionsOnly) {
+            html += '<div class="saveto-kicker">Listas</div>';
+            FIXED.forEach(function (f) {
+                var on = !!fixed[f.key];
+                html += '<button type="button" class="saveto-row js-fixed' + (on ? ' is-on' : '') + '" data-list="' + f.key + '">' +
+                    '<span class="saveto-emoji">' + f.emoji + '</span><span class="saveto-name">' + f.label + '</span>' +
+                    '<span class="saveto-check">' + CHECK + '</span></button>';
+            });
+            html += '<div class="saveto-sep"></div>';
+        }
+        html += '<div class="saveto-kicker">Mis colecciones</div>';
+        if (!lists.length) {
+            html += '<p class="saveto-loading">Aún no tienes colecciones.</p>';
+        } else {
+            lists.forEach(function (l) {
+                var on = memberIds.indexOf(l.id) >= 0;
+                html += '<button type="button" class="saveto-row js-coll' + (on ? ' is-on' : '') + '" data-id="' + esc(l.id) + '">' +
+                    '<span class="saveto-emoji">' + esc(l.icon || '🎬') + '</span><span class="saveto-name">' + esc(l.name) + '</span>' +
+                    '<span class="saveto-check">' + CHECK + '</span></button>';
+            });
+        }
+        html += '<div class="saveto-sep"></div>' +
+            '<button type="button" class="saveto-row saveto-create js-create"><span class="saveto-emoji">+</span><span class="saveto-name">Crear nueva colección</span></button>';
+        inner.innerHTML = html;
+    }
+
+    function open(trigger) {
+        cur = {
+            mt: trigger.getAttribute('data-mt'),
+            id: Number(trigger.getAttribute('data-id')),
+            title: trigger.getAttribute('data-title') || '',
+            poster: normPoster(trigger.getAttribute('data-poster')),
+            collectionsOnly: !!trigger.getAttribute('data-collections-only'),
+        };
+        inner.innerHTML = '<p class="saveto-loading">Cargando…</p>';
+        position(trigger);
+        fetch('/api/lists?media_type=' + cur.mt + '&tmdb_id=' + cur.id)
+            .then(function (r) {
+                if (r.status === 401) { close(); document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                return r.json();
+            })
+            .then(function (data) { if (cur) { render(data); position(trigger); } })
+            .catch(function () {});
+    }
+
+    // ---- disparadores (delegado, captura para adelantarnos a la navegación del <a>) ----
+    document.addEventListener('click', function (e) {
+        var trigger = e.target.closest && e.target.closest('.js-saveto');
+        if (trigger) {
+            e.preventDefault(); e.stopPropagation();
+            if (!loggedIn()) { document.dispatchEvent(new CustomEvent('yf:require-auth')); return; }
+            if (isOpen() && cur && cur.id === Number(trigger.getAttribute('data-id')) && cur.mt === trigger.getAttribute('data-mt')) { close(); return; }
+            open(trigger);
+            return;
+        }
+        // click fuera → cerrar
+        if (isOpen() && !pop.contains(e.target)) close();
+    }, true);
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && isOpen()) { close(); return; }
+        // span role="button": activar con Enter/Espacio
+        if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('js-saveto')) {
+            e.preventDefault();
+            e.target.click();
+        }
+    });
+    window.addEventListener('resize', function () { if (isOpen()) close(); });
+    window.addEventListener('scroll', function () { if (isOpen()) close(); }, true);
+
+    // ---- toggles dentro del popover ----
+    inner.addEventListener('click', function (e) {
+        if (busy || !cur) return;
+        var fixedBtn = e.target.closest('.js-fixed');
+        var collBtn = e.target.closest('.js-coll');
+        var createBtn = e.target.closest('.js-create');
+
+        if (fixedBtn) {
+            var on = fixedBtn.classList.contains('is-on');
+            toggle(fixedBtn, function () {
+                return fetch('/api/lists/fixed', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ media_type: cur.mt, tmdb_id: cur.id, list: fixedBtn.getAttribute('data-list'), action: on ? 'remove' : 'add' }),
+                });
+            });
+            return;
+        }
+        if (collBtn) {
+            var onC = collBtn.classList.contains('is-on');
+            toggle(collBtn, function () {
+                if (onC) {
+                    return fetch('/api/lists/items', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ op: 'remove', listId: collBtn.getAttribute('data-id'), itemId: cur.mt + '_' + cur.id }),
+                    });
+                }
+                return fetch('/api/lists/items', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ op: 'add', listId: collBtn.getAttribute('data-id'), item: { media_type: cur.mt, tmdb_id: cur.id, title: cur.title, poster_path: cur.poster } }),
+                });
+            });
+            return;
+        }
+        if (createBtn) {
+            showCreateForm();
+        }
+    });
+
+    function toggle(btn, doFetch) {
+        busy = true;
+        var wasOn = btn.classList.contains('is-on');
+        btn.classList.toggle('is-on'); // optimista
+        doFetch()
+            .then(function (r) {
+                if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                return r.json();
+            })
+            .then(function (res) { if (!res.ok) throw new Error(); })
+            .catch(function () { btn.classList.toggle('is-on', wasOn); }) // rollback
+            .finally(function () { busy = false; });
+    }
+
+    function showCreateForm() {
+        var create = inner.querySelector('.js-create');
+        if (!create || inner.querySelector('.saveto-newform')) return;
+        var form = document.createElement('div');
+        form.className = 'saveto-newform';
+        form.innerHTML = '<input type="text" maxlength="60" placeholder="Nombre de la colección" /><button type="button">Crear</button>';
+        create.parentNode.insertBefore(form, create.nextSibling);
+        var input = form.querySelector('input');
+        var btn = form.querySelector('button');
+        input.focus();
+        function submit() {
+            var name = input.value.trim();
+            if (!name || busy) return;
+            busy = true; btn.disabled = true;
+            fetch('/api/lists', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ op: 'create', name: name }),
+            })
+                .then(function (r) { if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); } return r.json(); })
+                .then(function (res) {
+                    if (!res.ok || !res.listId) throw new Error();
+                    // añade el item actual a la nueva colección
+                    return fetch('/api/lists/items', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ op: 'add', listId: res.listId, item: { media_type: cur.mt, tmdb_id: cur.id, title: cur.title, poster_path: cur.poster } }),
+                    });
+                })
+                .then(function (r) { return r.json(); })
+                .then(function () { reloadMembership(); })
+                .catch(function () { btn.disabled = false; })
+                .finally(function () { busy = false; });
+        }
+        btn.addEventListener('click', submit);
+        input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    }
+
+    function reloadMembership() {
+        if (!cur) return;
+        fetch('/api/lists?media_type=' + cur.mt + '&tmdb_id=' + cur.id)
+            .then(function (r) { return r.json(); })
+            .then(function (data) { if (cur) render(data); })
+            .catch(function () {});
+    }
+})();
+</script>

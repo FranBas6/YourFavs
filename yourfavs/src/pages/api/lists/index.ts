@@ -21,6 +21,7 @@ import {
     deleteList,
     reorderLists,
 } from '../../../services/BD/lists/customLists';
+import { getFixedMembership } from '../../../services/BD/lists/fixedLists';
 
 export const prerender = false;
 
@@ -34,8 +35,11 @@ export const GET: APIRoute = async ({ url, locals }) => {
         const mediaType = url.searchParams.get('media_type');
         const tmdbId = url.searchParams.get('tmdb_id');
         if ((mediaType === 'movie' || mediaType === 'tv') && tmdbId) {
-            const { lists, memberIds } = await getListsMembership(mediaType, tmdbId);
-            return json({ ok: true, lists, memberIds });
+            const [{ lists, memberIds }, fixed] = await Promise.all([
+                getListsMembership(mediaType, tmdbId),
+                getFixedMembership(mediaType, tmdbId),
+            ]);
+            return json({ ok: true, lists, memberIds, fixed });
         }
         return json({ ok: true, lists: await getCustomLists() });
     } catch (err) {
