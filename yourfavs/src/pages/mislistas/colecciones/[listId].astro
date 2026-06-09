@@ -1,0 +1,321 @@
+---
+/**
+ * Página de una colección (Fase L2/L3) — items + gestión.
+ *
+ * SSR: getCustomList + getListItems (scoped al uid). Protegida por middleware.
+ * Añadir títulos: buscador que reusa /api/search/multi → POST /api/lists/items.
+ * Quitar / portada: fetch a /api/lists/items y /api/lists. Sin recargar salvo portada.
+ */
+import Layout from "../../../layouts/Layout.astro";
+import { getCustomList, getListItems } from "../../../services/BD/lists/customLists";
+import { posterUrl } from "../../../services/API/shared/tmdbClient";
+
+const { listId } = Astro.params;
+const list = listId ? await getCustomList(listId) : null;
+if (!list) return Astro.redirect('/mislistas/colecciones');
+
+const items = await getListItems(list.id);
+---
+<Layout title={list.name}>
+    <section class="px-1 sm:py-8" data-list-id={list.id}>
+        <a href="/mislistas/colecciones" class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 mb-4">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            Mis colecciones
+        </a>
+
+        <header class="mb-6 flex items-start gap-4">
+            <span class={`cover-badge cover-${list.colorStamp}`}>{list.icon}</span>
+            <div class="flex-1 min-w-0">
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">{list.name}</h1>
+                {list.description && <p class="text-gray-500 text-sm mt-1">{list.description}</p>}
+                <p class="font-mono text-[11px] text-gray-400 mt-1"><span id="item-count">{items.length}</span> títulos</p>
+            </div>
+            <div class="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                <button type="button" id="add-toggle"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 bg-[#E63946] text-white rounded-lg text-sm font-semibold hover:bg-[#C7283A] transition-colors">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    Añadir títulos
+                </button>
+                <button type="button" id="cover-btn"
+                        class="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:border-gray-300 transition-colors">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                    Portada
+                </button>
+            </div>
+        </header>
+
+        <!-- Panel "Añadir títulos" -->
+        <div id="add-panel" class="mb-6 bg-white border border-gray-200 rounded-2xl p-4" hidden>
+            <div class="relative">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                <input type="text" id="add-search" class="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-[#E63946]" placeholder="Buscar películas y series para añadir…" autocomplete="off" />
+            </div>
+            <p id="add-hint" class="text-sm text-gray-400 mt-3">Busca pelis y series por título y pulsa <span class="font-semibold text-[#E63946]">+</span> para añadirlas. Puedes seguir buscando y añadiendo las que quieras.</p>
+            <div id="add-results" class="mt-3 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 max-h-[26rem] overflow-y-auto"></div>
+        </div>
+
+        <!-- Grid de items -->
+        <div id="items-grid" class={`grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 ${items.length === 0 ? 'hidden' : ''}`}>
+            {items.map((it) => (
+                <div class="item-card group relative" data-item-id={it.id}>
+                    <a href={it.media_type === 'movie' ? `/movie/${it.tmdb_id}` : `/serie/${it.tmdb_id}`} class="block bg-[#0F172A] rounded-xl overflow-hidden">
+                        <div class="relative aspect-[2/3]">
+                            {it.poster_path
+                                ? <img src={posterUrl(it.poster_path, 'w342') || ''} alt={it.title} loading="lazy" class="w-full h-full object-cover" />
+                                : <div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl">{it.media_type === 'movie' ? '🎬' : '📺'}</div>}
+                            <span class="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white uppercase">{it.media_type === 'movie' ? 'Peli' : 'Serie'}</span>
+                        </div>
+                        <div class="p-2"><div class="text-white text-xs font-medium line-clamp-2 leading-snug">{it.title}</div></div>
+                    </a>
+                    <button type="button" class="remove-item absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-black/55 hover:bg-red-600 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                            aria-label="Quitar de la colección" data-item-id={it.id}>
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                    </button>
+                </div>
+            ))}
+        </div>
+
+        <!-- Empty state -->
+        <div id="items-empty" class={`text-center py-16 ${items.length > 0 ? 'hidden' : ''}`}>
+            <div class="text-5xl mb-3">{list.icon}</div>
+            <h2 class="text-lg font-semibold text-gray-800">Esta colección está vacía</h2>
+            <p class="text-gray-500 text-sm mt-1 mb-4">Busca pelis y series y añádelas aquí.</p>
+            <button type="button" id="add-toggle-2" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg text-sm font-medium hover:bg-[#C7283A] transition-colors">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                Añadir títulos
+            </button>
+        </div>
+    </section>
+
+    <!-- Modal portada -->
+    <div class="cl-overlay" id="cover-modal" role="dialog" aria-modal="true" aria-label="Portada de la colección" hidden>
+        <div class="cl-card">
+            <div class="cl-head">
+                <h3>Portada de la colección</h3>
+                <button type="button" class="cl-close" id="cover-close" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="cl-body">
+                <p class="text-sm text-gray-500 mb-3">Elige el póster de uno de los títulos de la colección.</p>
+                <div id="cover-grid" class="grid grid-cols-4 sm:grid-cols-5 gap-2"></div>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<style>
+    .cover-badge {
+        width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center; font-size: 26px;
+        background: var(--st-bg, #334155);
+    }
+    .cover-red { --st-bg: #7c2d3a; } .cover-amber { --st-bg: #78350f; }
+    .cover-blue { --st-bg: #1e3a8a; } .cover-green { --st-bg: #14532d; }
+    .cover-purple { --st-bg: #3a2545; } .cover-pink { --st-bg: #831843; }
+    .cover-slate { --st-bg: #334155; }
+
+    .cl-overlay { position: fixed; inset: 0; z-index: 1200; background: rgba(15,23,42,.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .cl-overlay[hidden] { display: none; }
+    .cl-card { width: 100%; max-width: 480px; background: var(--bg-elev,#fff); color: var(--text,#16130f); border-radius: 18px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.5); max-height: 90vh; display: flex; flex-direction: column; }
+    .cl-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border,#efeae0); }
+    .cl-head h3 { margin: 0; font-size: 19px; font-weight: 700; }
+    .cl-close { background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-3,#9a9082); padding: 4px; }
+    .cl-body { padding: 18px 22px; overflow-y: auto; }
+</style>
+
+<script is:inline>
+(function () {
+    var IMG = 'https://image.tmdb.org/t/p/w342';
+    var PLUS = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>';
+    var CHECK = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    var ADD_BASE = 'js-add absolute top-1.5 right-1.5 w-8 h-8 rounded-full flex items-center justify-center shadow-lg ';
+    var ADD_OFF = ADD_BASE + 'bg-[#E63946] hover:bg-[#C7283A] text-white';
+    var ADD_ON = ADD_BASE + 'bg-green-600 text-white cursor-default';
+    function setAddedState(btn, added) {
+        if (added) { btn.setAttribute('data-added', '1'); btn.disabled = true; btn.className = ADD_ON; btn.innerHTML = CHECK; btn.setAttribute('aria-label', 'Añadida'); }
+        else { btn.removeAttribute('data-added'); btn.disabled = false; btn.className = ADD_OFF; btn.innerHTML = PLUS; btn.setAttribute('aria-label', 'Añadir a la colección'); }
+    }
+    var section = document.querySelector('[data-list-id]');
+    if (!section) return;
+    var listId = section.getAttribute('data-list-id');
+
+    var grid = document.getElementById('items-grid');
+    var empty = document.getElementById('items-empty');
+    var countEl = document.getElementById('item-count');
+    var panel = document.getElementById('add-panel');
+    var searchInput = document.getElementById('add-search');
+    var resultsEl = document.getElementById('add-results');
+
+    function count() { return grid ? grid.querySelectorAll('.item-card').length : 0; }
+    function syncCount() {
+        var n = count();
+        if (countEl) countEl.textContent = String(n);
+        if (grid) grid.classList.toggle('hidden', n === 0);
+        if (empty) empty.classList.toggle('hidden', n > 0);
+    }
+    function hasItem(itemId) { return !!grid.querySelector('.item-card[data-item-id="' + itemId + '"]'); }
+
+    // ---- togglear panel de búsqueda ----
+    function openPanel() {
+        panel.hidden = false;
+        setTimeout(function () { searchInput.focus(); }, 30);
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    ['add-toggle', 'add-toggle-2'].forEach(function (id) {
+        var b = document.getElementById(id);
+        if (b) b.addEventListener('click', function () { panel.hidden ? openPanel() : (panel.hidden = true); });
+    });
+
+    // ---- búsqueda (reusa /api/search/multi) ----
+    var t = null, lastQ = '';
+    searchInput.addEventListener('input', function () {
+        var q = searchInput.value.trim();
+        if (t) clearTimeout(t);
+        if (q.length < 2) { resultsEl.innerHTML = ''; return; }
+        t = setTimeout(function () { runSearch(q); }, 250);
+    });
+    function runSearch(q) {
+        lastQ = q;
+        fetch('/api/search/multi?q=' + encodeURIComponent(q))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.query !== lastQ) return;
+                var items = (data.items || []).filter(function (it) { return it.media_type === 'movie' || it.media_type === 'tv'; });
+                renderResults(items);
+            })
+            .catch(function () {});
+    }
+    function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    function renderResults(items) {
+        var hint = document.getElementById('add-hint');
+        if (!items.length) { resultsEl.innerHTML = ''; if (hint) hint.textContent = 'Sin resultados para esa búsqueda.'; return; }
+        if (hint) hint.textContent = '';
+        resultsEl.innerHTML = items.map(function (it) {
+            var itemId = it.media_type + '_' + it.id;
+            var added = hasItem(itemId);
+            var posterHtml = it.poster_path
+                ? '<img src="' + IMG + it.poster_path + '" alt="' + esc(it.title) + '" loading="lazy" class="w-full h-full object-cover">'
+                : '<div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl">' + (it.media_type === 'movie' ? '🎬' : '📺') + '</div>';
+            return '<div class="relative bg-[#0F172A] rounded-xl overflow-hidden">' +
+                '<div class="relative aspect-[2/3]">' + posterHtml +
+                '<button type="button" class="' + (added ? ADD_ON : ADD_OFF) + '" data-mt="' + it.media_type + '" data-id="' + it.id + '" data-title="' + esc(it.title) + '" data-poster="' + esc(it.poster_path || '') + '"' + (added ? ' data-added="1" disabled' : '') + ' aria-label="' + (added ? 'Añadida' : 'Añadir a la colección') + '">' + (added ? CHECK : PLUS) + '</button>' +
+                '</div>' +
+                '<div class="p-2"><div class="text-white text-xs font-medium line-clamp-2 leading-snug">' + esc(it.title) + '</div><div class="text-[10px] text-gray-400 mt-0.5">' + esc(it.subtitle) + '</div></div>' +
+                '</div>';
+        }).join('');
+    }
+
+    // ---- añadir item (delegado) ----
+    resultsEl.addEventListener('click', function (e) {
+        var btn = e.target.closest('.js-add');
+        if (!btn || btn.getAttribute('data-added')) return;
+        var mt = btn.getAttribute('data-mt');
+        var id = Number(btn.getAttribute('data-id'));
+        var title = btn.getAttribute('data-title');
+        var poster = btn.getAttribute('data-poster') || null;
+        btn.disabled = true;
+        fetch('/api/lists/items', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'add', listId: listId, item: { media_type: mt, tmdb_id: id, title: title, poster_path: poster } }),
+        })
+            .then(function (r) {
+                if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                return r.json();
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                setAddedState(btn, true);
+                insertCard(mt, id, title, poster);
+                syncCount();
+            })
+            .catch(function () { btn.disabled = false; });
+    });
+
+    function insertCard(mt, id, title, poster) {
+        var itemId = mt + '_' + id;
+        if (hasItem(itemId)) return;
+        var href = mt === 'movie' ? '/movie/' + id : '/serie/' + id;
+        var posterHtml = poster
+            ? '<img src="' + IMG + poster + '" alt="' + esc(title) + '" loading="lazy" class="w-full h-full object-cover">'
+            : '<div class="w-full h-full flex items-center justify-center text-gray-600 text-3xl">' + (mt === 'movie' ? '🎬' : '📺') + '</div>';
+        var div = document.createElement('div');
+        div.className = 'item-card group relative';
+        div.setAttribute('data-item-id', itemId);
+        div.innerHTML = '<a href="' + href + '" class="block bg-[#0F172A] rounded-xl overflow-hidden">' +
+            '<div class="relative aspect-[2/3]">' + posterHtml +
+            '<span class="absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-black/60 text-white uppercase">' + (mt === 'movie' ? 'Peli' : 'Serie') + '</span></div>' +
+            '<div class="p-2"><div class="text-white text-xs font-medium line-clamp-2 leading-snug">' + esc(title) + '</div></div></a>' +
+            '<button type="button" class="remove-item absolute top-1.5 right-1.5 w-7 h-7 rounded-lg bg-black/55 hover:bg-red-600 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity" aria-label="Quitar de la colección" data-item-id="' + itemId + '">' +
+            '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>';
+        grid.appendChild(div);
+    }
+
+    // ---- quitar item (delegado) ----
+    grid.addEventListener('click', function (e) {
+        var btn = e.target.closest('.remove-item');
+        if (!btn) return;
+        e.preventDefault();
+        var itemId = btn.getAttribute('data-item-id');
+        var card = btn.closest('.item-card');
+        if (card) card.style.opacity = '0.4';
+        fetch('/api/lists/items', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'remove', listId: listId, itemId: itemId }),
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                if (card) card.remove();
+                syncCount();
+                // refleja el estado en los resultados de búsqueda si está abierto
+                var parts = itemId.split('_');
+                var rb = resultsEl.querySelector('.js-add[data-mt="' + parts[0] + '"][data-id="' + parts.slice(1).join('_') + '"]');
+                if (rb) setAddedState(rb, false);
+            })
+            .catch(function () { if (card) card.style.opacity = ''; });
+    });
+
+    // ---- portada ----
+    var coverModal = document.getElementById('cover-modal');
+    var coverGrid = document.getElementById('cover-grid');
+    var coverBtn = document.getElementById('cover-btn');
+    var coverClose = document.getElementById('cover-close');
+
+    coverBtn.addEventListener('click', function () {
+        var cards = grid.querySelectorAll('.item-card');
+        if (!cards.length) { alert('Añade títulos primero para elegir una portada.'); return; }
+        var html = '';
+        cards.forEach(function (c) {
+            var img = c.querySelector('img');
+            var itemId = c.getAttribute('data-item-id');
+            if (!img) return;
+            // reconstruye poster_path desde el src (…/w342{path})
+            var src = img.getAttribute('src') || '';
+            var m = src.match(/\/t\/p\/w\d+(\/.+)$/);
+            var path = m ? m[1] : '';
+            if (!path) return;
+            html += '<button type="button" class="js-cover aspect-[2/3] rounded-lg overflow-hidden border-2 border-transparent hover:border-[#E63946] bg-[#0F172A] p-0 cursor-pointer" data-poster="' + path + '" data-id="' + itemId + '"><img src="' + src + '" alt="" class="w-full h-full object-cover"></button>';
+        });
+        coverGrid.innerHTML = html || '<p class="text-sm text-gray-400">No hay pósters disponibles.</p>';
+        coverModal.hidden = false;
+        document.body.style.overflow = 'hidden';
+    });
+    function closeCover() { coverModal.hidden = true; document.body.style.overflow = ''; }
+    coverClose.addEventListener('click', closeCover);
+    coverModal.addEventListener('click', function (e) { if (e.target === coverModal) closeCover(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !coverModal.hidden) closeCover(); });
+
+    coverGrid.addEventListener('click', function (e) {
+        var btn = e.target.closest('.js-cover');
+        if (!btn) return;
+        var poster = btn.getAttribute('data-poster');
+        var tmdbId = (btn.getAttribute('data-id') || '').split('_').slice(1).join('_');
+        fetch('/api/lists', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'update', listId: listId, patch: { cover: { type: 'poster', poster_path: poster, tmdb_id: Number(tmdbId) } } }),
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (res) { if (!res.ok) throw new Error(); closeCover(); })
+            .catch(function () {});
+    });
+})();
+</script>

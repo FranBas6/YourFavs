@@ -31,8 +31,9 @@ const MAX_ICON = 8; // un emoji puede ocupar varios code units
 
 export interface CustomListCover {
     type: 'poster' | 'upload';
-    tmdb_id?: number;   // type 'poster' → póster de un título de la lista
-    url?: string;       // type 'upload' → imagen propia (Fase L7)
+    poster_path?: string;   // type 'poster' → póster de un título de la lista (renderizable sin fetch)
+    tmdb_id?: number;       // type 'poster' → referencia al título origen
+    url?: string;           // type 'upload' → imagen propia (Fase L7)
 }
 
 export interface CustomList {
@@ -92,8 +93,10 @@ function cleanColor(raw: unknown): ColorStamp {
 function cleanCover(raw: unknown): CustomListCover | null {
     if (!raw || typeof raw !== 'object') return null;
     const c = raw as Record<string, unknown>;
-    if (c.type === 'poster' && Number.isFinite(Number(c.tmdb_id))) {
-        return { type: 'poster', tmdb_id: Number(c.tmdb_id) };
+    if (c.type === 'poster' && typeof c.poster_path === 'string' && c.poster_path) {
+        const cover: CustomListCover = { type: 'poster', poster_path: String(c.poster_path).slice(0, 200) };
+        if (Number.isFinite(Number(c.tmdb_id))) cover.tmdb_id = Number(c.tmdb_id);
+        return cover;
     }
     if (c.type === 'upload' && typeof c.url === 'string' && c.url) {
         return { type: 'upload', url: String(c.url).slice(0, 500) };

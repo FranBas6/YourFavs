@@ -1,0 +1,325 @@
+---
+/**
+ * Hub "Mis colecciones" (Fase L2) — listas personalizadas del usuario.
+ *
+ * SSR: getCustomLists() (ya scoped al uid de la sesión vía userScope). La página
+ * está protegida por el middleware (/mislistas/* → invitado redirige a /).
+ * Crear/editar/borrar se hace por fetch a /api/lists (op create|update|delete).
+ */
+import Layout from "../../layouts/Layout.astro";
+import PersonalNav from "../../components/personal/PersonalNav.astro";
+import EmptyState from "../../components/EmptyState.astro";
+import { getCustomLists, LIST_COLORS } from "../../services/BD/lists/customLists";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+
+const lists = await getCustomLists();
+
+const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','📺','🎞️','🏆','🌟','🎃','💀','🧠','🌍'];
+---
+<Layout title="Mis colecciones">
+    <section class="px-1 sm:py-8">
+        <header class="mb-6 flex items-end justify-between gap-4">
+            <div>
+                <p class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-1">Mi espacio</p>
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Mis colecciones</h1>
+                <p class="text-gray-500 text-base mt-1">{lists.length} {lists.length === 1 ? 'colección' : 'colecciones'}</p>
+            </div>
+            <button type="button" id="new-list-btn"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#E63946] text-white rounded-full text-sm font-semibold hover:bg-[#C7283A] transition-colors flex-shrink-0">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                Nueva colección
+            </button>
+        </header>
+
+        <div class="mb-6">
+            <PersonalNav currentPage="/mislistas/colecciones" />
+        </div>
+
+        {lists.length === 0 ? (
+            <EmptyState
+                size="md"
+                title="Aún no tienes colecciones"
+                description="Crea listas a tu medida (Cine de los 90, Para domingos de lluvia…) y guarda en ellas pelis y series."
+            >
+                <button slot="cta" type="button" id="new-list-cta"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    Crear mi primera colección
+                </button>
+            </EmptyState>
+        ) : (
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {lists.map((l) => (
+                    <div class="group relative bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                        <a href={`/mislistas/colecciones/${l.id}`} class="block">
+                            <div class={`cover-block cover-${l.colorStamp} relative h-24 flex items-end p-3`}>
+                                {l.cover?.type === 'poster' && l.cover.poster_path && (
+                                    <img src={posterUrl(l.cover.poster_path, 'w342') || ''} alt="" class="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                                )}
+                                {l.cover?.type === 'upload' && l.cover.url && (
+                                    <img src={l.cover.url} alt="" class="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                                )}
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/55 to-transparent"></div>
+                                <span class="relative text-2xl">{l.icon}</span>
+                            </div>
+                            <div class="p-3.5">
+                                <div class="font-bold text-[15px] text-gray-900 line-clamp-1">{l.name}</div>
+                                <div class="font-mono text-[11px] text-gray-500 mt-0.5">{l.itemCount} {l.itemCount === 1 ? 'título' : 'títulos'}</div>
+                            </div>
+                        </a>
+                        <button type="button" class="edit-list-btn absolute top-2 right-2 w-8 h-8 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                                aria-label="Editar colección"
+                                data-id={l.id} data-name={l.name} data-desc={l.description} data-icon={l.icon} data-color={l.colorStamp}>
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                        </button>
+                    </div>
+                ))}
+
+                <button type="button" id="new-list-tile"
+                        class="border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-[#E63946] hover:border-[#E63946]/50 transition-colors min-h-[150px]">
+                    <svg class="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+                    <span class="text-sm font-semibold">Crear colección</span>
+                </button>
+            </div>
+        )}
+    </section>
+
+    <!-- Modal crear / editar -->
+    <div class="cl-overlay" id="cl-modal" role="dialog" aria-modal="true" aria-label="Colección" hidden>
+        <div class="cl-card">
+            <div class="cl-head">
+                <h3 id="cl-title">Nueva colección</h3>
+                <button type="button" class="cl-close" id="cl-close" aria-label="Cerrar">✕</button>
+            </div>
+            <div class="cl-body">
+                <label class="cl-label" for="cl-name">NOMBRE</label>
+                <input type="text" id="cl-name" class="cl-input" maxlength="60" placeholder="Cine de los 90" autocomplete="off" />
+
+                <label class="cl-label" for="cl-desc">DESCRIPCIÓN <span class="cl-opt">· opcional</span></label>
+                <textarea id="cl-desc" class="cl-input cl-textarea" maxlength="280" rows="2" placeholder="¿De qué va esta colección?"></textarea>
+
+                <label class="cl-label">ICONO</label>
+                <div class="cl-emojis" id="cl-emojis">
+                    {EMOJIS.map((e) => (
+                        <button type="button" class="cl-emoji" data-emoji={e}>{e}</button>
+                    ))}
+                </div>
+
+                <label class="cl-label">COLOR</label>
+                <div class="cl-colors" id="cl-colors">
+                    {LIST_COLORS.map((c) => (
+                        <button type="button" class={`cl-color cl-c-${c}`} data-color={c} aria-label={c}></button>
+                    ))}
+                </div>
+            </div>
+            <div class="cl-foot">
+                <button type="button" class="cl-del" id="cl-delete" hidden>Eliminar</button>
+                <div class="cl-foot-right">
+                    <button type="button" class="cl-cancel" id="cl-cancel">Cancelar</button>
+                    <button type="button" class="cl-save" id="cl-save">Crear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</Layout>
+
+<style>
+    /* Portada por color (fallback sin póster) — usa los stamps del sistema */
+    .cover-block { background: var(--st-bg, #334155); }
+    .cover-red    { --st-bg: #7c2d3a; }
+    .cover-amber  { --st-bg: #78350f; }
+    .cover-blue   { --st-bg: #1e3a8a; }
+    .cover-green  { --st-bg: #14532d; }
+    .cover-purple { --st-bg: #3a2545; }
+    .cover-pink   { --st-bg: #831843; }
+    .cover-slate  { --st-bg: #334155; }
+
+    /* ===== Modal crear/editar ===== */
+    .cl-overlay {
+        position: fixed; inset: 0; z-index: 1200;
+        background: rgba(15,23,42,.6);
+        display: flex; align-items: center; justify-content: center;
+        padding: 20px;
+    }
+    .cl-overlay[hidden] { display: none; }
+    .cl-card {
+        width: 100%; max-width: 440px;
+        background: var(--bg-elev, #fff); color: var(--text, #16130f);
+        border-radius: 18px; overflow: hidden;
+        box-shadow: 0 30px 80px rgba(0,0,0,.5);
+        max-height: 90vh; display: flex; flex-direction: column;
+    }
+    .cl-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 18px 22px; border-bottom: 1px solid var(--border, #efeae0);
+    }
+    .cl-head h3 { margin: 0; font-size: 19px; font-weight: 700; }
+    .cl-close {
+        background: none; border: none; font-size: 18px; cursor: pointer;
+        color: var(--text-3, #9a9082); line-height: 1; padding: 4px;
+    }
+    .cl-body { padding: 18px 22px; overflow-y: auto; }
+    .cl-label {
+        display: block; font-family: var(--font-mono, monospace);
+        font-size: 10px; letter-spacing: .12em; color: var(--text-3, #9a9082);
+        margin: 0 0 7px; margin-top: 16px;
+    }
+    .cl-body .cl-label:first-child { margin-top: 0; }
+    .cl-opt { color: var(--text-4, #b8ad99); }
+    .cl-input {
+        width: 100%; border: 1.5px solid var(--border, #e2dccd);
+        background: var(--bg, #fff); color: var(--text, #16130f);
+        border-radius: 9px; padding: 9px 12px; font-size: 14px; font-family: inherit;
+    }
+    .cl-input:focus { outline: none; border-color: #E63946; }
+    .cl-textarea { resize: vertical; min-height: 38px; }
+    .cl-emojis { display: flex; flex-wrap: wrap; gap: 7px; }
+    .cl-emoji {
+        width: 38px; height: 38px; border-radius: 9px; font-size: 18px;
+        border: 1px solid var(--border, #e2dccd); background: var(--bg, #fff);
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .cl-emoji.is-active { border: 2px solid #E63946; background: rgba(230,57,70,.06); }
+    .cl-colors { display: flex; gap: 9px; }
+    .cl-color {
+        width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+        border: 2px solid transparent; outline-offset: -4px;
+    }
+    .cl-color.is-active { border-color: var(--text, #16130f); outline: 2px solid var(--bg, #fff); }
+    .cl-c-red { background: #b91c1c; } .cl-c-amber { background: #b45309; }
+    .cl-c-blue { background: #1e40af; } .cl-c-green { background: #047857; }
+    .cl-c-purple { background: #6d28d9; } .cl-c-pink { background: #be185d; }
+    .cl-c-slate { background: #334155; }
+    .cl-foot {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px; padding: 14px 22px; border-top: 1px solid var(--border, #efeae0);
+    }
+    .cl-foot-right { display: flex; gap: 8px; margin-left: auto; }
+    .cl-del {
+        font-size: 13.5px; font-weight: 600; padding: 9px 14px; border-radius: 9px;
+        border: 1px solid transparent; background: none; color: #dc2626; cursor: pointer;
+    }
+    .cl-del:hover { background: rgba(220,38,38,.08); }
+    .cl-cancel {
+        font-size: 13.5px; font-weight: 600; padding: 9px 16px; border-radius: 9px;
+        border: 1px solid var(--border, #e2dccd); background: none; color: var(--text-2, #6d6456); cursor: pointer;
+    }
+    .cl-save {
+        font-size: 13.5px; font-weight: 700; padding: 9px 18px; border-radius: 9px;
+        border: none; background: #E63946; color: #fff; cursor: pointer;
+    }
+    .cl-save:disabled { opacity: .6; cursor: default; }
+</style>
+
+<script is:inline>
+(function () {
+    var modal = document.getElementById('cl-modal');
+    if (!modal) return;
+    var titleEl = document.getElementById('cl-title');
+    var nameEl = document.getElementById('cl-name');
+    var descEl = document.getElementById('cl-desc');
+    var emojisWrap = document.getElementById('cl-emojis');
+    var colorsWrap = document.getElementById('cl-colors');
+    var saveBtn = document.getElementById('cl-save');
+    var delBtn = document.getElementById('cl-delete');
+    var cancelBtn = document.getElementById('cl-cancel');
+    var closeBtn = document.getElementById('cl-close');
+
+    var editingId = null;
+    var selEmoji = '🎬';
+    var selColor = 'slate';
+
+    function setEmoji(e) {
+        selEmoji = e;
+        emojisWrap.querySelectorAll('.cl-emoji').forEach(function (b) {
+            b.classList.toggle('is-active', b.getAttribute('data-emoji') === e);
+        });
+    }
+    function setColor(c) {
+        selColor = c;
+        colorsWrap.querySelectorAll('.cl-color').forEach(function (b) {
+            b.classList.toggle('is-active', b.getAttribute('data-color') === c);
+        });
+    }
+
+    emojisWrap.addEventListener('click', function (e) {
+        var b = e.target.closest('.cl-emoji'); if (b) setEmoji(b.getAttribute('data-emoji'));
+    });
+    colorsWrap.addEventListener('click', function (e) {
+        var b = e.target.closest('.cl-color'); if (b) setColor(b.getAttribute('data-color'));
+    });
+
+    function open(mode, data) {
+        editingId = mode === 'edit' ? data.id : null;
+        titleEl.textContent = mode === 'edit' ? 'Editar colección' : 'Nueva colección';
+        saveBtn.textContent = mode === 'edit' ? 'Guardar' : 'Crear';
+        nameEl.value = mode === 'edit' ? (data.name || '') : '';
+        descEl.value = mode === 'edit' ? (data.desc || '') : '';
+        setEmoji(mode === 'edit' && data.icon ? data.icon : '🎬');
+        setColor(mode === 'edit' && data.color ? data.color : 'slate');
+        delBtn.hidden = mode !== 'edit';
+        modal.hidden = false;
+        document.body.style.overflow = 'hidden';
+        setTimeout(function () { nameEl.focus(); }, 30);
+    }
+    function close() {
+        modal.hidden = true;
+        document.body.style.overflow = '';
+        editingId = null;
+    }
+
+    function openCreate() { open('create'); }
+    var b1 = document.getElementById('new-list-btn'); if (b1) b1.addEventListener('click', openCreate);
+    var b2 = document.getElementById('new-list-tile'); if (b2) b2.addEventListener('click', openCreate);
+    var b3 = document.getElementById('new-list-cta'); if (b3) b3.addEventListener('click', openCreate);
+
+    document.querySelectorAll('.edit-list-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault(); e.stopPropagation();
+            open('edit', {
+                id: btn.getAttribute('data-id'),
+                name: btn.getAttribute('data-name'),
+                desc: btn.getAttribute('data-desc'),
+                icon: btn.getAttribute('data-icon'),
+                color: btn.getAttribute('data-color'),
+            });
+        });
+    });
+
+    cancelBtn.addEventListener('click', close);
+    closeBtn.addEventListener('click', close);
+    modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) close(); });
+
+    saveBtn.addEventListener('click', function () {
+        var name = nameEl.value.trim();
+        if (!name) { nameEl.focus(); return; }
+        saveBtn.disabled = true;
+        var body = editingId
+            ? { op: 'update', listId: editingId, patch: { name: name, description: descEl.value, icon: selEmoji, colorStamp: selColor } }
+            : { op: 'create', name: name, description: descEl.value, icon: selEmoji, colorStamp: selColor };
+        fetch('/api/lists', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        })
+            .then(function (r) {
+                if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                return r.json();
+            })
+            .then(function (res) { if (!res.ok) throw new Error(res.error || 'fail'); location.reload(); })
+            .catch(function () { saveBtn.disabled = false; });
+    });
+
+    delBtn.addEventListener('click', function () {
+        if (!editingId) return;
+        if (!confirm('¿Eliminar esta colección? Los títulos que contiene no se borran de tus otras listas.')) return;
+        delBtn.disabled = true;
+        fetch('/api/lists', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'delete', listId: editingId }),
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (res) { if (!res.ok) throw new Error(); location.reload(); })
+            .catch(function () { delBtn.disabled = false; });
+    });
+})();
+</script>

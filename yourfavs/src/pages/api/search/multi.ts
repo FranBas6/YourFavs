@@ -21,6 +21,8 @@ export interface MultiSearchItem {
     subtitle: string;
     /** URL w92 del póster/avatar, o null (el cliente pinta placeholder). */
     image: string | null;
+    /** poster_path/profile_path crudo (para reusar a otros tamaños), o null. */
+    poster_path: string | null;
     /** vote_average a 1 decimal; null para personas o sin votos. */
     rating: number | null;
     /** Ruta interna: /movie/:id, /serie/:id o /actor/:id. */
@@ -56,6 +58,7 @@ function toItem(raw: any): MultiSearchItem | null {
             title,
             subtitle: DEPARTMENT_ES[raw.known_for_department] || raw.known_for_department || 'Persona',
             image: raw.profile_path ? posterUrl(raw.profile_path, 'w92') : null,
+            poster_path: raw.profile_path ?? null,
             rating: null,
             href: `/actor/${raw.id}`,
         };
@@ -73,6 +76,7 @@ function toItem(raw: any): MultiSearchItem | null {
         title,
         subtitle: [year, type === 'movie' ? 'Película' : 'Serie'].filter(Boolean).join(' · '),
         image: raw.poster_path ? posterUrl(raw.poster_path, 'w92') : null,
+        poster_path: raw.poster_path ?? null,
         rating,
         // OJO: las series viven en /serie/:id (no /tv/).
         href: type === 'movie' ? `/movie/${raw.id}` : `/serie/${raw.id}`,
