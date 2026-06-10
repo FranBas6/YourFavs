@@ -85,9 +85,39 @@ async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
     }
 }
 
+// Re-visionados explícitos del botón "Vuelto a ver" (WatchLog): pelis con
+// rewatch=true y "pases" de serie (entradas a nivel serie, sin season). NO los
+// episodios sueltos (esos ya salen vía WatchedEpisodes; no duplicamos).
+async function fetchRewatchEvents(): Promise<ActivityEvent[]> {
+    try {
+        const snap = await userCol('WatchLog').get();
+        const events: ActivityEvent[] = [];
+        for (const docSnap of snap.docs) {
+            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; rewatch?: boolean; logged_at?: unknown; watched_on?: string };
+            const isMovieRewatch = x.media_type === 'movie' && x.rewatch === true;
+            const isSeriesPass = x.media_type === 'tv' && x.season == null;
+            if (!isMovieRewatch && !isSeriesPass) continue;
+            let ts = getFirebaseTimestamp(x.logged_at);
+            if (!ts && x.watched_on) ts = new Date(x.watched_on + 'T12:00:00').getTime();
+            if (!ts) continue;
+            events.push({
+                type: x.media_type === 'movie' ? 'movie' : 'serie',
+                id: String(x.tmdb_id),
+                collection: 'Rewatch',
+                action: 'Vuelto a ver',
+                timestamp: ts,
+            });
+        }
+        return events;
+    } catch (error) {
+        console.error('Error al leer WatchLog (rewatch):', error);
+        return [];
+    }
+}
+
 export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (!getCurrentUid()) return [];
-    const [collectionEvents, episodeEvents] = await Promise.all([
+    const [collectionEvents, episodeEvents, rewatchEvents] = await Promise.all([
         Promise.all(
             COLLECTIONS.map(async (c) => {
                 try {
@@ -108,6 +138,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
             })
         ).then(r => r.flat()),
         fetchWatchedEpisodeEvents(),
+        fetchRewatchEvents(),
     ]);
-    return [...collectionEvents, ...episodeEvents];
+    return [...collectionEvents, ...episodeEvents, ...rewatchEvents];
 }

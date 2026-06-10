@@ -1,15 +1,13 @@
 /**
- * POST /api/watchlog — diario de visionado (Fase L5).
+ * POST /api/watchlog — registrar un visionado en el diario (WatchLog).
  *
- *   { op:'adjust', media_type, tmdb_id, watched_on }  → cambia la fecha de la última entrada
- *   { op:'append', media_type, tmdb_id, watched_on?, season?, episode? } → añade entrada
+ *   { media_type, tmdb_id, watched_on?, season?, episode? } → añade una entrada.
  *
- * El registro normal de pelis/series lo hacen los handlers en servidor; este endpoint
- * sirve al popover "¿cuándo?" (adjust) y queda abierto para usos cliente (append).
- * Invitado → 401. El uid sale de la sesión.
+ * Lo usa "Vista otra vez" en la ficha (re-visionado). El registro normal al marcar
+ * vista/episodios lo hacen los handlers en servidor. Invitado → 401; uid de la sesión.
  */
 import type { APIRoute } from 'astro';
-import { adjustLastWatchDate, appendWatchLog, setWatchLogDate, deleteWatchLogEntry } from '../../services/BD/lists/watchLog';
+import { appendWatchLog } from '../../services/BD/lists/watchLog';
 
 export const prerender = false;
 
@@ -23,33 +21,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
         const body = await request.json().catch(() => ({}));
-        const op = String(body?.op || 'adjust');
-
-        // Edición/borrado de una entrada concreta (página del diario, L6b).
-        if (op === 'set-date') {
-            const entryId = String(body?.entryId || '');
-            if (!entryId || !isDate(body?.watched_on)) return json({ ok: false, error: 'Datos inválidos' }, 400);
-            await setWatchLogDate(entryId, body.watched_on);
-            return json({ ok: true });
-        }
-        if (op === 'delete') {
-            const entryId = String(body?.entryId || '');
-            if (!entryId) return json({ ok: false, error: 'entryId requerido' }, 400);
-            await deleteWatchLogEntry(entryId);
-            return json({ ok: true });
-        }
-
         const mediaType = body?.media_type;
         const tmdbId = body?.tmdb_id;
 
         if (mediaType !== 'movie' && mediaType !== 'tv') return json({ ok: false, error: 'media_type inválido' }, 400);
         if (!Number.isFinite(Number(tmdbId))) return json({ ok: false, error: 'tmdb_id inválido' }, 400);
-
-        if (op === 'adjust') {
-            if (!isDate(body?.watched_on)) return json({ ok: false, error: 'watched_on inválido' }, 400);
-            await adjustLastWatchDate(mediaType, tmdbId, body.watched_on);
-            return json({ ok: true });
-        }
 
         const res = await appendWatchLog({
             media_type: mediaType,

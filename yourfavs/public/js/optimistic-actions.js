@@ -45,6 +45,9 @@ function showToast(message, type) {
 function submitOptimistic(form, options) {
     form.addEventListener('submit', function (e) {
         e.preventDefault();
+        // Confirmación opcional (data-confirm): p. ej. "Volver a ver" reinicia el progreso.
+        var confirmMsg = form.getAttribute('data-confirm');
+        if (confirmMsg && !window.confirm(confirmMsg)) return;
         var submitter = e.submitter || form.querySelector('button[type="submit"]');
         var btn = submitter || form.querySelector('button[type="submit"]');
         if (!btn || btn.classList.contains('is-submitting')) return;

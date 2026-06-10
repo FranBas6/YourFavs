@@ -118,38 +118,6 @@ export async function appendEpisodes(
     await batch.commit();
 }
 
-/** Cambia la fecha de la entrada MÁS RECIENTE de un item (para el popover "¿cuándo?"). */
-export async function adjustLastWatchDate(
-    media_type: 'movie' | 'tv',
-    tmdb_id: number | string,
-    watched_on: string
-): Promise<void> {
-    if (!getCurrentUid()) return;
-    const tmdbId = Number(tmdb_id);
-    const snap = await userCol(COLLECTION).where('tmdb_id', '==', tmdbId).get();
-    const entries = snap.docs
-        .filter((d) => d.data().media_type === media_type)
-        .sort((a, b) => millis(b.data().logged_at) - millis(a.data().logged_at));
-    if (!entries.length) return;
-    await entries[0].ref.update({ watched_on });
-}
-
-function millis(v: any): number {
-    return (v && typeof v.toMillis === 'function') ? v.toMillis() : 0;
-}
-
-/** Cambia la fecha de una entrada concreta del diario (edición desde la página). */
-export async function setWatchLogDate(entryId: string, watched_on: string): Promise<void> {
-    if (!getCurrentUid() || !entryId) return;
-    await userCol(COLLECTION).doc(entryId).update({ watched_on });
-}
-
-/** Borra una entrada concreta del diario (corrección manual del usuario). */
-export async function deleteWatchLogEntry(entryId: string): Promise<void> {
-    if (!getCurrentUid() || !entryId) return;
-    await userCol(COLLECTION).doc(entryId).delete();
-}
-
 /** Nº de veces visto + última fecha (para "La has visto N veces" en la ficha). */
 export async function countWatches(
     media_type: 'movie' | 'tv',
@@ -163,13 +131,19 @@ export async function countWatches(
     return { count: rows.length, last };
 }
 
-/** Entradas del diario (orden desc por fecha), opcionalmente acotadas a un rango. */
-export async function getWatchLog(opts?: { from?: string; to?: string }): Promise<WatchLogEntry[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userCol(COLLECTION).get();
-    let rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Record<string, unknown>) }) as WatchLogEntry);
-    if (opts?.from) rows = rows.filter((r) => r.watched_on >= opts.from!);
-    if (opts?.to) rows = rows.filter((r) => r.watched_on <= opts.to!);
-    rows.sort((a, b) => b.watched_on.localeCompare(a.watched_on));
-    return rows;
+/**
+ * "Pases" de una serie = entradas de nivel SERIE (sin season/episode), que crea el
+ * botón "Vuelto a ver". El primer visionado NO crea entrada (se deriva de estar
+ * vista/en lista); aquí solo contamos los re-visionados explícitos. Para "Vista N
+ * veces" la ficha hace: base(1 si vista) + passes.
+ */
+export async function countSeriesPasses(
+    serieId: number | string
+): Promise<{ passes: number; last: string | null }> {
+    if (!getCurrentUid()) return { passes: 0, last: null };
+    const snap = await userCol(COLLECTION).where('tmdb_id', '==', Number(serieId)).get();
+    const rows = snap.docs.map((d) => d.data()).filter((x) => x.media_type === 'tv' && x.season == null);
+    if (!rows.length) return { passes: 0, last: null };
+    const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
+    return { passes: rows.length, last };
 }
