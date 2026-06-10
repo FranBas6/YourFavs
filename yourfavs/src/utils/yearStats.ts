@@ -38,6 +38,7 @@ export interface YearStats {
     moviesAdded: number;
     seriesAdded: number;
     episodesWatched: number;
+    rewatches: number;        // entradas del diario (WatchLog) marcadas como re-visionado
     totalHours: number;
     topGenres: { id: number; count: number }[];
     activeMonth: { month: number; count: number } | null;
@@ -355,11 +356,29 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         return Math.round(((cur - prev) / prev) * 100);
     };
 
+    // Re-visionados del año: entradas del diario (WatchLog) con rewatch=true.
+    // Aditivo: NO afecta a episodesWatched/totalHours (que salen de WatchedEpisodes),
+    // así que no hay doble conteo; es un número aparte.
+    let rewatches = 0;
+    try {
+        if (getCurrentUid()) {
+            const wlSnap = await userCol('WatchLog').get();
+            for (const d of wlSnap.docs) {
+                const x = d.data() as { watched_on?: string; rewatch?: boolean };
+                if (!x.rewatch || !x.watched_on) continue;
+                if (year === 'all' || x.watched_on.slice(0, 4) === String(year)) rewatches++;
+            }
+        }
+    } catch (error) {
+        console.error('Error leyendo WatchLog (rewatches):', error);
+    }
+
     const data: YearStats = {
         year,
         moviesAdded,
         seriesAdded,
         episodesWatched,
+        rewatches,
         totalHours,
         topGenres,
         activeMonth,

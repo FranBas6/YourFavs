@@ -80,6 +80,23 @@
         if (host) host.dispatchEvent(new Event('mouseleave'));
     });
 
+    // "Vista otra vez" (ficha de pelis, Fase L6): añade un re-visionado al diario
+    // (append sin dedupe → rewatch=true). Recarga para refrescar el "N veces".
+    document.addEventListener('click', function (e) {
+        var rb = e.target.closest && e.target.closest('.js-rewatch');
+        if (!rb || rb.dataset.busy) return;
+        e.preventDefault();
+        if (!loggedIn()) { document.dispatchEvent(new CustomEvent('yf:require-auth')); return; }
+        rb.dataset.busy = '1';
+        fetch('/api/watchlog', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'append', media_type: rb.getAttribute('data-mt'), tmdb_id: Number(rb.getAttribute('data-id')) }),
+        })
+            .then(function (r) { if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); } return r.json(); })
+            .then(function (res) { if (!res.ok) throw new Error(); location.reload(); })
+            .catch(function () { delete rb.dataset.busy; });
+    });
+
     var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
     var FIXED = [
         { key: 'favorites', emoji: '❤️', label: 'Favoritos' },
