@@ -1,0 +1,216 @@
+---
+/**
+ * Diario de visionado (Fase L6) — calendario de lo que viste, día a día.
+ *
+ * SSR: getDiaryMonth(year, month) lee WatchLog (append-only) + enriquece por TMDB.
+ * Reutiliza el patrón de cuadrícula del calendario de estrenos. Protegida por el
+ * middleware (/mislistas/*). El detalle del día se pinta en cliente al pulsar.
+ */
+import Layout from "../../layouts/Layout.astro";
+import PersonalNav from "../../components/personal/PersonalNav.astro";
+import EmptyState from "../../components/EmptyState.astro";
+import { getDiaryMonth } from "../../services/API/Diary/diaryService";
+
+const now = new Date();
+const year = parseInt(Astro.url.searchParams.get("year") || String(now.getFullYear()));
+const month = parseInt(Astro.url.searchParams.get("month") || String(now.getMonth() + 1));
+
+let diary;
+let errorMessage = "";
+try {
+    diary = await getDiaryMonth(year, month);
+} catch (error) {
+    console.error("Error al cargar el diario:", error);
+    errorMessage = error instanceof Error ? error.message : "Error al cargar el diario";
+}
+
+const today = diary?.today || new Date().toISOString().slice(0, 10);
+const daysInMonth = new Date(year, month, 0).getDate();
+const firstDayOfWeek = (new Date(year, month - 1, 1).getDay() + 6) % 7; // Lunes=0
+
+const itemsByDate = new Map<string, any[]>();
+for (const d of diary?.days || []) itemsByDate.set(d.date, d.items);
+
+const calendarCells: { day: number | null; date: string; items: any[] }[] = [];
+for (let i = 0; i < firstDayOfWeek; i++) calendarCells.push({ day: null, date: '', items: [] });
+for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    calendarCells.push({ day: d, date: dateStr, items: itemsByDate.get(dateStr) || [] });
+}
+
+const prevMonth = month === 1 ? 12 : month - 1;
+const prevYear = month === 1 ? year - 1 : year;
+const nextMonth = month === 12 ? 1 : month + 1;
+const nextYear = month === 12 ? year + 1 : year;
+
+const monthNames = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+const stats = diary?.stats || { movies: 0, episodes: 0, hours: 0, rewatches: 0 };
+---
+<Layout title="Tu diario">
+    <section class="px-1 sm:py-8">
+        {errorMessage && (
+            <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">{errorMessage}</div>
+        )}
+
+        <header class="mb-6 flex items-center gap-3">
+            <span class="w-10 h-10 rounded-xl bg-red-100 text-red-700 flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+            </span>
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">Tu diario</h1>
+                <p class="text-gray-500 text-sm">Lo que viste, día a día</p>
+            </div>
+        </header>
+
+        <div class="mb-6"><PersonalNav currentPage="/mislistas/diario" /></div>
+
+        <div class="grid lg:grid-cols-[1.6fr_1fr] gap-6">
+            <!-- Calendario -->
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden self-start">
+                <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
+                    <a href={`/mislistas/diario?year=${prevYear}&month=${prevMonth}`} class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </a>
+                    <h2 class="text-lg sm:text-xl font-semibold text-gray-800">{monthNames[month - 1]} {year}</h2>
+                    <a href={`/mislistas/diario?year=${nextYear}&month=${nextMonth}`} class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </a>
+                </div>
+
+                <div class="grid grid-cols-7 border-b border-gray-100">
+                    {dayNames.map(d => (
+                        <div class="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">{d}</div>
+                    ))}
+                </div>
+
+                <div class="grid grid-cols-7">
+                    {calendarCells.map((cell) => {
+                        const isToday = cell.date === today;
+                        const has = cell.items.length > 0;
+                        const hasMovie = cell.items.some((i: any) => i.media_type === 'movie');
+                        const hasEp = cell.items.some((i: any) => i.media_type === 'tv');
+                        const hasRewatch = cell.items.some((i: any) => i.rewatch);
+                        return (
+                            <div class={`diary-cell min-h-[3rem] sm:min-h-[5rem] border-b border-r border-gray-50 p-1 sm:p-2 relative
+                                ${!cell.day ? 'bg-gray-50/50' : ''}
+                                ${isToday ? 'ring-2 ring-inset ring-red-400' : ''}
+                                ${has ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
+                                data-date={cell.date}
+                                data-items={has ? JSON.stringify(cell.items) : undefined}>
+                                {cell.day && (
+                                    <>
+                                        <span class={`text-xs sm:text-sm font-medium ${isToday ? 'text-red-600 font-bold' : 'text-gray-600'}`} style="font-family: var(--font-mono);">{cell.day}</span>
+                                        {has && (
+                                            <div class="flex items-center gap-0.5 mt-0.5 flex-wrap">
+                                                {hasMovie && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#E63946]" title="Película"></span>}
+                                                {hasEp && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3B82F6]" title="Episodio"></span>}
+                                                {hasRewatch && <span class="text-[9px] text-gray-400" title="Re-visionado">↻</span>}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div class="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#E63946]"></span> Películas</span>
+                    <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-[#3B82F6]"></span> Episodios</span>
+                    <span class="flex items-center gap-1.5">↻ Re-visionado</span>
+                </div>
+            </div>
+
+            <!-- Columna derecha: detalle del día + stats -->
+            <div class="space-y-6">
+                <div id="diary-detail">
+                    {diary && diary.total === 0 ? (
+                        <EmptyState
+                            size="sm"
+                            title="Este mes aún no hay nada"
+                            description="Marca pelis o episodios como vistos y los verás aparecer aquí, día a día."
+                        />
+                    ) : (
+                        <div class="bg-white border border-gray-200 rounded-2xl p-5 text-sm text-gray-400">
+                            Pulsa un día con actividad para ver qué viste.
+                        </div>
+                    )}
+                </div>
+
+                <div class="bg-white border border-gray-200 rounded-2xl p-5">
+                    <div class="font-mono text-[10px] tracking-widest text-gray-400 uppercase mb-3">Este mes</div>
+                    <div class="space-y-2">
+                        {[['Películas', stats.movies], ['Series · episodios', stats.episodes], ['Horas', `${stats.hours} h`], ['Re-visionados', stats.rewatches]].map(([label, value]) => (
+                            <div class="flex items-center justify-between text-sm">
+                                <span class="text-gray-500">{label}</span>
+                                <span class="font-bold font-mono text-gray-900">{value}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+</Layout>
+
+<script is:inline>
+(function () {
+    var detail = document.getElementById('diary-detail');
+    if (!detail) return;
+    var IMG_OK = true;
+    var selected = null;
+
+    function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+    var MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+    function render(date, items) {
+        var d = new Date(date + 'T12:00:00');
+        var head = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+        var html = '<div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">';
+        html += '<div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">';
+        html += '<span class="text-sm font-semibold text-gray-800 capitalize">' + esc(head) + '</span>';
+        html += '<span class="font-mono text-[11px] text-gray-400">' + items.length + (items.length === 1 ? ' título' : ' títulos') + '</span></div>';
+        html += '<div class="divide-y divide-gray-50">';
+        items.forEach(function (it) {
+            var link = it.media_type === 'movie' ? '/movie/' + it.tmdb_id : '/serie/' + it.tmdb_id;
+            var label = it.media_type === 'movie'
+                ? 'Película'
+                : (it.season != null && it.episode != null ? 'T' + it.season + '·E' + it.episode : 'Serie');
+            var poster = it.poster_path
+                ? '<img src="' + esc(it.poster_path) + '" alt="" class="w-10 h-14 object-cover rounded-md flex-shrink-0" loading="lazy">'
+                : '<div class="w-10 h-14 bg-gray-200 rounded-md flex-shrink-0 flex items-center justify-center text-gray-400 text-xs">' + (it.media_type === 'movie' ? '🎬' : '📺') + '</div>';
+            html += '<a href="' + link + '" class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">';
+            html += poster;
+            html += '<div class="min-w-0 flex-1"><div class="text-sm font-medium text-gray-800 truncate">' + esc(it.title) + '</div>';
+            html += '<div class="text-[11px] text-gray-500 flex items-center gap-1.5">' + label;
+            if (it.rewatch) html += '<span class="inline-flex items-center gap-0.5 text-gray-400">· ↻ re-visionado</span>';
+            html += '</div></div></a>';
+        });
+        html += '</div></div>';
+        detail.innerHTML = html;
+    }
+
+    document.querySelectorAll('[data-items]').forEach(function (cell) {
+        cell.addEventListener('click', function () {
+            var items;
+            try { items = JSON.parse(cell.getAttribute('data-items') || '[]'); } catch (e) { items = []; }
+            if (!items.length) return;
+            if (selected) selected.removeAttribute('data-selected');
+            cell.setAttribute('data-selected', 'true');
+            selected = cell;
+            render(cell.getAttribute('data-date'), items);
+            if (window.matchMedia('(max-width: 1023px)').matches) {
+                detail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        });
+    });
+})();
+</script>
+
+<style>
+    .diary-cell[data-selected="true"] {
+        background-color: var(--accent-soft);
+        box-shadow: inset 0 0 0 2px var(--accent);
+    }
+</style>
