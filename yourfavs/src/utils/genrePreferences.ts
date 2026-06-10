@@ -1,10 +1,35 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getCached, setCached, invalidateCached } from './recsBlobCache';
-import { getCurrentUid } from '../services/BD/shared/userScope';
+import { getCurrentUid, userCol } from '../services/BD/shared/userScope';
 import { getMovieFav } from '../services/BD/movies/yourfavsMovie';
 import { getSerieFav } from '../services/BD/series/yourfavsSerie';
 import { getUserTaste } from '../services/BD/profile/userTaste';
+import { getCustomLists, getListItems } from '../services/BD/lists/customLists';
+
+// Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
+// que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).
+const MOVIE_LIST_COLS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
+const TV_LIST_COLS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'];
+
+/** IDs (tmdb, string) de TODO lo que el usuario tiene en listas fijas + colecciones. */
+async function collectLibraryIds(): Promise<{ movies: Set<string>; tv: Set<string> }> {
+    const movies = new Set<string>();
+    const tv = new Set<string>();
+    try {
+        const movieSnaps = await Promise.all(MOVIE_LIST_COLS.map((c) => userCol(c).get().catch(() => null)));
+        movieSnaps.forEach((s) => s?.docs.forEach((d) => movies.add(d.id)));
+        const tvSnaps = await Promise.all(TV_LIST_COLS.map((c) => userCol(c).get().catch(() => null)));
+        tvSnaps.forEach((s) => s?.docs.forEach((d) => tv.add(d.id)));
+        // Items de colecciones personalizadas.
+        const lists = await getCustomLists();
+        const itemsPerList = await Promise.all(lists.map((l) => getListItems(l.id).catch(() => [])));
+        itemsPerList.flat().forEach((it) => {
+            (it.media_type === 'tv' ? tv : movies).add(String(it.tmdb_id));
+        });
+    } catch { /* exclusión best-effort */ }
+    return { movies, tv };
+}
 
 /**
  * Preferencias de género (Fase F · modelo simplificado).
@@ -40,7 +65,7 @@ type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'genrePrefs_v4';        // v4: modelo simplificado favs+taste, keyed por uid
+const BLOB_KEY = 'genrePrefs_v5';        // v5: exclusión = TODAS las listas (no solo favs); v4 favs+taste
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 const l1 = new Map<string, { data: GenrePrefs; expires: number }>();
@@ -172,6 +197,13 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const movieEntries = Array.from(movieMap.entries());
     const tvEntries = Array.from(tvMap.entries());
 
+    // Exclusión de recomendaciones: TODO lo que el usuario ya tiene en cualquier
+    // lista (fijas + colecciones) + las semillas. Los seeds (favs+taste) siguen
+    // alimentando la afinidad; esto solo evita recomendar lo ya guardado.
+    const libraryIds = await collectLibraryIds();
+    movieEntries.forEach(([id]) => libraryIds.movies.add(id));
+    tvEntries.forEach(([id]) => libraryIds.tv.add(id));
+
     // Géneros ya guardados en los docs (pelis sí; series no → se pedirán a TMDB).
     const movieDocGenres = docGenreMap(movFavs as any[]);
     const tvDocGenres = docGenreMap(tvFavs as any[]);
@@ -189,10 +221,7 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const data: GenrePrefs = {
         movies: aggregateGenres(movieDetails, TOP_N_MOVIES, movieTasteGenres),
         tv: aggregateGenres(tvDetails, TOP_N_TV, tvTasteGenres),
-        libraryIds: {
-            movies: new Set(movieEntries.map(([id]) => id)),
-            tv: new Set(tvEntries.map(([id]) => id)),
-        },
+        libraryIds,
         genresById: { movies: movieGenresById, tv: tvGenresById },
         seeds: { movies: movieEntries, tv: tvEntries },
         tasteGenres: movieTasteGenres,

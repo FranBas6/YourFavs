@@ -480,6 +480,17 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
     .perfil-delete:disabled { opacity: .55; cursor: progress; }
 </style>
 
+<!-- La galería de avatares la inyecta el JS (#avatar-grid) → estos estilos van
+     GLOBALES porque el CSS scoped de Astro no alcanza al HTML inyectado. -->
+<style is:global>
+    #avatar-grid .av-group { margin: 8px 0 2px; font-size: 11.5px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: .03em; }
+    #avatar-grid .av-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 10px; }
+    #avatar-grid .av-state { text-align: center; color: var(--text-3); font-size: 13px; padding: 20px 0; }
+    #avatar-grid .av-pick { padding: 0; border: 2px solid transparent; border-radius: 999px; cursor: pointer; background: var(--bg-tint); aspect-ratio: 1; overflow: hidden; }
+    #avatar-grid .av-pick:hover { border-color: var(--accent); }
+    #avatar-grid .av-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+</style>
+
 <script>
     // Tema: aplica al instante (data-theme + localStorage) al cambiar el select,
     // además de guardarse en el perfil al enviar el form (sync entre dispositivos).
