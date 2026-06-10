@@ -48,9 +48,9 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
                 </button>
             </EmptyState>
         ) : (
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4" id="lists-grid">
                 {lists.map((l) => (
-                    <div class="group relative bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                    <div class="js-list-card group relative bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow" data-id={l.id}>
                         <a href={`/mislistas/colecciones/${l.id}`} class="block">
                             <div class={`cover-block cover-${l.colorStamp} relative h-24 flex items-end p-3`}>
                                 {l.cover?.type === 'poster' && l.cover.poster_path && (
@@ -209,7 +209,36 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
         border: none; background: #E63946; color: #fff; cursor: pointer;
     }
     .cl-save:disabled { opacity: .6; cursor: default; }
+
+    /* Drag-reorder (L3b) */
+    .js-list-card { cursor: grab; }
+    .js-list-card:active { cursor: grabbing; }
+    .yf-dragging { opacity: .4; }
 </style>
+
+<style is:global>
+    /* Táctil (sin hover): el lápiz de editar colección siempre visible */
+    @media (hover: none) {
+        .edit-list-btn { opacity: 1 !important; }
+    }
+</style>
+
+<script is:inline src="/js/reorder.js"></script>
+<script is:inline>
+(function () {
+    var grid = document.getElementById('lists-grid');
+    if (!grid || !window.YFReorder) return;
+    window.YFReorder(grid, '.js-list-card', function (order) {
+        fetch('/api/lists', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'reorder', order: order }),
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (res) { if (!res.ok) throw new Error(); })
+            .catch(function () { location.reload(); }); // revertir si falla
+    });
+})();
+</script>
 
 <script is:inline>
 (function () {

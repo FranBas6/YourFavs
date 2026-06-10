@@ -12,6 +12,7 @@ import { getWatchLog } from '../../BD/lists/watchLog';
 const FALLBACK_EPISODE_RUNTIME = 45;
 
 export interface DiaryItem {
+    id: string;                    // id de la entrada en WatchLog (para editar/borrar)
     media_type: 'movie' | 'tv';
     tmdb_id: number;
     title: string;
@@ -73,6 +74,7 @@ export async function getDiaryMonth(year: number, month: number): Promise<DiaryM
     for (const e of entries) {
         const det = detailById.get(`${e.media_type}:${e.tmdb_id}`);
         const item: DiaryItem = {
+            id: e.id,
             media_type: e.media_type,
             tmdb_id: e.tmdb_id,
             title: det?.title || '—',

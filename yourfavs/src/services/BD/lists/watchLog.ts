@@ -138,6 +138,18 @@ function millis(v: any): number {
     return (v && typeof v.toMillis === 'function') ? v.toMillis() : 0;
 }
 
+/** Cambia la fecha de una entrada concreta del diario (edición desde la página). */
+export async function setWatchLogDate(entryId: string, watched_on: string): Promise<void> {
+    if (!getCurrentUid() || !entryId) return;
+    await userCol(COLLECTION).doc(entryId).update({ watched_on });
+}
+
+/** Borra una entrada concreta del diario (corrección manual del usuario). */
+export async function deleteWatchLogEntry(entryId: string): Promise<void> {
+    if (!getCurrentUid() || !entryId) return;
+    await userCol(COLLECTION).doc(entryId).delete();
+}
+
 /** Nº de veces visto + última fecha (para "La has visto N veces" en la ficha). */
 export async function countWatches(
     media_type: 'movie' | 'tv',

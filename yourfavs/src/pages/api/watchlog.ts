@@ -9,7 +9,7 @@
  * Invitado → 401. El uid sale de la sesión.
  */
 import type { APIRoute } from 'astro';
-import { adjustLastWatchDate, appendWatchLog } from '../../services/BD/lists/watchLog';
+import { adjustLastWatchDate, appendWatchLog, setWatchLogDate, deleteWatchLogEntry } from '../../services/BD/lists/watchLog';
 
 export const prerender = false;
 
@@ -23,7 +23,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
         const body = await request.json().catch(() => ({}));
-        const op = body?.op === 'append' ? 'append' : 'adjust';
+        const op = String(body?.op || 'adjust');
+
+        // Edición/borrado de una entrada concreta (página del diario, L6b).
+        if (op === 'set-date') {
+            const entryId = String(body?.entryId || '');
+            if (!entryId || !isDate(body?.watched_on)) return json({ ok: false, error: 'Datos inválidos' }, 400);
+            await setWatchLogDate(entryId, body.watched_on);
+            return json({ ok: true });
+        }
+        if (op === 'delete') {
+            const entryId = String(body?.entryId || '');
+            if (!entryId) return json({ ok: false, error: 'entryId requerido' }, 400);
+            await deleteWatchLogEntry(entryId);
+            return json({ ok: true });
+        }
+
         const mediaType = body?.media_type;
         const tmdbId = body?.tmdb_id;
 
