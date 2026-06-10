@@ -82,6 +82,16 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     if (action === 'add' && !exists) {
         await docRef.set(movieData);
         mutated = true;
+        // Diario (L5): en YourFavs "visto" = Vistas ∪ Me gusta ∪ Favoritos, así que
+        // entrar a cualquiera de las tres registra el visionado (fecha = hoy). dedupe:
+        // solo la PRIMERA vez que entra a "visto" (mover de lista o curar algo ya
+        // visto NO duplica). Pendientes/Ver pronto NO registran. Best-effort.
+        if (collectionName === 'MovieFavs' || collectionName === 'LikedMovies' || collectionName === 'MoviesVistas') {
+            try {
+                const { appendWatchLog } = await import('../lists/watchLog');
+                await appendWatchLog({ media_type: 'movie', tmdb_id: movieId, dedupe: true });
+            } catch { /* diario opcional */ }
+        }
     } else if (action === 'remove' && exists) {
         await docRef.delete();
         mutated = true;

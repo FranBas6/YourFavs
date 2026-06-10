@@ -1,7 +1,17 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
+import { appendWatchLog, appendEpisodes } from "../lists/watchLog";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
+
+// Diario (L5): registrar lo que se marca como visto, SIN acoplar al progreso y
+// best-effort (un fallo del diario nunca rompe el marcado). Fecha = hoy.
+async function logEpisode(serieId: string, season: number, episode: number): Promise<void> {
+    try { await appendWatchLog({ media_type: 'tv', tmdb_id: serieId, season, episode }); } catch { /* diario opcional */ }
+}
+async function logSeasonEpisodes(serieId: string, eps: { season: number; episode: number }[]): Promise<void> {
+    try { await appendEpisodes(serieId, eps); } catch { /* diario opcional */ }
+}
 
 const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'];
 
@@ -391,6 +401,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
             watched_episodes: [ep],
             last_watched: ep,
         });
+        await logEpisode(serieId, season, episode);
         return;
     }
 
@@ -399,7 +410,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
     const idx = episodes.findIndex(e => e.season === season && e.episode === episode);
 
     if (idx >= 0) {
-        // Ya visto — quitar
+        // Ya visto — quitar (no toca el diario: es append-only)
         episodes.splice(idx, 1);
         await ref.update({
             watched_episodes: episodes,
@@ -413,6 +424,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
             watched_episodes: episodes,
             last_watched: ep,
         });
+        await logEpisode(serieId, season, episode);
     }
 }
 
@@ -428,6 +440,7 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
 
     if (!snap.exists) {
         await ref.set({ id: serieId, watched_episodes: [ep], last_watched: ep });
+        await logEpisode(serieId, season, episode);
         return;
     }
 
@@ -437,6 +450,7 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
 
     episodes.push(ep);
     await ref.update({ watched_episodes: episodes, last_watched: ep });
+    await logEpisode(serieId, season, episode);
 }
 
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
@@ -449,6 +463,7 @@ export async function markSeasonWatched(serieId: string, season: number, episode
     if (!snap.exists) {
         const last = newEpisodes[newEpisodes.length - 1];
         await ref.set({ id: serieId, watched_episodes: newEpisodes, last_watched: last });
+        await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
         return;
     }
 
@@ -460,6 +475,7 @@ export async function markSeasonWatched(serieId: string, season: number, episode
         watched_episodes: allEpisodes,
         last_watched: allEpisodes[allEpisodes.length - 1],
     });
+    await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
 }
 
 export async function unmarkSeasonWatched(serieId: string, season: number): Promise<void> {
@@ -481,6 +497,7 @@ export async function markAllWatched(serieId: string, allEpisodes: { season: num
     const episodes: WatchedEpisode[] = allEpisodes.map(e => ({ season: e.season, episode: e.episode, watched_at: now }));
     const last = episodes[episodes.length - 1];
     await ref.set({ id: serieId, watched_episodes: episodes, last_watched: last });
+    await logSeasonEpisodes(serieId, allEpisodes.map(e => ({ season: e.season, episode: e.episode })));
 }
 
 export async function unmarkAllWatched(serieId: string): Promise<void> {
