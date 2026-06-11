@@ -1,6 +1,7 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
+import { appDateParts } from './appTime';
 import { userCol, getCurrentUid } from '../services/BD/shared/userScope';
 import {
     getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
@@ -71,10 +72,10 @@ const COLLECTION_LABELS: Record<string, string> = {
     vistos: 'Vistos', pendientes: 'Pendientes', verpronto: 'Pronto',
 };
 
-function yearOf(timestamp: number): number { return new Date(timestamp).getFullYear(); }
-function monthOf(timestamp: number): number { return new Date(timestamp).getMonth(); }
-function weekdayOf(timestamp: number): number { return new Date(timestamp).getDay(); }
-function dayKey(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function yearOf(timestamp: number): number { return appDateParts(timestamp).year; }
+function monthOf(timestamp: number): number { return appDateParts(timestamp).month; }
+function weekdayOf(timestamp: number): number { return appDateParts(timestamp).weekday; }
+function dayKey(d: Date): string { return appDateParts(d.getTime()).key; }
 function decadeOf(year: number): string {
     if (!year || year < 1900) return 'Desconocido';
     return `${Math.floor(year / 10) * 10}s`;
@@ -266,7 +267,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
                 if (!ep.watched_at) continue;
                 const d = new Date(ep.watched_at);
                 if (isNaN(d.getTime())) continue;
-                const y = d.getFullYear();
+                const y = yearOf(d.getTime());
                 if (year === 'all' || y === year) {
                     episodesWatched++;
                     const k = dayKey(d);

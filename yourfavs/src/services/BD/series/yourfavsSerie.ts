@@ -1,6 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 import { appendWatchLog, appendEpisodes } from "../lists/watchLog";
+import { appDateParts } from "../../../utils/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 
@@ -541,41 +542,32 @@ export async function getWatchStreak(): Promise<{ current: number; lastDay: stri
     if (!getCurrentUid()) return { current: 0, lastDay: null };
     try {
         const snap = await userCol('WatchedEpisodes').get();
-        const dayKeys = new Set<string>();
+        // Día absoluto en hora de Madrid (no UTC del servidor): así una marca de
+        // las 00:30 cuenta en su día real y la racha no se rompe de madrugada.
+        const dayNums = new Set<number>();
         for (const docSnap of snap.docs) {
             const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
             for (const ep of data.watched_episodes || []) {
                 if (!ep.watched_at) continue;
-                const d = new Date(ep.watched_at);
-                if (isNaN(d.getTime())) continue;
-                dayKeys.add(`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`);
+                const t = new Date(ep.watched_at).getTime();
+                if (isNaN(t)) continue;
+                dayNums.add(appDateParts(t).dayNum);
             }
         }
-        if (dayKeys.size === 0) return { current: 0, lastDay: null };
+        if (dayNums.size === 0) return { current: 0, lastDay: null };
 
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const todayKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
-        const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayKey = `${yesterday.getFullYear()}-${yesterday.getMonth()}-${yesterday.getDate()}`;
+        const todayNum = appDateParts(Date.now()).dayNum;
+        // La racha cuenta si hubo actividad hoy o ayer (Madrid).
+        let cursor: number;
+        if (dayNums.has(todayNum)) cursor = todayNum;
+        else if (dayNums.has(todayNum - 1)) cursor = todayNum - 1;
+        else return { current: 0, lastDay: null };
 
-        let cursor = new Date(today);
-        if (!dayKeys.has(todayKey)) {
-            if (dayKeys.has(yesterdayKey)) cursor = yesterday;
-            else return { current: 0, lastDay: null };
-        }
-
+        const lastDayNum = cursor;
         let streak = 0;
-        while (true) {
-            const key = `${cursor.getFullYear()}-${cursor.getMonth()}-${cursor.getDate()}`;
-            if (dayKeys.has(key)) {
-                streak++;
-                cursor.setDate(cursor.getDate() - 1);
-            } else break;
-        }
+        while (dayNums.has(cursor)) { streak++; cursor--; }
 
-        const lastDayDate = new Date(today);
-        if (!dayKeys.has(todayKey)) lastDayDate.setDate(lastDayDate.getDate() - 1);
-        return { current: streak, lastDay: lastDayDate.toISOString() };
+        return { current: streak, lastDay: new Date(lastDayNum * 86400000).toISOString() };
     } catch (error) {
         console.error('Error al calcular racha:', error);
         return { current: 0, lastDay: null };
@@ -584,9 +576,9 @@ export async function getWatchStreak(): Promise<{ current: number; lastDay: stri
 
 /**
  * Racha máxima histórica + actual, en una sola lectura de WatchedEpisodes.
- * Cada día se reduce a un nº de día (ms/86400000 con Math.round, que absorbe
- * el desfase ±1h de los cambios DST) y se busca la secuencia consecutiva más
- * larga. La actual replica el criterio de getWatchStreak (hoy o ayer cuentan).
+ * Cada día se reduce a un nº de día absoluto en hora de Madrid (appDateParts,
+ * DST-safe) y se busca la secuencia consecutiva más larga. La actual replica el
+ * criterio de getWatchStreak (hoy o ayer cuentan).
  */
 export async function getMaxWatchStreak(): Promise<{ max: number; current: number }> {
     if (!getCurrentUid()) return { max: 0, current: 0 };
@@ -599,7 +591,7 @@ export async function getMaxWatchStreak(): Promise<{ max: number; current: numbe
                 if (!ep.watched_at) continue;
                 const d = new Date(ep.watched_at);
                 if (isNaN(d.getTime())) continue;
-                dayNums.add(Math.round(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86400000));
+                dayNums.add(appDateParts(d.getTime()).dayNum);
             }
         }
         if (dayNums.size === 0) return { max: 0, current: 0 };
@@ -614,8 +606,7 @@ export async function getMaxWatchStreak(): Promise<{ max: number; current: numbe
             prev = n;
         }
 
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const todayNum = Math.round(today.getTime() / 86400000);
+        const todayNum = appDateParts(Date.now()).dayNum;
         let cursor = dayNums.has(todayNum) ? todayNum : dayNums.has(todayNum - 1) ? todayNum - 1 : null;
         let current = 0;
         while (cursor !== null && dayNums.has(cursor)) { current++; cursor--; }

@@ -331,7 +331,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                         const binge = isBinge ? bingeView(ev, d) : null;
                         return binge ? (
                             binge.mode === 'single' ? (
-                                <a href={href} class="ev" data-cat="ep">
+                                <a href={href} class="ev" data-cat="ep" data-ts={ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -350,7 +350,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                     <Icon name="lucide:chevron-right" class="chev" />
                                 </a>
                             ) : binge.mode === 'episodes' ? (
-                                <a href={href} class="ev binge" data-cat="ep">
+                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -374,7 +374,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                     <span class="time">{time}</span>
                                 </a>
                             ) : binge.mode === 'season' ? (
-                                <a href={href} class="ev binge" data-cat="ep">
+                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -393,7 +393,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                     <span class="time">{time}</span>
                                 </a>
                             ) : (
-                                <a href={href} class="ev binge" data-cat="ep">
+                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -425,7 +425,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                 </a>
                             )
                         ) : (
-                            <a href={href} class="ev" data-cat={cat}>
+                            <a href={href} class="ev" data-cat={cat} data-ts={ev.timestamp}>
                                 <span class="act-ico" style={`background: var(--a-${cat}-bg); color: var(--a-${cat});`}><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
                                 {poster ? (
                                     <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -471,6 +471,36 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
         // Filtros por acción: oculta filas que no coinciden y días que quedan vacíos.
         // Soporta varios bloques .act-filters (rail desktop + móvil) con estado sincronizado.
         (function () {
+            // Zona horaria del NAVEGADOR: el servidor renderiza en UTC, así que la
+            // hora y la etiqueta de día (Hoy/Ayer/fecha) se recalculan aquí con la
+            // zona del visitante. El valor del servidor queda como fallback sin-JS.
+            const dayKey = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD, zona local
+            const todayKey = dayKey(new Date());
+            const yKey = (() => { const y = new Date(); y.setDate(y.getDate() - 1); return dayKey(y); })();
+            const fmtTime = (ts) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            const fmtDay = (d) => {
+                const k = dayKey(d);
+                if (k === todayKey) return 'Hoy';
+                if (k === yKey) return 'Ayer';
+                return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+            };
+            document.querySelectorAll('.act-timeline .ev[data-ts]').forEach((ev) => {
+                const ts = Number(ev.dataset.ts);
+                if (!ts) return;
+                const t = ev.querySelector('.time');
+                if (t) t.textContent = fmtTime(ts);
+            });
+            document.querySelectorAll('.act-timeline .tl-day').forEach((day) => {
+                // ts representativo del grupo = el más reciente de sus filas
+                let maxTs = 0;
+                day.querySelectorAll('.ev[data-ts]').forEach((ev) => {
+                    const ts = Number(ev.dataset.ts);
+                    if (ts > maxTs) maxTs = ts;
+                });
+                const label = day.querySelector('.tl-day-head .d');
+                if (maxTs && label) label.textContent = fmtDay(new Date(maxTs));
+            });
+
             const groups = document.querySelectorAll('.act-filters');
             if (!groups.length) return;
             groups.forEach((group) => {

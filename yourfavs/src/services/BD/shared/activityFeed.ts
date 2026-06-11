@@ -1,5 +1,6 @@
 import { userCol, getCurrentUid } from "./userScope";
 import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
+import { appDateParts } from "../../../utils/appTime";
 
 export interface ActivityEvent {
     type: 'movie' | 'serie';
@@ -25,8 +26,7 @@ const COLLECTIONS: { name: string; type: 'movie' | 'serie'; action: string }[] =
 ];
 
 function dayKey(ts: number): string {
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    return appDateParts(ts).key; // agrupado por día en hora de Madrid (no UTC del servidor)
 }
 
 async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
