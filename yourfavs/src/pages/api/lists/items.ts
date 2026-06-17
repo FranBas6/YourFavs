@@ -35,13 +35,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
             if ((mediaType !== 'movie' && mediaType !== 'tv') || !Number.isFinite(Number(item?.tmdb_id))) {
                 return json({ ok: false, error: 'item inválido' }, 400);
             }
-            await addItemToList(listId, {
+            const { itemCount } = await addItemToList(listId, {
                 media_type: mediaType,
                 tmdb_id: Number(item.tmdb_id),
                 title: item.title,
                 poster_path: item.poster_path,
             });
-            return json({ ok: true });
+            return json({ ok: true, itemCount });
         }
 
         if (op === 'remove') {

@@ -9,7 +9,7 @@
  * Solo las 3 listas del mockup (favorites/pendientes/vistas); el resto (Me gusta,
  * Ver pronto, Siguiendo) siguen gestionándose en la ficha.
  */
-import { userDoc, getCurrentUid } from '../shared/userScope';
+import { userDoc, userCol, getCurrentUid } from '../shared/userScope';
 import { handleMovieFavAction } from '../movies/yourfavsMovie';
 import { handleSerieFavAction } from '../series/yourfavsSerie';
 
@@ -44,13 +44,16 @@ export async function getFixedMembership(
     return result;
 }
 
-/** Añade/quita de una lista fija, reusando los handlers de la ficha. */
+/**
+ * Añade/quita de una lista fija, reusando los handlers de la ficha. Devuelve el
+ * tamaño de la lista TRAS la operación (`count`), para el toast "· #N" del popover.
+ */
 export async function saveFixed(
     mediaType: 'movie' | 'tv',
     tmdbId: number | string,
     list: FixedList,
     action: 'add' | 'remove'
-): Promise<void> {
+): Promise<{ count: number }> {
     const fd = new FormData();
     fd.set('id', String(tmdbId));
     fd.set('action', action);
@@ -61,4 +64,11 @@ export async function saveFixed(
         fd.set('actionType', SERIE_ACTION_TYPE[list]);
         await handleSerieFavAction(fd);
     }
+    // Contador agregado (no lee los docs). Es decorativo: si falla, devolvemos 0.
+    let count = 0;
+    try {
+        const agg = await userCol(COLLECTION_BY_MEDIA[mediaType][list]).count().get();
+        count = agg.data().count;
+    } catch { /* el toast simplemente no mostrará el #N */ }
+    return { count };
 }

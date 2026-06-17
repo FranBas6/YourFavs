@@ -209,17 +209,19 @@ export async function reorderLists(orderedIds: string[]): Promise<void> {
 
 // ---- escrituras: items ----
 
-export async function addItemToList(listId: string, item: CustomListItemInput): Promise<void> {
+export async function addItemToList(listId: string, item: CustomListItemInput): Promise<{ itemCount: number }> {
     requireUid();
     const listRef = userDoc(COLLECTION, listId);
-    if (!(await listRef.get()).exists) throw new Error('Lista no encontrada');
+    const listSnap = await listRef.get();
+    if (!listSnap.exists) throw new Error('Lista no encontrada');
+    const prevCount = Number(listSnap.data()?.itemCount) || 0;
 
     const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
     const tmdbId = Number(item.tmdb_id);
     if (!Number.isFinite(tmdbId)) throw new Error('tmdb_id inválido');
 
     const itemRef = listRef.collection(ITEMS).doc(itemIdFor(mediaType, tmdbId));
-    if ((await itemRef.get()).exists) return; // idempotente: ya está, no recontar
+    if ((await itemRef.get()).exists) return { itemCount: prevCount }; // idempotente: ya está, no recontar
 
     const itemsSnap = await listRef.collection(ITEMS).orderBy('position', 'desc').limit(1).get();
     const maxPos = itemsSnap.empty ? 0 : (Number(itemsSnap.docs[0].data().position) || 0);
@@ -235,6 +237,7 @@ export async function addItemToList(listId: string, item: CustomListItemInput): 
     });
     batch.update(listRef, { itemCount: FieldValue.increment(1), updated_at: new Date() });
     await batch.commit();
+    return { itemCount: prevCount + 1 };
 }
 
 export async function removeItemFromList(listId: string, itemId: string): Promise<void> {

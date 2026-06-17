@@ -27,8 +27,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
         if (!Number.isFinite(Number(tmdbId))) return json({ ok: false, error: 'tmdb_id inválido' }, 400);
         if (!isFixedList(list)) return json({ ok: false, error: 'list inválida' }, 400);
 
-        await saveFixed(mediaType, Number(tmdbId), list, action);
-        return json({ ok: true });
+        const { count } = await saveFixed(mediaType, Number(tmdbId), list, action);
+        return json({ ok: true, count });
     } catch (err) {
         console.error('[api/lists/fixed POST] error:', (err as Error).message);
         return json({ ok: false, error: 'No se pudo guardar.' }, 500);

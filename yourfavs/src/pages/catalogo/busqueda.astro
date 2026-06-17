@@ -47,25 +47,21 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
             icon="search"
         />
 
-        <div class="-mt-4 mb-6">
-            {totalResults > 0 ? (
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm text-gray-500">{totalResults} resultados</span>
-                    <span class="text-gray-300">·</span>
-                    {limitedMovies.length > 0 && (
-                        <span class="text-xs px-2.5 py-1 bg-red-50 text-red-600 rounded-full font-medium">{limitedMovies.length} películas</span>
-                    )}
-                    {limitedSeries.length > 0 && (
-                        <span class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full font-medium">{limitedSeries.length} series</span>
-                    )}
-                    {limitedActors.length > 0 && (
-                        <span class="text-xs px-2.5 py-1 bg-purple-50 text-purple-600 rounded-full font-medium">{limitedActors.length} actores</span>
-                    )}
-                </div>
-            ) : (
-                <p class="text-gray-500">No se encontraron resultados</p>
-            )}
-        </div>
+        {totalResults > 0 && (
+            <div class="-mt-4 mb-6 flex flex-wrap items-center gap-2">
+                <span class="text-sm text-gray-500">{totalResults} resultados</span>
+                <span class="text-gray-300">·</span>
+                {limitedMovies.length > 0 && (
+                    <span class="text-xs px-2.5 py-1 bg-red-50 text-red-600 rounded-full font-medium">{limitedMovies.length} películas</span>
+                )}
+                {limitedSeries.length > 0 && (
+                    <span class="text-xs px-2.5 py-1 bg-blue-50 text-blue-600 rounded-full font-medium">{limitedSeries.length} series</span>
+                )}
+                {limitedActors.length > 0 && (
+                    <span class="text-xs px-2.5 py-1 bg-purple-50 text-purple-600 rounded-full font-medium">{limitedActors.length} actores</span>
+                )}
+            </div>
+        )}
 
         <!-- Navegación por secciones -->
         {totalResults > 0 && (
