@@ -79,6 +79,16 @@ if (filtersActive || filters.sort) {
 const totalPages = 190;
 const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p => p.slug === platformParam)?.name || platformParam;
 
+// Contexto para el contador en vivo del sheet (2.3b): mismos providers + región que el discover.
+const _provIds = platformParam === 'all'
+    ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
+    : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
+const _provBase = { with_watch_providers: _provIds, watch_region: 'ES' };
+const countCtx = _provIds ? [
+    ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: _provBase }] : []),
+    ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: _provBase }] : []),
+] : [];
+
 function buildFilterUrl(changes: Record<string, string | null>) {
     const p = new URLSearchParams(urlParams);
     for (const [k, v] of Object.entries(changes)) {
@@ -163,7 +173,7 @@ function buildPlatformUrl(slug: string) {
         <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
-                         showCert={type === 'movies'} order="Popularidad"
+                         showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

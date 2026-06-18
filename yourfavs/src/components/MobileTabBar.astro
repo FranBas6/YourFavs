@@ -1,0 +1,109 @@
+---
+/**
+ * Tab bar inferior móvil (<1024px) — Auditoría v2 · 2.1.
+ *
+ * 4 destinos, adaptativos según sesión:
+ *   - Con sesión: Inicio · Buscar · Mis listas · Perfil
+ *   - Invitado:   Inicio · Buscar · Descubrir · Entrar
+ * "Buscar" abre el command palette (⌘K) vía evento `yf:open-palette`.
+ * "Entrar" / tocar zonas privadas sin sesión → modal de registro (`data-auth-open`).
+ *
+ * Singleton montado en Layout (oculto en flujos a pantalla completa: /gustos, login).
+ * La hamburguesa del header se queda para lo secundario (Descubrir, Calendario, ajustes).
+ */
+import { Icon } from 'astro-icon/components';
+
+const user = Astro.locals.user;
+const path = Astro.url.pathname;
+const isActive = (href: string): boolean => href === '/' ? path === '/' : path.startsWith(href);
+---
+<nav class="tabbar" aria-label="Navegación inferior">
+    <a href="/" class={`tabbar-item ${isActive('/') ? 'is-active' : ''}`}>
+        <Icon name="lucide:home" class="tabbar-icon" />
+        <span>Inicio</span>
+    </a>
+
+    <button type="button" class="tabbar-item" id="tabbar-search" aria-label="Buscar">
+        <Icon name="lucide:search" class="tabbar-icon" />
+        <span>Buscar</span>
+    </button>
+
+    {user ? (
+        <>
+            <a href="/mislistas/favoritos" class={`tabbar-item ${isActive('/mislistas') ? 'is-active' : ''}`}>
+                <Icon name="lucide:list" class="tabbar-icon" />
+                <span>Mis listas</span>
+            </a>
+            <a href="/perfil" class={`tabbar-item ${isActive('/perfil') ? 'is-active' : ''}`}>
+                <Icon name="lucide:user" class="tabbar-icon" />
+                <span>Perfil</span>
+            </a>
+        </>
+    ) : (
+        <>
+            <a href="/catalogo/tendencias" class={`tabbar-item ${isActive('/catalogo') ? 'is-active' : ''}`}>
+                <Icon name="lucide:compass" class="tabbar-icon" />
+                <span>Descubrir</span>
+            </a>
+            <button type="button" class="tabbar-item" data-auth-open aria-label="Entrar">
+                <Icon name="lucide:user" class="tabbar-icon" />
+                <span>Entrar</span>
+            </button>
+        </>
+    )}
+</nav>
+
+<script is:inline>
+    (function () {
+        var s = document.getElementById('tabbar-search');
+        if (s) s.addEventListener('click', function () {
+            document.dispatchEvent(new CustomEvent('yf:open-palette'));
+        });
+    })();
+</script>
+
+<style is:global>
+    .tabbar { display: none; }
+
+    @media (max-width: 1023px) {
+        .tabbar {
+            display: flex;
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            z-index: 1000; /* sobre el contenido; bajo overlays (panel 9999, popover 1300, toast 10000) */
+            background: var(--bg-elev, #fff);
+            border-top: 1px solid var(--border, #e5e7eb);
+            box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+            /* Respeta el notch/gesture bar de iOS */
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .tabbar-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3px;
+            padding: 8px 4px 7px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            font: inherit;
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-3, #9ca3af);
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tabbar-icon { width: 22px; height: 22px; }
+        .tabbar-item.is-active { color: var(--accent, #E63946); }
+        .tabbar-item.is-active span { font-weight: 700; }
+
+        /* Hueco para que la barra no tape el contenido ni el footer. */
+        body { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+
+        /* Elevar los flotantes inferiores por encima de la barra. */
+        .toast-container { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+        #yf-taste-hint { bottom: calc(72px + env(safe-area-inset-bottom, 0px)) !important; }
+    }
+</style>

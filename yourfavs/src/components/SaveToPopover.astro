@@ -10,8 +10,10 @@
  * Invitado (sin cookie has_session) → abre el modal de registro (gating), sin fetch.
  */
 ---
+<div class="saveto-backdrop" id="saveto-backdrop" hidden></div>
 <div class="saveto-pop" id="saveto-pop" role="dialog" aria-label="Guardar en tus listas" hidden>
     <div class="saveto-arrow" aria-hidden="true"></div>
+    <div class="saveto-sheet-handle" aria-hidden="true"></div>
     <div class="saveto-inner" id="saveto-inner">
         <p class="saveto-loading">Cargando…</p>
     </div>
@@ -62,6 +64,38 @@
         flex-shrink: 0; border: none; background: #E63946; color: #fff; border-radius: 8px;
         padding: 0 12px; font-size: 13px; font-weight: 700; cursor: pointer;
     }
+
+    /* ── 2.2 · Hoja inferior (long-press): el mismo popover, presentado como sheet en móvil ── */
+    .saveto-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1290; }
+    .saveto-backdrop[hidden] { display: none; }
+    .saveto-sheet-handle { display: none; }
+    .saveto-sheet-head { display: flex; align-items: center; gap: 11px; padding: 4px 16px 12px; }
+    .saveto-sheet-poster {
+        width: 38px; height: 57px; border-radius: 6px; object-fit: cover;
+        flex-shrink: 0; background: var(--bg-tint, #eee);
+    }
+    .saveto-sheet-title { font-size: 14px; font-weight: 700; color: var(--text, #16130f); line-height: 1.25; }
+
+    @media (max-width: 1023px) {
+        .saveto-pop.saveto-sheet {
+            left: 0 !important; right: 0; top: auto !important; bottom: 0;
+            width: 100%; max-width: 100%;
+            border-radius: 18px 18px 0 0;
+            max-height: 82vh;
+            padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+            animation: saveto-up .22s ease;
+        }
+        .saveto-pop.saveto-sheet .saveto-arrow { display: none; }
+        .saveto-pop.saveto-sheet .saveto-sheet-handle {
+            display: block; width: 36px; height: 4px; border-radius: 9px;
+            background: var(--border, #e2dccd); margin: 8px auto 4px;
+        }
+        /* Targets táctiles más grandes en la hoja */
+        .saveto-pop.saveto-sheet .saveto-row { padding-top: 12px; padding-bottom: 12px; }
+        /* Evita el callout/popup de iOS al mantener pulsada la card */
+        .media-card { -webkit-touch-callout: none; }
+    }
+    @keyframes saveto-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>
 
 <script is:inline>
@@ -119,7 +153,15 @@
     }
     function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-    function close() { pop.hidden = true; cur = null; }
+    var backdrop = document.getElementById('saveto-backdrop');
+    function lockScroll() { document.body.style.overflow = 'hidden'; }
+    function unlockScroll() { document.body.style.overflow = ''; }
+    function close() {
+        pop.hidden = true; cur = null;
+        pop.classList.remove('saveto-sheet');
+        if (backdrop) backdrop.hidden = true;
+        unlockScroll();
+    }
     function isOpen() { return !pop.hidden; }
 
     function position(trigger) {
@@ -138,6 +180,12 @@
         var fixed = data.fixed || {};
         var lists = data.lists || [];
         var html = '';
+        // En modo hoja (long-press) mostramos qué título estamos guardando.
+        if (cur && cur.sheet) {
+            html += '<div class="saveto-sheet-head">' +
+                (cur.poster ? '<img class="saveto-sheet-poster" src="https://image.tmdb.org/t/p/w92' + cur.poster + '" alt="" />' : '') +
+                '<div class="saveto-sheet-title">' + esc(cur.title) + '</div></div>';
+        }
         // En las fichas, las listas fijas ya tienen sus botones → el popover solo
         // muestra colecciones (data-collections-only). En cards, muestra ambas.
         if (!cur.collectionsOnly) {
@@ -185,6 +233,90 @@
             .catch(function () {});
     }
 
+    // Mismo popover, presentado como HOJA INFERIOR (long-press en cards, 2.2).
+    function openSheet(trigger) {
+        if (!trigger) return;
+        cur = {
+            mt: trigger.getAttribute('data-mt'),
+            id: Number(trigger.getAttribute('data-id')),
+            title: trigger.getAttribute('data-title') || '',
+            poster: normPoster(trigger.getAttribute('data-poster')),
+            collectionsOnly: false,
+            sheet: true,
+        };
+        pop.classList.add('saveto-sheet');
+        pop.style.left = ''; pop.style.top = '';   // limpiar posicionamiento de popover
+        if (backdrop) backdrop.hidden = false;
+        lockScroll();
+        pop.hidden = false;
+        inner.innerHTML = '<p class="saveto-loading">Cargando…</p>';
+        fetch('/api/lists?media_type=' + cur.mt + '&tmdb_id=' + cur.id)
+            .then(function (r) {
+                if (r.status === 401) { close(); document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                return r.json();
+            })
+            .then(function (data) { if (cur) render(data); })
+            .catch(function () {});
+    }
+
+    // ---- long-press en cards de descubrimiento → hoja inferior ----
+    var lpTimer = null, lpTrig = null, lpX = 0, lpY = 0, lpFired = false;
+    function lpFind(target) {
+        var card = target.closest && target.closest('.media-card');
+        return card ? card.querySelector('.js-saveto') : null;
+    }
+    document.addEventListener('touchstart', function (e) {
+        if (e.touches.length !== 1) return;
+        if (e.target.closest('.js-saveto')) return;   // el ⊕ ya tiene su propio tap
+        var trig = lpFind(e.target);
+        if (!trig) return;
+        lpTrig = trig; lpFired = false;
+        lpX = e.touches[0].clientX; lpY = e.touches[0].clientY;
+        lpTimer = setTimeout(function () {
+            lpTimer = null; lpFired = true;
+            if (!loggedIn()) { document.dispatchEvent(new CustomEvent('yf:require-auth')); return; }
+            if (navigator.vibrate) { try { navigator.vibrate(15); } catch (_) {} }
+            openSheet(lpTrig);
+        }, 480);
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) {
+        if (!lpTimer) return;
+        var t = e.touches[0];
+        if (Math.abs(t.clientX - lpX) > 12 || Math.abs(t.clientY - lpY) > 12) { clearTimeout(lpTimer); lpTimer = null; }
+    }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+        if (lpFired) { e.preventDefault(); lpFired = false; }   // corta la navegación del <a>
+    }, { passive: false });
+    document.addEventListener('touchcancel', function () { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } }, { passive: true });
+    document.addEventListener('contextmenu', function (e) { if (lpFind(e.target)) e.preventDefault(); });
+
+    // ---- arrastrar hacia abajo (asa/cabecera) para cerrar la hoja ----
+    (function () {
+        var startY = 0, dy = 0, dragging = false;
+        function isSheet() { return pop.classList.contains('saveto-sheet'); }
+        pop.addEventListener('touchstart', function (e) {
+            if (!isSheet() || e.touches.length !== 1) return;
+            if (!e.target.closest('.saveto-sheet-handle, .saveto-sheet-head')) return;
+            dragging = true; dy = 0; startY = e.touches[0].clientY;
+            pop.style.transition = 'none';
+        }, { passive: true });
+        pop.addEventListener('touchmove', function (e) {
+            if (!dragging) return;
+            dy = Math.max(0, e.touches[0].clientY - startY);
+            pop.style.transform = 'translateY(' + dy + 'px)';
+            if (dy > 0) e.preventDefault();
+        }, { passive: false });
+        function end() {
+            if (!dragging) return; dragging = false;
+            if (dy > 110) { pop.style.transition = ''; pop.style.transform = ''; close(); }
+            else { pop.style.transition = 'transform .2s ease'; pop.style.transform = '';
+                   setTimeout(function () { pop.style.transition = ''; }, 220); }
+        }
+        pop.addEventListener('touchend', end, { passive: true });
+        pop.addEventListener('touchcancel', end, { passive: true });
+    })();
+
     // ---- disparadores (delegado, captura para adelantarnos a la navegación del <a>) ----
     document.addEventListener('click', function (e) {
         var trigger = e.target.closest && e.target.closest('.js-saveto');
@@ -208,7 +340,7 @@
         }
     });
     window.addEventListener('resize', function () { if (isOpen()) close(); });
-    window.addEventListener('scroll', function () { if (isOpen()) close(); }, true);
+    window.addEventListener('scroll', function () { if (isOpen() && !pop.classList.contains('saveto-sheet')) close(); }, true);
 
     // ---- toggles dentro del popover ----
     inner.addEventListener('click', function (e) {

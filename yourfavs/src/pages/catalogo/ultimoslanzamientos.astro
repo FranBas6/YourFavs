@@ -39,6 +39,12 @@ const latestSeries = useDiscover
 
 const totalPages = 150;
 
+// Contexto para el contador en vivo del sheet (2.3b): mismo vote_count.gte que discoverContent.
+const countCtx = [
+    ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: { 'vote_count.gte': '100' } }] : []),
+    ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { 'vote_count.gte': '100' } }] : []),
+];
+
 function buildFilterUrl(changes: Record<string, string | null>) {
     const p = new URLSearchParams(urlParams);
     for (const [k, v] of Object.entries(changes)) {
@@ -68,7 +74,7 @@ function buildTypeUrl(t: string) {
         <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
-                         showCert={type === 'movies'} order="Recientes"
+                         showCert={type === 'movies'} order="Recientes" countCtx={countCtx}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

@@ -14,9 +14,12 @@ interface Props {
     sortOptions?: { value: string; label: string }[];
     /** Etiqueta del orden por defecto de la página (mono), p.ej. "Popularidad". */
     order?: string;
+    /** Contexto discover base por tipo (2.3b) — alimenta el contador "Aplicar (N)" del sheet.
+     *  Vacío/omitido → el botón muestra solo "Aplicar" (páginas sin discover filtrable). */
+    countCtx?: { type: 'movie' | 'tv'; base: Record<string, string> }[];
 }
 
-const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order } = Astro.props;
+const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [] } = Astro.props;
 
 const RUNTIMES = [
     { value: 'short', label: '< 90 min' },
@@ -66,7 +69,8 @@ if (showCert && filters.cert) activeChips.push({ label: String(labelOf(CERTS, fi
 const clearAll = { decade: null, year: null, yearFrom: null, yearTo: null, rating: null, runtime: null, language: null, status: null, cert: null };
 const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
 ---
-<div class="yf-adv-wrap" data-adv>
+<div class="yf-adv-wrap" data-adv data-count-ctx={countCtx.length ? JSON.stringify(countCtx) : undefined}>
+    <div class="yf-adv-backdrop" data-adv-backdrop hidden></div>
     <details class="yf-adv" open={hasActive}>
         <summary class="yf-adv-trigger">
             <span class="yf-adv-trigger-left">
@@ -85,9 +89,10 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         </summary>
 
         <div class="yf-adv-panel">
+            <div class="yf-adv-handle" aria-hidden="true"></div>
             <div class="yf-adv-head">
                 <h3>Filtros avanzados</h3>
-                {hasActive && <a href={buildUrl(clearAll)} class="yf-adv-clear">✕ Borrar todo</a>}
+                {hasActive && <a href={buildUrl(clearAll)} class="yf-adv-clear" data-adv-clear>✕ Borrar todo</a>}
             </div>
 
             <slot name="before" />
@@ -97,7 +102,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                     <p class="yf-group-label">Ordenar por</p>
                     <div class="yf-chips">
                         {sortOptions.map((o) => (
-                            <a href={buildUrl({ sort: filters.sort === o.value ? null : o.value })} class={chipClass(filters.sort === o.value)}>{o.label}</a>
+                            <a href={buildUrl({ sort: filters.sort === o.value ? null : o.value })} class={chipClass(filters.sort === o.value)} data-fkey="sort" data-fval={o.value}>{o.label}</a>
                         ))}
                     </div>
                 </div>
@@ -129,7 +134,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                             <p class="yf-group-label">Duración</p>
                             <div class="yf-chips">
                                 {RUNTIMES.map((r) => (
-                                    <a href={buildUrl({ runtime: filters.runtime === r.value ? null : r.value })} class={chipClass(filters.runtime === r.value)}>{r.label}</a>
+                                    <a href={buildUrl({ runtime: filters.runtime === r.value ? null : r.value })} class={chipClass(filters.runtime === r.value)} data-fkey="runtime" data-fval={r.value}>{r.label}</a>
                                 ))}
                             </div>
                         </div>
@@ -140,7 +145,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                             <p class="yf-group-label">Edad (certificación · España)</p>
                             <div class="yf-chips">
                                 {CERTS.map((c) => (
-                                    <a href={buildUrl({ cert: filters.cert === c.value ? null : c.value })} class={chipClass(filters.cert === c.value)}>{c.label}</a>
+                                    <a href={buildUrl({ cert: filters.cert === c.value ? null : c.value })} class={chipClass(filters.cert === c.value)} data-fkey="cert" data-fval={c.value}>{c.label}</a>
                                 ))}
                             </div>
                         </div>
@@ -150,7 +155,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                         <p class="yf-group-label">Idioma original</p>
                         <div class="yf-chips">
                             {LANGUAGES.map((l) => (
-                                <a href={buildUrl({ language: filters.language === l.value ? null : l.value })} class={chipClass(filters.language === l.value)}>{l.label}</a>
+                                <a href={buildUrl({ language: filters.language === l.value ? null : l.value })} class={chipClass(filters.language === l.value)} data-fkey="language" data-fval={l.value}>{l.label}</a>
                             ))}
                         </div>
                     </div>
@@ -160,7 +165,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                             <p class="yf-group-label">Estado de la serie</p>
                             <div class="yf-chips">
                                 {STATUSES.map((s) => (
-                                    <a href={buildUrl({ status: filters.status === s.value ? null : s.value })} class={chipClass(filters.status === s.value)}>{s.label}</a>
+                                    <a href={buildUrl({ status: filters.status === s.value ? null : s.value })} class={chipClass(filters.status === s.value)} data-fkey="status" data-fval={s.value}>{s.label}</a>
                                 ))}
                             </div>
                         </div>
@@ -183,10 +188,57 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
             <a href={buildUrl(clearAll)} class="yf-activechip-clear">Borrar todo</a>
         </div>
     )}
+
+    <!-- Barra "Aplicar" — solo visible en modo hoja (móvil). En 2.3b mostrará el nº de resultados. -->
+    <div class="yf-adv-applybar">
+        <button type="button" class="yf-adv-apply-btn" data-adv-apply>Aplicar</button>
+    </div>
 </div>
 
 <script is:inline>
+    var mqSheet = window.matchMedia('(max-width: 1023px)');
     document.querySelectorAll('[data-adv]').forEach(function (root) {
+        var details = root.querySelector('.yf-adv');
+        var panel = root.querySelector('.yf-adv-panel');
+        var backdrop = root.querySelector('[data-adv-backdrop]');
+        var slider = root.querySelector('[data-rating]');
+        var out = root.querySelector('[data-rating-out]');
+        var from = root.querySelector('[data-year-from]');
+        var to = root.querySelector('[data-year-to]');
+        var applyBtn = root.querySelector('[data-adv-apply]');
+        var countCtx = []; try { countCtx = JSON.parse(root.getAttribute('data-count-ctx') || '[]'); } catch (e) {}
+        var countTimer = null, countAbort = null;
+        var FILTER_KEYS = ['decade','year','yearFrom','yearTo','rating','runtime','language','status','cert','sort'];
+        var pending = {};
+
+        // Contador en vivo (2.3b): pregunta a /api/discover/count cuántos resultados daría
+        // la selección pendiente y lo pinta en el botón. Decorativo: si falla, "Aplicar" a secas.
+        function updateCount() {
+            if (!applyBtn || !countCtx.length) return;
+            if (countTimer) clearTimeout(countTimer);
+            countTimer = setTimeout(function () {
+                if (countAbort) countAbort.abort();
+                countAbort = new AbortController();
+                var f = {};
+                ['year','yearFrom','yearTo','decade','rating','runtime','language','status','cert'].forEach(function (k) { if (pending[k] != null) f[k] = pending[k]; });
+                fetch('/api/discover/count', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ queries: countCtx, filters: f }), signal: countAbort.signal,
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (res && typeof res.count === 'number') {
+                            var n = res.count.toLocaleString('es-ES');
+                            applyBtn.textContent = 'Aplicar (' + n + (res.count === 1 ? ' resultado)' : ' resultados)');
+                        }
+                    })
+                    .catch(function (e) { if (e.name !== 'AbortError') applyBtn.textContent = 'Aplicar'; });
+            }, 320);
+        }
+
+        function inSheet() { return root.classList.contains('is-sheet'); }
+
+        // Navega aplicando cambios parciales (instant-apply en desktop / al "Aplicar" en hoja).
         function apply(changes) {
             var url = new URL(location.href);
             Object.keys(changes).forEach(function (k) {
@@ -198,30 +250,135 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
             location.href = url.pathname + '?' + url.searchParams.toString();
         }
 
-        // Slider de nota: tooltip en vivo (input), aplica al soltar (change)
-        var slider = root.querySelector('[data-rating]');
-        var out = root.querySelector('[data-rating-out]');
+        // ---- modo hoja (móvil): acumula en `pending`, aplica una sola vez ----
+        function initPending() {
+            pending = {};
+            var p = new URL(location.href).searchParams;
+            FILTER_KEYS.forEach(function (k) { var v = p.get(k); if (v) pending[k] = v; });
+        }
+        function refreshChips() {
+            root.querySelectorAll('.yf-chip[data-fkey]').forEach(function (chip) {
+                chip.classList.toggle('is-active', pending[chip.getAttribute('data-fkey')] === chip.getAttribute('data-fval'));
+            });
+            if (slider) {
+                var rv = pending.rating ? Number(pending.rating) : 0;
+                slider.value = rv;
+                if (out) out.textContent = rv > 0 ? '★ ' + rv : 'Cualquiera';
+            }
+            if (from) from.value = pending.yearFrom || '';
+            if (to) to.value = pending.yearTo || '';
+        }
+        function openSheet() {
+            initPending();
+            root.classList.add('is-sheet');
+            if (backdrop) backdrop.hidden = false;
+            document.body.style.overflow = 'hidden';
+            refreshChips();
+            updateCount();
+        }
+        function closeSheet() {
+            root.classList.remove('is-sheet');
+            if (backdrop) backdrop.hidden = true;
+            document.body.style.overflow = '';
+            if (details && details.open) details.open = false;
+        }
+        function applyPending() {
+            var changes = {};
+            FILTER_KEYS.forEach(function (k) { changes[k] = pending[k] != null ? pending[k] : null; });
+            if (pending.yearFrom || pending.yearTo) { changes.decade = null; changes.year = null; }
+            apply(changes);
+        }
+
+        // El <details> es el toggle; en móvil su apertura = hoja inferior.
+        if (details) {
+            details.addEventListener('toggle', function () {
+                if (!mqSheet.matches) return;          // desktop: panel inline normal
+                if (details.open) openSheet(); else closeSheet();
+            });
+            // En móvil no auto-abrir como hoja al cargar (taparía resultados).
+            if (mqSheet.matches && details.open) details.open = false;
+        }
+        if (backdrop) backdrop.addEventListener('click', closeSheet);
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && inSheet()) closeSheet(); });
+
+        // Arrastrar hacia abajo desde el asa/cabecera para cerrar (gesto nativo de hoja).
+        (function () {
+            if (!panel) return;
+            var startY = 0, dy = 0, dragging = false;
+            panel.addEventListener('touchstart', function (e) {
+                if (!inSheet() || e.touches.length !== 1) return;
+                if (!e.target.closest('.yf-adv-handle, .yf-adv-head')) return;
+                dragging = true; dy = 0; startY = e.touches[0].clientY;
+                panel.style.transition = 'none';
+            }, { passive: true });
+            panel.addEventListener('touchmove', function (e) {
+                if (!dragging) return;
+                dy = Math.max(0, e.touches[0].clientY - startY);
+                panel.style.transform = 'translateY(' + dy + 'px)';
+                if (dy > 0) e.preventDefault();
+            }, { passive: false });
+            function end() {
+                if (!dragging) return; dragging = false;
+                if (dy > 110) { panel.style.transition = ''; panel.style.transform = ''; closeSheet(); }
+                else { panel.style.transition = 'transform .2s ease'; panel.style.transform = '';
+                       setTimeout(function () { panel.style.transition = ''; }, 220); }
+            }
+            panel.addEventListener('touchend', end, { passive: true });
+            panel.addEventListener('touchcancel', end, { passive: true });
+        })();
+
+        // Chips: en hoja togglean `pending`; en desktop son enlaces normales.
+        root.querySelectorAll('.yf-chip[data-fkey]').forEach(function (chip) {
+            chip.addEventListener('click', function (e) {
+                if (!inSheet()) return;                // desktop: deja navegar el <a>
+                e.preventDefault();
+                var k = chip.getAttribute('data-fkey'), v = chip.getAttribute('data-fval');
+                if (pending[k] === v) delete pending[k]; else pending[k] = v;
+                refreshChips();
+                updateCount();
+            });
+        });
+
+        // Slider de nota: tooltip en vivo siempre; aplica al soltar SOLO fuera de la hoja.
         if (slider) {
             slider.addEventListener('input', function () {
                 var v = Number(slider.value);
                 if (out) out.textContent = v > 0 ? '★ ' + v : 'Cualquiera';
+                if (inSheet()) { if (v > 0) pending.rating = String(v); else delete pending.rating; updateCount(); }
             });
             slider.addEventListener('change', function () {
+                if (inSheet()) return;                 // en hoja, espera a "Aplicar"
                 var v = Number(slider.value);
                 apply({ rating: v > 0 ? String(v) : null });
             });
         }
 
-        // Rango de años: aplica al confirmar (Enter o blur). Usar rango limpia decade/year.
-        var from = root.querySelector('[data-year-from]');
-        var to = root.querySelector('[data-year-to]');
+        // Rango de años: en hoja actualiza pending; fuera, aplica al confirmar (Enter/blur).
         function applyRange() {
             apply({ yearFrom: from && from.value ? from.value : null, yearTo: to && to.value ? to.value : null, decade: null, year: null });
         }
+        function pendRange() {
+            if (from && from.value) pending.yearFrom = from.value; else delete pending.yearFrom;
+            if (to && to.value) pending.yearTo = to.value; else delete pending.yearTo;
+            updateCount();
+        }
         [from, to].forEach(function (el) {
             if (!el) return;
-            el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyRange(); } });
-            el.addEventListener('change', applyRange);
+            el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inSheet() ? pendRange() : applyRange(); } });
+            el.addEventListener('change', function () { inSheet() ? pendRange() : applyRange(); });
+        });
+
+        // "Aplicar" (solo hoja): una sola recarga con todo lo acumulado.
+        if (applyBtn) applyBtn.addEventListener('click', applyPending);
+
+        // "Borrar todo" dentro de la hoja: limpia pending; fuera, deja navegar el <a>.
+        var clearLink = root.querySelector('[data-adv-clear]');
+        if (clearLink) clearLink.addEventListener('click', function (e) {
+            if (!inSheet()) return;
+            e.preventDefault();
+            pending = {};
+            refreshChips();
+            updateCount();
         });
     });
 </script>
@@ -345,4 +502,38 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         text-decoration: none; padding: 5px 8px;
     }
     .yf-activechip-clear:hover { color: var(--accent); }
+
+    /* ── 2.3a · Filtros como hoja inferior en móvil (batch + Aplicar) ── */
+    .yf-adv-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1290; }
+    .yf-adv-backdrop[hidden] { display: none; }
+    .yf-adv-handle { display: none; }
+    .yf-adv-applybar { display: none; }
+
+    @media (max-width: 1023px) {
+        .yf-adv-wrap.is-sheet .yf-adv-panel {
+            position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+            z-index: 1300; margin: 0;
+            max-height: 85vh; overflow-y: auto;
+            border-radius: 18px 18px 0 0;
+            /* hueco para que el contenido no quede bajo la barra fija "Aplicar" */
+            padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+            animation: yf-adv-up .24s ease;
+        }
+        .yf-adv-wrap.is-sheet .yf-adv-handle {
+            display: block; width: 36px; height: 4px; border-radius: 9px;
+            background: var(--border); margin: 2px auto 12px;
+        }
+        .yf-adv-wrap.is-sheet .yf-chip { padding: 8px 14px; }  /* targets táctiles */
+
+        .yf-adv-wrap.is-sheet .yf-adv-applybar {
+            display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1310;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+            background: var(--bg-elev); border-top: 1px solid var(--border);
+        }
+        .yf-adv-apply-btn {
+            width: 100%; padding: 13px; border: none; border-radius: 12px;
+            background: var(--accent); color: #fff; font: inherit; font-weight: 700; font-size: 15px; cursor: pointer;
+        }
+    }
+    @keyframes yf-adv-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 </style>

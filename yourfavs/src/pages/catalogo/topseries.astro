@@ -47,6 +47,11 @@ if (networkId || filtersActive || filters.sort) {
 
 const totalPages = 113;
 
+// Contexto para el contador en vivo del sheet (2.3b): vote_count.gte 100 + cadena si está activa.
+const _tsBase: Record<string, string> = { 'vote_count.gte': '100' };
+if (networkId) _tsBase.with_networks = networkId.toString();
+const countCtx = [{ type: 'tv' as const, base: _tsBase }];
+
 function buildFilterUrl(changes: Record<string, string | null>) {
     const p = new URLSearchParams(urlParams);
     for (const [k, v] of Object.entries(changes)) {
@@ -67,7 +72,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
             icon="trophy"
         />
 
-        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} showStatus order="Nota"
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} showStatus order="Nota" countCtx={countCtx}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'recent', label: 'Más recientes' }]}>
             <div slot="before">
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Cadena TV</p>

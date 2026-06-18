@@ -3,6 +3,7 @@ import Header from "../components/Header.astro";
 import CommandPalette from "../components/CommandPalette.astro";
 import AuthModal from "../components/AuthModal.astro";
 import SaveToPopover from "../components/SaveToPopover.astro";
+import MobileTabBar from "../components/MobileTabBar.astro";
 import "../styles/tokens.css";
 import "../styles/layout.css";
 import "@fontsource/poppins/400.css";
@@ -32,6 +33,10 @@ const {
 // NO ha completado el onboarding (undefined o 'skipped' → se le puede invitar;
 // 'done' → no molestar). El JS decide cuándo mostrarla (tras guardar, 1 vez).
 const tasteHintEligible = !!Astro.locals.user && Astro.locals.user.onboarding !== 'done';
+
+// Tab bar móvil: oculta en flujos a pantalla completa (onboarding/auth).
+const _tbPath = Astro.url.pathname;
+const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p || _tbPath.startsWith(p + '/'));
 ---
 <!DOCTYPE html>
 <html lang="es">
@@ -127,6 +132,7 @@ const tasteHintEligible = !!Astro.locals.user && Astro.locals.user.onboarding !=
     })();
 </script>
 <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+{!hideTabbar && <MobileTabBar />}
 <script is:inline src="/js/hover-preview.js" defer></script>
 <script is:inline src="/js/scroll-restore.js"></script>
 </body>

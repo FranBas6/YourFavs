@@ -36,6 +36,15 @@ const useDiscover = filtersActive || !!filters.sort;
 // que NO admiten orden → ahí ocultamos el selector y el indicador de orden.
 const supportsSort = typeof MOVIE_GENRE_SLUGS[category] === 'number' || typeof SERIE_GENRE_SLUGS[category] === 'number';
 
+// Contexto para el contador en vivo del sheet (2.3b): por tipo visible y solo si el
+// slug tiene género numérico (los especiales no filtran vía discover → sin contador).
+const _movieG = MOVIE_GENRE_SLUGS[category];
+const _serieG = SERIE_GENRE_SLUGS[category];
+const countCtx = [
+    ...(typeof _movieG === 'number' && (type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: { with_genres: String(_movieG), 'vote_count.gte': '100' } }] : []),
+    ...(typeof _serieG === 'number' && (type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { with_genres: String(_serieG), 'vote_count.gte': '100' } }] : []),
+];
+
 // Cuando hay filtros avanzados, construimos /discover directo combinando
 // with_genres del slug + params de filtros. Si el slug es "upcoming"/"on_the_air",
 // esos endpoints no aceptan filtros, así que caemos a discover por género (18 Drama
@@ -148,7 +157,7 @@ function buildCategoryUrl(slug: string) {
         <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
-                         showCert={type === 'movies'} order={supportsSort ? 'Popularidad' : undefined}
+                         showCert={type === 'movies'} order={supportsSort ? 'Popularidad' : undefined} countCtx={countCtx}
                          sortOptions={supportsSort ? [{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }] : []} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">
