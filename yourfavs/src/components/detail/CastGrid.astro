@@ -11,9 +11,11 @@ interface CastMember {
 interface Props {
     cast: CastMember[];
     title?: string;
+    /** actor id → nº de títulos tuyos con esa persona (3.4). Solo si la caché está caliente. */
+    seenWith?: Map<number, number>;
 }
 
-const { cast, title = "Reparto Principal" } = Astro.props;
+const { cast, title = "Reparto Principal", seenWith } = Astro.props;
 ---
 {cast.length > 0 && (
     <section>
@@ -31,6 +33,13 @@ const { cast, title = "Reparto Principal" } = Astro.props;
                     <div class="min-w-0">
                         <p class="text-sm sm:text-base font-medium text-gray-800 truncate">{actor.name}</p>
                         {actor.character && <p class="text-xs sm:text-sm text-gray-500 truncate">{actor.character}</p>}
+                        {seenWith && seenWith.get(actor.id) ? (
+                            <span class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium"
+                                  title={`Has visto ${seenWith.get(actor.id)} ${seenWith.get(actor.id) === 1 ? 'título' : 'títulos'} con ${actor.name}`}>
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6L9 17l-5-5"/></svg>
+                                {seenWith.get(actor.id)} en tu biblioteca
+                            </span>
+                        ) : null}
                     </div>
                 </a>
             ))}

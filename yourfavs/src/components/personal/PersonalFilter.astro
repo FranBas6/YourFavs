@@ -10,9 +10,11 @@ interface Props {
     availableGenres?: string[];
     tagsFilter?: string;
     availableTags?: string[];
+    /** Plataformas del perfil (3.2): habilita el atajo "Solo en mis plataformas". */
+    myPlatforms?: number[];
 }
 
-const { pageUrl, filter, searchQuery = '', genreFilter = '', platformFilter = '', availableGenres = [], tagsFilter = '', availableTags = [] } = Astro.props;
+const { pageUrl, filter, searchQuery = '', genreFilter = '', platformFilter = '', availableGenres = [], tagsFilter = '', availableTags = [], myPlatforms = [] } = Astro.props;
 
 const PLATFORM_OPTIONS = [
     { id: 8, label: 'Netflix' },
@@ -48,6 +50,11 @@ const togglePlatform = (id: string) => {
     return [...activePlatforms, id].join(',');
 };
 
+// "Solo en mis plataformas" (3.2): atajo que selecciona de golpe TODAS las del perfil.
+const mineIds = (myPlatforms || []).map(String);
+const mineActive = mineIds.length > 0 && mineIds.length === activePlatforms.length && mineIds.every((id) => activePlatforms.includes(id));
+const minePlatformsParam = mineActive ? '' : mineIds.join(',');
+
 // Soporte multi-tags: "comedia,90s" → ["comedia", "90s"]
 const activeTags = tagsFilter ? tagsFilter.split(',').filter(Boolean) : [];
 const toggleTag = (tag: string) => {
@@ -71,7 +78,9 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
         )}
     </summary>
 
-    <div class="absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-lg">
+    <div class="pf-backdrop" aria-hidden="true"></div>
+    <div class="pf-panel absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-lg">
+        <div class="pf-handle" hidden aria-hidden="true"></div>
         <!-- Tipo -->
         <div class="flex flex-wrap gap-1.5 justify-center">
             {typeFilters.map(f => (
@@ -136,6 +145,15 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
         <div>
             <p class="text-xs text-gray-400 mb-2">Plataformas {activePlatforms.length > 0 && `(${activePlatforms.length})`}</p>
             <div class="flex flex-wrap gap-1.5">
+                {myPlatforms.length > 0 && (
+                    <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: minePlatformsParam, tags: tagsFilter })}
+                       class={`min-h-[44px] md:min-h-0 inline-flex items-center px-3 py-2 md:px-2.5 md:py-1 rounded-full text-xs font-semibold transition-all border
+                           ${mineActive
+                               ? 'bg-emerald-600 text-white border-emerald-600'
+                               : 'bg-white text-emerald-700 border-emerald-200 hover:border-emerald-400'}`}>
+                        Solo en mis plataformas
+                    </a>
+                )}
                 {PLATFORM_OPTIONS.map(platform => (
                     <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: togglePlatform(String(platform.id)), tags: tagsFilter })}
                        class={`min-h-[44px] md:min-h-0 inline-flex items-center px-3 py-2 md:px-2.5 md:py-1 rounded-full text-xs font-medium transition-all border
@@ -210,6 +228,37 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
         if (form) form.addEventListener('submit', function () {
             try { sessionStorage.setItem(KEY, '1'); } catch {}
         });
+
+        // ── Presentación de hoja inferior en móvil (instant-apply se mantiene) ──
+        var mq = window.matchMedia('(max-width: 1023px)');
+        var panel = details.querySelector('.pf-panel');
+        var backdrop = details.querySelector('.pf-backdrop');
+        details.addEventListener('toggle', function () {
+            if (!mq.matches) return;
+            document.body.style.overflow = details.open ? 'hidden' : '';
+        });
+        if (backdrop) backdrop.addEventListener('click', function () { details.open = false; });
+        // Arrastrar el asa hacia abajo para cerrar.
+        if (panel) {
+            var sy = 0, dy = 0, drag = false;
+            panel.addEventListener('touchstart', function (e) {
+                if (!mq.matches || e.touches.length !== 1 || !e.target.closest('.pf-handle')) return;
+                drag = true; dy = 0; sy = e.touches[0].clientY; panel.style.transition = 'none';
+            }, { passive: true });
+            panel.addEventListener('touchmove', function (e) {
+                if (!drag) return;
+                dy = Math.max(0, e.touches[0].clientY - sy);
+                panel.style.transform = 'translateY(' + dy + 'px)';
+                if (dy > 0) e.preventDefault();
+            }, { passive: false });
+            var endDrag = function () {
+                if (!drag) return; drag = false;
+                if (dy > 100) { panel.style.transition = ''; panel.style.transform = ''; details.open = false; }
+                else { panel.style.transition = 'transform .2s ease'; panel.style.transform = ''; setTimeout(function () { panel.style.transition = ''; }, 220); }
+            };
+            panel.addEventListener('touchend', endDrag, { passive: true });
+            panel.addEventListener('touchcancel', endDrag, { passive: true });
+        }
     });
 
     // Cierre por click fuera y por Esc (el <details> nativo no lo trae)
@@ -227,3 +276,31 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
     });
 })();
 </script>
+
+<style>
+    /* Por defecto (desktop) el panel es el dropdown de siempre; el backdrop oculto
+       (el asa usa el atributo `hidden` para no contar en el space-y del panel). */
+    .pf-backdrop { display: none; }
+
+    /* Móvil: el panel se presenta como hoja inferior (presentación; instant-apply intacto). */
+    @media (max-width: 1023px) {
+        [data-personal-filter] .pf-panel {
+            position: fixed; left: 0; right: 0; top: auto; bottom: 0;
+            width: 100%; max-width: 100%; margin: 0;
+            border-radius: 18px 18px 0 0;
+            max-height: 85vh; overflow-y: auto;
+            z-index: 1300;
+            padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+            animation: pf-up .24s ease;
+        }
+        [data-personal-filter][open] .pf-backdrop {
+            display: block; position: fixed; inset: 0; z-index: 1290;
+            background: rgba(0, 0, 0, .4);
+        }
+        [data-personal-filter] .pf-handle {
+            display: block; width: 36px; height: 4px; border-radius: 9px;
+            background: var(--border, #e2dccd); margin: 0 auto 10px;
+        }
+    }
+    @keyframes pf-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+</style>

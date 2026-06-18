@@ -28,11 +28,15 @@ const activeNetwork = NETWORKS.find((n) => n.id === networkId) || null;
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
+// "Solo en mis plataformas" (3.2b).
+const mine = urlParams.get('mine') === '1';
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
 
-// Prioridad: si hay network O filtros avanzados, usamos /discover/tv
+// Prioridad: si hay network, filtros, orden o "mis plataformas", usamos /discover/tv
 // combinando ambos. Si no, usamos el endpoint top_rated por defecto.
 let popularSeries: Serie[];
-if (networkId || filtersActive || filters.sort) {
+if (networkId || filtersActive || filters.sort || myProviders) {
     const params: Record<string, string> = {
         page: pageStr,
         sort_by: sortByFor(filters.sort, 'tv') || 'vote_average.desc',
@@ -40,6 +44,7 @@ if (networkId || filtersActive || filters.sort) {
         ...buildDiscoverFilterParams(filters, 'tv'),
     };
     if (networkId) params.with_networks = networkId.toString();
+    if (myProviders) { params.with_watch_providers = myProviders; params.watch_region = myRegion; }
     popularSeries = await tmdbFetchList<Serie>('/discover/tv', params);
 } else {
     popularSeries = await getTopRatedSeries({page: pageStr});
@@ -73,6 +78,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
         />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={false} showStatus order="Nota" countCtx={countCtx}
+                         mine={mine} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'recent', label: 'Más recientes' }]}>
             <div slot="before">
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Cadena TV</p>

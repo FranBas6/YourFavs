@@ -31,7 +31,11 @@ const type = urlParams.get('type') || 'all';
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
-const useDiscover = filtersActive || !!filters.sort;
+// "Solo en mis plataformas" (3.2b).
+const mine = urlParams.get('mine') === '1';
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
+const useDiscover = filtersActive || !!filters.sort || !!myProviders;
 // Las categorías especiales (Próximamente, En emisión…) usan endpoints propios
 // que NO admiten orden → ahí ocultamos el selector y el indicador de orden.
 const supportsSort = typeof MOVIE_GENRE_SLUGS[category] === 'number' || typeof SERIE_GENRE_SLUGS[category] === 'number';
@@ -59,6 +63,7 @@ async function fetchMoviesWithFilters(): Promise<Movie[]> {
         with_genres: g.toString(),
         ...buildDiscoverFilterParams(filters, 'movie'),
     };
+    if (myProviders) { params.with_watch_providers = myProviders; params.watch_region = myRegion; }
     return tmdbFetchList<Movie>('/discover/movie', params);
 }
 
@@ -72,6 +77,7 @@ async function fetchSeriesWithFilters(): Promise<Serie[]> {
         with_genres: g.toString(),
         ...buildDiscoverFilterParams(filters, 'tv'),
     };
+    if (myProviders) { params.with_watch_providers = myProviders; params.watch_region = myRegion; }
     return tmdbFetchList<Serie>('/discover/tv', params);
 }
 
@@ -158,6 +164,7 @@ function buildCategoryUrl(slug: string) {
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order={supportsSort ? 'Popularidad' : undefined} countCtx={countCtx}
+                         mine={mine} myPlatforms={supportsSort ? (Astro.locals.user?.platforms ?? []) : []} region={myRegion}
                          sortOptions={supportsSort ? [{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }] : []} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

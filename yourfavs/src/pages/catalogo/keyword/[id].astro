@@ -1,0 +1,166 @@
+---
+/**
+ * Descubrimiento por keyword (Auditoría v2 · 3.1).
+ * Pelis + series que comparten una keyword de TMDB (`with_keywords`). Las pills de
+ * keyword en las fichas enlazan aquí: /catalogo/keyword/{id}?name={nombre}.
+ * Reutiliza el patrón de las páginas de catálogo (FilterBar + AdvancedFilters + grid + paginación).
+ */
+import Layout from "../../../layouts/Layout.astro";
+import CatalogHeader from "../../../components/CatalogHeader.astro";
+import CardMovie from "../../../components/Cards/CardMovie.astro";
+import CardSerie from "../../../components/Cards/CardSerie.astro";
+import FilterBar from "../../../components/FilterBar.astro";
+import AdvancedFilters from "../../../components/AdvancedFilters.astro";
+import Pagination from "../../../components/Pagination.astro";
+import EmptyState from "../../../components/EmptyState.astro";
+import HoverPreview from "../../../components/HoverPreview.astro";
+import { parseAdvancedFilters, sortByFor, buildDiscoverFilterParams } from "../../../services/API/shared/tmdbDiscoverService";
+import { tmdbFetch, posterUrl } from "../../../services/API/shared/tmdbClient";
+import { getGenreName } from "../../../utils/constants/genres";
+import { safeFetch } from "../../../utils/safeFetch";
+import type { Movie } from "../../../types/ApiMovie";
+import type { Serie } from "../../../types/ApiSerie";
+import '../../../styles/pages/catalogo/shared.css';
+import '../../../styles/pages/catalogo/card-animations.css';
+
+const keywordId = String(Astro.params.id || '');
+const urlParams = new URL(Astro.request.url).searchParams;
+const page = Number(urlParams.get('page') || 1);
+const pageStr = page.toString();
+const type = urlParams.get('type') || 'all';
+const keywordName = (urlParams.get('name') || 'Tema').slice(0, 80);
+const prettyName = keywordName.charAt(0).toUpperCase() + keywordName.slice(1);
+
+const filters = parseAdvancedFilters(urlParams);
+
+// Discover por keyword (+ filtros avanzados). Devolvemos resultados y total_pages real.
+async function fetchKw(mt: 'movie' | 'tv'): Promise<{ results: (Movie | Serie)[]; totalPages: number }> {
+    const params: Record<string, string> = {
+        page: pageStr,
+        sort_by: sortByFor(filters.sort, mt) || 'popularity.desc',
+        'vote_count.gte': '50',
+        with_keywords: keywordId,
+        ...buildDiscoverFilterParams(filters, mt),
+    };
+    const data = await tmdbFetch<{ results: (Movie | Serie)[]; total_pages: number }>(`/discover/${mt}`, params);
+    return { results: data.results || [], totalPages: data.total_pages || 1 };
+}
+
+const [movieData, serieData] = await Promise.all([
+    (type === 'all' || type === 'movies') ? safeFetch(fetchKw('movie'), 'keyword/movies', { results: [], totalPages: 1 }) : Promise.resolve({ results: [], totalPages: 1 }),
+    (type === 'all' || type === 'series') ? safeFetch(fetchKw('tv'), 'keyword/series', { results: [], totalPages: 1 }) : Promise.resolve({ results: [], totalPages: 1 }),
+]);
+const movies = movieData.results as Movie[];
+const series = serieData.results as Serie[];
+const totalPages = Math.min(500, Math.max(movieData.totalPages, serieData.totalPages, 1));
+
+const countCtx = [
+    ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: { with_keywords: keywordId, 'vote_count.gte': '50' } }] : []),
+    ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { with_keywords: keywordId, 'vote_count.gte': '50' } }] : []),
+];
+
+function buildFilterUrl(changes: Record<string, string | null>) {
+    const p = new URLSearchParams(urlParams);
+    for (const [k, v] of Object.entries(changes)) {
+        if (v === null || v === '') p.delete(k);
+        else p.set(k, v);
+    }
+    p.set('page', '1');
+    return `?${p.toString()}`;
+}
+function buildTypeUrl(t: string) {
+    const changes: Record<string, string | null> = { type: t };
+    if (t !== 'series') changes.status = null;
+    if (t !== 'movies') changes.runtime = null;
+    return buildFilterUrl(changes);
+}
+---
+<Layout title={`${prettyName} · Descubrir por tema`}>
+    <div class="px-1 sm:py-8">
+        <CatalogHeader
+            title={prettyName}
+            subtitle="Películas y series sobre este tema"
+            color="purple"
+            icon="tag"
+        />
+
+        <FilterBar currentType={type} buildUrl={buildTypeUrl} />
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
+                         showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}
+                         sortOptions={[{ value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
+
+        <!-- Películas -->
+        {(type === 'all' || type === 'movies') && (
+            <div class="mb-12" id="peliculas">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
+                    Películas
+                </h2>
+                {movies.length === 0 ? (
+                    <EmptyState variant="filter" size="sm" title="Sin películas con este tema"
+                                description="Prueba a quitar filtros o mira las series." />
+                ) : (
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                        {movies.map((item) => (
+                            <div class="card-wrapper group">
+                                <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}>
+                                    <CardMovie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            title={item.title}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            release_date={item.release_date}
+                                            genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                    />
+                                </HoverPreview>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+
+        <!-- Series -->
+        {(type === 'all' || type === 'series') && (
+            <div class="mb-12" id="series">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
+                    Series
+                </h2>
+                {series.length === 0 ? (
+                    <EmptyState variant="filter" size="sm" title="Sin series con este tema"
+                                description="Prueba a quitar filtros o mira las películas." />
+                ) : (
+                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
+                        {series.map((item) => (
+                            <div class="card-wrapper group">
+                                <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}>
+                                    <CardSerie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            name={item.name}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            first_air_date={item.first_air_date}
+                                            seasons={item.seasons}
+                                            last_episode_to_air={item.last_episode_to_air}
+                                            next_episode_to_air={item.next_episode_to_air}
+                                            genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
+                                    />
+                                </HoverPreview>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+
+        <Pagination page={page} totalPages={totalPages} buildUrl={(p) => {
+            const q = new URLSearchParams(urlParams);
+            q.set('page', String(p));
+            return `?${q.toString()}`;
+        }} />
+    </div>
+</Layout>

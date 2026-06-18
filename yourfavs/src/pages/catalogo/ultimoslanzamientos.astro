@@ -25,16 +25,20 @@ const type = urlParams.get('type') || 'all';
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
-const useDiscover = filtersActive || !!filters.sort;
+// "Solo en mis plataformas" (3.2b).
+const mine = urlParams.get('mine') === '1';
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
+const useDiscover = filtersActive || !!filters.sort || !!myProviders;
 
-// Con filtros/orden: /discover (default fecha desc = identidad "últimos").
+// Con filtros/orden/plataformas: /discover (default fecha desc = identidad "últimos").
 // Sin nada: endpoints estándar /movie/now_playing + /tv/on_the_air.
 const latestMovies = useDiscover
-    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'primary_release_date.desc', page: pageStr })
+    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'primary_release_date.desc', page: pageStr, providers: myProviders, region: myRegion })
     : await getLatestMovies({page: pageStr});
 
 const latestSeries = useDiscover
-    ? await discoverContent<Serie>('tv', filters, { sort_by: sortByFor(filters.sort, 'tv') || 'first_air_date.desc', page: pageStr })
+    ? await discoverContent<Serie>('tv', filters, { sort_by: sortByFor(filters.sort, 'tv') || 'first_air_date.desc', page: pageStr, providers: myProviders, region: myRegion })
     : await getLatestSeries({page: pageStr});
 
 const totalPages = 150;
@@ -75,6 +79,7 @@ function buildTypeUrl(t: string) {
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order="Recientes" countCtx={countCtx}
+                         mine={mine} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

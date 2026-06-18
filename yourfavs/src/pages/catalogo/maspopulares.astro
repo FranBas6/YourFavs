@@ -25,20 +25,25 @@ const pageStr = page.toString();
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
-// Si hay filtros O un orden seleccionado, vamos por discover (que respeta sort_by).
-const useDiscover = filtersActive || !!filters.sort;
+// "Solo en mis plataformas" (3.2b): with_watch_providers desde el perfil.
+const mine = urlParams.get('mine') === '1';
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
+// Si hay filtros, orden o "mis plataformas", vamos por discover (que respeta esos params).
+const useDiscover = filtersActive || !!filters.sort || !!myProviders;
 
 const popularMovies = useDiscover
-    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'popularity.desc', page: pageStr })
+    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'popularity.desc', page: pageStr, providers: myProviders, region: myRegion })
     : await getMostPopularMovies({page: pageStr});
 
 const popularSeries = useDiscover
-    ? await discoverContent<Serie>('tv', filters, { sort_by: sortByFor(filters.sort, 'tv') || 'popularity.desc', page: pageStr })
+    ? await discoverContent<Serie>('tv', filters, { sort_by: sortByFor(filters.sort, 'tv') || 'popularity.desc', page: pageStr, providers: myProviders, region: myRegion })
     : await getMostPopularSeries({page: pageStr});
 
 const totalPages = 250;
 
 // Contexto para el contador en vivo del sheet (2.3b): mismo vote_count.gte que discoverContent.
+// (El filtro "mis plataformas" lo inyecta el cliente en el contador según el pending.)
 const countCtx = [
     ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: { 'vote_count.gte': '100' } }] : []),
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { 'vote_count.gte': '100' } }] : []),
@@ -80,6 +85,7 @@ function buildTypeUrl(t: string) {
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}
+                         mine={mine} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
                          sortOptions={[{ value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

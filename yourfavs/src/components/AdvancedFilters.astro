@@ -17,9 +17,15 @@ interface Props {
     /** Contexto discover base por tipo (2.3b) — alimenta el contador "Aplicar (N)" del sheet.
      *  Vacío/omitido → el botón muestra solo "Aplicar" (páginas sin discover filtrable). */
     countCtx?: { type: 'movie' | 'tv'; base: Record<string, string> }[];
+    /** Filtro "Solo en mis plataformas" (3.2): estado actual + plataformas del perfil + región.
+     *  Si `myPlatforms` está vacío, el chip no se muestra. */
+    mine?: boolean;
+    myPlatforms?: number[];
+    region?: string;
 }
 
-const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [] } = Astro.props;
+const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [], mine = false, myPlatforms = [], region = 'ES' } = Astro.props;
+const showMine = myPlatforms.length > 0;
 
 const RUNTIMES = [
     { value: 'short', label: '< 90 min' },
@@ -48,6 +54,7 @@ const yearRangeActive = !!(filters.yearFrom || filters.yearTo);
 const activeCount = [
     yearRangeActive || filters.year || filters.decade,
     filters.rating, filters.runtime, filters.language, filters.status, (showCert && filters.cert),
+    (showMine && mine),
 ].filter(Boolean).length;
 // Orden actual (sort seleccionado o el por defecto de la página).
 const currentOrderLabel = sortOptions.find((o) => o.value === filters.sort)?.label || order;
@@ -65,11 +72,13 @@ if (filters.runtime) activeChips.push({ label: String(labelOf(RUNTIMES, filters.
 if (filters.language) activeChips.push({ label: String(labelOf(LANGUAGES, filters.language)), remove: { language: null } });
 if (filters.status) activeChips.push({ label: String(labelOf(STATUSES, filters.status)), remove: { status: null } });
 if (showCert && filters.cert) activeChips.push({ label: String(labelOf(CERTS, filters.cert)), remove: { cert: null } });
+if (showMine && mine) activeChips.push({ label: 'Mis plataformas', remove: { mine: null } });
 
-const clearAll = { decade: null, year: null, yearFrom: null, yearTo: null, rating: null, runtime: null, language: null, status: null, cert: null };
+const clearAll = { decade: null, year: null, yearFrom: null, yearTo: null, rating: null, runtime: null, language: null, status: null, cert: null, mine: null };
 const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
 ---
-<div class="yf-adv-wrap" data-adv data-count-ctx={countCtx.length ? JSON.stringify(countCtx) : undefined}>
+<div class="yf-adv-wrap" data-adv data-count-ctx={countCtx.length ? JSON.stringify(countCtx) : undefined}
+     data-my-platforms={showMine ? myPlatforms.join(',') : undefined} data-region={region}>
     <div class="yf-adv-backdrop" data-adv-backdrop hidden></div>
     <details class="yf-adv" open={hasActive}>
         <summary class="yf-adv-trigger">
@@ -96,6 +105,15 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
             </div>
 
             <slot name="before" />
+
+            {showMine && (
+                <div class="yf-filter-group">
+                    <p class="yf-group-label">Dónde ver</p>
+                    <div class="yf-chips">
+                        <a href={buildUrl({ mine: mine ? null : '1' })} class={chipClass(mine)} data-fkey="mine" data-fval="1">Solo en mis plataformas</a>
+                    </div>
+                </div>
+            )}
 
             {sortOptions.length > 0 && (
                 <div class="yf-filter-group">
@@ -208,7 +226,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         var applyBtn = root.querySelector('[data-adv-apply]');
         var countCtx = []; try { countCtx = JSON.parse(root.getAttribute('data-count-ctx') || '[]'); } catch (e) {}
         var countTimer = null, countAbort = null;
-        var FILTER_KEYS = ['decade','year','yearFrom','yearTo','rating','runtime','language','status','cert','sort'];
+        var FILTER_KEYS = ['decade','year','yearFrom','yearTo','rating','runtime','language','status','cert','sort','mine'];
         var pending = {};
 
         // Contador en vivo (2.3b): pregunta a /api/discover/count cuántos resultados daría
@@ -221,9 +239,17 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                 countAbort = new AbortController();
                 var f = {};
                 ['year','yearFrom','yearTo','decade','rating','runtime','language','status','cert'].forEach(function (k) { if (pending[k] != null) f[k] = pending[k]; });
+                // "Solo en mis plataformas" no es un filtro discover normal: si está activo,
+                // inyectamos with_watch_providers en cada query del contador.
+                var qs = countCtx;
+                var providers = (root.getAttribute('data-my-platforms') || '').split(',').filter(Boolean).join('|');
+                if (pending.mine === '1' && providers) {
+                    var rg = root.getAttribute('data-region') || 'ES';
+                    qs = countCtx.map(function (q) { return { type: q.type, base: Object.assign({}, q.base, { with_watch_providers: providers, watch_region: rg }) }; });
+                }
                 fetch('/api/discover/count', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ queries: countCtx, filters: f }), signal: countAbort.signal,
+                    body: JSON.stringify({ queries: qs, filters: f }), signal: countAbort.signal,
                 })
                     .then(function (r) { return r.json(); })
                     .then(function (res) {

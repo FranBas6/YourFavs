@@ -61,12 +61,13 @@ export async function getAdditionalInfo(
 ): Promise<Record<string, any>> {
     try {
         const [keywordsData, detailData] = await Promise.all([
-            tmdbFetch<{ results?: any[] }>(`/${mediaType}/${id}/keywords`),
+            tmdbFetch<{ results?: any[]; keywords?: any[] }>(`/${mediaType}/${id}/keywords`),
             tmdbFetch<any>(`/${mediaType}/${id}`, { append_to_response: 'content_ratings' }),
         ]);
 
         const base: Record<string, any> = {
-            keywords: keywordsData.results || [],
+            // TMDB devuelve las keywords en `keywords` (películas) o `results` (series).
+            keywords: keywordsData.keywords || keywordsData.results || [],
             networks: detailData.networks || [],
             content_ratings: detailData.content_ratings?.results || [],
             episode_run_time: detailData.episode_run_time || [],
@@ -258,4 +259,26 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
         type: 'recommendations',
         ...(recResult.success ? {} : { error: 'No se pudieron obtener recomendaciones ni similares' }),
     };
+}
+
+/**
+ * Title art (3.3): logotipo oficial del título para el hero. Prefiere español,
+ * luego inglés, luego neutro; dentro de cada idioma el de mayor vote_average.
+ * Devuelve una URL w500 lista para <img>, o null (la ficha cae al título de texto).
+ */
+export async function getTitleLogo(mediaType: MediaType, id: number | string): Promise<string | null> {
+    try {
+        const data = await tmdbFetch<{ logos?: { file_path: string; iso_639_1: string | null; vote_average?: number }[] }>(
+            `/${mediaType}/${id}/images`,
+            { include_image_language: 'es,en,null' }
+        );
+        const logos = data.logos || [];
+        if (!logos.length) return null;
+        const pick = (lang: string | null) =>
+            logos.filter((l) => l.iso_639_1 === lang).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
+        const best = pick('es') || pick('en') || pick(null) || logos[0];
+        return best ? `https://image.tmdb.org/t/p/w500${best.file_path}` : null;
+    } catch {
+        return null;
+    }
 }

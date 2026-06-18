@@ -221,7 +221,7 @@ export function buildDiscoverFilterParams(filters: AdvancedFilters, mediaType: M
 export async function discoverContent<T>(
     mediaType: MediaType,
     filters: AdvancedFilters,
-    options: { sort_by?: string; voteCountMin?: string; page?: string } = {}
+    options: { sort_by?: string; voteCountMin?: string; page?: string; providers?: string; region?: string } = {}
 ): Promise<T[]> {
     const sort_by = options.sort_by || 'popularity.desc';
     const voteCountMin = options.voteCountMin || '100';
@@ -233,6 +233,11 @@ export async function discoverContent<T>(
         'vote_count.gte': voteCountMin,
         ...buildDiscoverParams(filters, mediaType),
     };
+    // Filtro "Solo en mis plataformas" (3.2): with_watch_providers + región.
+    if (options.providers) {
+        params.with_watch_providers = options.providers;
+        params.watch_region = options.region || 'ES';
+    }
 
     return tmdbFetchList<T>(`/discover/${mediaType}`, params);
 }

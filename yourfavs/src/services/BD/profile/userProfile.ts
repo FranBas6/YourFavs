@@ -15,6 +15,7 @@ export interface UserProfile {
     theme?: 'light' | 'dark' | 'system';
     email?: string;             // espejo del email (informativo)
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
+    platforms?: number[];       // provider_ids TMDB de "mis plataformas" (Auditoría v2 · 3.2)
     updated_at?: unknown;
 }
 

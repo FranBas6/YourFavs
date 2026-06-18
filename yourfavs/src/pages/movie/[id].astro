@@ -15,6 +15,8 @@ import {
     getMovieTrailer, fetchAllMoviePosters, getMovieCollectionInfo,
     getMovieRecommendationsOrSimilar, getMoviesAdditionalInfo, getMovieVideos
 } from "../../services/API/Movies/InfoMovies";
+import { getTitleLogo } from "../../services/API/shared/tmdbInfoService";
+import { peekTopActors } from "../../utils/topActorsLibrary";
 import { posterUrl, backdropUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
 import {initializeApp} from "firebase/app";
 import {getFirestore, doc, getDoc} from "firebase/firestore";
@@ -173,6 +175,7 @@ const [
     additionalInfo,
     allVideos,
     reviewsData,
+    movieLogo,
 ] = await Promise.all([
     id ? fetchAllMoviePosters(id).catch(() => []) : Promise.resolve([]),
     item?.belongs_to_collection ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null) : Promise.resolve(null),
@@ -181,6 +184,7 @@ const [
     tmdbId ? getMoviesAdditionalInfo(tmdbId) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null, budget: null, revenue: null }),
     id ? getMovieVideos(id) : Promise.resolve([]),
     tmdbId ? tmdbFetch<{ results: any[] }>(`/movie/${tmdbId}/reviews`).catch(() => ({ results: [] })) : Promise.resolve({ results: [] }),
+    tmdbId ? getTitleLogo('movie', tmdbId) : Promise.resolve(null),
 ]);
 
 // Saga con progreso: solo si la película pertenece a colección (evita la
@@ -201,6 +205,11 @@ const movieSocialLinks = {
     twitter: externalIds.twitter_id ? `https://twitter.com/${externalIds.twitter_id}` : null,
 };
 const hasSocialLinks = Object.values(movieSocialLinks).some(v => v);
+// Reparto cruzado con tu biblioteca (3.4): solo si la caché de top-actores está
+// caliente (no se computa aquí). actor id → nº de títulos tuyos con esa persona.
+const _topActors = Astro.locals.user ? peekTopActors() : null;
+const seenWithMap = _topActors ? new Map(_topActors.map((a) => [a.id, a.appearances])) : undefined;
+
 const movieKeywords: { id: number; name: string }[] = additionalInfo.keywords || [];
 const movieLanguages: { iso_639_1: string; name: string }[] = additionalInfo.languages || [];
 const movieStatus = item?.status && item.status !== 'Released' ? item.status : null;
@@ -279,7 +288,9 @@ const jsonLd = item ? {
                         <img src={posterUrl(item?.poster_path)} alt={item?.title} class="w-full aspect-[2/3] object-cover" />
                     </div>
                     <div class="flex-1 text-white">
-                        <h1 class="text-4xl md:text-5xl font-bold mb-3 leading-tight">{item?.title}</h1>
+                        {movieLogo
+                            ? <img src={movieLogo} alt={item?.title} class="mb-3 h-auto max-h-20 md:max-h-28 w-auto max-w-[85%] md:max-w-[440px] object-contain drop-shadow-lg" />
+                            : <h1 class="text-4xl md:text-5xl font-bold mb-3 leading-tight">{item?.title}</h1>}
                         {additionalInfo.tagline && (
                             <p class="text-white/60 italic text-lg mb-4">"{additionalInfo.tagline}"</p>
                         )}
@@ -586,7 +597,7 @@ const jsonLd = item ? {
                             <h3 class="text-base font-semibold text-gray-800 mb-2">Keywords</h3>
                             <div class="flex flex-wrap gap-1.5">
                                 {movieKeywords.map((kw) => (
-                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full">{kw.name}</span>
+                                    <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
                                 ))}
                             </div>
                         </div>
@@ -632,7 +643,7 @@ const jsonLd = item ? {
                     <LightboxGallery posters={posters} prefix="poster" />
 
                     <!-- Reparto (grid cards) -->
-                    <CastGrid cast={cast} />
+                    <CastGrid cast={cast} seenWith={seenWithMap} />
 
                     <!-- Dobladores en español (lazy, eldoblaje.com) -->
                     <DubbingSection type="movie" tmdbId={id} />

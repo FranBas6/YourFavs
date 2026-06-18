@@ -23,6 +23,15 @@ let cache: { data: TopActor[]; expires: number } | null = null;
 
 export function invalidateTopActorsCache() { cache = null; }
 
+/**
+ * Lee el top de actores de la caché SIN computar (3.4). Devuelve null si está
+ * fría → las fichas no disparan el cómputo (caro) y se quedan rápidas; el badge
+ * "visto N con esta persona" solo aparece cuando la caché ya está caliente.
+ */
+export function peekTopActors(): TopActor[] | null {
+    return cache && cache.expires > Date.now() ? cache.data : null;
+}
+
 interface CastEntry { id: number; name: string; profile_path: string | null; order: number }
 interface CreditsResponse { cast?: CastEntry[] }
 

@@ -19,10 +19,14 @@ const pageStr = page.toString();
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
-const useDiscover = filtersActive || !!filters.sort;
+// "Solo en mis plataformas" (3.2b).
+const mine = urlParams.get('mine') === '1';
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
+const useDiscover = filtersActive || !!filters.sort || !!myProviders;
 
 const popularMovies = useDiscover
-    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'vote_average.desc', voteCountMin: '300', page: pageStr })
+    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'vote_average.desc', voteCountMin: '300', page: pageStr, providers: myProviders, region: myRegion })
     : await getTopRatedMovies({page: pageStr});
 
 const totalPages = 500;
@@ -50,6 +54,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
         />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showCert order="Nota" countCtx={countCtx}
+                         mine={mine} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

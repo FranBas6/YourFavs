@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import { getUserProfile, setUserProfile, type UserProfile } from "../services/BD/profile/userProfile";
 import { getUserTaste, clearUserTaste } from "../services/BD/profile/userTaste";
 import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
+import { STREAMING_PLATFORMS, STREAMING_PLATFORM_IDS } from "../utils/constants/streamingPlatforms";
 import { genresMap } from "../utils/constants/genres";
 import { posterUrl } from "../services/API/shared/tmdbClient";
 
@@ -36,6 +37,8 @@ if (Astro.request.method === 'POST') {
             language: String(fd.get('language') || '') || undefined,
             theme: (String(fd.get('theme') || '') as UserProfile['theme']) || undefined,
         };
+        // "Mis plataformas" (3.2): multi-checkbox; [] válido (= ninguna) → siempre se escribe.
+        patch.platforms = fd.getAll('platforms').map((v) => Number(v)).filter((n) => STREAMING_PLATFORM_IDS.has(n));
         await setUserProfile(patch);
         return Astro.redirect('/perfil?saved=1');
     }
@@ -71,6 +74,7 @@ const displayName = profile.display_name || user.name || (user.email ? user.emai
 const region = profile.region || 'ES';
 const language = profile.language || 'es-ES';
 const theme = profile.theme || 'system';
+const selectedPlatforms = profile.platforms ?? [];
 
 // Iniciales para el fallback del avatar
 const initials = (() => {
@@ -147,6 +151,18 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                             <option value="dark" selected={theme === 'dark'}>Oscuro</option>
                         </select>
                     </label>
+                    <div class="perfil-field perfil-field-wide">
+                        <span>Mis plataformas</span>
+                        <div class="plat-chips">
+                            {STREAMING_PLATFORMS.map((p) => (
+                                <label class="plat-chip">
+                                    <input type="checkbox" name="platforms" value={p.id} checked={selectedPlatforms.includes(p.id)} />
+                                    <span>{p.label}</span>
+                                </label>
+                            ))}
+                        </div>
+                        <small>Para el filtro «Solo en mis plataformas» del catálogo y la ruleta.</small>
+                    </div>
                 </div>
             </section>
 
@@ -346,6 +362,20 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
         outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
     }
     .perfil-field input:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* "Mis plataformas" (3.2): chips toggle a ancho completo del grid */
+    .perfil-field-wide { grid-column: 1 / -1; }
+    .plat-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .plat-chip { position: relative; }
+    .plat-chip input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; padding: 0; }
+    .plat-chip span {
+        display: inline-flex; align-items: center; padding: 7px 13px; border-radius: 999px;
+        border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-2);
+        font-size: 13px; font-weight: 600; cursor: pointer; user-select: none; transition: all .15s ease;
+    }
+    .plat-chip:hover span { border-color: var(--border-strong); color: var(--text); }
+    .plat-chip input:checked + span { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .plat-chip input:focus-visible + span { box-shadow: 0 0 0 3px var(--accent-soft); }
 
     .perfil-avatar-btn {
         align-self: flex-start; padding: 7px 13px; border-radius: 8px;
