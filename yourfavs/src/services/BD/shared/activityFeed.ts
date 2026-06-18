@@ -1,4 +1,5 @@
 import { userCol, getCurrentUid } from "./userScope";
+import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
 import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
 import { appDateParts } from "../../../utils/appTime";
 
@@ -11,18 +12,19 @@ export interface ActivityEvent {
     episodes?: { season: number; episode: number }[];
 }
 
-const COLLECTIONS: { name: string; type: 'movie' | 'serie'; action: string }[] = [
-    { name: 'MovieFavs', type: 'movie', action: 'Añadida a Favoritos' },
-    { name: 'MoviesPendientes', type: 'movie', action: 'Marcada como pendiente' },
-    { name: 'MoviesVistas', type: 'movie', action: 'Marcada como vista' },
-    { name: 'MoviesVerPronto', type: 'movie', action: 'Añadida a Ver Pronto' },
-    { name: 'LikedMovies', type: 'movie', action: 'Me gusta' },
-    { name: 'SeriesFavs', type: 'serie', action: 'Añadida a Favoritos' },
-    { name: 'SeriesPendiente', type: 'serie', action: 'Marcada como pendiente' },
-    { name: 'SeriesVistas', type: 'serie', action: 'Marcada como vista' },
-    { name: 'SeriesSiguiendo', type: 'serie', action: 'Empezaste a seguir' },
-    { name: 'LikedSeries', type: 'serie', action: 'Me gusta' },
-    { name: 'SeriesVerPronto', type: 'serie', action: 'Añadida a Ver Pronto' },
+// `key` apunta al array del snapshot compartido (ya no se lee colección a colección).
+const COLLECTIONS: { name: string; key: keyof LibrarySnapshot; type: 'movie' | 'serie'; action: string }[] = [
+    { name: 'MovieFavs', key: 'movFavs', type: 'movie', action: 'Añadida a Favoritos' },
+    { name: 'MoviesPendientes', key: 'movPend', type: 'movie', action: 'Marcada como pendiente' },
+    { name: 'MoviesVistas', key: 'movVistos', type: 'movie', action: 'Marcada como vista' },
+    { name: 'MoviesVerPronto', key: 'movVerPronto', type: 'movie', action: 'Añadida a Ver Pronto' },
+    { name: 'LikedMovies', key: 'movLike', type: 'movie', action: 'Me gusta' },
+    { name: 'SeriesFavs', key: 'tvFavs', type: 'serie', action: 'Añadida a Favoritos' },
+    { name: 'SeriesPendiente', key: 'tvPend', type: 'serie', action: 'Marcada como pendiente' },
+    { name: 'SeriesVistas', key: 'tvVistos', type: 'serie', action: 'Marcada como vista' },
+    { name: 'SeriesSiguiendo', key: 'tvSig', type: 'serie', action: 'Empezaste a seguir' },
+    { name: 'LikedSeries', key: 'tvLike', type: 'serie', action: 'Me gusta' },
+    { name: 'SeriesVerPronto', key: 'tvVerPronto', type: 'serie', action: 'Añadida a Ver Pronto' },
 ];
 
 function dayKey(ts: number): string {
@@ -115,30 +117,54 @@ async function fetchRewatchEvents(): Promise<ActivityEvent[]> {
     }
 }
 
+// Valoraciones (4.2): cada nota en Ratings → un evento. updated_at marca el
+// instante; si updated_at supera a created_at es una edición → "Nota actualizada".
+async function fetchRatingEvents(): Promise<ActivityEvent[]> {
+    try {
+        const snap = await userCol('Ratings').get();
+        const events: ActivityEvent[] = [];
+        for (const docSnap of snap.docs) {
+            const x = docSnap.data() as { media_type?: string; tmdb_id?: string; score?: number; created_at?: unknown; updated_at?: unknown };
+            if (!x.score) continue;
+            const updated = getFirebaseTimestamp(x.updated_at);
+            const created = getFirebaseTimestamp(x.created_at);
+            const ts = updated || created;
+            if (!ts) continue;
+            const edited = created > 0 && updated > 0 && updated - created > 60_000; // >1min = edición real
+            events.push({
+                type: x.media_type === 'movie' ? 'movie' : 'serie',
+                id: String(x.tmdb_id || docSnap.id.replace(/^(movie|tv)_/, '')),
+                collection: 'Ratings',
+                action: `${edited ? 'Nota actualizada' : 'Has valorado'} · ★ ${x.score}`,
+                timestamp: ts,
+            });
+        }
+        return events;
+    } catch (error) {
+        console.error('Error al leer Ratings:', error);
+        return [];
+    }
+}
+
 export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (!getCurrentUid()) return [];
-    const [collectionEvents, episodeEvents, rewatchEvents] = await Promise.all([
-        Promise.all(
-            COLLECTIONS.map(async (c) => {
-                try {
-                    const snap = await userCol(c.name).get();
-                    return snap.docs
-                        .map(d => ({
-                            type: c.type,
-                            id: d.id,
-                            collection: c.name,
-                            action: c.action,
-                            timestamp: getFirebaseTimestamp(d.data().added_at),
-                        }))
-                        .filter(e => e.timestamp > 0);
-                } catch (error) {
-                    console.error(`Error al leer ${c.name}:`, error);
-                    return [];
-                }
-            })
-        ).then(r => r.flat()),
+    // Las 11 listas salen del snapshot compartido (1 lectura), no colección a colección.
+    const [snapshot, episodeEvents, rewatchEvents, ratingEvents] = await Promise.all([
+        getLibrarySnapshot(),
         fetchWatchedEpisodeEvents(),
         fetchRewatchEvents(),
+        fetchRatingEvents(),
     ]);
-    return [...collectionEvents, ...episodeEvents, ...rewatchEvents];
+    const collectionEvents = COLLECTIONS.flatMap(c =>
+        (snapshot[c.key] || [])
+            .map((d: any) => ({
+                type: c.type,
+                id: String(d.id),
+                collection: c.name,
+                action: c.action,
+                timestamp: getFirebaseTimestamp(d.added_at),
+            }))
+            .filter(e => e.timestamp > 0)
+    );
+    return [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents];
 }

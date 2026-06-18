@@ -1,10 +1,7 @@
 import { tmdbFetch, tmdbFetchList } from "./tmdbClient";
 import { processBatch } from "../../../utils/processBatch";
 import { getMovieCollectionInfo, type MovieCollectionInfo } from "../Movies/InfoMovies";
-import {
-    getMovieFav, getMoviesVistas, getLikedMovies,
-    getMoviesPendientes, getMoviesVerPronto
-} from "../../BD/movies/yourfavsMovie";
+import { getLibrarySnapshot } from "../../BD/shared/librarySnapshot";
 import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
 import { SEED_COLLECTION_IDS } from "../../../utils/constants/featuredCollections";
 
@@ -97,10 +94,7 @@ export async function getPopularCollections(): Promise<MovieCollectionInfo[]> {
 export async function getUserCollections(): Promise<MovieCollectionInfo[]> {
     if (userCache && userCache.expires > Date.now()) return userCache.data;
     try {
-        const [favs, vistas, liked, pendientes, verPronto] = await Promise.all([
-            getMovieFav(), getMoviesVistas(), getLikedMovies(),
-            getMoviesPendientes(), getMoviesVerPronto(),
-        ]);
+        const { movFavs: favs, movVistos: vistas, movLike: liked, movPend: pendientes, movVerPronto: verPronto } = await getLibrarySnapshot();
 
         // Dedup por id y quedarnos con el added_at más reciente de cada peli
         const byId = new Map<string, { id: string; ts: number }>();

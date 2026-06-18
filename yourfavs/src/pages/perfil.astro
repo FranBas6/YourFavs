@@ -171,6 +171,18 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
             </div>
         </form>
 
+        <!-- Tu cine en números (4.1 · acceso destacado a /siempre) -->
+        <a href="/mislistas/year/siempre" class="perfil-card perfil-stats-cta">
+            <div class="perfil-stats-icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+            </div>
+            <div class="perfil-stats-body">
+                <h2 class="perfil-h2">Tu cine en números</h2>
+                <p class="perfil-muted">Horas, géneros, tu nota media frente a TMDB, director más visto y todo tu acumulado.</p>
+            </div>
+            <span class="perfil-stats-arrow" aria-hidden="true">→</span>
+        </a>
+
         <!-- Tus gustos (Fase F · Acceso B) -->
         <section class="perfil-card">
             <div class="perfil-taste-head">
@@ -383,6 +395,23 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
         font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
     }
     .perfil-avatar-btn:hover { border-color: var(--border-strong); color: var(--text); }
+
+    /* Tu cine en números (4.1) — tarjeta-enlace destacada */
+    .perfil-stats-cta {
+        display: flex; align-items: center; gap: 16px; text-decoration: none;
+        transition: border-color .15s ease, transform .15s ease;
+    }
+    .perfil-stats-cta:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .perfil-stats-icon {
+        width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--accent-soft); color: var(--accent);
+    }
+    .perfil-stats-body { flex: 1; min-width: 0; }
+    .perfil-stats-body .perfil-h2 { margin-bottom: 4px; }
+    .perfil-stats-body .perfil-muted { margin: 0; }
+    .perfil-stats-arrow { color: var(--text-3); font-size: 20px; flex-shrink: 0; transition: transform .15s ease; }
+    .perfil-stats-cta:hover .perfil-stats-arrow { color: var(--accent); transform: translateX(3px); }
 
     /* Tus gustos (Fase F) */
     .perfil-taste-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }

@@ -54,6 +54,11 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
                 .filter(snap => snap.exists)
                 .map(snap => snap.ref.update({ rating: ratingNum }))
         );
+        // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
+        try {
+            const { setRating } = await import('../lists/ratings');
+            await setRating('tv', serieId, ratingNum);
+        } catch { /* la nota inline ya está guardada */ }
         return `/serie/${serieId}`;
     }
 
@@ -66,6 +71,10 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
                 .filter(snap => snap.exists)
                 .map(snap => snap.ref.update({ rating: FieldValue.delete() }))
         );
+        try {
+            const { deleteRating } = await import('../lists/ratings');
+            await deleteRating('tv', serieId);
+        } catch { /* ignore */ }
         return `/serie/${serieId}`;
     }
 
@@ -194,6 +203,14 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         try {
             const { invalidateTopActorsCache } = await import('../../../utils/topActorsLibrary');
             invalidateTopActorsCache();
+        } catch { /* ignore */ }
+        try {
+            const { invalidatePersonalIndexCache } = await import('../shared/personalIndex');
+            invalidatePersonalIndexCache(); // 4.3 · buscador "lo mío"
+        } catch { /* ignore */ }
+        try {
+            const { invalidateLibrarySnapshot } = await import('../shared/librarySnapshot');
+            invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
         } catch { /* ignore */ }
     }
 

@@ -1,26 +1,27 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getCached, setCached, invalidateCached } from './recsBlobCache';
-import { getCurrentUid, userCol } from '../services/BD/shared/userScope';
-import { getMovieFav } from '../services/BD/movies/yourfavsMovie';
-import { getSerieFav } from '../services/BD/series/yourfavsSerie';
+import { getCurrentUid } from '../services/BD/shared/userScope';
+import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import { getUserTaste } from '../services/BD/profile/userTaste';
 import { getCustomLists, getListItems } from '../services/BD/lists/customLists';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
 // que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).
-const MOVIE_LIST_COLS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
-const TV_LIST_COLS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'];
 
 /** IDs (tmdb, string) de TODO lo que el usuario tiene en listas fijas + colecciones. */
 async function collectLibraryIds(): Promise<{ movies: Set<string>; tv: Set<string> }> {
     const movies = new Set<string>();
     const tv = new Set<string>();
     try {
-        const movieSnaps = await Promise.all(MOVIE_LIST_COLS.map((c) => userCol(c).get().catch(() => null)));
-        movieSnaps.forEach((s) => s?.docs.forEach((d) => movies.add(d.id)));
-        const tvSnaps = await Promise.all(TV_LIST_COLS.map((c) => userCol(c).get().catch(() => null)));
-        tvSnaps.forEach((s) => s?.docs.forEach((d) => tv.add(d.id)));
+        // Listas fijas desde el snapshot compartido (no 11 lecturas sueltas).
+        const snap = await getLibrarySnapshot();
+        for (const arr of [snap.movFavs, snap.movPend, snap.movVistos, snap.movVerPronto, snap.movLike]) {
+            for (const d of arr) movies.add(String(d.id));
+        }
+        for (const arr of [snap.tvFavs, snap.tvPend, snap.tvVistos, snap.tvSig, snap.tvLike, snap.tvVerPronto]) {
+            for (const d of arr) tv.add(String(d.id));
+        }
         // Items de colecciones personalizadas.
         const lists = await getCustomLists();
         const itemsPerList = await Promise.all(lists.map((l) => getListItems(l.id).catch(() => [])));
@@ -174,8 +175,8 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
         return data;
     }
 
-    const [movFavs, tvFavs, taste] = await Promise.all([
-        getMovieFav(), getSerieFav(), getUserTaste(),
+    const [{ movFavs, tvFavs }, taste] = await Promise.all([
+        getLibrarySnapshot(), getUserTaste(),
     ]);
     // Géneros del onboarding, ya partidos por tipo (F.7). Retrocompat: docs
     // pre-F.7 traen `genres` (IDs de cine) → alimentan cine; TV tira de favoritos.

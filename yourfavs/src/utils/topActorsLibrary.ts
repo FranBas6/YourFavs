@@ -1,11 +1,6 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
-import {
-    getMovieFav, getMoviesVistas, getLikedMovies
-} from '../services/BD/movies/yourfavsMovie';
-import {
-    getSerieFav, getSeriesVistas, getSeriesSiguiendo, getLikedSeries
-} from '../services/BD/series/yourfavsSerie';
+import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 
 const TTL_MS = 60 * 60 * 1000;
 const MAX_CAST_ORDER = 10;
@@ -39,10 +34,7 @@ export async function calculateTopActors(limit = 10): Promise<TopActor[]> {
     const now = Date.now();
     if (cache && cache.expires > now) return cache.data;
 
-    const [movFavs, movVistos, movLike, tvFavs, tvVistos, tvSig, tvLike] = await Promise.all([
-        getMovieFav(), getMoviesVistas(), getLikedMovies(),
-        getSerieFav(), getSeriesVistas(), getSeriesSiguiendo(), getLikedSeries(),
-    ]);
+    const { movFavs, movVistos, movLike, tvFavs, tvVistos, tvSig, tvLike } = await getLibrarySnapshot();
 
     const movieIds = new Set<string>();
     for (const arr of [movFavs, movVistos, movLike]) for (const m of arr) movieIds.add(m.id);

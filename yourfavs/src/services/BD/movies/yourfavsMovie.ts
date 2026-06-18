@@ -57,11 +57,20 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
         if (!ratingNum) return `/movie/${movieId}`;
         await updateExisting({ rating: ratingNum });
+        // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
+        try {
+            const { setRating } = await import('../lists/ratings');
+            await setRating('movie', movieId, ratingNum);
+        } catch { /* la nota inline ya está guardada */ }
         return `/movie/${movieId}`;
     }
 
     if (action === 'delete_rating') {
         await updateExisting({ rating: FieldValue.delete() });
+        try {
+            const { deleteRating } = await import('../lists/ratings');
+            await deleteRating('movie', movieId);
+        } catch { /* ignore */ }
         return `/movie/${movieId}`;
     }
 
@@ -118,6 +127,14 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         try {
             const { invalidateTopActorsCache } = await import('../../../utils/topActorsLibrary');
             invalidateTopActorsCache();
+        } catch { /* ignore */ }
+        try {
+            const { invalidatePersonalIndexCache } = await import('../shared/personalIndex');
+            invalidatePersonalIndexCache(); // 4.3 · buscador "lo mío"
+        } catch { /* ignore */ }
+        try {
+            const { invalidateLibrarySnapshot } = await import('../shared/librarySnapshot');
+            invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
         } catch { /* ignore */ }
     }
 

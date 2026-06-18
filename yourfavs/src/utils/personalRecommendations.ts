@@ -29,7 +29,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v8';     // v8: excluye TODO lo que está en cualquier lista; v7 favs+taste
+const BLOB_KEY = 'personalRecs_v9';     // v9: añade _recSeedTitle (explicable 4.4); v8 excluye toda la biblioteca
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 const l1 = new Map<string, { data: PersonalRecResult; expires: number }>();
@@ -134,6 +134,24 @@ async function trendingFallback(
         .map((m) => ({ ...m, _recScore: 0, _recSources: 0, _fallback: true }));
 }
 
+/**
+ * 4.4 · Resuelve el título de cada semilla (para "porque viste X"). Las semillas
+ * del onboarding ya traen `title`; las de favoritos no → 1 fetch TMDB por id
+ * (≤6 por tipo). El resultado viaja con la caché de recos, así que se paga 1 vez.
+ */
+async function resolveSeedTitles(seeds: SeedInfo[], kind: 'movie' | 'tv'): Promise<Map<string, string>> {
+    const out = new Map<string, string>();
+    await processBatch(seeds, async (s: SeedInfo) => {
+        if (s.title) { out.set(s.id, s.title); return; }
+        try {
+            const d: any = await tmdbFetch<any>(`/${kind}/${s.id}`);
+            const t = kind === 'movie' ? d?.title : d?.name;
+            if (t) out.set(s.id, t);
+        } catch { /* sin título → la UI cae a "por tus géneros" */ }
+    }, 8);
+    return out;
+}
+
 export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const uidKey = getCurrentUid() ?? 'guest';
     const blobKey = `${BLOB_KEY}:${uidKey}`;
@@ -185,7 +203,8 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const movieSeeds = topSeedsFiltered(movieFinal, SEED_LIMIT);
     const tvSeeds = topSeedsFiltered(tvFinal, SEED_LIMIT);
 
-    type Agg = { item: any; score: number; sources: number };
+    // seedId/seedWeight: la semilla MÁS fuerte que generó este candidato (4.4 · explicable).
+    type Agg = { item: any; score: number; sources: number; seedId?: string; seedWeight?: number };
     const movieAgg = new Map<string, Agg>();
     const tvAgg = new Map<string, Agg>();
 
@@ -224,8 +243,12 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 for (const m of eligible) {
                     const k = String(m.id);
                     const cur = movieAgg.get(k);
-                    if (cur) { cur.score += seed.weight; cur.sources += 1; }
-                    else movieAgg.set(k, { item: m, score: seed.weight, sources: 1 });
+                    if (cur) {
+                        cur.score += seed.weight; cur.sources += 1;
+                        if (seed.weight > (cur.seedWeight ?? 0)) { cur.seedId = seed.id; cur.seedWeight = seed.weight; }
+                    } else {
+                        movieAgg.set(k, { item: m, score: seed.weight, sources: 1, seedId: seed.id, seedWeight: seed.weight });
+                    }
                 }
             } catch {}
         }, 8),
@@ -239,8 +262,12 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
                 for (const m of eligible) {
                     const k = String(m.id);
                     const cur = tvAgg.get(k);
-                    if (cur) { cur.score += seed.weight; cur.sources += 1; }
-                    else tvAgg.set(k, { item: m, score: seed.weight, sources: 1 });
+                    if (cur) {
+                        cur.score += seed.weight; cur.sources += 1;
+                        if (seed.weight > (cur.seedWeight ?? 0)) { cur.seedId = seed.id; cur.seedWeight = seed.weight; }
+                    } else {
+                        tvAgg.set(k, { item: m, score: seed.weight, sources: 1, seedId: seed.id, seedWeight: seed.weight });
+                    }
                 }
             } catch {}
         }, 8),
@@ -268,20 +295,32 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         else tvAgg.set(k, { item: s, score: DISCOVER_BOOST, sources: 0 });
     }
 
+    // 4.4 · "porque viste X": resolver el título de cada semilla (≤6+6 fetches,
+    // cacheados con el resultado). Las semillas de onboarding ya traen título.
+    const [movieSeedTitles, tvSeedTitles] = await Promise.all([
+        resolveSeedTitles(movieSeeds, 'movie'),
+        resolveSeedTitles(tvSeeds, 'tv'),
+    ]);
+
     // I: score híbrido. sources×1.5 + score×0.5 + (rating/10)×2.
     const hybridScore = (a: Agg) =>
         a.sources * 1.5 + a.score * 0.5 + ((a.item.vote_average ?? 0) / 10) * 2;
-    const sortAgg = (m: Map<string, Agg>) => Array.from(m.values())
+    const sortAgg = (m: Map<string, Agg>, titles: Map<string, string>) => Array.from(m.values())
         .sort((a, b) =>
             hybridScore(b) - hybridScore(a) ||
             b.sources - a.sources ||
             (b.item.vote_average ?? 0) - (a.item.vote_average ?? 0)
         )
         .slice(0, RESULT_LIMIT)
-        .map(r => ({ ...r.item, _recScore: r.score, _recSources: r.sources }));
+        .map(r => ({
+            ...r.item,
+            _recScore: r.score,
+            _recSources: r.sources,
+            _recSeedTitle: r.seedId ? titles.get(r.seedId) : undefined,
+        }));
 
-    let movies = sortAgg(movieAgg);
-    let tv = sortAgg(tvAgg);
+    let movies = sortAgg(movieAgg, movieSeedTitles);
+    let tv = sortAgg(tvAgg, tvSeedTitles);
 
     // Fallback: sin semillas ni género (usuario nuevo sin favs ni onboarding) el pool queda
     // vacío → mostramos tendencias en vez de un hueco. También cubre cobertura parcial.

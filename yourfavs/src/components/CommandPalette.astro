@@ -8,8 +8,10 @@
  * a /api/search/multi por tecleo; navegación ↑↓ + Enter; Esc cierra.
  */
 import '../styles/components/command-palette.css';
+// 4.3 · el toggle "Lo mío" solo aparece con sesión (necesita la biblioteca del uid).
+const isLogged = !!Astro.locals.user;
 ---
-<div class="cmdk-overlay" id="cmdk" role="dialog" aria-modal="true" aria-label="Buscar en YourFavs" hidden>
+<div class="cmdk-overlay" id="cmdk" role="dialog" aria-modal="true" aria-label="Buscar en YourFavs" data-logged={isLogged ? '1' : '0'} hidden>
     <div class="cmdk-panel">
         <div class="cmdk-input-row">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -24,8 +26,16 @@ import '../styles/components/command-palette.css';
                 spellcheck="false"
                 aria-label="Buscar"
             />
+            <button class="cmdk-go" id="cmdk-go" type="button" hidden>Buscar</button>
             <span class="cmdk-kbd">ESC</span>
         </div>
+
+        {isLogged && (
+            <div class="cmdk-scope" role="tablist" aria-label="Ámbito de búsqueda">
+                <button class="cmdk-scope-btn is-active" type="button" data-scope="all" role="tab" aria-selected="true">Todo</button>
+                <button class="cmdk-scope-btn" type="button" data-scope="mine" role="tab" aria-selected="false">Lo mío</button>
+            </div>
+        )}
 
         <div class="cmdk-results" id="cmdk-results" role="listbox" aria-label="Resultados">
             <!-- El JS pinta aquí recientes + acciones al abrir (renderEmpty) -->
@@ -46,6 +56,7 @@ import '../styles/components/command-palette.css';
     var input = document.getElementById('cmdk-input');
     var results = document.getElementById('cmdk-results');
     var seeAll = document.getElementById('cmdk-see-all');
+    var goBtn = document.getElementById('cmdk-go');
 
     var items = [];          // items planos renderizados (en orden visual)
     var selected = -1;       // índice resaltado en `items`
@@ -53,6 +64,7 @@ import '../styles/components/command-palette.css';
     var debounceTimer = null;
     var controller = null;   // AbortController del fetch en vuelo
     var lastFocus = null;    // foco previo, para restaurarlo al cerrar
+    var mode = 'all';        // 'all' = TMDB (multi) · 'mine' = mi biblioteca (4.3)
 
     var GROUP_LABELS = { movie: 'PELÍCULAS', tv: 'SERIES', person: 'PERSONAS' };
     var GROUP_ORDER = ['movie', 'tv', 'person'];
@@ -125,6 +137,27 @@ import '../styles/components/command-palette.css';
     // Trigger externo (lupa del header)
     document.addEventListener('yf:open-palette', open);
 
+    // ---- toggle Todo | Lo mío (4.3, solo con sesión) ----
+    var scopeBtns = overlay.querySelectorAll('.cmdk-scope-btn');
+    function setMode(m) {
+        if (mode === m) return;
+        mode = m;
+        scopeBtns.forEach(function (b) {
+            var on = b.getAttribute('data-scope') === m;
+            b.classList.toggle('is-active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        input.placeholder = m === 'mine'
+            ? 'Buscar en tu biblioteca (título o etiqueta)...'
+            : 'Buscar películas, series, personas...';
+        var q = input.value.trim();
+        if (q.length >= (m === 'mine' ? 1 : 2)) runSearch(q); else { renderEmpty(); updateSeeAll(''); }
+        input.focus();
+    }
+    scopeBtns.forEach(function (b) {
+        b.addEventListener('click', function () { setMode(b.getAttribute('data-scope')); });
+    });
+
     // Click en el backdrop cierra (el panel hace stopPropagation implícito por target)
     overlay.addEventListener('mousedown', function (e) {
         if (e.target === overlay) close();
@@ -144,20 +177,25 @@ import '../styles/components/command-palette.css';
         }
         navKeyboard = false;
 
-        if (q.length < 2) {
+        var minLen = mode === 'mine' ? 1 : 2;
+        if (q.length < minLen) {
             renderEmpty();
             updateSeeAll('');
             return;
         }
 
-        debounceTimer = setTimeout(function () { search(q); }, 250);
+        debounceTimer = setTimeout(function () { runSearch(q); }, 250);
     });
 
-    function search(q) {
+    function runSearch(q) {
         if (controller) controller.abort();
         controller = new AbortController();
 
-        fetch('/api/search/multi?q=' + encodeURIComponent(q), { signal: controller.signal })
+        var endpoint = mode === 'mine'
+            ? '/api/search/personal?q=' + encodeURIComponent(q)
+            : '/api/search/multi?q=' + encodeURIComponent(q);
+
+        fetch(endpoint, { signal: controller.signal })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 // Descarta respuestas tardías de otra query
@@ -260,11 +298,23 @@ import '../styles/components/command-palette.css';
     }
 
     function updateSeeAll(q) {
-        if (!q) { seeAll.hidden = true; return; }
+        // En "Lo mío" no hay "ver todos" (la búsqueda completa es de TMDB).
+        if (!q || mode === 'mine') {
+            seeAll.hidden = true;
+            if (goBtn) goBtn.hidden = true;
+            return;
+        }
+        var href = '/catalogo/busqueda?query=' + encodeURIComponent(q);
         seeAll.hidden = false;
-        seeAll.href = '/catalogo/busqueda?query=' + encodeURIComponent(q);
+        seeAll.href = href;
         seeAll.textContent = 'Ver todos los resultados de «' + q + '»';
+        if (goBtn) { goBtn.hidden = false; goBtn.dataset.href = href; }
     }
+
+    // Botón "Buscar": misma acción que Enter directo (búsqueda completa en /catalogo/busqueda).
+    if (goBtn) goBtn.addEventListener('click', function () {
+        if (goBtn.dataset.href) location.href = goBtn.dataset.href;
+    });
 
     // ---- navegación por teclado ----
     function select(idx, byKeyboard) {

@@ -3,13 +3,7 @@ import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
 import { appDateParts } from './appTime';
 import { userCol, getCurrentUid } from '../services/BD/shared/userScope';
-import {
-    getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
-} from '../services/BD/movies/yourfavsMovie';
-import {
-    getSerieFav, getSeriesPendientes, getSeriesVistas, getSeriesSiguiendo,
-    getLikedSeries, getSeriesVerPronto
-} from '../services/BD/series/yourfavsSerie';
+import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 
 const TTL_MS = 60 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
@@ -61,6 +55,10 @@ export interface YearStats {
         seriesDelta: number | null;
         episodesDelta: number | null;
     };
+    /** 4.1 · Tu nota media frente a la de TMDB, sobre los títulos que has puntuado. */
+    ratingCompare: { count: number; userAvg: number; tmdbAvg: number } | null;
+    /** 4.1 · Directores (pelis) y creadores (series) más vistos en la biblioteca. */
+    topDirectors: { id: number; name: string; profile_path: string | null; count: number }[];
     availableYears: number[];
     hasData: boolean;
 }
@@ -124,13 +122,11 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const cached = cache.get(year);
     if (cached && cached.expires > now) return cached.data;
 
-    const [movFavs, movPend, movVistos, movLike, movVerPronto] = await Promise.all([
-        getMovieFav(), getMoviesPendientes(), getMoviesVistas(), getLikedMovies(), getMoviesVerPronto()
-    ]);
-    const [tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto] = await Promise.all([
-        getSerieFav(), getSeriesPendientes(), getSeriesVistas(),
-        getSeriesSiguiendo(), getLikedSeries(), getSeriesVerPronto()
-    ]);
+    // Lectura compartida de la biblioteca (dedupe de lecturas Firestore).
+    const {
+        movFavs, movPend, movVistos, movLike, movVerPronto,
+        tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto,
+    } = await getLibrarySnapshot();
 
     const movieMap = buildRawMap([
         { items: movFavs, key: 'favs' },
@@ -165,11 +161,19 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         async (item: RawItem) => {
             try {
                 const path = item.kind === 'movie' ? `/movie/${item.id}` : `/tv/${item.id}`;
-                const d: any = await tmdbFetch<any>(path);
+                // append credits → directores/creadores SIN una petición extra (4.1)
+                const d: any = await tmdbFetch<any>(path, { append_to_response: 'credits' });
                 const releaseStr = item.kind === 'movie' ? d?.release_date : d?.first_air_date;
                 const releaseYear = releaseStr ? Number(releaseStr.slice(0, 4)) : 0;
                 const epRuntime = Array.isArray(d?.episode_run_time) && d.episode_run_time.length > 0
                     ? d.episode_run_time[0] : FALLBACK_EPISODE_RUNTIME;
+                // Pelis: crew con job "Director". Series: created_by (el campo fiable para TV).
+                const directors = item.kind === 'movie'
+                    ? ((d?.credits?.crew || []) as any[])
+                        .filter((c) => c.job === 'Director')
+                        .map((c) => ({ id: c.id, name: c.name, profile_path: c.profile_path ?? null }))
+                    : ((d?.created_by || []) as any[])
+                        .map((c) => ({ id: c.id, name: c.name, profile_path: c.profile_path ?? null }));
                 return {
                     raw: item,
                     title: (item.kind === 'movie' ? d?.title : d?.name) || '',
@@ -180,12 +184,14 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
                     release_year: releaseYear,
                     original_language: d?.original_language || '',
                     genres: ((d?.genres || []) as any[]).map(g => g.id as number),
+                    directors,
                 };
             } catch {
                 return {
                     raw: item, title: '', poster_path: '', tmdb_rating: 0,
                     runtime: 0, episode_runtime: FALLBACK_EPISODE_RUNTIME,
                     release_year: 0, original_language: '', genres: [] as number[],
+                    directors: [] as { id: number; name: string; profile_path: string | null }[],
                 };
             }
         },
@@ -347,6 +353,33 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const firstOfYear = enrichedSorted.length ? toShowcase(enrichedSorted[0]) : null;
     const lastOfYear = enrichedSorted.length ? toShowcase(enrichedSorted[enrichedSorted.length - 1]) : null;
 
+    // 4.1 · Tu nota media vs TMDB (solo títulos que TÚ has puntuado, comparados
+    // contra la nota TMDB de ESOS mismos títulos → comparación justa).
+    const ratedItems = enriched.filter(e => (e.raw.user_rating || 0) > 0 && e.tmdb_rating > 0);
+    const ratingCompare = ratedItems.length > 0
+        ? {
+            count: ratedItems.length,
+            userAvg: Math.round((ratedItems.reduce((s, e) => s + (e.raw.user_rating || 0), 0) / ratedItems.length) * 10) / 10,
+            tmdbAvg: Math.round((ratedItems.reduce((s, e) => s + e.tmdb_rating, 0) / ratedItems.length) * 10) / 10,
+        }
+        : null;
+
+    // 4.1 · Director (pelis) / creador (series) más visto. Se exige ≥2 para que
+    // "más visto" sea significativo; top 3.
+    const dirCounter = new Map<number, { id: number; name: string; profile_path: string | null; count: number }>();
+    for (const e of enriched) {
+        for (const dir of e.directors) {
+            if (!dir.id) continue;
+            const cur = dirCounter.get(dir.id);
+            if (cur) cur.count++;
+            else dirCounter.set(dir.id, { id: dir.id, name: dir.name, profile_path: dir.profile_path, count: 1 });
+        }
+    }
+    const topDirectors = Array.from(dirCounter.values())
+        .filter(d => d.count >= 2)
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+        .slice(0, 3);
+
     // Comparison
     const moviesPrev = itemsOfPrev.filter(r => r.kind === 'movie').length;
     const seriesPrev = itemsOfPrev.filter(r => r.kind === 'tv').length;
@@ -395,6 +428,8 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
             seriesDelta: pctDelta(seriesAdded, seriesPrev),
             episodesDelta: pctDelta(episodesWatched, episodesPrev),
         },
+        ratingCompare,
+        topDirectors,
         availableYears: Array.from(allYears).sort((a, b) => b - a),
         hasData: moviesAdded + seriesAdded + episodesWatched > 0,
     };

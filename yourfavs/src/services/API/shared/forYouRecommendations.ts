@@ -8,6 +8,8 @@ export interface ForYouItem {
     vote_average: number;
     overview: string;
     date?: string;
+    /** 4.4 · semilla que generó la reco ("porque viste X"); undefined si vino de géneros/tendencias. */
+    seedTitle?: string;
 }
 
 export async function getForYouRecommendations(limit: number = 12): Promise<ForYouItem[]> {
@@ -21,6 +23,7 @@ export async function getForYouRecommendations(limit: number = 12): Promise<ForY
         vote_average: m.vote_average,
         overview: m.overview,
         date: m.release_date,
+        seedTitle: m._recSeedTitle,
     }));
 
     const series: ForYouItem[] = recs.tv.map((s: any): ForYouItem => ({
@@ -31,6 +34,7 @@ export async function getForYouRecommendations(limit: number = 12): Promise<ForY
         vote_average: s.vote_average,
         overview: s.overview,
         date: s.first_air_date,
+        seedTitle: s._recSeedTitle,
     }));
 
     // Interleave movies/series para variedad visual en home
