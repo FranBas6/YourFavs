@@ -11,6 +11,7 @@ import PersonalNav from "../../../components/personal/PersonalNav.astro";
 import EmptyState from "../../../components/EmptyState.astro";
 import { calculateLifetimeStats, type ItemShowcase } from "../../../utils/yearStats";
 import { getMaxWatchStreak } from "../../../services/BD/series/yourfavsSerie";
+import { deriveArchetype } from "../../../utils/cinemaIdentity";
 import { getGenreName } from "../../../utils/constants/genres";
 import { getLanguageDisplayName } from "../../../utils/constants/helpers/media-helpers";
 import { posterUrl } from "../../../services/API/shared/tmdbClient";
@@ -42,6 +43,12 @@ const ratingVerdict = !rc ? '' :
     ratingDiff <= -0.5 ? 'Eres más exigente que la media' :
     'Coincides bastante con la media';
 const topDirector = stats.topDirectors[0] || null;
+
+// ④ Identidad cinéfila: arquetipo (reglas) + ADN por género (barras), sin fetches nuevos.
+const archetype = deriveArchetype(stats, streak.max);
+const dnaGenres = stats.topGenres.slice(0, 6);
+const maxGenre = Math.max(1, ...dnaGenres.map(g => g.count));
+const DNA_COLORS = ['#E63946', '#6d4aa0', '#2f6fb0', '#9a6a12', '#2f7d52', '#b8417a'];
 
 function showcaseHref(s: ItemShowcase): string {
     return s.kind === 'movie' ? `/movie/${s.id}` : `/serie/${s.id}`;
@@ -76,6 +83,20 @@ function showcaseHref(s: ItemShowcase): string {
 
         {stats.hasData && (
             <div class="space-y-10">
+                {/* ④ Arquetipo cinéfilo */}
+                <section class="rounded-2xl p-6 md:p-7 text-white relative overflow-hidden" style="background: linear-gradient(135deg, #3a2545, #1e3a8a);">
+                    <div class="flex items-center gap-5">
+                        <span class="w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center text-amber-200 flex-shrink-0">
+                            <Icon name={`lucide:${archetype.icon}`} class="w-8 h-8" />
+                        </span>
+                        <div class="min-w-0">
+                            <div class="text-[11px] uppercase tracking-[0.14em] text-white/60 mb-1.5" style="font-family:'JetBrains Mono',monospace;">Tu arquetipo cinéfilo</div>
+                            <div class="text-2xl md:text-3xl font-bold mb-1.5" style="font-family:'Fraunces','Poppins',serif; font-style:italic;">{archetype.name}</div>
+                            <p class="text-sm text-white/80 leading-relaxed">{archetype.description}</p>
+                        </div>
+                    </div>
+                </section>
+
                 {/* KPIs de por vida */}
                 <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div class="rounded-xl bg-gradient-to-br from-red-50 to-red-100 border border-red-200 p-4">
@@ -170,6 +191,42 @@ function showcaseHref(s: ItemShowcase): string {
                                 )}
                             </div>
                         )}
+                    </section>
+                )}
+
+                {/* ④ Tu ADN por género + tarjeta retrato compartible */}
+                {dnaGenres.length > 0 && (
+                    <section class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                        <div class="md:col-span-3 bg-white rounded-xl border border-gray-200 p-5">
+                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-4 flex items-center gap-2">
+                                <Icon name="lucide:fingerprint" class="w-4 h-4 text-rose-600" /> Tu ADN por género
+                            </h3>
+                            <div class="space-y-3">
+                                {dnaGenres.map((g, i) => (
+                                    <div>
+                                        <div class="flex items-center justify-between text-sm mb-1">
+                                            <span class="font-semibold text-gray-800">{getGenreName(g.id)}</span>
+                                            <span class="text-xs text-gray-400">×{g.count}</span>
+                                        </div>
+                                        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                            <div class="h-full rounded-full" style={`width:${(g.count / maxGenre) * 100}%; background:${DNA_COLORS[i % DNA_COLORS.length]};`}></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div class="md:col-span-2 rounded-xl p-5 text-white flex flex-col" style="background: linear-gradient(135deg,#16130f,#2a2118);">
+                            <div class="text-[11px] uppercase tracking-[0.12em] text-white/55 mb-2" style="font-family:'JetBrains Mono',monospace;">Tu retrato · compartible</div>
+                            <div class="text-2xl font-bold leading-tight mb-3" style="font-family:'Fraunces','Poppins',serif; font-style:italic; color:#e0a86b;">{archetype.name}</div>
+                            <ul class="text-sm text-gray-300 space-y-1.5 leading-relaxed">
+                                <li>{totalTitles} títulos · {stats.totalHours} h vistas</li>
+                                <li>Racha máxima: {streak.max} día{streak.max !== 1 ? 's' : ''}</li>
+                                {dnaGenres[0] && <li>Género estrella: {getGenreName(dnaGenres[0].id)}</li>}
+                                {topDirector && <li>Tu director: {topDirector.name}</li>}
+                                {rc && <li>{ratingDiff > 0 ? '+' : ''}{ratingDiff} vs TMDB</li>}
+                            </ul>
+                        </div>
                     </section>
                 )}
 
@@ -292,20 +349,6 @@ function showcaseHref(s: ItemShowcase): string {
                         </section>
                     )}
 
-                    {stats.topGenres.length > 0 && (
-                        <section class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Icon name="lucide:drama" class="w-4 h-4 text-orange-600" /> Top géneros
-                            </h3>
-                            <div class="flex flex-wrap gap-2">
-                                {stats.topGenres.map((g) => (
-                                    <span class="text-sm px-3 py-1.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-medium">
-                                        {getGenreName(g.id)} <span class="text-xs text-orange-500 ml-1">×{g.count}</span>
-                                    </span>
-                                ))}
-                            </div>
-                        </section>
-                    )}
                 </div>
 
                 {/* Volver a un año concreto */}

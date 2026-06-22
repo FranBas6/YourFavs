@@ -29,6 +29,8 @@ interface RouletteCandidate {
     /** Minutos: duración de la peli o de un episodio (fallback 45). */
     runtime: number;
     genres: string[];
+    /** IDs de género TMDB — para la capa de "ánimo" de "¿Qué veo esta noche?" (③). */
+    genre_ids: number[];
     /** Solo flatrate ES (suscripción): para el filtro "dónde puedo verlo". */
     providers: { id: number; name: string; logo: string | null }[];
     /** Página JustWatch del título en ES (todos sus proveedores). */
@@ -55,6 +57,7 @@ async function enrich(id: string, type: 'movie' | 'tv'): Promise<RouletteCandida
             vote_average: typeof detail.vote_average === 'number' && detail.vote_average > 0 ? detail.vote_average : null,
             runtime: runtime || FALLBACK_EPISODE_RUNTIME,
             genres: (detail.genres || []).slice(0, 3).map((g: any) => g.name),
+            genre_ids: (detail.genres || []).map((g: any) => g.id),
             providers: mapAndDeduplicateProviders(rawES)
                 .filter((p) => p.type === 'flatrate')
                 .map((p) => ({ id: p.provider_id, name: p.provider_name, logo: p.logo_path ?? null })),

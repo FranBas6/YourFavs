@@ -318,6 +318,18 @@ a, button, input {
     to { opacity: 0; transform: translateY(1rem); }
 }
 
+/* ── Microfeedback (saltos UX · "El salto") ──────────────────────────────── */
+/* El nº de posición (#N) entra con vida; el icono de la lista "late" al añadir. */
+@keyframes yfCountPop { 0% { transform: scale(.5); opacity: 0; } 60% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes yfPop { 0% { transform: scale(1); } 45% { transform: scale(1.28); } 100% { transform: scale(1); } }
+@keyframes yfHeart { 0% { transform: scale(1); } 22% { transform: scale(1.32); } 40% { transform: scale(1.05); } 60% { transform: scale(1.28); } 100% { transform: scale(1); } }
+.toast-count { animation: yfCountPop .4s ease both; }
+.saveto-emoji.yf-pop { display: inline-block; animation: yfPop .4s ease; }
+.saveto-emoji.yf-heart { display: inline-block; animation: yfHeart .6s ease; }
+@media (prefers-reduced-motion: reduce) {
+    .toast-count, .saveto-emoji.yf-pop, .saveto-emoji.yf-heart { animation: none; }
+}
+
 /* Spinner en botones de acción */
 button.is-submitting {
     pointer-events: none;

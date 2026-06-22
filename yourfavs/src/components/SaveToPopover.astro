@@ -355,6 +355,9 @@
             var list = fixedBtn.getAttribute('data-list');
             toggle(fixedBtn, function () { return postFixed(snap, list, on ? 'remove' : 'add'); }, {
                 label: fixedLabel(list), countKey: 'count',
+                // El "#N" (posición) solo tiene sentido en SERIES → Favoritos (las únicas
+                // que se ordenan por ese número). En el resto el número no aporta.
+                showCount: list === 'favorites' && snap.mt === 'tv',
                 undo: function () { return postFixed(snap, list, on ? 'add' : 'remove'); },
             });
             return;
@@ -417,7 +420,15 @@
     // Tras un toggle OK: "Añadida a X · #N · Deshacer" (o "Quitada de X · Deshacer").
     function afterToggle(btn, meta, wasOn, res) {
         var added = !wasOn; // antes off → ahora añadida
-        var count = added ? res[meta.countKey] : null;
+        var count = (added && meta.showCount) ? res[meta.countKey] : null;
+        // Microfeedback: al AÑADIR, el icono "late" (corazón en Favoritos, pop en el resto).
+        if (added && btn) {
+            var ico = btn.querySelector('.saveto-emoji');
+            if (ico) {
+                var cls = meta.label === 'Favoritos' ? 'yf-heart' : 'yf-pop';
+                ico.classList.remove('yf-heart', 'yf-pop'); void ico.offsetWidth; ico.classList.add(cls);
+            }
+        }
         pushToast(added ? 'Añadida a' : 'Quitada de', meta.label, count, function () {
             meta.undo()
                 .then(function (r) { return r.json(); })

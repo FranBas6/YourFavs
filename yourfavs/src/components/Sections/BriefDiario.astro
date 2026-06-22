@@ -1,0 +1,138 @@
+---
+// Brief diario "Hoy en tu cine" (apuesta ① · "El salto"). Hero personal de la home
+// (solo con sesión): saluda y muestra 3-4 señales del día compuestas en `getDailyBrief`.
+// Se renderiza SSR → el CSS scoped de Astro alcanza este markup sin problema.
+import { Icon } from 'astro-icon/components';
+import type { DailyBrief, BriefSignalKind } from '../../services/API/shared/dailyBrief';
+
+interface Props {
+    brief: DailyBrief;
+    userName?: string | null;
+}
+const { brief, userName } = Astro.props;
+const firstName = (userName || '').trim().split(/\s+/)[0] || '';
+
+// Color + icono Lucide por tipo de señal (chips translúcidos sobre el hero oscuro).
+const STYLE: Record<BriefSignalKind, { color: string; icon: string }> = {
+    new_episode: { color: '#E63946', icon: 'play' },
+    on_platform: { color: '#34a673', icon: 'clapperboard' },
+    anniversary: { color: '#e0a86b', icon: 'cake' },
+    finishing:   { color: '#5b9bd5', icon: 'tv' },
+};
+---
+<section class="brief" aria-label="Hoy en tu cine">
+    <div class="brief-head">
+        <span class="brief-kicker">
+            <Icon name="lucide:sun" />
+            {brief.dateLabel}{firstName && ` · hola, ${firstName}`}
+        </span>
+        <h2 class="brief-title">Hoy en <em>tu cine</em></h2>
+    </div>
+
+    <div class="brief-grid">
+        {brief.signals.map((s) => (
+            <a class="brief-card" href={s.href}>
+                <span class="brief-ic" style={`--c:${STYLE[s.kind].color}`}>
+                    <Icon name={`lucide:${STYLE[s.kind].icon}`} />
+                </span>
+                <span class="brief-text">
+                    <span class="brief-card-title">{s.title}</span>
+                    <span class="brief-card-sub">{s.subtitle}</span>
+                </span>
+            </a>
+        ))}
+    </div>
+</section>
+
+<style>
+    .brief {
+        background: linear-gradient(135deg, #16130f, #2a2118);
+        border-radius: var(--r-lg);
+        padding: var(--s-7);
+        margin-bottom: var(--s-6);
+        color: #fff;
+        position: relative;
+        overflow: hidden;
+    }
+    .brief-head { margin-bottom: var(--s-5); }
+    .brief-kicker {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.7rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: #b8ad99;
+    }
+    .brief-kicker :global(svg) { width: 1.1em; height: 1.1em; color: #fbbf24; }
+    .brief-title {
+        font-family: 'Fraunces', 'Poppins', serif;
+        font-weight: 600;
+        font-size: clamp(1.5rem, 3.5vw, 1.9rem);
+        letter-spacing: -0.01em;
+        margin: 0.35rem 0 0;
+        line-height: 1.15;
+    }
+    .brief-title em { font-style: italic; color: #e0a86b; }
+
+    .brief-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: var(--s-3);
+    }
+    .brief-card {
+        display: flex;
+        align-items: center;
+        gap: var(--s-3);
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: var(--r-md);
+        padding: 0.8rem 0.95rem;
+        text-decoration: none;
+        color: inherit;
+        transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+    }
+    .brief-card:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+    }
+    .brief-ic {
+        width: 34px;
+        height: 34px;
+        border-radius: var(--r-sm, 8px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        background: color-mix(in srgb, var(--c) 22%, transparent);
+        color: var(--c);
+    }
+    .brief-ic :global(svg) { width: 1.05rem; height: 1.05rem; }
+    .brief-text { min-width: 0; display: flex; flex-direction: column; }
+    .brief-card-title {
+        font-size: 0.9rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .brief-card-sub {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.72rem;
+        color: #b8ad99;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @media (max-width: 640px) {
+        .brief { padding: var(--s-5); }
+        .brief-grid { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .brief-card { transition: none; }
+        .brief-card:hover { transform: none; }
+    }
+</style>

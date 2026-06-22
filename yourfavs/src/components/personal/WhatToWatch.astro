@@ -11,22 +11,27 @@
  */
 import '../../styles/components/roulette.css';
 
-// Mismas 7 plataformas (ids TMDB) que el filtro de /personal
-const PLATFORM_OPTIONS = [
-    { id: 8, label: 'Netflix' },
-    { id: 119, label: 'Amazon' },
-    { id: 337, label: 'Disney+' },
-    { id: 1899, label: 'HBO' },
-    { id: 350, label: 'Apple TV+' },
-    { id: 2241, label: 'Movistar+' },
-    { id: 63, label: 'Filmin' },
+const COMPANION_OPTIONS = [
+    { key: 'solo', label: 'Solo' },
+    { key: 'pareja', label: 'En pareja' },
+    { key: 'amigos', label: 'Con amigos' },
 ];
 
 const TIME_OPTIONS = [
     { key: '60', label: '< 1 h' },
     { key: '150', label: '~2 h' },
-    { key: 'any', label: 'Lo que sea' },
+    { key: 'any', label: 'El que sea' },
 ];
+
+const MOOD_OPTIONS = [
+    { key: 'ligero', label: 'Ligero' },
+    { key: 'intenso', label: 'Intenso' },
+    { key: 'fondo', label: 'De fondo' },
+];
+
+// "Dónde ver" se vuelve preferencia automática por tus plataformas del perfil
+// (no chips manuales): el plan se inclina a lo que puedes ver ya.
+const myPlatforms = Astro.locals.user?.platforms ?? [];
 ---
 <button type="button" class="wtw-trigger" data-wtw-open>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -40,7 +45,7 @@ const TIME_OPTIONS = [
     No sé qué ver
 </button>
 
-<div class="wtw-overlay" id="wtw" role="dialog" aria-modal="true" aria-label="¿Qué veo?" hidden>
+<div class="wtw-overlay" id="wtw" role="dialog" aria-modal="true" aria-label="¿Qué veo esta noche?" data-my-platforms={JSON.stringify(myPlatforms)} hidden>
     <div class="wtw-panel">
         <div class="wtw-head">
             <span class="wtw-head-icon" aria-hidden="true">
@@ -54,8 +59,8 @@ const TIME_OPTIONS = [
                 </svg>
             </span>
             <div class="wtw-head-text">
-                <h2>¿Qué veo?</h2>
-                <p id="wtw-subtitle">De tus pendientes, según tu momento</p>
+                <h2>¿Qué veo esta noche?</h2>
+                <p id="wtw-subtitle">Dinos tu noche y te damos un plan</p>
             </div>
             <span class="cmdk-kbd wtw-esc-hint" aria-hidden="true">ESC</span>
             <button type="button" class="wtw-close" data-wtw-close aria-label="Cerrar">
@@ -67,7 +72,15 @@ const TIME_OPTIONS = [
 
         <div class="wtw-filters">
             <div class="wtw-filter-group">
-                <div class="wtw-filter-label">TENGO TIEMPO PARA</div>
+                <div class="wtw-filter-label">¿SOLO O ACOMPAÑADO?</div>
+                <div class="wtw-chips" id="wtw-companion">
+                    {COMPANION_OPTIONS.map((c) => (
+                        <button type="button" class={`wtw-chip${c.key === 'solo' ? ' is-active' : ''}`} data-companion={c.key}>{c.label}</button>
+                    ))}
+                </div>
+            </div>
+            <div class="wtw-filter-group">
+                <div class="wtw-filter-label">¿CUÁNTO TIEMPO?</div>
                 <div class="wtw-chips" id="wtw-time">
                     {TIME_OPTIONS.map((t) => (
                         <button type="button" class={`wtw-chip${t.key === 'any' ? ' is-active' : ''}`} data-time={t.key}>{t.label}</button>
@@ -75,10 +88,10 @@ const TIME_OPTIONS = [
                 </div>
             </div>
             <div class="wtw-filter-group">
-                <div class="wtw-filter-label">DONDE PUEDO VERLO</div>
-                <div class="wtw-chips" id="wtw-platforms">
-                    {PLATFORM_OPTIONS.map((p) => (
-                        <button type="button" class="wtw-chip" data-platform={p.id}>{p.label}</button>
+                <div class="wtw-filter-label">¿QUÉ ÁNIMO?</div>
+                <div class="wtw-chips" id="wtw-mood">
+                    {MOOD_OPTIONS.map((m) => (
+                        <button type="button" class="wtw-chip" data-mood={m.key}>{m.label}</button>
                     ))}
                 </div>
             </div>
@@ -102,28 +115,35 @@ const TIME_OPTIONS = [
     if (!overlay) return;
     var result = document.getElementById('wtw-result');
     var subtitle = document.getElementById('wtw-subtitle');
+    var companionChips = document.getElementById('wtw-companion');
     var timeChips = document.getElementById('wtw-time');
-    var platformChips = document.getElementById('wtw-platforms');
+    var moodChips = document.getElementById('wtw-mood');
 
     var IMG = 'https://image.tmdb.org/t/p/w185';
-    var LS_KEY = 'yf_roulette_platforms';
+
+    // Géneros TMDB por ánimo (capa de "¿qué te apetece?").
+    var MOOD_GENRES = {
+        ligero: [35, 10751, 16, 10764, 10402],          // comedia, familia, animación, reality, música
+        intenso: [53, 18, 80, 9648, 27, 10752],         // thriller, drama, crimen, misterio, terror, bélico
+        fondo: [35, 10764, 16, 10751],                  // ligero/episódico (+ bonus si es serie)
+    };
+    var FUN_GENRES = [35, 28, 16, 12];                  // para "con amigos": comedia, acción, animación, aventura
 
     var all = null;        // candidatos del endpoint (null = sin cargar)
-    var order = [];        // candidatos filtrados, barajados
+    var order = [];        // candidatos filtrados y ordenados por encaje
     var cursor = -1;       // posición en `order`
+    var companion = 'solo';
     var timeFilter = 'any';
-    var platforms = [];    // ids seleccionados (vacío = da igual)
+    var mood = '';         // '' = cualquiera
     var lastFocus = null;
+
+    // "Dónde ver" automático: plataformas del perfil (preferencia, no filtro duro).
+    var myPlatforms = [];
+    try { myPlatforms = JSON.parse(overlay.dataset.myPlatforms || '[]'); } catch { myPlatforms = []; }
 
     function escapeHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
-
-    // ---- plataformas persistidas ----
-    try { platforms = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { platforms = []; }
-    platformChips.querySelectorAll('.wtw-chip').forEach(function (chip) {
-        if (platforms.indexOf(parseInt(chip.dataset.platform, 10)) >= 0) chip.classList.add('is-active');
-    });
 
     // ---- apertura / cierre ----
     function openModal() {
@@ -171,11 +191,30 @@ const TIME_OPTIONS = [
             });
     }
 
-    // ---- filtros ----
+    // ---- filtros + encaje ----
+    // Tiempo = filtro duro. Compañía y ánimo PUNTÚAN (no vacían el pool): ordenamos
+    // por encaje y "Otra" recorre de mejor a peor. "Dónde ver" suma si está en tus plataformas.
     function passes(c) {
         if (timeFilter !== 'any' && c.runtime > parseInt(timeFilter, 10)) return false;
-        if (platforms.length && !c.providers.some(function (p) { return platforms.indexOf(p.id) >= 0; })) return false;
         return true;
+    }
+
+    function score(c) {
+        var s = 0;
+        var ids = c.genre_ids || [];
+        if (mood) {
+            var mg = MOOD_GENRES[mood] || [];
+            if (ids.some(function (id) { return mg.indexOf(id) >= 0; })) s += 2;
+            if (mood === 'fondo' && c.media_type === 'tv') s += 2; // series = mejor "de fondo"
+        }
+        if (companion === 'pareja' && c.vote_average && c.vote_average >= 7) s += 1;
+        if (companion === 'amigos') {
+            if (c.vote_average && c.vote_average >= 7) s += 1;
+            if (ids.some(function (id) { return FUN_GENRES.indexOf(id) >= 0; })) s += 1;
+        }
+        // "solo" no premia ni penaliza: permite nicho.
+        if (myPlatforms.length && c.providers.some(function (p) { return myPlatforms.indexOf(p.id) >= 0; })) s += 1;
+        return s;
     }
 
     function shuffle(arr) {
@@ -186,15 +225,18 @@ const TIME_OPTIONS = [
         return arr;
     }
 
-    // Re-baraja el pool filtrado y muestra el primero (cambio de filtro o 1ª carga)
+    // Ordena el pool por encaje (azar para desempatar) y muestra el mejor.
     function reroll() {
         if (all === null) return;
-        order = shuffle(all.filter(passes));
+        order = all.filter(passes)
+            .map(function (c) { return { c: c, s: score(c), r: Math.random() }; })
+            .sort(function (a, b) { return (b.s - a.s) || (b.r - a.r); })
+            .map(function (x) { return x.c; });
         cursor = -1;
         next();
     }
 
-    // "Otra": avanza sin repetir; al agotar el pool, re-baraja y vuelve a empezar
+    // "Otra": avanza sin repetir; al agotar, re-baraja y vuelve a empezar.
     function next() {
         if (!order.length) { renderEmpty(); return; }
         cursor++;
@@ -202,22 +244,31 @@ const TIME_OPTIONS = [
         renderCard(order[cursor]);
     }
 
+    function singleSelect(group, chip) {
+        group.querySelectorAll('.wtw-chip').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+    }
+
+    companionChips.addEventListener('click', function (e) {
+        var chip = e.target.closest('.wtw-chip');
+        if (!chip) return;
+        companion = chip.dataset.companion;
+        singleSelect(companionChips, chip);
+        reroll();
+    });
+
     timeChips.addEventListener('click', function (e) {
         var chip = e.target.closest('.wtw-chip');
         if (!chip) return;
         timeFilter = chip.dataset.time;
-        timeChips.querySelectorAll('.wtw-chip').forEach(function (c) { c.classList.toggle('is-active', c === chip); });
+        singleSelect(timeChips, chip);
         reroll();
     });
 
-    platformChips.addEventListener('click', function (e) {
+    moodChips.addEventListener('click', function (e) {
         var chip = e.target.closest('.wtw-chip');
         if (!chip) return;
-        var id = parseInt(chip.dataset.platform, 10);
-        var idx = platforms.indexOf(id);
-        if (idx >= 0) platforms.splice(idx, 1); else platforms.push(id);
-        chip.classList.toggle('is-active', idx < 0);
-        try { localStorage.setItem(LS_KEY, JSON.stringify(platforms)); } catch {}
+        if (chip.classList.contains('is-active')) { mood = ''; chip.classList.remove('is-active'); } // re-toque = cualquiera
+        else { mood = chip.dataset.mood; singleSelect(moodChips, chip); }
         reroll();
     });
 
@@ -236,10 +287,10 @@ const TIME_OPTIONS = [
         var meta = [c.year, fmtRuntime(c.runtime) + (c.media_type === 'tv' ? '/ep' : ''), c.vote_average ? '★ ' + c.vote_average.toFixed(1) : null, c.genres[0] || null]
             .filter(Boolean).join(' · ');
 
-        // Proveedor a mostrar: el que casa con tu filtro; si no filtras, el primero
+        // Proveedor a mostrar: prefiere una de TUS plataformas; si no, el primero.
         var prov = null;
-        if (platforms.length) {
-            prov = c.providers.find(function (p) { return platforms.indexOf(p.id) >= 0; }) || null;
+        if (myPlatforms.length) {
+            prov = c.providers.find(function (p) { return myPlatforms.indexOf(p.id) >= 0; }) || null;
         }
         if (!prov) prov = c.providers[0] || null;
 

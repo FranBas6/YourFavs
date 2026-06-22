@@ -132,6 +132,16 @@ export async function countWatches(
 }
 
 /**
+ * Entradas del diario en una fecha concreta ("YYYY-MM-DD"). Equality query sobre
+ * `watched_on` (indexada → barata). Para la efeméride "Hace un año…" del Brief diario.
+ */
+export async function getWatchLogOnDate(dateISO: string): Promise<WatchLogEntry[]> {
+    if (!getCurrentUid()) return [];
+    const snap = await userCol(COLLECTION).where('watched_on', '==', dateISO).get();
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as WatchLogEntry));
+}
+
+/**
  * "Pases" de una serie = entradas de nivel SERIE (sin season/episode), que crea el
  * botón "Vuelto a ver". El primer visionado NO crea entrada (se deriva de estar
  * vista/en lista); aquí solo contamos los re-visionados explícitos. Para "Vista N

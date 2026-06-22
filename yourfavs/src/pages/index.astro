@@ -11,7 +11,9 @@ import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
 import RecommendedForYou from "../components/Sections/RecommendedForYou.astro";
+import BriefDiario from "../components/Sections/BriefDiario.astro";
 import { getForYouRecommendations } from "../services/API/shared/forYouRecommendations";
+import { getDailyBrief, type DailyBrief } from "../services/API/shared/dailyBrief";
 import WhatToWatch from "../components/personal/WhatToWatch.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import { Icon } from 'astro-icon/components';
@@ -66,6 +68,17 @@ const [
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+
+// Brief diario "Hoy en tu cine" (① · solo con sesión). Reutiliza `continueWatching`
+// (ya calculado arriba) para no recomputar el "siguiente episodio"; cacheado por
+// uid+día. Si no hay señales (usuario nuevo) → cae al hero trending de siempre.
+const brief: DailyBrief = Astro.locals.user
+    ? await safeFetch(
+        getDailyBrief({ platforms: Astro.locals.user.platforms ?? [], nextEpisodes: continueWatching }),
+        'home/brief',
+        { dateLabel: '', signals: [] } as DailyBrief,
+    )
+    : { dateLabel: '', signals: [] };
 
 // Película destacada para el hero (la más trending de la semana)
 const heroMovie = trendingMovies[0] || null;
@@ -145,26 +158,48 @@ const sections = [
 ---
 <Layout title="YourFavs">     
     <main class="main-container">
-        <!-- Hero con película trending destacada -->
-        {heroMovie ? (
-            <div class="hero-backdrop" style={`background-image: url(${backdropUrl(heroMovie.backdrop_path, 'w1280')})`}>
-                <div class="hero-backdrop-overlay">
-                    <div class="hero-backdrop-content">
-                        <span class="hero-trending-badge"><Icon name="lucide:trending-up" />Trending esta semana</span>
-                        <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
-                        <div class="hero-backdrop-meta">
-                            <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average?.toFixed(1)}</span>
-                            <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
+        <!-- Hero: Brief diario "Hoy en tu cine" (con sesión y señales) + Trending; con
+             ambos disponibles, un toggle deja elegir cuál ver (preferencia recordada). -->
+        {(brief.signals.length > 0 || heroMovie) ? (
+            <div class="home-hero" id="home-hero">
+                {brief.signals.length > 0 && heroMovie && (
+                    <div class="home-hero-switchrow">
+                        <div class="home-hero-switch" role="tablist" aria-label="Cambiar portada">
+                            <button type="button" class="is-active" data-hero-pick="brief">Hoy en tu cine</button>
+                            <button type="button" data-hero-pick="trending">Trending</button>
                         </div>
-                        <p class="hero-backdrop-overview">{heroMovie.overview}</p>
-                        <a href={`/movie/${heroMovie.id}`} class="hero-backdrop-cta">
-                            Ver detalles
-                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
-                            </svg>
-                        </a>
                     </div>
-                </div>
+                )}
+
+                {brief.signals.length > 0 && (
+                    <div data-hero="brief">
+                        <BriefDiario brief={brief} userName={Astro.locals.user?.name} />
+                    </div>
+                )}
+
+                {heroMovie && (
+                    <div data-hero="trending" hidden={brief.signals.length > 0}>
+                        <div class="hero-backdrop" style={`background-image: url(${backdropUrl(heroMovie.backdrop_path, 'w1280')})`}>
+                            <div class="hero-backdrop-overlay">
+                                <div class="hero-backdrop-content">
+                                    <span class="hero-trending-badge"><Icon name="lucide:trending-up" />Trending esta semana</span>
+                                    <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
+                                    <div class="hero-backdrop-meta">
+                                        <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average?.toFixed(1)}</span>
+                                        <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
+                                    </div>
+                                    <p class="hero-backdrop-overview">{heroMovie.overview}</p>
+                                    <a href={`/movie/${heroMovie.id}`} class="hero-backdrop-cta">
+                                        Ver detalles
+                                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
         ) : (
             <div class="hero-section">
@@ -181,6 +216,28 @@ const sections = [
                 </div>
             </div>
         )}
+
+        <script is:inline>
+            // Toggle de portada (Brief ↔ Trending). Recuerda la elección en localStorage.
+            (function () {
+                var root = document.getElementById('home-hero');
+                if (!root) return;
+                var picks = root.querySelectorAll('[data-hero-pick]');
+                if (!picks.length) return; // solo hay una portada → sin toggle
+                var panels = root.querySelectorAll('[data-hero]');
+                function apply(which) {
+                    panels.forEach(function (p) { p.hidden = p.getAttribute('data-hero') !== which; });
+                    picks.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-hero-pick') === which); });
+                    try { localStorage.setItem('yf_home_hero', which); } catch (e) {}
+                }
+                var saved = null;
+                try { saved = localStorage.getItem('yf_home_hero'); } catch (e) {}
+                if (saved === 'trending' || saved === 'brief') apply(saved);
+                picks.forEach(function (b) {
+                    b.addEventListener('click', function () { apply(b.getAttribute('data-hero-pick')); });
+                });
+            })();
+        </script>
 
         <!-- Continuar viendo: siguiente episodio a ver (primer no visto y emitido) -->
         {continueWatching.length > 0 && (
