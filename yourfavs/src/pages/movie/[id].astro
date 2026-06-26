@@ -23,7 +23,7 @@ import {getFirestore, doc, getDoc} from "firebase/firestore";
 import {firebaseConfig} from '../../utils/firebaseConfig';
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
-import { countWatches } from "../../services/BD/lists/watchLog";
+import { countMoviePasses } from "../../services/BD/lists/watchLog";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import NotificationBell from "../../components/personal/NotificationBell.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
@@ -123,11 +123,14 @@ const isInVerPronto = movieExists.MoviesVerPronto;
 const isInLiked = movieExists.LikedMovies;
 const userTags: string[] = mediaTagsDoc?.tags || [];
 
-// Diario (L6): "La has visto N veces". Solo con sesión (countWatches devuelve 0 sin uid).
-const watchInfo = Astro.locals.user ? await countWatches('movie', clientData.id) : { count: 0, last: null };
-const watchLastPretty = watchInfo.last ? new Date(watchInfo.last + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : '';
-// "Visto" = en cualquier nivel (Vistas/Me gusta/Favs) o con historial en el diario.
-const isWatchedMovie = isInVistas || isInFavorites || isInLiked || watchInfo.count > 0;
+// Diario (L6): "La has visto N veces" = base 1 si consta vista (Vistas/Me gusta/Favs)
+// + los "pases" del botón "Vuelto a ver", IGUAL que las series. El visionado original
+// se deduce de estar en lista, no necesita entrada en el diario. Solo con sesión.
+const moviePasses = Astro.locals.user ? await countMoviePasses(clientData.id) : { passes: 0, last: null };
+// "Visto" = en cualquier nivel (Vistas/Me gusta/Favs) o con re-visionados en el diario.
+const isWatchedMovie = isInVistas || isInFavorites || isInLiked || moviePasses.passes > 0;
+const movieTimes = (isWatchedMovie ? 1 : 0) + moviePasses.passes;
+const watchLastPretty = moviePasses.last ? new Date(moviePasses.last + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : '';
 const userNotes = mediaTagsDoc?.notes || '';
 const inAnyCollection = isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked;
 
@@ -437,8 +440,8 @@ const jsonLd = item ? {
                 <div class="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-3 text-sm text-gray-600">
                     <span class="flex items-center gap-2 min-w-0">
                         <svg class="w-4 h-4 text-[#b91c1c] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                        {watchInfo.count > 0
-                            ? <span class="min-w-0"><strong class="text-gray-900 whitespace-nowrap">La has visto {watchInfo.count} {watchInfo.count === 1 ? 'vez' : 'veces'}</strong>{watchLastPretty && <span class="text-gray-400 hidden sm:inline"> · última en {watchLastPretty}</span>}</span>
+                        {movieTimes > 0
+                            ? <span class="min-w-0"><strong class="text-gray-900 whitespace-nowrap">La has visto {movieTimes} {movieTimes === 1 ? 'vez' : 'veces'}</strong>{watchLastPretty && <span class="text-gray-400 hidden sm:inline"> · última en {watchLastPretty}</span>}</span>
                             : <span class="text-gray-500">La tienes como vista</span>}
                     </span>
                     <button type="button" class="js-rewatch flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-[#E63946] hover:text-[#E63946] transition-colors text-xs font-medium" data-mt="movie" data-id={item?.id} aria-label="Marcar visto otra vez">

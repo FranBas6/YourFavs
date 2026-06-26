@@ -157,3 +157,22 @@ export async function countSeriesPasses(
     const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
     return { passes: rows.length, last };
 }
+
+/**
+ * "Pases" de una PELÍCULA = re-visionados explícitos (entradas con `rewatch=true`),
+ * el equivalente de `countSeriesPasses`. El visionado original NO cuenta aquí: se
+ * deriva de estar vista/en lista. Para "Vista N veces" la ficha hace base(1 si
+ * vista) + passes. La entrada base (auto-append al marcar visto, o el backfill del
+ * diario) queda con `rewatch=false` y por tanto NO se cuenta como pase — solo suma
+ * el botón "Vuelto a ver", que al existir ya la base se registra como `rewatch=true`.
+ */
+export async function countMoviePasses(
+    tmdb_id: number | string
+): Promise<{ passes: number; last: string | null }> {
+    if (!getCurrentUid()) return { passes: 0, last: null };
+    const snap = await userCol(COLLECTION).where('tmdb_id', '==', Number(tmdb_id)).get();
+    const rows = snap.docs.map((d) => d.data()).filter((x) => x.media_type === 'movie' && x.rewatch === true);
+    if (!rows.length) return { passes: 0, last: null };
+    const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
+    return { passes: rows.length, last };
+}
