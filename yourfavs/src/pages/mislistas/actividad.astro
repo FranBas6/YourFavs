@@ -10,6 +10,7 @@ import { posterUrl } from "../../services/API/shared/tmdbClient";
 import ActivityStat from "../../components/personal/ActivityStat.astro";
 import ActivityHeatmap from "../../components/personal/ActivityHeatmap.astro";
 import { Icon } from "astro-icon/components";
+import { appDateParts, APP_TZ } from "../../utils/appTime";
 import "../../styles/pages/personal/actividad.css";
 
 const url = new URL(Astro.request.url);
@@ -59,27 +60,35 @@ const details: Detail[] = await processBatch(
 );
 const detailsMap = new Map<string, Detail>(details.map(d => [d.key, d]));
 
+// El cubo de día se calcula en hora de Madrid (appDateParts), NO con
+// setHours sobre la hora del servidor (que corre en UTC y pegaría en el
+// mismo día eventos de noches distintas — p.ej. un maratón que cruza
+// medianoche). Así la página agrupa igual que activityFeed.ts y un evento
+// de las 23:44 y otro de las 00:51 caen en días (Ayer/Hoy) distintos.
+const todayKey = appDateParts(now).key;
+const yesterdayKey = appDateParts(now - DAY_MS).key;
+
+function dayLabel(key: string, ts: number): string {
+    if (key === todayKey) return 'Hoy';
+    if (key === yesterdayKey) return 'Ayer';
+    return new Date(ts).toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: APP_TZ });
+}
+
+// Clave = día-calendario de Madrid; el orden de inserción (eventos ya
+// ordenados desc por ts) deja los grupos de más reciente a más antiguo.
+const groups = new Map<string, { label: string; events: ActivityEvent[] }>();
+for (const ev of windowEvents) {
+    const key = appDateParts(ev.timestamp).key;
+    let g = groups.get(key);
+    if (!g) { g = { label: dayLabel(key, ev.timestamp), events: [] }; groups.set(key, g); }
+    g.events.push(ev);
+}
+const groupEntries = Array.from(groups.values()).map(g => [g.label, g.events] as [string, ActivityEvent[]]);
+
+// Medianoche local del servidor — la usa el heatmap/racha de abajo (se conserva
+// su cálculo previo; el agrupado del feed ya no depende de esto).
 const todayStart = new Date();
 todayStart.setHours(0, 0, 0, 0);
-const yesterdayStart = new Date(todayStart);
-yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-
-function dayLabel(ts: number): string {
-    const d = new Date(ts);
-    const dStart = new Date(d);
-    dStart.setHours(0, 0, 0, 0);
-    if (dStart.getTime() === todayStart.getTime()) return 'Hoy';
-    if (dStart.getTime() === yesterdayStart.getTime()) return 'Ayer';
-    return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
-const groups = new Map<string, ActivityEvent[]>();
-for (const ev of windowEvents) {
-    const label = dayLabel(ev.timestamp);
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label)!.push(ev);
-}
-const groupEntries = Array.from(groups.entries());
 
 const windowLabel = page === 1
     ? `Últimos ${DAYS_PER_PAGE} días`
