@@ -117,6 +117,10 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
                 {partsSorted.map(part => (
                     <div class="card-wrapper group relative">
+                      {/* Único hijo directo de .card-wrapper: shared.css estira todo
+                          hijo directo a 100%×100% con fondo blanco (asume 1 sola card).
+                          El badge va DENTRO de este marco, no como hermano del HoverPreview. */}
+                      <div class="relative w-full h-full">
                         {/* top-10: deja libre la esquina del rating badge de CardMovie */}
                         {watchedMovieTiers.has(part.id) ? (
                             <span class={`absolute top-10 right-2 z-20 w-6 h-6 rounded-full ${TIER_BADGE[watchedMovieTiers.get(part.id)!].bg} text-white flex items-center justify-center shadow-md pointer-events-none`} aria-label={TIER_BADGE[watchedMovieTiers.get(part.id)!].label} title={TIER_BADGE[watchedMovieTiers.get(part.id)!].label}>
@@ -140,6 +144,7 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
                             release_date={part.release_date || ''}
                             genres={part.genre_ids?.map(gId => ({ id: gId, name: getGenreName(gId) }))}
                         /></HoverPreview>
+                      </div>
                     </div>
                 ))}
             </div>
