@@ -1,0 +1,127 @@
+---
+/**
+ * Las 3 hojas del tab bar móvil: Explorar · Mis listas · Perfil.
+ * Montadas una vez en el Layout (junto al MobileTabBar). Cada tab que abre hoja
+ * dispara `yf:sheet-open` con su id ('explorar' | 'listas' | 'perfil').
+ *
+ * Contadores de "Mis listas": LAZY — se piden a /api/lists/counts la primera vez
+ * que se abre la hoja (no en SSR), respetando la cuota Firestore.
+ */
+import BottomSheet from './BottomSheet.astro';
+import Stamp from './Stamp.astro';
+import { Icon } from 'astro-icon/components';
+import { EXPLORE_ITEMS, MY_LISTS_ITEMS } from '../utils/constants/myLists';
+
+const user = Astro.locals.user;
+const displayName = user ? (user.name || user.email?.split('@')[0] || 'Tú') : '';
+const email = user?.email ?? '';
+function initials(name: string, mail: string): string {
+    const n = name?.trim();
+    if (n) { const p = n.split(/\s+/); return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase(); }
+    return (mail || '').slice(0, 2).toUpperCase() || '??';
+}
+const avatarInitials = user ? initials(displayName, email) : '';
+const avatarUrl = user?.picture || null;
+---
+
+<!-- Explorar (público) -->
+<BottomSheet id="explorar" title="Explorar el catálogo">
+    {EXPLORE_ITEMS.map((it) => (
+        <a class="yf-sheet-row" href={it.href}>
+            <Stamp color={it.color} icon={it.icon} size={38} />
+            <span class="yf-sheet-rowtext">
+                <span class="yf-sheet-rowtitle">{it.title}</span>
+                {it.desc && <span class="yf-sheet-rowsub">{it.desc}</span>}
+            </span>
+        </a>
+    ))}
+</BottomSheet>
+
+{user && (
+    <BottomSheet id="listas" title="Mis listas">
+        {MY_LISTS_ITEMS.map((it) => (
+            <a class="yf-sheet-row" href={it.href}>
+                <Stamp color={it.color} icon={it.icon} size={38} />
+                <span class="yf-sheet-rowtext">
+                    <span class="yf-sheet-rowtitle">{it.title}</span>
+                    {it.countKey
+                        ? <span class="yf-sheet-rowsub" data-count-key={it.countKey}>&nbsp;</span>
+                        : (it.desc && <span class="yf-sheet-rowsub">{it.desc}</span>)}
+                </span>
+            </a>
+        ))}
+    </BottomSheet>
+)}
+
+{user && (
+    <BottomSheet id="perfil" title="Tu cuenta">
+        <a class="yf-sheet-row" href="/perfil">
+            <span class="yf-sheet-avatar" aria-hidden="true">
+                {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitials}</span>}
+            </span>
+            <span class="yf-sheet-rowtext">
+                <span class="yf-sheet-rowtitle">{displayName} · ver perfil</span>
+                {email && <span class="yf-sheet-rowsub">{email}</span>}
+            </span>
+        </a>
+        <a class="yf-sheet-row" href="/mislistas/year">
+            <Stamp color="red" icon="bar-chart-3" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tu cine en números</span></span>
+        </a>
+        <a class="yf-sheet-row" href="/mislistas/actividad">
+            <Stamp color="green" icon="activity" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Actividad</span></span>
+        </a>
+        <a class="yf-sheet-row" href="/gustos">
+            <Stamp color="purple" icon="cake" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tus gustos</span></span>
+        </a>
+        <a class="yf-sheet-row" href="/perfil">
+            <Stamp color="slate" icon="settings" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Configuración</span></span>
+        </a>
+        <button type="button" class="yf-sheet-row theme-toggle" aria-label="Cambiar tema">
+            <Stamp color="amber" icon="sun-moon" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Cambiar tema</span></span>
+        </button>
+        <button type="button" class="yf-sheet-row is-danger" data-auth-logout>
+            <Stamp color="slate" icon="log-out" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Cerrar sesión</span></span>
+        </button>
+    </BottomSheet>
+)}
+
+<style is:global>
+    .yf-sheet-avatar {
+        width: 38px; height: 38px; border-radius: 9999px; flex-shrink: 0; overflow: hidden;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #93c5fd, #fbbf24); color: #fff;
+        font-size: 13px; font-weight: 700;
+    }
+    .yf-sheet-avatar img { width: 100%; height: 100%; object-fit: cover; }
+</style>
+
+{user && (
+    <script is:inline>
+        (function () {
+            // Contadores lazy: se piden la 1ª vez que se abre la hoja "Mis listas".
+            var loaded = false;
+            document.addEventListener('yf:sheet-open', function (e) {
+                if (!e.detail || e.detail.id !== 'listas' || loaded) return;
+                loaded = true;
+                fetch('/api/lists/counts')
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (res) {
+                        if (!res || !res.ok) { loaded = false; return; }   // reintentar al reabrir
+                        var c = res.counts || {};
+                        document.querySelectorAll('[data-count-key]').forEach(function (el) {
+                            var k = el.getAttribute('data-count-key');
+                            if (c[k] != null) el.textContent = String(c[k]);
+                            else el.textContent = '';
+                        });
+                    })
+                    .catch(function () { loaded = false; });
+            });
+        })();
+    </script>
+)}

@@ -1,24 +1,28 @@
 ---
 /**
- * Tab bar inferior móvil (<1024px) — Auditoría v2 · 2.1.
+ * Tab bar inferior móvil (<1024px) — Tab bar de 5 (rediseño).
  *
- * 4 destinos, adaptativos según sesión:
- *   - Con sesión: Inicio · Buscar · Mis listas · Perfil  (badge de novedades del Radar)
- *   - Invitado:   Inicio · Buscar · Descubrir · Entrar
- * "Buscar" abre el command palette (⌘K) vía evento `yf:open-palette`.
- * "Entrar" / tocar zonas privadas sin sesión → modal de registro (`data-auth-open`).
+ * 5 destinos: Inicio · Buscar · Explorar · Mis listas · Perfil
+ *   - Inicio  → navega a "/"
+ *   - Buscar  → command palette (⌘K) vía evento `yf:open-palette`
+ *   - Explorar→ abre la hoja del catálogo (`yf:sheet-open` id="explorar"); público
+ *   - Mis listas → con sesión abre hoja id="listas" (badge Radar); sin sesión → login
+ *   - Perfil  → con sesión abre hoja id="perfil"; sin sesión → login (`data-auth-open`)
  *
+ * Las hojas las pinta <MobileNavSheets/>. Re-tocar un tab de hoja la cierra (toggle).
  * Singleton montado en Layout (oculto en flujos a pantalla completa: /gustos, login).
- * La hamburguesa del header se queda para lo secundario (Descubrir, Calendario, ajustes).
  */
 import { Icon } from 'astro-icon/components';
 
 const user = Astro.locals.user;
 const path = Astro.url.pathname;
 const isActive = (href: string): boolean => href === '/' ? path === '/' : path.startsWith(href);
+const catalogActive = isActive('/catalogo');
+const listsActive = isActive('/mislistas');
+const perfilActive = isActive('/perfil');
 ---
 <nav class="tabbar" aria-label="Navegación inferior">
-    <a href="/" class={`tabbar-item ${isActive('/') ? 'is-active' : ''}`}>
+    <a href="/" class={`tabbar-item ${isActive('/') ? 'is-active' : ''}`} aria-current={isActive('/') ? 'page' : undefined}>
         <Icon name="lucide:home" class="tabbar-icon" />
         <span>Inicio</span>
     </a>
@@ -28,31 +32,36 @@ const isActive = (href: string): boolean => href === '/' ? path === '/' : path.s
         <span>Buscar</span>
     </button>
 
+    <button type="button" class={`tabbar-item ${catalogActive ? 'is-active' : ''}`} data-sheet-open="explorar" aria-label="Explorar">
+        <Icon name="lucide:compass" class="tabbar-icon" />
+        <span>Explorar</span>
+    </button>
+
     {user ? (
-        <>
-            <a href="/mislistas/favoritos" class={`tabbar-item ${isActive('/mislistas') ? 'is-active' : ''}`}>
-                <span class="tabbar-iconwrap">
-                    <Icon name="lucide:list" class="tabbar-icon" />
-                    <span class="tabbar-badge js-radar-badge" hidden></span>
-                </span>
-                <span>Mis listas</span>
-            </a>
-            <a href="/perfil" class={`tabbar-item ${isActive('/perfil') ? 'is-active' : ''}`}>
-                <Icon name="lucide:user" class="tabbar-icon" />
-                <span>Perfil</span>
-            </a>
-        </>
+        <button type="button" class={`tabbar-item ${listsActive ? 'is-active' : ''}`} data-sheet-open="listas" aria-label="Mis listas">
+            <span class="tabbar-iconwrap">
+                <Icon name="lucide:bookmark" class="tabbar-icon" />
+                <span class="tabbar-badge js-radar-badge" hidden></span>
+            </span>
+            <span>Mis listas</span>
+        </button>
     ) : (
-        <>
-            <a href="/catalogo/tendencias" class={`tabbar-item ${isActive('/catalogo') ? 'is-active' : ''}`}>
-                <Icon name="lucide:compass" class="tabbar-icon" />
-                <span>Descubrir</span>
-            </a>
-            <button type="button" class="tabbar-item" data-auth-open aria-label="Entrar">
-                <Icon name="lucide:user" class="tabbar-icon" />
-                <span>Entrar</span>
-            </button>
-        </>
+        <button type="button" class="tabbar-item" data-auth-open aria-label="Mis listas">
+            <Icon name="lucide:bookmark" class="tabbar-icon" />
+            <span>Mis listas</span>
+        </button>
+    )}
+
+    {user ? (
+        <button type="button" class={`tabbar-item ${perfilActive ? 'is-active' : ''}`} data-sheet-open="perfil" aria-label="Perfil">
+            <Icon name="lucide:user" class="tabbar-icon" />
+            <span>Perfil</span>
+        </button>
+    ) : (
+        <button type="button" class="tabbar-item" data-auth-open aria-label="Entrar">
+            <Icon name="lucide:user" class="tabbar-icon" />
+            <span>Perfil</span>
+        </button>
     )}
 </nav>
 
@@ -61,6 +70,12 @@ const isActive = (href: string): boolean => href === '/' ? path === '/' : path.s
         var s = document.getElementById('tabbar-search');
         if (s) s.addEventListener('click', function () {
             document.dispatchEvent(new CustomEvent('yf:open-palette'));
+        });
+        // Tabs que abren hoja (toggle lo gestiona el controlador del BottomSheet).
+        document.querySelectorAll('.tabbar [data-sheet-open]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.dispatchEvent(new CustomEvent('yf:sheet-open', { detail: { id: btn.getAttribute('data-sheet-open') } }));
+            });
         });
     })();
 </script>

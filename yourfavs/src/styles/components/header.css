@@ -867,13 +867,24 @@
     margin: 1rem 0 0.5rem 0.4rem;
 }
 
+/* --- Header móvil mínimo (sin hamburguesa): logo + calendario ---
+   La navegación vive en el tab bar inferior + hojas. En <1024px mostramos
+   `.header-actions` pero SOLO con el calendario (búsqueda/tema/cuenta ocultos:
+   Buscar es un tab, y tema/cuenta viven en la hoja de Perfil). */
+@media (max-width: 1023px) {
+    .header-actions { display: flex; margin-left: auto; gap: 0; }
+    .header-actions .header-search-form,
+    .header-actions .theme-toggle,
+    .header-account,
+    .header-entrar-btn { display: none; }
+    /* El botón navega a /mislistas/calendario (el dropdown no se abre en móvil). */
+    .header-calendar-btn { display: flex; }
+}
+
 /* --- Reduced motion --- */
 @media (prefers-reduced-motion: reduce) {
-    .mobile-panel,
-    .mobile-overlay,
     .header-search-input,
-    .header-nav-link,
-    .mobile-nav-link {
+    .header-nav-link {
         transition: none;
     }
 }
