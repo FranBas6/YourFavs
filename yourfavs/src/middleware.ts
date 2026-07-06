@@ -32,6 +32,29 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
     }
 
+    // Fallback móvil (Fase C): sin cookie válida, aceptar
+    // `Authorization: Bearer <idToken>` (la app nativa NO usa cookies). Verificamos
+    // el ID token con el Admin SDK. Es ADITIVO: la web no manda esta cabecera, así
+    // que su flujo de cookie de sesión no se ve afectado.
+    if (!context.locals.user) {
+        const authz = context.request.headers.get('authorization');
+        const m = authz?.match(/^Bearer\s+(.+)$/i);
+        if (m) {
+            try {
+                const decoded = await adminAuth.verifyIdToken(m[1]); // ID token, no session cookie
+                context.locals.user = {
+                    uid: decoded.uid,
+                    email: decoded.email ?? null,
+                    name: (decoded.name as string | undefined) ?? null,
+                    picture: (decoded.picture as string | undefined) ?? null,
+                };
+            } catch {
+                // ID token inválido/caducado → seguimos como invitado (user = null).
+                context.locals.user = null;
+            }
+        }
+    }
+
     // Guard de invitado: las páginas /mislistas/* requieren sesión. Sin ella,
     // de vuelta a inicio (la UX fina del gating — modal "regístrate" — es Fase D).
     const path = context.url.pathname;

@@ -244,6 +244,102 @@
 
 .cmdk-see-all:hover { text-decoration: underline; }
 
+/* ---- "Por reparto": chips + toggle Y/O + contador ---- */
+.cmdk-cast {
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.cmdk-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cmdk-chips:empty { display: none; }
+
+.cmdk-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 6px 4px 4px;
+    border-radius: var(--r-full, 999px);
+    background: var(--card);
+    color: var(--card-text);
+    max-width: 100%;
+}
+.cmdk-chip-av {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; color: #fff;
+}
+.cmdk-chip-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cmdk-chip-x {
+    display: flex; align-items: center; justify-content: center;
+    width: 18px; height: 18px; padding: 0; border: 0; cursor: pointer;
+    border-radius: 50%; background: transparent; color: var(--card-text-3);
+}
+.cmdk-chip-x svg { width: 12px; height: 12px; }
+.cmdk-chip-x:hover { background: rgba(255, 255, 255, .16); color: #fff; }
+
+.cmdk-cast-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+}
+.cmdk-seg {
+    display: inline-flex;
+    background: var(--bg-tint);
+    border: 1px solid var(--border);
+    border-radius: var(--r-full, 999px);
+    padding: 3px;
+}
+.cmdk-seg-btn {
+    padding: 5px 12px;
+    border: 0;
+    border-radius: var(--r-full, 999px);
+    background: transparent;
+    color: var(--text-3);
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.cmdk-seg-btn.is-on { background: var(--card); color: var(--card-text); font-weight: 700; }
+.cmdk-cast-count { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-4); }
+.cmdk-cast-count.has { color: #2f7d52; }
+
+/* Miniatura redonda para sugerencias de actor (mismo hueco 34×48) */
+.cmdk-thumb-round { border-radius: 50%; width: 34px; height: 34px; }
+
+/* "+" al final de cada sugerencia de actor */
+.cmdk-add {
+    flex-shrink: 0;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--accent);
+    padding-right: 4px;
+}
+
+/* Enlace inline (p.ej. "Probar «Cualquiera»") dentro de una pista */
+.cmdk-inline-link {
+    border: 0;
+    background: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .cmdk-seg-btn { transition: none; }
+}
+
 /* Móvil: pantalla casi completa, hints de teclado fuera */
 @media (max-width: 640px) {
     .cmdk-overlay { padding: 12px; }

@@ -30,12 +30,25 @@ const isLogged = !!Astro.locals.user;
             <span class="cmdk-kbd">ESC</span>
         </div>
 
-        {isLogged && (
-            <div class="cmdk-scope" role="tablist" aria-label="Ámbito de búsqueda">
-                <button class="cmdk-scope-btn is-active" type="button" data-scope="all" role="tab" aria-selected="true">Todo</button>
+        <div class="cmdk-scope" role="tablist" aria-label="Ámbito de búsqueda">
+            <button class="cmdk-scope-btn is-active" type="button" data-scope="all" role="tab" aria-selected="true">Todo</button>
+            {isLogged && (
                 <button class="cmdk-scope-btn" type="button" data-scope="mine" role="tab" aria-selected="false">Lo mío</button>
+            )}
+            <button class="cmdk-scope-btn" type="button" data-scope="cast" role="tab" aria-selected="false">Por reparto</button>
+        </div>
+
+        <!-- Barra "Por reparto": chips de actores + toggle Y/O + contador (solo en ese modo) -->
+        <div class="cmdk-cast" id="cmdk-cast" hidden>
+            <div class="cmdk-chips" id="cmdk-chips" aria-label="Actores elegidos"></div>
+            <div class="cmdk-cast-controls">
+                <div class="cmdk-seg" role="group" aria-label="Tipo de coincidencia">
+                    <button type="button" class="cmdk-seg-btn is-on" data-castmode="and" aria-pressed="true">Todos juntos</button>
+                    <button type="button" class="cmdk-seg-btn" data-castmode="or" aria-pressed="false">Cualquiera</button>
+                </div>
+                <span class="cmdk-cast-count" id="cmdk-cast-count" aria-live="polite"></span>
             </div>
-        )}
+        </div>
 
         <div class="cmdk-results" id="cmdk-results" role="listbox" aria-label="Resultados">
             <!-- El JS pinta aquí recientes + acciones al abrir (renderEmpty) -->
@@ -64,7 +77,15 @@ const isLogged = !!Astro.locals.user;
     var debounceTimer = null;
     var controller = null;   // AbortController del fetch en vuelo
     var lastFocus = null;    // foco previo, para restaurarlo al cerrar
-    var mode = 'all';        // 'all' = TMDB (multi) · 'mine' = mi biblioteca (4.3)
+    var mode = 'all';        // 'all' = TMDB (multi) · 'mine' = mi biblioteca (4.3) · 'cast' = por reparto
+
+    // ---- "Por reparto": chips de actores + intersección de sus repartos ----
+    var castBar = document.getElementById('cmdk-cast');
+    var chipsWrap = document.getElementById('cmdk-chips');
+    var castCountEl = document.getElementById('cmdk-cast-count');
+    var castChips = [];      // [{id, name, image}]
+    var castMode = 'and';    // 'and' = todos juntos · 'or' = cualquiera
+    var castCtrl = null;     // AbortController de la intersección (/api/search/cast)
 
     var GROUP_LABELS = { movie: 'PELÍCULAS', tv: 'SERIES', person: 'PERSONAS' };
     var GROUP_ORDER = ['movie', 'tv', 'person'];
@@ -115,7 +136,7 @@ const isLogged = !!Astro.locals.user;
         document.body.style.overflow = 'hidden';
         input.focus();
         input.select();
-        if (input.value.trim().length < 2) renderEmpty();
+        if (input.value.trim().length < 2) { if (mode === 'cast') renderCastState(); else renderEmpty(); }
     }
 
     function close() {
@@ -147,6 +168,18 @@ const isLogged = !!Astro.locals.user;
             b.classList.toggle('is-active', on);
             b.setAttribute('aria-selected', on ? 'true' : 'false');
         });
+        castBar.hidden = (m !== 'cast');
+
+        if (m === 'cast') {
+            input.value = '';
+            input.placeholder = 'Añade un actor por su nombre…';
+            updateSeeAll('');       // en "Por reparto" no hay "ver todos"
+            renderChips();
+            renderCastState();      // intersección actual (o pista si no hay actores)
+            input.focus();
+            return;
+        }
+
         input.placeholder = m === 'mine'
             ? 'Buscar en tu biblioteca (título o etiqueta)...'
             : 'Buscar películas, series, personas...';
@@ -176,6 +209,14 @@ const isLogged = !!Astro.locals.user;
             selected = -1;
         }
         navKeyboard = false;
+
+        // En "Por reparto" el input añade actores: <2 letras → intersección actual;
+        // si no, autocompletar de personas para elegir a quién añadir.
+        if (mode === 'cast') {
+            if (q.length < 2) { renderCastState(); return; }
+            debounceTimer = setTimeout(function () { runCastAutocomplete(q); }, 250);
+            return;
+        }
 
         var minLen = mode === 'mine' ? 1 : 2;
         if (q.length < minLen) {
@@ -253,6 +294,7 @@ const isLogged = !!Astro.locals.user;
     // Abrir un item (Enter o click): la ruleta se abre en la propia página si
     // su modal existe; si no, navega a pendientes con auto-open (?roulette=1).
     function openItem(it) {
+        if (it.castAdd) { addPerson(it.castAdd); return; }   // sugerencia "Por reparto"
         if (it.action === 'roulette' && document.getElementById('wtw')) {
             close();
             document.dispatchEvent(new CustomEvent('yf:open-roulette'));
@@ -297,9 +339,172 @@ const isLogged = !!Astro.locals.user;
         // solo ↑↓ (intención explícita) hace que Enter abra un item.
     }
 
+    // ==== "Por reparto": chips + intersección ==============================
+
+    function chipInitials(name) {
+        return String(name).replace(/[#\d]/g, '').trim().split(/\s+/)
+            .map(function (w) { return w.charAt(0); }).slice(0, 2).join('').toUpperCase();
+    }
+
+    function renderChips() {
+        var html = '';
+        castChips.forEach(function (c) {
+            var av = c.image
+                ? '<img class="cmdk-chip-av" src="' + escapeHtml(c.image) + '" alt=""/>'
+                : '<span class="cmdk-chip-av">' + escapeHtml(chipInitials(c.name)) + '</span>';
+            html += '<span class="cmdk-chip">' + av +
+                '<span class="cmdk-chip-name">' + escapeHtml(c.name) + '</span>' +
+                '<button type="button" class="cmdk-chip-x" data-id="' + escapeHtml(c.id) + '" aria-label="Quitar a ' + escapeHtml(c.name) + '">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>';
+        });
+        chipsWrap.innerHTML = html;
+    }
+
+    function addPerson(c) {
+        if (castChips.some(function (x) { return x.id === c.id; })) return;  // sin duplicados
+        if (castChips.length >= 5) return;                                  // tope
+        castChips.push(c);
+        input.value = '';
+        renderChips();
+        renderCastState();
+        input.focus();
+    }
+
+    function removePerson(id) {
+        castChips = castChips.filter(function (c) { return c.id !== id; });
+        renderChips();
+        renderCastState();
+        input.focus();
+    }
+
+    // Autocompletar de personas (reusa /api/search/multi, filtra media_type person).
+    function runCastAutocomplete(q) {
+        if (controller) controller.abort();
+        controller = new AbortController();
+        fetch('/api/search/multi?q=' + encodeURIComponent(q), { signal: controller.signal })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (mode !== 'cast' || input.value.trim() !== data.query) return;
+                var persons = (data.items || []).filter(function (it) {
+                    return it.media_type === 'person' && !castChips.some(function (c) { return c.id === String(it.id); });
+                });
+                renderCastSuggestions(persons);
+            })
+            .catch(function (err) { if (!err || err.name !== 'AbortError') renderHint('No se pudo buscar. Inténtalo de nuevo.'); });
+    }
+
+    function renderCastSuggestions(persons) {
+        items = [];
+        selected = -1;
+        if (!persons.length) {
+            renderHint('Sin actores para «' + input.value.trim() + '»');
+            return;
+        }
+        var html = '<div class="cmdk-group-label">AÑADIR ACTOR</div>';
+        persons.slice(0, 8).forEach(function (it) {
+            var idx = items.length;
+            items.push({ castAdd: { id: String(it.id), name: it.title, image: it.image || null } });
+            var av = it.image
+                ? '<img class="cmdk-thumb cmdk-thumb-round" src="' + escapeHtml(it.image) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'"/>'
+                : '<span class="cmdk-thumb cmdk-thumb-round is-empty" aria-hidden="true">' + EMPTY_ICONS.person + '</span>';
+            html += '<div class="cmdk-item" role="option" aria-selected="false" data-idx="' + idx + '">' + av +
+                '<span class="cmdk-item-body"><span class="cmdk-item-title">' + escapeHtml(it.title) + '</span>' +
+                '<span class="cmdk-item-meta">' + escapeHtml(it.subtitle || 'Interpretación') + '</span></span>' +
+                '<span class="cmdk-add" aria-hidden="true">+</span></div>';
+        });
+        results.innerHTML = html;
+        // Preselección: Enter añade el primero (autocompletar típico).
+        if (items.length) select(0, true);
+    }
+
+    // Input vacío en modo reparto: sin actores → pista; con actores → intersección.
+    function renderCastState() {
+        if (!castChips.length) {
+            items = [];
+            selected = -1;
+            castCountEl.textContent = '';
+            castCountEl.classList.remove('has');
+            results.innerHTML = '<p class="cmdk-hint">Añade 2 o más actores para ver los títulos donde coinciden.</p>';
+            return;
+        }
+        fetchIntersection();
+    }
+
+    function fetchIntersection() {
+        if (castCtrl) castCtrl.abort();
+        castCtrl = new AbortController();
+        var ids = castChips.map(function (c) { return c.id; }).join(',');
+        results.innerHTML = '<p class="cmdk-hint">Buscando…</p>';
+        fetch('/api/search/cast?ids=' + encodeURIComponent(ids) + '&mode=' + castMode, { signal: castCtrl.signal })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (mode !== 'cast') return;
+                renderCastResults(data.items || [], data.count || 0);
+            })
+            .catch(function (err) { if (!err || err.name !== 'AbortError') renderHint('No se pudo buscar. Inténtalo de nuevo.'); });
+    }
+
+    function renderCastResults(list, count) {
+        items = [];
+        selected = -1;
+        castCountEl.textContent = count ? ('● ' + count + (count === 1 ? ' título' : ' títulos')) : '';
+        castCountEl.classList.toggle('has', !!count);
+
+        if (!list.length) {
+            // "Todos juntos" sin resultados con 2+ actores → sugerir "Cualquiera" (no error).
+            if (castMode === 'and' && castChips.length >= 2) {
+                results.innerHTML = '<p class="cmdk-hint">Ningún título donde salgan todos. ' +
+                    '<button type="button" class="cmdk-inline-link" id="cmdk-try-or">Probar «Cualquiera»</button></p>';
+                var tryOr = document.getElementById('cmdk-try-or');
+                if (tryOr) tryOr.addEventListener('click', function () { setCastMode('or'); });
+            } else {
+                renderHint('Sin títulos para estos actores.');
+            }
+            return;
+        }
+
+        var html = '<div class="cmdk-group-label">' + (castMode === 'and' ? 'COINCIDEN' : 'CUALQUIERA DE ELLOS') + '</div>';
+        list.forEach(function (it) {
+            var idx = items.length;
+            var href = it.media_type === 'movie' ? '/movie/' + it.id : '/serie/' + it.id;
+            var sub = (it.year ? it.year + ' · ' : '') + (it.media_type === 'movie' ? 'Película' : 'Serie');
+            items.push({ title: it.title, subtitle: sub, href: href, media_type: it.media_type, image: it.image });
+            html += '<a class="cmdk-item" role="option" aria-selected="false" data-idx="' + idx + '" href="' + escapeHtml(href) + '">';
+            html += it.image
+                ? '<img class="cmdk-thumb" src="' + escapeHtml(it.image) + '" alt="" loading="lazy" onerror="this.style.visibility=\'hidden\'"/>'
+                : '<span class="cmdk-thumb is-empty" aria-hidden="true">' + EMPTY_ICONS[it.media_type] + '</span>';
+            html += '<span class="cmdk-item-body"><span class="cmdk-item-title">' + escapeHtml(it.title) + '</span>' +
+                '<span class="cmdk-item-meta">' + escapeHtml(sub) + '</span></span>';
+            if (it.rating != null) html += '<span class="cmdk-item-rating">★ ' + it.rating.toFixed(1) + '</span>';
+            html += '</a>';
+        });
+        results.innerHTML = html;
+    }
+
+    function setCastMode(m) {
+        if (castMode === m) return;
+        castMode = m;
+        castSegBtns.forEach(function (b) {
+            var on = b.getAttribute('data-castmode') === m;
+            b.classList.toggle('is-on', on);
+            b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+        renderCastState();
+        input.focus();
+    }
+
+    var castSegBtns = overlay.querySelectorAll('.cmdk-seg-btn');
+    castSegBtns.forEach(function (b) {
+        b.addEventListener('click', function () { setCastMode(b.getAttribute('data-castmode')); });
+    });
+    chipsWrap.addEventListener('click', function (e) {
+        var btn = e.target.closest('.cmdk-chip-x');
+        if (btn) removePerson(btn.getAttribute('data-id'));
+    });
+
     function updateSeeAll(q) {
-        // En "Lo mío" no hay "ver todos" (la búsqueda completa es de TMDB).
-        if (!q || mode === 'mine') {
+        // "Lo mío" y "Por reparto" no tienen página de "ver todos".
+        if (!q || mode === 'mine' || mode === 'cast') {
             seeAll.hidden = true;
             if (goBtn) goBtn.hidden = true;
             return;
@@ -368,6 +573,7 @@ const isLogged = !!Astro.locals.user;
         if (!node) return;
         var it = items[parseInt(node.getAttribute('data-idx'), 10)];
         if (!it) return;
+        if (it.castAdd) { e.preventDefault(); addPerson(it.castAdd); return; }   // añadir actor
         if (it.action === 'roulette' && document.getElementById('wtw')) {
             e.preventDefault();
             close();
