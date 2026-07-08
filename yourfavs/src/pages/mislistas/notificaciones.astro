@@ -1,0 +1,87 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { syncNotifications } from '../../services/API/notifications/generator';
+import { listNotifications } from '../../services/BD/notifications/notifications';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import { Icon } from 'astro-icon/components';
+
+if (Astro.locals.user) {
+    await syncNotifications(Astro.locals.user.platforms ?? []);
+}
+const items = Astro.locals.user ? await listNotifications(100) : [];
+
+const DAY = 86400000;
+function bucket(ts: number): string {
+    const n = Date.now();
+    if (n - ts < DAY) return 'Hoy';
+    if (n - ts < 7 * DAY) return 'Esta semana';
+    return 'Antes';
+}
+const COLOR: Record<string, string> = { new_episode: '#3b82f6', on_platform: '#2f7d52', person_release: '#c4392f', anniversary: '#6d4aa0' };
+const ICON: Record<string, string> = { new_episode: 'lucide:tv', on_platform: 'lucide:popcorn', person_release: 'lucide:clapperboard', anniversary: 'lucide:calendar-days' };
+
+// Agrupar por antigüedad conservando el orden (ya viene desc por created_at).
+const groups: [string, typeof items][] = [];
+let last = '';
+for (const it of items) {
+    const b = bucket(it.created_at);
+    if (b !== last) { groups.push([b, []]); last = b; }
+    groups[groups.length - 1][1].push(it);
+}
+---
+<Layout title="Notificaciones">
+    <section class="max-w-2xl mx-auto px-3 sm:py-8 py-4">
+        <header class="mb-6 flex items-center justify-between gap-3">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">Notificaciones</h1>
+                <p class="text-gray-500 text-sm">Novedades de lo que sigues</p>
+            </div>
+            {items.length > 0 && (
+                <button id="notif-page-markall" type="button" class="text-sm font-semibold text-[#3b82f6] hover:underline whitespace-nowrap">Marcar todas leídas</button>
+            )}
+        </header>
+
+        {!Astro.locals.user && (
+            <p class="notif-empty">Inicia sesión para ver tus notificaciones.</p>
+        )}
+        {Astro.locals.user && items.length === 0 && (
+            <p class="notif-empty">No hay notificaciones por ahora.</p>
+        )}
+
+        {groups.map(([label, its]) => (
+            <div class="mb-4">
+                <p class="notif-group">{label}</p>
+                <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;">
+                    {its.map((it) => (
+                        <a href={it.href} class:list={["notif-item", { "is-unread": !it.read }]} data-id={it.id}>
+                            <span class="notif-ico" style={`color:${COLOR[it.type] || '#3b82f6'};background:${COLOR[it.type] || '#3b82f6'}1a;`}><Icon name={ICON[it.type] || 'lucide:bell'} /></span>
+                            {it.poster_path
+                                ? <img class="notif-poster" src={posterUrl(it.poster_path, 'w92')} alt="" loading="lazy"/>
+                                : <span class="notif-poster"></span>}
+                            <span class="notif-body">
+                                <span class="notif-sub">{it.subtitle}</span>
+                                <span class="notif-name">{it.title}</span>
+                            </span>
+                            {!it.read && <span class="notif-dot"></span>}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        ))}
+    </section>
+
+    <script is:inline>
+        (function () {
+            var all = document.getElementById('notif-page-markall');
+            if (all) all.addEventListener('click', function () {
+                fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read_all' }) })
+                    .then(function () { location.reload(); }).catch(function () {});
+            });
+            document.querySelectorAll('.notif-item.is-unread').forEach(function (el) {
+                el.addEventListener('click', function () {
+                    fetch('/api/notifications', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read', id: el.getAttribute('data-id') }) }).catch(function () {});
+                });
+            });
+        })();
+    </script>
+</Layout>

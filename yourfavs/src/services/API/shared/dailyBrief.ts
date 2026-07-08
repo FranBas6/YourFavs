@@ -124,7 +124,7 @@ export async function getPendientesOnMyPlatforms(platforms: number[]): Promise<P
 }
 
 /** Efeméride "hace un año": resuelve título/póster de una entrada del diario de esa fecha. */
-async function anniversarySignal(): Promise<BriefSignal | null> {
+export async function anniversarySignal(): Promise<BriefSignal | null> {
     const entries = await getWatchLogOnDate(oneYearAgoKey());
     // Prioriza pelis (re-ver es más natural) y descarta episodios sueltos de serie.
     const pick = entries.find((e) => e.media_type === 'movie')

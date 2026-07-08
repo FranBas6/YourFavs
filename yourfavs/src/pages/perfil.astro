@@ -39,7 +39,17 @@ if (Astro.request.method === 'POST') {
         };
         // "Mis plataformas" (3.2): multi-checkbox; [] válido (= ninguna) → siempre se escribe.
         patch.platforms = fd.getAll('platforms').map((v) => Number(v)).filter((n) => STREAMING_PLATFORM_IDS.has(n));
+        // Campana (Bloque 4): toggles por tipo. Checkbox ausente = desactivado.
+        patch.notifPrefs = {
+            episodes: fd.get('notif_episodes') != null,
+            releases: fd.get('notif_releases') != null,
+            anniversary: fd.get('notif_anniversary') != null,
+        };
         await setUserProfile(patch);
+        try {
+            const { invalidateNotifSync } = await import('../services/API/notifications/generator');
+            invalidateNotifSync(); // re-materializa la campana con las nuevas preferencias
+        } catch { /* se re-sincroniza igual al día siguiente */ }
         return Astro.redirect('/perfil?saved=1');
     }
     if (postAction === 'reset_taste') {
@@ -162,6 +172,24 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                             ))}
                         </div>
                         <small>Para el filtro «Solo en mis plataformas» del catálogo y la ruleta.</small>
+                    </div>
+                    <div class="perfil-field perfil-field-wide">
+                        <span>Notificaciones (campana)</span>
+                        <div class="plat-chips">
+                            <label class="plat-chip">
+                                <input type="checkbox" name="notif_episodes" checked={profile.notifPrefs?.episodes !== false} />
+                                <span>Nuevos episodios</span>
+                            </label>
+                            <label class="plat-chip">
+                                <input type="checkbox" name="notif_releases" checked={profile.notifPrefs?.releases !== false} />
+                                <span>Estrenos de quien sigo</span>
+                            </label>
+                            <label class="plat-chip">
+                                <input type="checkbox" name="notif_anniversary" checked={profile.notifPrefs?.anniversary !== false} />
+                                <span>Efemérides «hace un año»</span>
+                            </label>
+                        </div>
+                        <small>Qué te avisa la campana. El «cambio de plataforma» llegará más adelante (necesita proceso programado).</small>
                     </div>
                 </div>
             </section>
