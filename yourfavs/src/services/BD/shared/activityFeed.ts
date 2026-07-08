@@ -4,12 +4,15 @@ import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-hel
 import { appDateParts } from "../../../utils/appTime";
 
 export interface ActivityEvent {
-    type: 'movie' | 'serie';
+    type: 'movie' | 'serie' | 'person';
     id: string;
     collection: string;
     action: string;
     timestamp: number;
     episodes?: { season: number; episode: number }[];
+    /** Solo eventos de persona: llevan su nombre/foto (no se resuelven por TMDB). */
+    name?: string;
+    profile_path?: string | null;
 }
 
 // `key` apunta al array del snapshot compartido (ya no se lee colección a colección).
@@ -146,14 +149,74 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
     }
 }
 
+// Personas seguidas (Bloque 3): "Empezaste a seguir a X". Avatar circular (no póster).
+// FollowedPeople guarda name/profile_path/added_at → sin fetch extra a TMDB.
+async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
+    try {
+        const { getAllFollowedPeople } = await import('../people/yourfavsPeople');
+        const people = await getAllFollowedPeople();
+        return people
+            .map((p): ActivityEvent => ({
+                type: 'person',
+                id: String(p.id),
+                collection: 'FollowPerson',
+                action: 'Empezaste a seguir',
+                timestamp: getFirebaseTimestamp(p.added_at),
+                name: p.name,
+                profile_path: p.profile_path ?? null,
+            }))
+            .filter(e => e.timestamp > 0);
+    } catch (error) {
+        console.error('Error al leer FollowedPeople:', error);
+        return [];
+    }
+}
+
+// Actores en favoritos (Bloque 3): "Añadiste a favoritos a X". Avatar circular.
+// ActorsFavs solo guarda { id, added_at, position } → resolvemos nombre/foto por TMDB.
+async function fetchActorFavEvents(): Promise<ActivityEvent[]> {
+    try {
+        const { getActorsFav } = await import('../actors/yourfavsActor');
+        const favs = await getActorsFav();
+        if (!favs.length) return [];
+        const { tmdbFetch } = await import('../../API/shared/tmdbClient');
+        const { processBatch } = await import('../../../utils/processBatch');
+        const events = await processBatch(
+            favs,
+            async (f: any): Promise<ActivityEvent | null> => {
+                const timestamp = getFirebaseTimestamp(f.added_at);
+                if (!timestamp) return null;
+                let name = 'Actor';
+                let profile_path: string | null = null;
+                try {
+                    const d = await tmdbFetch<any>(`/person/${f.id}`);
+                    if (d?.name) name = d.name;
+                    profile_path = d?.profile_path ?? null;
+                } catch { /* nombre/foto opcionales */ }
+                return {
+                    type: 'person', id: String(f.id), collection: 'FavPerson',
+                    action: 'Añadiste a favoritos', timestamp, name, profile_path,
+                };
+            },
+            5
+        );
+        return events.filter(Boolean) as ActivityEvent[];
+    } catch (error) {
+        console.error('Error al leer ActorsFavs:', error);
+        return [];
+    }
+}
+
 export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (!getCurrentUid()) return [];
     // Las 11 listas salen del snapshot compartido (1 lectura), no colección a colección.
-    const [snapshot, episodeEvents, rewatchEvents, ratingEvents] = await Promise.all([
+    const [snapshot, episodeEvents, rewatchEvents, ratingEvents, personEvents, favPersonEvents] = await Promise.all([
         getLibrarySnapshot(),
         fetchWatchedEpisodeEvents(),
         fetchRewatchEvents(),
         fetchRatingEvents(),
+        fetchFollowPersonEvents(),
+        fetchActorFavEvents(),
     ]);
     const collectionEvents = COLLECTIONS.flatMap(c =>
         (snapshot[c.key] || [])
@@ -166,5 +229,5 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
             }))
             .filter(e => e.timestamp > 0)
     );
-    return [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents];
+    return [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents];
 }
