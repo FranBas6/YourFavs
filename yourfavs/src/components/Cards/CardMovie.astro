@@ -26,7 +26,10 @@ const isTrending = vote_average >= 8.0;
 // "Guardar en…" es una acción de descubrimiento: en catálogo y en recomendaciones
 // (sugerencias que aún no tienes). Dentro de "Mis listas" la card ya está guardada → oculto.
 const _p = Astro.url.pathname;
-const showSaveBtn = !_p.startsWith('/mislistas') || _p.startsWith('/mislistas/recomendaciones');
+// El ⊕ se muestra fuera de /mislistas y, dentro, en recomendaciones + las listas
+// fijas donde el marcado reubica la card en vivo (Pendientes/Vistas/Favoritos).
+const showSaveBtn = !_p.startsWith('/mislistas') || _p.startsWith('/mislistas/recomendaciones')
+    || _p.startsWith('/mislistas/pendientes') || _p.startsWith('/mislistas/vistos') || _p.startsWith('/mislistas/favoritos');
 ---
 <div class="media-card group">
     <a href={`/movie/${id}`}

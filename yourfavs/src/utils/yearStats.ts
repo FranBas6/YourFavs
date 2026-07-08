@@ -239,10 +239,17 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         .sort(([a], [b]) => (b === 'Desconocido' ? -1 : a === 'Desconocido' ? 1 : Number(b.replace('s', '')) - Number(a.replace('s', ''))))
         .map(([decade, count]) => ({ decade, count }));
 
-    // By collection
+    // By collection. Modelo de 2 capas: Favoritos/Me gusta también viven en Vistas
+    // (paraguas "consumido"), así que contamos "vistos" como "a secas" (excluyendo los
+    // que tienen opinión) para que la distribución sean niveles y no se dupliquen.
     const collCount: Record<string, number> = {};
     for (const e of enriched) {
-        for (const c of e.raw.collections) collCount[c] = (collCount[c] || 0) + 1;
+        const cols = e.raw.collections;
+        const hasOpinion = cols.has('favs') || cols.has('like');
+        for (const c of cols) {
+            if (c === 'vistos' && hasOpinion) continue;
+            collCount[c] = (collCount[c] || 0) + 1;
+        }
     }
     const byCollection = Object.entries(collCount)
         .sort(([, a], [, b]) => b - a)

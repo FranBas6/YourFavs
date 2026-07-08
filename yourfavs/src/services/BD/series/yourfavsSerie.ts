@@ -1,5 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
+import { adminDb } from "../../../utils/firebaseAdmin";
+import { getTransition } from "../shared/stateTransitions";
 import { appendWatchLog, appendEpisodes } from "../lists/watchLog";
 import { appDateParts } from "../../../utils/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
@@ -105,15 +107,25 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             added_at: new Date(),
         };
 
-        // Buscar opinión existente (lectura paralela)
+        // Buscar opinión + nota existentes (lectura paralela; se copian al mover/añadir)
         const opinionSnaps = await Promise.all(
             SERIE_COLLECTIONS.map(col => userDoc(col, serieId).get())
         );
-        const foundOpinion = opinionSnaps.find(s => s.exists && s.data()?.opinion);
-        const existingOpinion: string = foundOpinion?.data()?.opinion || '';
+        let existingOpinion = '';
+        let existingRating: number | undefined;
+        for (const s of opinionSnaps) {
+            if (!s.exists) continue;
+            const d = s.data();
+            if (!existingOpinion && d?.opinion) existingOpinion = d.opinion;
+            if (existingRating === undefined && typeof d?.rating === 'number') existingRating = d.rating;
+        }
 
         const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
-        const newEntry = opinionForSeries ? { ...baseEntry, opinion: opinionForSeries } : baseEntry;
+        // Entrada "limpia" (sin position) para la cascada a SeriesVistas.
+        const castedEntry: Record<string, any> = { ...baseEntry };
+        if (opinionForSeries) castedEntry.opinion = opinionForSeries;
+        if (existingRating !== undefined) castedEntry.rating = existingRating;
+        const newEntry: Record<string, any> = { ...castedEntry };
 
         // Manejo de posición para favoritos
         if (coleccion === 'SeriesFavs') {
@@ -138,7 +150,23 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             newEntry.position = newPosition;
         }
 
-        await docRef.set(newEntry);
+        // Modelo de 2 capas: mover + limpiar en un batch atómico. Vista/Fav/Me gusta
+        // añaden "Vistas" y limpian el progreso (Pendiente/Ver pronto/Siguiendo);
+        // Fav/Me gusta se excluyen. La cascada a Vistas usa la entrada sin position.
+        const tr = getTransition('serie', coleccion);
+        const snapByCol = new Map<string, typeof opinionSnaps[number]>();
+        SERIE_COLLECTIONS.forEach((col, i) => snapByCol.set(col, opinionSnaps[i]));
+        const batch = adminDb.batch();
+        batch.set(docRef, newEntry);
+        for (const col of tr.alsoAdd) {
+            const s = snapByCol.get(col);
+            if (!s || !s.exists) batch.set(userDoc(col, serieId), castedEntry);
+        }
+        for (const col of tr.remove) {
+            const s = snapByCol.get(col);
+            if (s && s.exists) batch.delete(userDoc(col, serieId));
+        }
+        await batch.commit();
 
     } else if (action === 'remove' && serieExiste) {
         await docRef.delete();
@@ -263,6 +291,16 @@ export const getSeriesVistas = () => getSeriesCollection<SeriesInterface>("Serie
 export const getSeriesSiguiendo = () => getSeriesCollection<SeriesInterface>("SeriesSiguiendo");
 export const getLikedSeries = () => getSeriesCollection<SeriesInterface>("LikedSeries");
 export const getSeriesVerPronto = () => getSeriesCollection<SeriesInterface>("SeriesVerPronto");
+
+/**
+ * Vistas "a secas": consumido SIN opinión más fuerte (excluye Favoritos y Me gusta).
+ * Paraguas "Visto" del modelo de 2 capas → la página /mislistas/vistos las excluye.
+ */
+export const getSeriesVistasSolo = async (): Promise<SeriesInterface[]> => {
+    const [vistas, liked, favs] = await Promise.all([getSeriesVistas(), getLikedSeries(), getSerieFav()]);
+    const exclude = new Set<string>([...liked.map(s => s.id), ...favs.map(s => s.id)]);
+    return vistas.filter(s => !exclude.has(s.id));
+};
 
 export async function clearAllSeriesVerPronto(): Promise<void> {
     const querySnapshot = await userCol('SeriesVerPronto').get();

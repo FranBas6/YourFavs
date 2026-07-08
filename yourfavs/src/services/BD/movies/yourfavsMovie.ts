@@ -1,5 +1,7 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
+import { adminDb } from "../../../utils/firebaseAdmin";
+import { getTransition } from "../shared/stateTransitions";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
 
@@ -25,19 +27,21 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const refs = MOVIE_COLLECTIONS.map(col => userDoc(col, movieId));
     const snaps = await Promise.all(refs.map(ref => ref.get()));
 
-    // Buscar opinión existente en cualquier colección
+    // Buscar opinión + nota existentes en cualquier colección (se copian al mover/añadir
+    // en cascada para no perderlas al reubicar el título entre listas).
     let existingOpinion = '';
+    let existingRating: number | undefined;
     for (const snap of snaps) {
-        if (snap.exists && snap.data()?.opinion) {
-            existingOpinion = snap.data()?.opinion;
-            break;
-        }
+        if (!snap.exists) continue;
+        const d = snap.data();
+        if (!existingOpinion && d?.opinion) existingOpinion = d.opinion;
+        if (existingRating === undefined && typeof d?.rating === 'number') existingRating = d.rating;
     }
 
     const opinionTextForCreate = String(formData.get('opinion') || '').trim() || existingOpinion;
-    const movieData = opinionTextForCreate
-        ? { ...movieDataBase, opinion: opinionTextForCreate }
-        : movieDataBase;
+    const movieData: Record<string, any> = { ...movieDataBase };
+    if (opinionTextForCreate) movieData.opinion = opinionTextForCreate;
+    if (existingRating !== undefined) movieData.rating = existingRating;
 
     // Helper: aplica un patch en paralelo a todas las colecciones donde la peli existe
     const updateExisting = (patch: Record<string, any>) =>
@@ -83,26 +87,42 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const collectionName = LIST_TYPE_MAP[listType];
     if (!collectionName) return `/movie/${movieId}`;
 
-    const docRef = userDoc(collectionName, movieId);
-    const docSnap = await docRef.get();
-    const exists = docSnap.exists;
+    // snaps ya cargados arriba, indexados por colección (para el batch de transición)
+    const snapByCol = new Map<string, typeof snaps[number]>();
+    MOVIE_COLLECTIONS.forEach((col, i) => snapByCol.set(col, snaps[i]));
+    const exists = snapByCol.get(collectionName)?.exists ?? false;
 
     let mutated = false;
+    let logPase = false;
     if (action === 'add' && !exists) {
-        await docRef.set(movieData);
+        // Modelo de 2 capas: aplica la transición (mover + limpiar) en un solo batch
+        // atómico. Marcar Visto/Fav/Me gusta añade "Vistas" y limpia el progreso;
+        // Fav/Me gusta se excluyen entre sí. Ver stateTransitions.ts.
+        const tr = getTransition('movie', collectionName);
+        const batch = adminDb.batch();
+        batch.set(userDoc(collectionName, movieId), movieData);
+        for (const col of tr.alsoAdd) {
+            const s = snapByCol.get(col);
+            if (!s || !s.exists) batch.set(userDoc(col, movieId), movieData);
+        }
+        for (const col of tr.remove) {
+            const s = snapByCol.get(col);
+            if (s && s.exists) batch.delete(userDoc(col, movieId));
+        }
+        await batch.commit();
         mutated = true;
-        // Diario (L5): en YourFavs "visto" = Vistas ∪ Me gusta ∪ Favoritos, así que
-        // entrar a cualquiera de las tres registra el visionado (fecha = hoy). dedupe:
-        // solo la PRIMERA vez que entra a "visto" (mover de lista o curar algo ya
-        // visto NO duplica). Pendientes/Ver pronto NO registran. Best-effort.
-        if (collectionName === 'MovieFavs' || collectionName === 'LikedMovies' || collectionName === 'MoviesVistas') {
+        logPase = tr.logPase;
+        // Diario (L5): cada entrada a "visto" registra el visionado (fecha = hoy). dedupe:
+        // solo la PRIMERA vez (mover de lista o curar algo ya visto NO duplica el pase).
+        if (logPase) {
             try {
                 const { appendWatchLog } = await import('../lists/watchLog');
                 await appendWatchLog({ media_type: 'movie', tmdb_id: movieId, dedupe: true });
             } catch { /* diario opcional */ }
         }
     } else if (action === 'remove' && exists) {
-        await docRef.delete();
+        // Quitar es un borrado simple: no auto-restaura estados previos.
+        await userDoc(collectionName, movieId).delete();
         mutated = true;
     }
 
@@ -209,6 +229,17 @@ export async function getWatchedMovieTiers(): Promise<Map<number, WatchedTier>> 
     for (const m of favs) map.set(Number(m.id), 'fav');
     return map;
 }
+
+/**
+ * Vistas "a secas": consumido SIN opinión más fuerte (excluye Favoritos y Me gusta).
+ * En el modelo de 2 capas, Favs/Me gusta también viven en Vistas (paraguas "consumido"),
+ * así que la página /mislistas/vistos las excluye para no duplicar entre listas.
+ */
+export const getMoviesVistasSolo = async (): Promise<MovieInterface[]> => {
+    const [vistas, liked, favs] = await Promise.all([getMoviesVistas(), getLikedMovies(), getMovieFav()]);
+    const exclude = new Set<string>([...liked.map(m => m.id), ...favs.map(m => m.id)]);
+    return vistas.filter(m => !exclude.has(m.id));
+};
 
 export async function clearAllMoviesVerPronto(): Promise<void> {
     const querySnapshot = await userCol('MoviesVerPronto').get();

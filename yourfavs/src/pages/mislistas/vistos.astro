@@ -2,8 +2,8 @@
 import Layout from '../../layouts/Layout.astro';
 import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getSeriesVistas} from "../../services/BD/series/yourfavsSerie";
-import {getMoviesVistas} from "../../services/BD/movies/yourfavsMovie";
+import {getSeriesVistasSolo} from "../../services/BD/series/yourfavsSerie";
+import {getMoviesVistasSolo} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
@@ -18,7 +18,7 @@ import type {Movie} from "../../types/ApiMovie";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
-    { getSeries: getSeriesVistas, getMovies: getMoviesVistas },
+    { getSeries: getSeriesVistasSolo, getMovies: getMoviesVistasSolo },
     Astro.url
 );
 

@@ -178,6 +178,7 @@
     function render(data) {
         var memberIds = data.memberIds || [];
         var fixed = data.fixed || {};
+        if (cur) cur.fixed = fixed; // estado previo (para un Deshacer fiel al reubicar)
         var lists = data.lists || [];
         var html = '';
         // En modo hoja (long-press) mostramos qué título estamos guardando.
@@ -221,6 +222,7 @@
             title: trigger.getAttribute('data-title') || '',
             poster: normPoster(trigger.getAttribute('data-poster')),
             collectionsOnly: !!trigger.getAttribute('data-collections-only'),
+            trigger: trigger,
         };
         inner.innerHTML = '<p class="saveto-loading">Cargando…</p>';
         position(trigger);
@@ -353,12 +355,21 @@
             var on = fixedBtn.classList.contains('is-on');
             var snap = snapshot();
             var list = fixedBtn.getAttribute('data-list');
+            // Reubicación en vivo: si estamos en una página de lista fija y el marcado
+            // saca la card de ella (p.ej. marcar Vista en Pendientes), la card se
+            // desvanece. Capturamos la card en el momento del toggle (el popover se cierra).
+            var reloc = currentListKey();
+            var cardEl = reloc ? cardOf(cur && cur.trigger) : null;
+            var priorFixed = (reloc && cur && cur.fixed)
+                ? { favorites: !!cur.fixed.favorites, pendientes: !!cur.fixed.pendientes, vistas: !!cur.fixed.vistas }
+                : null;
             toggle(fixedBtn, function () { return postFixed(snap, list, on ? 'remove' : 'add'); }, {
                 label: fixedLabel(list), countKey: 'count',
                 // El "#N" (posición) solo tiene sentido en SERIES → Favoritos (las únicas
                 // que se ordenan por ese número). En el resto el número no aporta.
                 showCount: list === 'favorites' && snap.mt === 'tv',
                 undo: function () { return postFixed(snap, list, on ? 'add' : 'remove'); },
+                reloc: reloc, cardEl: cardEl, snap: snap, priorFixed: priorFixed,
             });
             return;
         }
@@ -417,10 +428,29 @@
         });
     }
 
+    // Página de lista fija en la que estamos (para reubicar la card en vivo). null fuera de ellas.
+    function currentListKey() {
+        var p = location.pathname;
+        if (p.indexOf('/mislistas/pendientes') === 0) return { key: 'pendientes', label: 'Pendientes' };
+        if (p.indexOf('/mislistas/vistos') === 0) return { key: 'vistas', label: 'Vistas' };
+        if (p.indexOf('/mislistas/favoritos') === 0) return { key: 'favorites', label: 'Favoritos' };
+        return null;
+    }
+    // La card a desvanecer = el item de la rejilla (host de HoverPreview) o la propia card.
+    function cardOf(trigger) {
+        if (!trigger) return null;
+        return trigger.closest('.hover-preview-host') || trigger.closest('.media-card');
+    }
+    // ¿El título ya NO pertenece a la lista de esta página tras el marcado?
+    function leftCurrentList(snap, key) {
+        return fetch('/api/lists?media_type=' + snap.mt + '&tmdb_id=' + snap.id)
+            .then(function (r) { return r.json(); })
+            .then(function (data) { return !((data && data.fixed) || {})[key]; });
+    }
+
     // Tras un toggle OK: "Añadida a X · #N · Deshacer" (o "Quitada de X · Deshacer").
     function afterToggle(btn, meta, wasOn, res) {
         var added = !wasOn; // antes off → ahora añadida
-        var count = (added && meta.showCount) ? res[meta.countKey] : null;
         // Microfeedback: al AÑADIR, el icono "late" (corazón en Favoritos, pop en el resto).
         if (added && btn) {
             var ico = btn.querySelector('.saveto-emoji');
@@ -429,6 +459,22 @@
                 ico.classList.remove('yf-heart', 'yf-pop'); void ico.offsetWidth; ico.classList.add(cls);
             }
         }
+        // Reubicación en páginas de lista: si el marcado sacó la card de la lista actual,
+        // se desvanece con "Deshacer". Si no, toast normal.
+        if (meta.reloc && meta.cardEl) {
+            leftCurrentList(meta.snap, meta.reloc.key)
+                .then(function (left) {
+                    if (left) relocateOut(meta);
+                    else normalToast(btn, added, meta, res);
+                })
+                .catch(function () { normalToast(btn, added, meta, res); });
+            return;
+        }
+        normalToast(btn, added, meta, res);
+    }
+
+    function normalToast(btn, added, meta, res) {
+        var count = (added && meta.showCount) ? res[meta.countKey] : null;
         pushToast(added ? 'Añadida a' : 'Quitada de', meta.label, count, function () {
             meta.undo()
                 .then(function (r) { return r.json(); })
@@ -439,6 +485,47 @@
                 })
                 .catch(function () { pushToast('No se pudo deshacer', '', null, null); });
         });
+    }
+
+    // La card salió de la lista actual: desvanecer + "Fuera de X · Deshacer". El modelo no
+    // auto-restaura, así que el Deshacer restablece EXACTAMENTE el estado previo de las 3
+    // listas fijas (p.ej. marcar Vista quitó Pendiente y añadió Vista → deshacer vuelve a
+    // Pendiente y quita Vista). No revierte Ver pronto/Me gusta previos (caso marginal).
+    function relocateOut(meta) {
+        var cardEl = meta.cardEl;
+        close();
+        cardEl.style.transition = 'opacity .28s ease, transform .28s ease';
+        cardEl.style.opacity = '0';
+        cardEl.style.transform = 'scale(.94)';
+        var prevDisplay = null;
+        var hideTimer = setTimeout(function () { prevDisplay = cardEl.style.display; cardEl.style.display = 'none'; }, 300);
+
+        pushToast('Fuera de', meta.reloc.label, null, function () {
+            clearTimeout(hideTimer);
+            restorePrior(meta.snap, meta.priorFixed, meta.reloc.key)
+                .then(function () {
+                    cardEl.style.display = prevDisplay || '';
+                    requestAnimationFrame(function () { cardEl.style.opacity = '1'; cardEl.style.transform = ''; });
+                    pushToast('Restaurada', '', null, null);
+                })
+                .catch(function () { pushToast('No se pudo deshacer', '', null, null); });
+        });
+    }
+
+    // Restablece las 3 listas fijas a su estado previo. Si no lo capturamos (priorFixed
+    // nulo), al menos re-añade la lista de la página para devolver la card.
+    function restorePrior(snap, prior, key) {
+        var ops;
+        if (prior) {
+            ops = ['favorites', 'pendientes', 'vistas'].map(function (k) {
+                return postFixed(snap, k, prior[k] ? 'add' : 'remove');
+            });
+        } else {
+            ops = [postFixed(snap, key, 'add')];
+        }
+        return Promise.all(ops)
+            .then(function (rs) { return Promise.all(rs.map(function (r) { return r.json(); })); })
+            .then(function (arr) { if (arr.some(function (x) { return !x || !x.ok; })) throw new Error(); });
     }
 
     // Toast autónomo: este popover es global, pero showToast (optimistic-actions.js)
