@@ -3,7 +3,7 @@ import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 import { adminDb } from "../../../utils/firebaseAdmin";
 import { getTransition } from "../shared/stateTransitions";
 
-const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies'];
+const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
 
 const LIST_TYPE_MAP: Record<string, string> = {
     'favorites': 'MovieFavs',
@@ -11,12 +11,20 @@ const LIST_TYPE_MAP: Record<string, string> = {
     'vistas': 'MoviesVistas',
     'verPronto': 'MoviesVerPronto',
     'liked': 'LikedMovies',
+    'viendo': 'MoviesViendo',
 };
 
 export async function handleMovieFavAction(formData: FormData): Promise<string> {
     const movieId = String(formData.get('id'));
     const action = String(formData.get('action'));
     const listType = String(formData.get('list_type'));
+
+    // "Terminada" (Bloque 2): terminar la sesión de visionado. Distingue primer
+    // visionado (→ Vistas) de re-visionado (→ pase en el diario). Ver finishViewingMovie.
+    if (action === 'finish_viewing') {
+        await finishViewingMovie(movieId);
+        return `/movie/${movieId}`;
+    }
 
     const movieDataBase = {
         id: movieId,
@@ -207,6 +215,44 @@ export const getMoviesPendientes = () => getMovieCollection("MoviesPendientes");
 export const getMoviesVistas = () => getMovieCollection("MoviesVistas");
 export const getLikedMovies = () => getMovieCollection("LikedMovies");
 export const getMoviesVerPronto = () => getMovieCollection("MoviesVerPronto");
+// "Viendo" (Bloque 2): pelis que estás viendo ahora mismo. Alimenta la franja
+// "Estás viendo" del Home. Solo pelis (las series ya tienen progreso por episodios).
+export const getMoviesViendo = () => getMovieCollection("MoviesViendo");
+
+/**
+ * "Terminada": cierra la sesión de visionado de una peli en "Viendo".
+ *  - Primer visionado (aún no en Vistas): la marca como Vista (la transición limpia
+ *    Viendo/Pendientes/Ver pronto y registra el visionado base).
+ *  - Re-visionado (ya en Vistas): sale de Viendo y registra un PASE en el diario
+ *    (sin dedupe → cuenta como "vuelta a ver"), preservando Vistas y la opinión.
+ */
+export async function finishViewingMovie(movieId: string): Promise<void> {
+    const wasVista = (await userDoc('MoviesVistas', movieId).get()).exists;
+
+    if (!wasVista) {
+        const fd = new FormData();
+        fd.set('id', movieId);
+        fd.set('action', 'add');
+        fd.set('list_type', 'vistas');
+        await handleMovieFavAction(fd); // reutiliza transición + diario + invalidaciones
+        return;
+    }
+
+    // Re-visionado terminado: fuera de Viendo + pase en el diario.
+    await userDoc('MoviesViendo', movieId).delete();
+    try {
+        const { appendWatchLog } = await import('../lists/watchLog');
+        await appendWatchLog({ media_type: 'movie', tmdb_id: movieId }); // sin dedupe → pase
+    } catch { /* diario opcional */ }
+    try {
+        const { invalidateLibrarySnapshot } = await import('../shared/librarySnapshot');
+        invalidateLibrarySnapshot();
+    } catch { /* ignore */ }
+    try {
+        const { invalidateYearStatsCache } = await import('../../../utils/yearStats');
+        invalidateYearStatsCache();
+    } catch { /* ignore */ }
+}
 
 /**
  * Películas vistas con su NIVEL. Las listas son escalones excluyentes

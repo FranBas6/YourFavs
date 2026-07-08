@@ -9,20 +9,37 @@
  */
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import type { NextEpisodeItem } from "../../services/API/Series/nextEpisode";
+import type { ViendoMovie } from "../../services/API/Movies/viendoMovies";
 import Stamp from "../Stamp.astro";
 import '../../styles/components/next-episode.css';
 
 interface Props {
     items: NextEpisodeItem[];
+    /** Películas en estado "Viendo" (Bloque 2) — se muestran junto a las series. */
+    movies?: ViendoMovie[];
+    /** Título de la sección (Home: "Estás viendo"; siguiendo: "Continuar viendo"). */
+    title?: string;
     /** Oculta la cabecera de sección (p. ej. dentro de /mislistas/siguiendo). */
     showLink?: boolean;
 }
 
-const { items, showLink = true } = Astro.props;
+const { items, movies = [], title = 'Continuar viendo', showLink = true } = Astro.props;
+const total = items.length + movies.length;
 
 function fmtDate(d: string | null): string {
     if (!d) return '';
     return 'Estrenado ' + new Date(d + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function fmtStarted(ms: number): string {
+    if (!ms) return '';
+    return ' · empezada ' + new Date(ms).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+}
+
+function fmtRuntime(min: number | null): string {
+    if (!min) return '';
+    const h = Math.floor(min / 60), m = min % 60;
+    return ' · ' + (h > 0 ? `${h} h${m ? ' ' + m : ''}` : `${m} min`);
 }
 
 function posterSrc(item: NextEpisodeItem): string | null {
@@ -34,13 +51,13 @@ function pct(item: NextEpisodeItem): number {
     return Math.min(100, Math.round((item.watched_count / item.total_count) * 100));
 }
 ---
-{items.length > 0 && (
+{total > 0 && (
     <section class="next-episode-section mb-8" data-nep>
         <header class="flex items-center justify-between mb-4 px-1">
             <div class="flex items-center gap-2">
                 <Stamp color="green" icon="play" size={32} />
-                <h2 class="text-lg sm:text-xl font-bold text-gray-800 uppercase tracking-wide whitespace-nowrap">Continuar viendo</h2>
-                <span class="text-xs text-gray-400 font-mono whitespace-nowrap hidden sm:inline">{items.length} en curso</span>
+                <h2 class="text-lg sm:text-xl font-bold text-gray-800 uppercase tracking-wide whitespace-nowrap">{title}</h2>
+                <span class="text-xs text-gray-400 font-mono whitespace-nowrap hidden sm:inline">{total} en curso</span>
             </div>
             {showLink && (
                 <a href="/mislistas/siguiendo" class="text-sm text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap">Mi seguimiento →</a>
@@ -48,6 +65,33 @@ function pct(item: NextEpisodeItem): number {
         </header>
 
         <div class="nep-scroll">
+            {movies.map((mv) => (
+                <article class="nep-card" data-movie-id={mv.id}>
+                    <a class="nep-poster" href={`/movie/${mv.id}`} aria-label={`Ver ficha de ${mv.title}`}>
+                        {mv.poster_path ? (
+                            <img src={posterUrl(mv.poster_path, 'w154')} alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+                        ) : (
+                            <span class="nep-poster-empty" aria-hidden="true">
+                                <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
+                            </span>
+                        )}
+                    </a>
+                    <div class="nep-body">
+                        <p class="nep-kicker">▶ VIENDO</p>
+                        <h3 class="nep-title">{mv.title}</h3>
+                        <p class="nep-meta">Película{mv.year && ` · ${mv.year}`}{fmtRuntime(mv.runtime)}{mv.vote_average != null && ` · ★ ${mv.vote_average.toFixed(1)}`}</p>
+                        {mv.started_at ? <p class="nep-started">Empezada el {new Date(mv.started_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</p> : null}
+                        {mv.overview && <p class="nep-overview">{mv.overview}</p>}
+                        <div class="nep-actions">
+                            <button type="button" class="nep-mark nep-movie-done" data-id={mv.id}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                Terminar
+                            </button>
+                            <a class="nep-ghost" href={`/movie/${mv.id}`}>Ver ficha</a>
+                        </div>
+                    </div>
+                </article>
+            ))}
             {items.map((item) => (
                 <article
                     class="nep-card"
@@ -180,8 +224,47 @@ function pct(item: NextEpisodeItem): number {
             });
     }
 
+    function movieDoneHTML(title) {
+        return '<div class="nep-done">'
+            + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            + '<span><strong>' + escapeHtml(title) + '</strong> — marcada como vista.</span>'
+            + '</div>';
+    }
+
+    // "Terminada" en una peli en Viendo: la marca como Vista (la transición la saca de
+    // Viendo) vía /api/lists/fixed, y reemplaza la card. Invitado → gating.
+    function markMovieDone(card, btn, movieId, title) {
+        if (!card || card.dataset.busy) return;
+        card.dataset.busy = '1';
+        if (btn) { btn.disabled = true; btn.innerHTML = 'Marcando…'; }
+        fetch('/api/movies/finish', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tmdb_id: Number(movieId) }),
+        })
+            .then(function (r) {
+                if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
+                return r.json();
+            })
+            .then(function (res) {
+                if (!res.ok) throw new Error();
+                card.innerHTML = movieDoneHTML(title);
+            })
+            .catch(function () {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Terminar'; }
+            })
+            .finally(function () { delete card.dataset.busy; });
+    }
+
     document.querySelectorAll('[data-nep]').forEach(function (root) {
         root.addEventListener('click', function (e) {
+            var movieBtn = e.target.closest('.nep-movie-done');
+            if (movieBtn) {
+                var mcard = movieBtn.closest('.nep-card');
+                if (!mcard) return;
+                var mtitle = (mcard.querySelector('.nep-title') || {}).textContent || '';
+                markMovieDone(mcard, movieBtn, movieBtn.getAttribute('data-id'), mtitle);
+                return;
+            }
             var btn = e.target.closest('.nep-mark');
             if (!btn) return;
             var card = btn.closest('.nep-card');

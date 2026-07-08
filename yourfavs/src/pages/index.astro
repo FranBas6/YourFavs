@@ -9,6 +9,7 @@ import {getLatestMovies, getMostPopularMovies, getTopRatedMovies, getMoviesByCat
 import {getLatestSeries, getMostPopularSeries, getTopRatedSeries, getSeriesByCategory} from "../services/API/Series/tmdbSeries";
 import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
+import {getMoviesViendoDetailed} from "../services/API/Movies/viendoMovies";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
 import RecommendedForYou from "../components/Sections/RecommendedForYou.astro";
 import BriefDiario from "../components/Sections/BriefDiario.astro";
@@ -46,6 +47,7 @@ const [
     categoriesMovies,
     categoriesSeries,
     continueWatching,
+    viendoMovies,
     forYou,
 ] = await Promise.all([
     safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
@@ -60,6 +62,8 @@ const [
     safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
     safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
     safeFetch(getNextEpisodesData(), 'home/continueWatching', [] as any[]),
+    // Pelis en "Viendo" (Bloque 2) → se fusionan con las series en la franja "Estás viendo".
+    safeFetch(getMoviesViendoDetailed(), 'home/viendoMovies', [] as any[]),
     // "Para ti": solo con sesión. Cacheado por uid (L1/L2) y wrapeado en safeFetch:
     // si el cómputo falla/tarda en frío, la home renderiza sin esta sección.
     Astro.locals.user
@@ -240,10 +244,10 @@ const sections = [
             })();
         </script>
 
-        <!-- Continuar viendo: siguiente episodio a ver (primer no visto y emitido) -->
-        {continueWatching.length > 0 && (
+        <!-- Estás viendo: pelis en "Viendo" + siguiente episodio de series en curso -->
+        {(continueWatching.length > 0 || viendoMovies.length > 0) && (
             <div class="content-wrapper">
-                <NextEpisode items={continueWatching} />
+                <NextEpisode items={continueWatching} movies={viendoMovies} title="Estás viendo" />
             </div>
         )}
 

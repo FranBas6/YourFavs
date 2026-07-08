@@ -1,7 +1,7 @@
 var LIST_NAMES = {
     favorites: 'Favoritos', pendientes: 'Pendientes', vistas: 'Vistas',
     verPronto: 'Ver Pronto', liked: 'Me gusta', siguiendo: 'Siguiendo',
-    favs: 'Favoritos', verpronto: 'Ver Pronto'
+    favs: 'Favoritos', verpronto: 'Ver Pronto', viendo: 'Viendo'
 };
 
 var TEXT_TOGGLES = {
@@ -274,6 +274,8 @@ function initOptimisticActions() {
         var actionInput = form.querySelector('input[name="action"]');
         var action = actionInput ? actionInput.value : '';
         if (action === 'save_opinion' || action === 'delete_opinion') return handleOpinionForm(form);
+        // "Terminada" (Bloque 2): cierra la sesión de visionado; recarga para reflejar el estado.
+        if (action === 'finish_viewing') return submitOptimistic(form, { successMsg: 'Marcada como vista', reload: true, reloadDelay: 300 });
 
         handleGenericFavAction(form);
     });

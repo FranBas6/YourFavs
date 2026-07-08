@@ -121,6 +121,7 @@ const isInPendientes = movieExists.MoviesPendientes;
 const isInVistas = movieExists.MoviesVistas;
 const isInVerPronto = movieExists.MoviesVerPronto;
 const isInLiked = movieExists.LikedMovies;
+const isInViendo = movieExists.MoviesViendo;
 const userTags: string[] = mediaTagsDoc?.tags || [];
 
 // Diario (L6): "La has visto N veces" = base 1 si consta vista (Vistas/Me gusta/Favs)
@@ -129,6 +130,12 @@ const userTags: string[] = mediaTagsDoc?.tags || [];
 const moviePasses = Astro.locals.user ? await countMoviePasses(clientData.id) : { passes: 0, last: null };
 // "Visto" = en cualquier nivel (Vistas/Me gusta/Favs) o con re-visionados en el diario.
 const isWatchedMovie = isInVistas || isInFavorites || isInLiked || moviePasses.passes > 0;
+// CTA de visionado (Bloque 2): siempre disponible.
+//  - Viendo ahora  → "Terminar" (cierra la sesión; cuenta un pase si ya estaba vista).
+//  - Ya vista      → "Volver a ver" (re-visionado: entra en Viendo, aparece en "Estás viendo").
+//  - Aún no vista  → "Empezar a ver".
+const showViendoCta = true;
+const viendoCtaLabel = isInViendo ? 'Terminar' : (isWatchedMovie ? 'Volver a ver' : 'Empezar a ver');
 const movieTimes = (isWatchedMovie ? 1 : 0) + moviePasses.passes;
 const watchLastPretty = moviePasses.last ? new Date(moviePasses.last + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : '';
 const userNotes = mediaTagsDoc?.notes || '';
@@ -329,6 +336,19 @@ const jsonLd = item ? {
         <div class="bg-white border-b border-gray-200 shadow-sm">
             <!-- Desktop: fila horizontal -->
             <div class="hidden md:flex max-w-6xl mx-auto px-4 py-2 items-center gap-2">
+                {showViendoCta && (
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInViendo ? 'finish_viewing' : 'add'}/>{!isInViendo && <input type="hidden" name="list_type" value="viendo"/>}
+                    <button type="submit" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap bg-[#E63946] text-white hover:bg-[#C7283A]">
+                        {isInViendo
+                            ? <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            : isWatchedMovie
+                                ? <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"/></svg>
+                                : <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>}
+                        {viendoCtaLabel}
+                    </button>
+                </form>
+                )}
                 <form method="POST">
                     <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="favorites"/>
                     <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600 hover:bg-red-50'}`}>
@@ -380,6 +400,19 @@ const jsonLd = item ? {
             </div>
             <!-- Mobile: grid 2x2 + links -->
             <div class="md:hidden max-w-6xl mx-auto px-4 py-3 space-y-2">
+                {showViendoCta && (
+                <form method="POST">
+                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInViendo ? 'finish_viewing' : 'add'}/>{!isInViendo && <input type="hidden" name="list_type" value="viendo"/>}
+                    <button type="submit" class="w-full min-h-[44px] px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 bg-[#E63946] text-white">
+                        {isInViendo
+                            ? <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+                            : isWatchedMovie
+                                ? <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"/></svg>
+                                : <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>}
+                        {viendoCtaLabel}
+                    </button>
+                </form>
+                )}
                 <div class="grid grid-cols-2 gap-2">
                     <form method="POST">
                         <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="favorites"/>
