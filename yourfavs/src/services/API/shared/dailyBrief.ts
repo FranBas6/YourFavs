@@ -74,14 +74,15 @@ const hrefFor = (mediaType: 'movie' | 'tv', id: string | number) =>
     mediaType === 'movie' ? `/movie/${id}` : `/serie/${id}`;
 
 /**
- * Pendientes (peli+serie) que AHORA están en flatrate de alguna de tus plataformas.
- * Capa de señales compartida (Brief ① + Radar ②). Cacheada por uid + día.
+ * Watchlist (Pendientes + Ver pronto, peli+serie) que AHORA está en flatrate de alguna
+ * de tus plataformas. Capa de señales compartida (Brief ① + Radar ②). Cacheada por
+ * uid + día. "Ver pronto" va primero (mayor intención) al recortar por el tope.
  */
 export async function getPendientesOnMyPlatforms(platforms: number[]): Promise<PendienteOnPlatform[]> {
     const uid = getCurrentUid();
     if (!uid || platforms.length === 0) return [];
 
-    const key = `pendientesOnPlatforms_v1_${uid}_${todayKey()}`;
+    const key = `pendientesOnPlatforms_v2_${uid}_${todayKey()}`;
     const now = Date.now();
     const l1 = platformsL1.get(uid);
     if (l1 && l1.expires > now) return l1.data;
@@ -89,10 +90,16 @@ export async function getPendientesOnMyPlatforms(platforms: number[]): Promise<P
     if (l2) { platformsL1.set(uid, { data: l2, expires: now + DAY_TTL_MS }); return l2; }
 
     const snap = await getLibrarySnapshot();
+    // Ver pronto primero (mayor intención), luego Pendientes; dedup por tipo:id (un
+    // título puede estar en ambas listas) y recorte al tope de coste TMDB.
+    const seenJob = new Set<string>();
     const jobs = [
+        ...snap.movVerPronto.map((m: any) => ({ id: String(m.id), type: 'movie' as const })),
+        ...snap.tvVerPronto.map((s: any) => ({ id: String(s.id), type: 'tv' as const })),
         ...snap.movPend.map((m: any) => ({ id: String(m.id), type: 'movie' as const })),
         ...snap.tvPend.map((s: any) => ({ id: String(s.id), type: 'tv' as const })),
-    ].slice(0, MAX_PENDIENTES_CHECKED);
+    ].filter((j) => { const k = `${j.type}:${j.id}`; if (seenJob.has(k)) return false; seenJob.add(k); return true; })
+     .slice(0, MAX_PENDIENTES_CHECKED);
 
     const want = new Set(platforms);
     const region = getCurrentRegion();

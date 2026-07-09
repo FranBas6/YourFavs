@@ -44,6 +44,7 @@ if (Astro.request.method === 'POST') {
             episodes: fd.get('notif_episodes') != null,
             releases: fd.get('notif_releases') != null,
             anniversary: fd.get('notif_anniversary') != null,
+            platform: fd.get('notif_platform') != null,
         };
         await setUserProfile(patch);
         try {
@@ -188,8 +189,12 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                                 <input type="checkbox" name="notif_anniversary" checked={profile.notifPrefs?.anniversary !== false} />
                                 <span>Efemérides «hace un año»</span>
                             </label>
+                            <label class="plat-chip">
+                                <input type="checkbox" name="notif_platform" checked={profile.notifPrefs?.platform !== false} />
+                                <span>Cambios de plataforma</span>
+                            </label>
                         </div>
-                        <small>Qué te avisa la campana. El «cambio de plataforma» llegará más adelante (necesita proceso programado).</small>
+                        <small>Qué te avisa la campana. «Cambios de plataforma» te avisa cuando un pendiente entra o sale de tus plataformas.</small>
                     </div>
                 </div>
             </section>

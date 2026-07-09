@@ -9,7 +9,7 @@
 import { userCol, userDoc, requireUid, getCurrentUid } from '../shared/userScope';
 import { adminDb } from '../../../utils/firebaseAdmin';
 
-export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary';
+export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change';
 
 export interface NotificationDoc {
     id: string;
@@ -34,11 +34,11 @@ export interface NotifInput {
 
 const COL = 'notifications';
 
-// Tipos que la campana muestra hoy. 'on_platform' se retiró (sin detección de cambios
-// volcaba toda la watchlist); los docs viejos se ignoran aquí para que desaparezcan
-// solos, sin migración. Se autolimpian al marcarse leídos o pueden borrarse con el
-// script scripts/clean-notif-onplatform.mjs.
-const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary']);
+// Tipos que la campana muestra hoy. El viejo 'on_platform' se retiró (sin detección de
+// cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
+// desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
+// pendiente ENTRA o SALE de tus plataformas (diff contra snapshot, ver el generador).
+const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change']);
 
 function toMs(v: any): number {
     if (!v) return 0;
