@@ -18,9 +18,11 @@ export interface ProviderSnapEntry {
     title: string;                  // título (permite pintar "salió" sin fetch extra)
     poster: string | null;          // póster
     media_type: 'movie' | 'tv';
+    origin?: 'watchlist' | 'fav' | 'like';  // de qué lista viene (copy de "salió"); ausente = watchlist (snapshots antiguos)
 }
 
 export interface ProviderState {
+    version?: number;                               // conjunto de listas vigiladas; si cambia → re-siembra en silencio
     day: string;                                    // "YYYY-MM-DD" (Madrid) en que se capturó
     map: Record<string, ProviderSnapEntry>;         // key "movie:123" → entrada
 }
@@ -34,7 +36,7 @@ export async function readProviderState(): Promise<ProviderState | null> {
         const snap = await userDoc(COL, DOC).get();
         if (!snap.exists) return null;
         const d = snap.data() as any;
-        return { day: d?.day || '', map: d?.map || {} };
+        return { version: d?.version, day: d?.day || '', map: d?.map || {} };
     } catch {
         return null;
     }

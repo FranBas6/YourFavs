@@ -13,7 +13,7 @@
  * cambios. Ver platformChangeItems() más abajo.
  */
 import { getRadar } from '../shared/radar';
-import { anniversarySignal, getPendientesOnMyPlatforms } from '../shared/dailyBrief';
+import { anniversarySignal, getLibraryOnMyPlatforms, type LibraryOrigin } from '../shared/dailyBrief';
 import { upsertMany, type NotifInput, type NotifType } from '../../BD/notifications/notifications';
 import { getCurrentUid } from '../../BD/shared/userScope';
 import { getUserProfile } from '../../BD/profile/userProfile';
@@ -115,31 +115,59 @@ export async function syncNotifications(platforms: number[] = [], force = false)
 }
 
 /**
- * "Cambió de plataforma" (entró/salió), sin cron. Compara los pendientes que HOY están
- * en flatrate de tus plataformas contra el último snapshot guardado y emite solo los
- * cambios; luego reescribe el snapshot.
+ * Versión del CONJUNTO de listas vigiladas por "cambió de plataforma". Súbela cada vez
+ * que amplíes/cambies qué listas entran en el diff. Al detectar que el snapshot guardado
+ * tiene otra versión, se re-siembra en SILENCIO (evita floodear con "entró" toda la lista
+ * nueva, que es lo que pasa si comparas contra una memoria que no la conocía).
+ *   v1: Pendientes + Ver pronto.
+ *   v2: + Favoritos + Me gusta.
+ */
+const PROVIDER_STATE_VERSION = 2;
+
+// Copy según de qué lista viene el título (fav/like/watchlist).
+function enteredSubtitle(provider: string, origin: LibraryOrigin | undefined): string {
+    if (origin === 'fav') return `Ya en ${provider} · tu favorito`;
+    if (origin === 'like') return `Ya en ${provider} · te gustó`;
+    return `Ya en ${provider} · de tu lista`;
+}
+function leftSubtitle(provider: string, origin: LibraryOrigin | undefined): string {
+    if (origin === 'fav') return `Salió de ${provider} · tu favorito`;
+    if (origin === 'like') return `Salió de ${provider} · te gustó`;
+    return `Salió de ${provider} · aún en tu lista`;
+}
+
+/**
+ * "Cambió de plataforma" (entró/salió), sin cron. Compara tu biblioteca disponible en
+ * plataformas HOY — Pendientes + Ver pronto + Favoritos + Me gusta — contra el último
+ * snapshot guardado y emite solo los cambios; luego reescribe el snapshot.
  *
- * · 1ª sincronización (sin snapshot) → SIEMBRA en silencio (nada de volcar la watchlist).
+ * · 1ª sincronización (sin snapshot) → SIEMBRA en silencio (nada de volcar la biblioteca).
  * · Ya procesado hoy (snapshot.day === day) → no re-diffea (idempotente entre instancias).
- * · "Salió" solo se emite si el título SIGUE en Pendientes (evita el falso positivo de
- *   que lo hayas quitado tú de Pendientes o ya lo hayas visto).
+ * · "Salió" solo se emite si el título SIGUE en tu biblioteca (Pendientes/Ver pronto/Favs/
+ *   Me gusta). Si ya no está en ninguna, lo quitaste tú → no es "salió".
+ * · El copy distingue "tu favorito" / "te gustó" / "de tu lista" según el origin.
  * · Sin plataformas seleccionadas → función desactivada (no toca el snapshot).
  */
 async function platformChangeItems(platforms: number[], day: string): Promise<NotifInput[]> {
     if (!platforms.length) return [];
 
-    const onPlatform = await getPendientesOnMyPlatforms(platforms);
+    const onPlatform = await getLibraryOnMyPlatforms(platforms);
     const hoy: Record<string, ProviderSnapEntry> = {};
     for (const p of onPlatform) {
         hoy[`${p.media_type}:${p.id}`] = {
-            name: p.provider_name, title: p.title, poster: p.poster_path, media_type: p.media_type,
+            name: p.provider_name, title: p.title, poster: p.poster_path,
+            media_type: p.media_type, origin: p.origin,
         };
     }
 
     const prev = await readProviderState();
 
-    // Primera vez → sembrar sin notificar. Ya diffeado hoy → nada que hacer.
-    if (!prev) { await writeProviderState({ day, map: hoy }); return []; }
+    // Primera vez, O cambió el conjunto de listas vigiladas (version) → sembrar sin
+    // notificar. Ya diffeado hoy → nada que hacer.
+    if (!prev || prev.version !== PROVIDER_STATE_VERSION) {
+        await writeProviderState({ version: PROVIDER_STATE_VERSION, day, map: hoy });
+        return [];
+    }
     if (prev.day === day) return [];
 
     const items: NotifInput[] = [];
@@ -154,41 +182,41 @@ async function platformChangeItems(platforms: number[], day: string): Promise<No
             id: safeId(`platform:in:${key}:${day}`),
             type: 'platform_change',
             title: e.title,
-            subtitle: `Ya en ${e.name} · de tu lista`,
+            subtitle: enteredSubtitle(e.name, e.origin),
             href: hrefFor(e, id),
             poster_path: e.poster,
         });
     }
 
-    // SALIÓ: estaba en el snapshot previo, ya no está en hoy, PERO sigue en tu watchlist
-    // (Pendientes o Ver pronto). Si ya no está en ninguna, lo quitaste tú → no es "salió".
+    // SALIÓ: estaba en el snapshot previo, ya no está en hoy, PERO sigue en tu biblioteca
+    // (Pendientes/Ver pronto/Favoritos/Me gusta). Si ya no está, lo quitaste tú → no es "salió".
     const leftKeys = Object.keys(prev.map).filter((k) => !(k in hoy));
     if (leftKeys.length) {
-        let stillPend: Set<string>;
+        let stillMine: Set<string>;
         try {
             const snap = await getLibrarySnapshot();
-            stillPend = new Set<string>();
-            for (const m of [...((snap as any).movPend || []), ...((snap as any).movVerPronto || [])]) stillPend.add(`movie:${m.id}`);
-            for (const s of [...((snap as any).tvPend || []), ...((snap as any).tvVerPronto || [])]) stillPend.add(`tv:${s.id}`);
+            stillMine = new Set<string>();
+            for (const m of [...((snap as any).movPend || []), ...((snap as any).movVerPronto || []), ...((snap as any).movFavs || []), ...((snap as any).movLike || [])]) stillMine.add(`movie:${m.id}`);
+            for (const s of [...((snap as any).tvPend || []), ...((snap as any).tvVerPronto || []), ...((snap as any).tvFavs || []), ...((snap as any).tvLike || [])]) stillMine.add(`tv:${s.id}`);
         } catch {
-            stillPend = new Set(leftKeys); // si falla la lectura, no filtramos (conservador)
+            stillMine = new Set(leftKeys); // si falla la lectura, no filtramos (conservador)
         }
         for (const key of leftKeys) {
-            if (!stillPend.has(key)) continue; // ya no está en tu watchlist → no es "salió"
+            if (!stillMine.has(key)) continue; // ya no está en tu biblioteca → no es "salió"
             const e = prev.map[key];
             const id = key.split(':')[1];
             items.push({
                 id: safeId(`platform:out:${key}:${day}`),
                 type: 'platform_change',
                 title: e.title,
-                subtitle: `Salió de ${e.name} · aún en tu lista`,
+                subtitle: leftSubtitle(e.name, e.origin),
                 href: hrefFor(e, id),
                 poster_path: e.poster,
             });
         }
     }
 
-    await writeProviderState({ day, map: hoy });
+    await writeProviderState({ version: PROVIDER_STATE_VERSION, day, map: hoy });
     return items;
 }
 

@@ -42,6 +42,7 @@ const briefL1 = new Map<string, { data: DailyBrief; expires: number }>();
 const platformsL1 = new Map<string, { data: PendienteOnPlatform[]; expires: number }>();
 
 const MAX_PENDIENTES_CHECKED = 30;
+const MAX_FAVLIKE_CHECKED = 40;
 
 export interface PendienteOnPlatform {
     id: string;
@@ -50,6 +51,13 @@ export interface PendienteOnPlatform {
     poster_path: string | null;
     provider_id: number;
     provider_name: string;
+}
+
+/** De qué lista viene un título disponible en plataforma (para el copy de la campana). */
+export type LibraryOrigin = 'watchlist' | 'fav' | 'like';
+
+export interface LibraryOnPlatform extends PendienteOnPlatform {
+    origin: LibraryOrigin;
 }
 
 /** Clave de día (Madrid) para cachear "por uid + día". */
@@ -72,6 +80,43 @@ function oneYearAgoKey(): string {
 
 const hrefFor = (mediaType: 'movie' | 'tv', id: string | number) =>
     mediaType === 'movie' ? `/movie/${id}` : `/serie/${id}`;
+
+/**
+ * Cruce títulos×proveedores: para cada job {id,type}, ¿está en flatrate de alguna de
+ * TUS plataformas? Es lo único caro (1 fetch TMDB por título, en lotes de 8). Lo
+ * comparten `getPendientesOnMyPlatforms` (watchlist) y `getLibraryOnMyPlatforms`
+ * (favs/likes) para no duplicar la lógica ni las llamadas.
+ */
+async function resolveOnPlatforms(
+    jobs: { id: string; type: 'movie' | 'tv' }[],
+    platforms: number[],
+): Promise<PendienteOnPlatform[]> {
+    if (!jobs.length) return [];
+    const want = new Set(platforms);
+    const region = getCurrentRegion();
+
+    const results = await processBatch(jobs, async (j): Promise<PendienteOnPlatform | null> => {
+        try {
+            const detail = await tmdbFetch<any>(`/${j.type}/${j.id}`, { append_to_response: 'watch/providers' });
+            const rawES = detail['watch/providers']?.results?.[region] || detail['watch/providers']?.results?.ES || {};
+            const match = mapAndDeduplicateProviders(rawES)
+                .filter((p) => p.type === 'flatrate' && want.has(p.provider_id))[0];
+            if (!match) return null;
+            return {
+                id: String(j.id),
+                media_type: j.type,
+                title: j.type === 'movie' ? detail.title : detail.name,
+                poster_path: detail.poster_path ?? null,
+                provider_id: match.provider_id,
+                provider_name: match.provider_name,
+            };
+        } catch {
+            return null;
+        }
+    }, 8);
+
+    return results.filter((x): x is PendienteOnPlatform => x !== null && !!x.title);
+}
 
 /**
  * Watchlist (Pendientes + Ver pronto, peli+serie) que AHORA está en flatrate de alguna
@@ -101,33 +146,69 @@ export async function getPendientesOnMyPlatforms(platforms: number[]): Promise<P
     ].filter((j) => { const k = `${j.type}:${j.id}`; if (seenJob.has(k)) return false; seenJob.add(k); return true; })
      .slice(0, MAX_PENDIENTES_CHECKED);
 
-    const want = new Set(platforms);
-    const region = getCurrentRegion();
-
-    const results = await processBatch(jobs, async (j): Promise<PendienteOnPlatform | null> => {
-        try {
-            const detail = await tmdbFetch<any>(`/${j.type}/${j.id}`, { append_to_response: 'watch/providers' });
-            const rawES = detail['watch/providers']?.results?.[region] || detail['watch/providers']?.results?.ES || {};
-            const match = mapAndDeduplicateProviders(rawES)
-                .filter((p) => p.type === 'flatrate' && want.has(p.provider_id))[0];
-            if (!match) return null;
-            return {
-                id: String(j.id),
-                media_type: j.type,
-                title: j.type === 'movie' ? detail.title : detail.name,
-                poster_path: detail.poster_path ?? null,
-                provider_id: match.provider_id,
-                provider_name: match.provider_name,
-            };
-        } catch {
-            return null;
-        }
-    }, 8);
-
-    const list = results.filter((x): x is PendienteOnPlatform => x !== null && !!x.title);
+    const list = await resolveOnPlatforms(jobs, platforms);
     platformsL1.set(uid, { data: list, expires: now + DAY_TTL_MS });
     await setCached(key, list, DAY_TTL_MS);
     return list;
+}
+
+const favLikeL1 = new Map<string, { data: LibraryOnPlatform[]; expires: number }>();
+
+/**
+ * Biblioteca ampliada disponible en tus plataformas — SOLO para la campana:
+ * watchlist (Pendientes + Ver pronto) ∪ Favoritos ∪ Me gusta. Cada título llega
+ * etiquetado con su `origin` para que el copy distinga "tu favorito" de "de tu lista".
+ *
+ * Reutiliza el resultado ya cacheado de `getPendientesOnMyPlatforms` (no re-fetchea la
+ * watchlist) y solo añade el cruce de favs/likes que NO estén ya cubiertos. El Brief y
+ * el Radar NO usan esto: ellos siguen viendo solo pendientes (semántica intacta).
+ */
+export async function getLibraryOnMyPlatforms(platforms: number[]): Promise<LibraryOnPlatform[]> {
+    const uid = getCurrentUid();
+    if (!uid || platforms.length === 0) return [];
+
+    // ① Watchlist: reutiliza la función cacheada; etiqueta origin.
+    const watchlist: LibraryOnPlatform[] = (await getPendientesOnMyPlatforms(platforms))
+        .map((p) => ({ ...p, origin: 'watchlist' as const }));
+    const covered = new Set(watchlist.map((p) => `${p.media_type}:${p.id}`));
+
+    // ② Favs + Me gusta: cruce propio, cacheado por uid+día (excluye lo ya en watchlist).
+    const now = Date.now();
+    const key = `favLikeOnPlatforms_v1_${uid}_${todayKey()}`;
+    const l1 = favLikeL1.get(uid);
+    let favLike: LibraryOnPlatform[] | undefined = l1 && l1.expires > now ? l1.data : undefined;
+    if (!favLike) {
+        const l2 = await getCached<LibraryOnPlatform[]>(key);
+        if (l2) { favLikeL1.set(uid, { data: l2, expires: now + DAY_TTL_MS }); favLike = l2; }
+    }
+    if (!favLike) {
+        const snap = await getLibrarySnapshot();
+        // Favoritos primero (mayor valor emocional), luego Me gusta; dedup por tipo:id.
+        const originByKey = new Map<string, LibraryOrigin>();
+        const seen = new Set<string>();
+        const jobs = [
+            ...snap.movFavs.map((m: any) => ({ id: String(m.id), type: 'movie' as const, origin: 'fav' as const })),
+            ...snap.tvFavs.map((s: any) => ({ id: String(s.id), type: 'tv' as const, origin: 'fav' as const })),
+            ...snap.movLike.map((m: any) => ({ id: String(m.id), type: 'movie' as const, origin: 'like' as const })),
+            ...snap.tvLike.map((s: any) => ({ id: String(s.id), type: 'tv' as const, origin: 'like' as const })),
+        ].filter((j) => {
+            const k = `${j.type}:${j.id}`;
+            if (covered.has(k) || seen.has(k)) return false;   // ya en watchlist o repetido
+            seen.add(k); originByKey.set(k, j.origin); return true;
+        });
+
+        const capped = jobs.slice(0, MAX_FAVLIKE_CHECKED);
+        if (jobs.length > capped.length) {
+            console.warn(`[notifications] favs/likes en plataforma: ${jobs.length} candidatos, se comprueban ${capped.length} (tope ${MAX_FAVLIKE_CHECKED}); ${jobs.length - capped.length} sin comprobar hoy.`);
+        }
+
+        const resolved = await resolveOnPlatforms(capped, platforms);
+        favLike = resolved.map((p) => ({ ...p, origin: originByKey.get(`${p.media_type}:${p.id}`) ?? 'fav' }));
+        favLikeL1.set(uid, { data: favLike, expires: now + DAY_TTL_MS });
+        await setCached(key, favLike, DAY_TTL_MS);
+    }
+
+    return [...watchlist, ...favLike];
 }
 
 /** Efeméride "hace un año": resuelve título/póster de una entrada del diario de esa fecha. */
