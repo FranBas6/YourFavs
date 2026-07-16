@@ -8,6 +8,7 @@ interface SessionUser {
     region?: string;   // preferencia del perfil (para el menú de cuenta)
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     platforms?: number[];  // provider_ids de "mis plataformas" (Auditoría v2 · 3.2)
+    spoilerFree?: boolean;  // §2 modo sin spoilers (OFF por defecto; solo true lo activa)
 }
 
 declare namespace App {

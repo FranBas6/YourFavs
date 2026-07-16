@@ -18,6 +18,7 @@ export interface UserProfile {
     platforms?: number[];       // provider_ids TMDB de "mis plataformas" (Auditoría v2 · 3.2)
     /** Toggles de la campana por tipo (Bloque 4). Ausente = todo activado. */
     notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean; streak?: boolean };
+    spoilerFree?: boolean;   // §2 modo sin spoilers (OFF por defecto; solo true lo activa)
     updated_at?: unknown;
 }
 

@@ -176,6 +176,10 @@ if (watchedProgress?.watched_episodes) {
 }
 const totalWatchedEpisodes = watchedSet.size;
 
+// Modo sin spoilers (§2): solo con sesión; OFF por defecto (el usuario decide y lo activa en el
+// perfil). Difumina fotograma + sinopsis de episodios NO vistos (revelable con «Mostrar»). Invitados: sin blur.
+const spoilerFree = !!Astro.locals.user && Astro.locals.user.spoilerFree === true;
+
 // Todos los episodios regulares para "marcar todo"
 const allRegularEpisodesFlat: { season: number; episode: number }[] = [];
 if (item?.seasons) {
@@ -1019,7 +1023,13 @@ const jsonLd = item ? {
                                                                 </button>
                                                             </form>
                                                         </summary>
-                                                        <div class={`mt-2 mx-3 p-4 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'}`}>
+                                                        <div class={`mt-2 mx-3 p-4 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'} ${spoilerFree && !isWatched ? 'yf-spoil' : ''}`}>
+                                                            {spoilerFree && !isWatched && (
+                                                                <button type="button" class="yf-spoil-btn" aria-label="Mostrar contenido con posibles spoilers">
+                                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                                    Mostrar (spoilers)
+                                                                </button>
+                                                            )}
                                                             {/* Imagen */}
                                                             {episode.still_path && (
                                                                 <div class="flex justify-center mb-3">
@@ -1092,6 +1102,31 @@ const jsonLd = item ? {
 
     </article>
 </Layout>
+
+<style is:global>
+    /* Modo sin spoilers (§2): difumina el cuerpo del episodio no visto; «Mostrar» revela. */
+    .yf-spoil { position: relative; }
+    .yf-spoil > *:not(.yf-spoil-btn) { filter: blur(15px); pointer-events: none; user-select: none; transition: filter .35s ease; }
+    .yf-spoil.revealed > *:not(.yf-spoil-btn) { filter: none; pointer-events: auto; user-select: auto; }
+    .yf-spoil-btn {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2;
+        display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+        background: rgba(17, 24, 39, .82); color: #fff; border: none; border-radius: 9px;
+        padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .yf-spoil-btn:hover { background: rgba(17, 24, 39, .94); }
+    .yf-spoil.revealed .yf-spoil-btn { display: none; }
+    @media (prefers-reduced-motion: reduce) { .yf-spoil > *:not(.yf-spoil-btn) { transition: none; } }
+</style>
+<script is:inline>
+    // Revelar el episodio difuminado (§2 modo sin spoilers) al tocar «Mostrar».
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('.yf-spoil-btn');
+        if (!b) return;
+        var host = b.closest('.yf-spoil');
+        if (host) host.classList.add('revealed');
+    });
+</script>
 
 <script is:inline>
 // Cuando se añade a favoritos (action=add, actionType=favs), si el input

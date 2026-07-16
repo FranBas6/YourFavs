@@ -19,10 +19,24 @@ export const originalUrl = (path: string | null) =>
 
 export type MediaType = 'movie' | 'tv';
 
+// 5xx de TMDB o su CDN (CloudFront) y 429 (rate limit) suelen ser TRANSITORIOS.
+// Los 4xx (401/404…) NO se reintentan.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_RETRIES = 1;    // 2 intentos en total (un reintento barato para blips)
+const TIMEOUT_MS = 6000;  // corta un upstream colgado: sin esto, un fetch bloqueado espera ~30s
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
  * Fetch genérico a la API de TMDB con manejo de errores centralizado.
  * Añade api_key y el idioma del usuario (perfil → contexto ALS; default es-ES).
  * Un `language` explícito en `params` sigue teniendo prioridad.
+ *
+ * Cada intento tiene TIMEOUT (AbortController): si TMDB se cuelga, cortamos rápido en vez
+ * de esperar el timeout del socket (~30s) — clave para que la Home no tarde una eternidad
+ * cuando el CDN de TMDB va lento. Un único reintento cubre los 504 esporádicos sin
+ * multiplicar la latencia en una caída generalizada. Tras agotar, lanza como antes
+ * (los callers como `tmdbFetchList`/`safeFetch` ya lo capturan → sección vacía, sin crash).
  */
 export async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
     const allParams = new URLSearchParams({
@@ -32,15 +46,37 @@ export async function tmdbFetch<T>(path: string, params: Record<string, string> 
     });
 
     const url = `${BASE_URL}${path}?${allParams.toString()}`;
-    const res = await fetch(url);
 
-    if (!res.ok) {
+    for (let attempt = 0; ; attempt++) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+        let res: Response;
+        try {
+            res = await fetch(url, { signal: ctrl.signal });
+        } catch (err) {
+            clearTimeout(timer);
+            const aborted = (err as Error)?.name === 'AbortError';
+            // Timeout propio (aborted) → NO reintentar: ya esperamos 6s; reintentar solo dobla la
+            // espera y la carga si TMDB va lento. Fallo de red puntual (no-abort) → un reintento.
+            if (!aborted && attempt < MAX_RETRIES) { await sleep(250); continue; }
+            console.error(`❌ TMDB ${aborted ? 'timeout' : 'red'} [${path}] tras ${attempt + 1} intento(s)`);
+            throw err;
+        }
+        clearTimeout(timer);
+
+        if (res.ok) return res.json() as Promise<T>;
+
+        if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
+            await res.body?.cancel().catch(() => {}); // libera la conexión antes de reintentar
+            await sleep(250);
+            continue;
+        }
+
         const errorBody = await res.text();
-        console.error(`❌ TMDB error [${res.status}] ${path}:`, errorBody);
+        // Trunca: un 504 de CloudFront vuelca una página HTML entera que ensucia la consola.
+        console.error(`❌ TMDB error [${res.status}] ${path}:`, errorBody.slice(0, 200));
         throw new Error(`Error en la solicitud: ${res.statusText}`);
     }
-
-    return res.json();
 }
 
 /**

@@ -47,6 +47,8 @@ if (Astro.request.method === 'POST') {
             platform: fd.get('notif_platform') != null,
             streak: fd.get('notif_streak') != null,
         };
+        // Modo sin spoilers (§2): OFF por defecto; se activa solo si marcas el checkbox.
+        patch.spoilerFree = fd.get('spoiler_free') != null;
         await setUserProfile(patch);
         try {
             const { invalidateNotifSync } = await import('../services/API/notifications/generator');
@@ -200,6 +202,17 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                             </label>
                         </div>
                         <small>Qué te avisa la campana. «Cambios de plataforma» te avisa cuando un pendiente entra o sale de tus plataformas. «Racha en peligro» te recuerda ver algo si tu racha se va a romper hoy (desactivado por defecto).</small>
+                    </div>
+
+                    <div class="perfil-field perfil-field-wide">
+                        <span>Modo sin spoilers</span>
+                        <div class="plat-chips">
+                            <label class="plat-chip">
+                                <input type="checkbox" name="spoiler_free" checked={profile.spoilerFree === true} />
+                                <span>Ocultar fotograma y sinopsis de episodios que no he visto</span>
+                            </label>
+                        </div>
+                        <small>En las fichas de serie difumina el fotograma y la sinopsis de los episodios no vistos; toca «Mostrar» para revelar uno. Desactivado por defecto.</small>
                     </div>
                 </div>
             </section>
