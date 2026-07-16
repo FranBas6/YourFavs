@@ -13,6 +13,8 @@ export interface ActivityEvent {
     /** Solo eventos de persona: llevan su nombre/foto (no se resuelven por TMDB). */
     name?: string;
     profile_path?: string | null;
+    /** Nota opcional del visionado ("¿con quién? ¿qué te pareció?"), solo en Rewatch. */
+    note?: string;
 }
 
 // `key` apunta al array del snapshot compartido (ya no se lee colección a colección).
@@ -98,7 +100,7 @@ async function fetchRewatchEvents(): Promise<ActivityEvent[]> {
         const snap = await userCol('WatchLog').get();
         const events: ActivityEvent[] = [];
         for (const docSnap of snap.docs) {
-            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; rewatch?: boolean; logged_at?: unknown; watched_on?: string };
+            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; rewatch?: boolean; logged_at?: unknown; watched_on?: string; note?: string };
             const isMovieRewatch = x.media_type === 'movie' && x.rewatch === true;
             const isSeriesPass = x.media_type === 'tv' && x.season == null;
             if (!isMovieRewatch && !isSeriesPass) continue;
@@ -111,6 +113,7 @@ async function fetchRewatchEvents(): Promise<ActivityEvent[]> {
                 collection: 'Rewatch',
                 action: 'Vuelto a ver',
                 timestamp: ts,
+                ...(x.note ? { note: String(x.note) } : {}),
             });
         }
         return events;

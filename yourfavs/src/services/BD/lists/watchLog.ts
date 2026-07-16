@@ -168,11 +168,15 @@ export async function countSeriesPasses(
  */
 export async function countMoviePasses(
     tmdb_id: number | string
-): Promise<{ passes: number; last: string | null }> {
-    if (!getCurrentUid()) return { passes: 0, last: null };
+): Promise<{ passes: number; last: string | null; first: string | null }> {
+    if (!getCurrentUid()) return { passes: 0, last: null, first: null };
     const snap = await userCol(COLLECTION).where('tmdb_id', '==', Number(tmdb_id)).get();
-    const rows = snap.docs.map((d) => d.data()).filter((x) => x.media_type === 'movie' && x.rewatch === true);
-    if (!rows.length) return { passes: 0, last: null };
+    const all = snap.docs.map((d) => d.data()).filter((x) => x.media_type === 'movie');
+    // `first` = primer visionado registrado (incluye la entrada base, no solo re-visionados),
+    // para la efeméride "La viste por primera vez en…" (§6). Sin lecturas extra.
+    const first = all.length ? (all.map((x) => x.watched_on as string).filter(Boolean).sort()[0] || null) : null;
+    const rows = all.filter((x) => x.rewatch === true);
+    if (!rows.length) return { passes: 0, last: null, first };
     const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
-    return { passes: rows.length, last };
+    return { passes: rows.length, last, first };
 }

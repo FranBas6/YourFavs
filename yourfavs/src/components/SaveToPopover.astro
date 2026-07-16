@@ -65,6 +65,21 @@
         padding: 0 12px; font-size: 13px; font-weight: 700; cursor: pointer;
     }
 
+    /* Nota opcional al "Vuelto a ver" (§6 detalles con alma) — reusa el shell del popover. */
+    .saveto-note { padding: 6px 16px 12px; }
+    .saveto-note textarea {
+        width: 100%; box-sizing: border-box; resize: vertical; min-height: 54px;
+        border: 1.5px solid var(--border, #e2dccd); border-radius: 8px; padding: 8px 10px;
+        font-size: 13px; font-family: inherit; line-height: 1.4;
+        background: var(--bg, #fff); color: var(--text, #16130f);
+    }
+    .saveto-note textarea:focus { outline: none; border-color: #E63946; }
+    .saveto-note button {
+        margin-top: 8px; width: 100%; border: none; background: #E63946; color: #fff;
+        border-radius: 8px; padding: 9px 12px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    }
+    .saveto-note button:disabled { opacity: .6; cursor: default; }
+
     /* ── 2.2 · Hoja inferior (long-press): el mismo popover, presentado como sheet en móvil ── */
     .saveto-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1290; }
     .saveto-backdrop[hidden] { display: none; }
@@ -114,21 +129,16 @@
         if (host) host.dispatchEvent(new Event('mouseleave'));
     });
 
-    // "Vista otra vez" (ficha de pelis, Fase L6): añade un re-visionado al diario
-    // (append sin dedupe → rewatch=true). Recarga para refrescar el "N veces".
+    // "Vuelto a ver" (ficha de pelis/series): abre un mini-popover con una nota
+    // OPCIONAL ("¿con quién? ¿qué te pareció?") y registra el re-visionado en el
+    // diario (WatchLog, append sin dedupe → rewatch=true). Recarga para refrescar
+    // el "N veces". Guardar sin texto = un visionado sin nota, como antes.
     document.addEventListener('click', function (e) {
         var rb = e.target.closest && e.target.closest('.js-rewatch');
         if (!rb || rb.dataset.busy) return;
         e.preventDefault();
         if (!loggedIn()) { document.dispatchEvent(new CustomEvent('yf:require-auth')); return; }
-        rb.dataset.busy = '1';
-        fetch('/api/watchlog', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ op: 'append', media_type: rb.getAttribute('data-mt'), tmdb_id: Number(rb.getAttribute('data-id')) }),
-        })
-            .then(function (r) { if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); } return r.json(); })
-            .then(function (res) { if (!res.ok) throw new Error(); location.reload(); })
-            .catch(function () { delete rb.dataset.busy; });
+        openNotePopover(rb);
     });
 
     var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
@@ -259,6 +269,47 @@
             })
             .then(function (data) { if (cur) render(data); })
             .catch(function () {});
+    }
+
+    // Mini-popover de NOTA para "Vuelto a ver" (reusa el shell: posición, cierre por
+    // click-fuera/Escape). Nota opcional → POST /api/watchlog con `note`.
+    function openNotePopover(trigger) {
+        cur = {
+            mt: trigger.getAttribute('data-mt'),
+            id: Number(trigger.getAttribute('data-id')),
+            note: true,
+        };
+        pop.classList.remove('saveto-sheet');
+        pop.style.left = ''; pop.style.top = '';
+        inner.innerHTML =
+            '<div class="saveto-kicker">Vuelto a ver</div>' +
+            '<div class="saveto-note">' +
+                '<textarea maxlength="500" rows="2" placeholder="Nota (opcional): ¿con quién? ¿qué te pareció?"></textarea>' +
+                '<button type="button">Guardar visionado</button>' +
+            '</div>';
+        pop.hidden = false;
+        position(trigger);
+        var ta = inner.querySelector('.saveto-note textarea');
+        var sv = inner.querySelector('.saveto-note button');
+        if (ta) { try { ta.focus(); } catch (_) {} }
+        function submit() {
+            if (!cur || sv.disabled) return;
+            sv.disabled = true;
+            fetch('/api/watchlog', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    op: 'append', media_type: cur.mt, tmdb_id: cur.id,
+                    note: (ta && ta.value.trim()) || undefined,
+                }),
+            })
+                .then(function (r) { if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); } return r.json(); })
+                .then(function (res) { if (!res.ok) throw new Error(); location.reload(); })
+                .catch(function () { sv.disabled = false; });
+        }
+        if (sv) sv.addEventListener('click', submit);
+        if (ta) ta.addEventListener('keydown', function (e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); submit(); }
+        });
     }
 
     // ---- long-press en cards de descubrimiento → hoja inferior ----

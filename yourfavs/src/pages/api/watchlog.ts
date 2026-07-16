@@ -27,12 +27,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
         if (mediaType !== 'movie' && mediaType !== 'tv') return json({ ok: false, error: 'media_type inválido' }, 400);
         if (!Number.isFinite(Number(tmdbId))) return json({ ok: false, error: 'tmdb_id inválido' }, 400);
 
+        // Nota opcional (§6 "detalles con alma"): ¿con quién? ¿qué te pareció?
+        const noteRaw = typeof body?.note === 'string' ? body.note.trim() : '';
+
         const res = await appendWatchLog({
             media_type: mediaType,
             tmdb_id: tmdbId,
             watched_on: isDate(body?.watched_on) ? body.watched_on : undefined,
             season: Number.isFinite(Number(body?.season)) ? Number(body.season) : undefined,
             episode: Number.isFinite(Number(body?.episode)) ? Number(body.episode) : undefined,
+            note: noteRaw || undefined,
         });
         return json({ ok: true, rewatch: res.rewatch });
     } catch (err) {

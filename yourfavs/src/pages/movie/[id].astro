@@ -127,7 +127,7 @@ const userTags: string[] = mediaTagsDoc?.tags || [];
 // Diario (L6): "La has visto N veces" = base 1 si consta vista (Vistas/Me gusta/Favs)
 // + los "pases" del botón "Vuelto a ver", IGUAL que las series. El visionado original
 // se deduce de estar en lista, no necesita entrada en el diario. Solo con sesión.
-const moviePasses = Astro.locals.user ? await countMoviePasses(clientData.id) : { passes: 0, last: null };
+const moviePasses = Astro.locals.user ? await countMoviePasses(clientData.id) : { passes: 0, last: null, first: null };
 // "Visto" = en cualquier nivel (Vistas/Me gusta/Favs) o con re-visionados en el diario.
 const isWatchedMovie = isInVistas || isInFavorites || isInLiked || moviePasses.passes > 0;
 // CTA de visionado (Bloque 2): siempre disponible.
@@ -138,6 +138,18 @@ const showViendoCta = true;
 const viendoCtaLabel = isInViendo ? 'Terminar' : (isWatchedMovie ? 'Volver a ver' : 'Empezar a ver');
 const movieTimes = (isWatchedMovie ? 1 : 0) + moviePasses.passes;
 const watchLastPretty = moviePasses.last ? new Date(moviePasses.last + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : '';
+
+// Efeméride "tu historia con esta peli" (§6 detalles con alma): fecha del primer
+// visionado (de countMoviePasses, sin lecturas extra). Toque cálido "hace un año".
+let movieEfemeride = '';
+if (isWatchedMovie && moviePasses.first) {
+    const started = new Date(moviePasses.first + 'T12:00:00').toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+    const days = Math.floor((Date.now() - new Date(moviePasses.first + 'T12:00:00').getTime()) / 86400000);
+    let rel = '';
+    if (days >= 330) { const y = Math.max(1, Math.round(days / 365)); rel = y === 1 ? 'hace un año' : `hace ${y} años`; }
+    else if (days >= 55) { rel = `hace ${Math.round(days / 30)} meses`; }
+    movieEfemeride = `La viste por primera vez en ${started}` + (rel ? ` · ${rel}` : '');
+}
 const userNotes = mediaTagsDoc?.notes || '';
 const inAnyCollection = isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked;
 
@@ -482,6 +494,12 @@ const jsonLd = item ? {
                         Vuelto a ver
                     </button>
                 </div>
+                {movieEfemeride && (
+                    <div class="max-w-6xl mx-auto px-4 pb-2 -mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                        <span>{movieEfemeride}</span>
+                    </div>
+                )}
             </div>
         )}
 

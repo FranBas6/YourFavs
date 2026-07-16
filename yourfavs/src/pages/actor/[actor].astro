@@ -23,6 +23,7 @@ import { invalidateUpcomingPeopleCache } from "../../services/API/People/upcomin
 import FollowPersonButton from "../../components/personal/FollowPersonButton.astro";
 import type { ActorImage, TaggedImage } from "../../services/API/Actors/InfoActor";
 import { safeFetch } from "../../utils/safeFetch";
+import { getLibrarySnapshot } from "../../services/BD/shared/librarySnapshot";
 
 const { actor } = Astro.params;
 
@@ -144,6 +145,22 @@ const allYears = [...movieDates, ...seriesDates].filter(y => y > 1900);
 const careerStart = allYears.length > 0 ? Math.min(...allYears) : null;
 const careerEnd = allYears.length > 0 ? Math.max(...allYears) : null;
 const careerYears = careerStart && careerEnd ? careerEnd - careerStart : null;
+
+// Tu historia con esta persona (§6 detalles con alma): cruza su filmografía (ya cargada)
+// con tu biblioteca vista (snapshot cacheado, cero coste TMDB). "Vista" = Vistas ∪
+// Favoritos ∪ Me gusta, igual que en el resto de la app.
+let seenWithActor: { id: string; media_type: 'movie' | 'tv'; title: string; poster_path: string | null }[] = [];
+if (Astro.locals.user) {
+    try {
+        const snap = await getLibrarySnapshot();
+        const watchedMovieIds = new Set<string>([...snap.movVistos, ...snap.movFavs, ...snap.movLike].map((m: any) => String(m.id)));
+        const watchedTvIds = new Set<string>([...snap.tvVistos, ...snap.tvFavs, ...snap.tvLike].map((s: any) => String(s.id)));
+        for (const m of movies) if (watchedMovieIds.has(String(m.id))) seenWithActor.push({ id: String(m.id), media_type: 'movie', title: m.title, poster_path: m.poster_path || null });
+        for (const s of series) if (watchedTvIds.has(String(s.id))) seenWithActor.push({ id: String(s.id), media_type: 'tv', title: s.name, poster_path: s.poster_path || null });
+    } catch { /* sin biblioteca → sin caja */ }
+}
+const seenWithActorCount = seenWithActor.length;
+const actorFirstName = String(actorInfo.nombre || '').split(' ')[0];
 
 // JSON-LD structured data (schema.org Person)
 const jsonLd = {
@@ -498,6 +515,30 @@ const jsonLd = {
                 )}
             </div>
         ))}
+
+        <!-- Tu historia con esta persona (§6 detalles con alma) -->
+        {seenWithActorCount > 0 && (
+            <div class="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
+                <div class="flex items-center gap-2 mb-2">
+                    <svg class="w-4 h-4 text-[#E63946] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <h2 class="text-sm sm:text-base font-semibold text-gray-800">Tu historia con {actorFirstName}</h2>
+                </div>
+                <p class="text-sm text-gray-600 mb-3">
+                    Has visto <strong class="text-gray-900">{seenWithActorCount}</strong> {seenWithActorCount === 1 ? 'título' : 'títulos'} con {actorFirstName}.
+                </p>
+                <div class="flex gap-2 overflow-x-auto pb-1">
+                    {seenWithActor.slice(0, 12).map((t) => (
+                        <a href={t.media_type === 'movie' ? `/movie/${t.id}` : `/serie/${t.id}`} class="flex-shrink-0" title={t.title}>
+                            {t.poster_path ? (
+                                <img src={posterUrl(t.poster_path, 'w92')} alt={t.title} class="w-12 h-[72px] rounded-md object-cover border border-gray-200" loading="lazy"/>
+                            ) : (
+                                <span class="w-12 h-[72px] rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">Sin póster</span>
+                            )}
+                        </a>
+                    ))}
+                </div>
+            </div>
+        )}
 
         <!-- Navegación rápida -->
         <div class="flex flex-wrap gap-2 mb-4">

@@ -9,7 +9,7 @@
 import { userCol, userDoc, requireUid, getCurrentUid } from '../shared/userScope';
 import { adminDb } from '../../../utils/firebaseAdmin';
 
-export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change';
+export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change' | 'streak';
 
 export interface NotificationDoc {
     id: string;
@@ -38,7 +38,7 @@ const COL = 'notifications';
 // cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
 // desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
 // pendiente ENTRA o SALE de tus plataformas (diff contra snapshot, ver el generador).
-const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change']);
+const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak']);
 
 function toMs(v: any): number {
     if (!v) return 0;

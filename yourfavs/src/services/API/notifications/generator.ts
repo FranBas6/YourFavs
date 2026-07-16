@@ -18,6 +18,7 @@ import { upsertMany, type NotifInput, type NotifType } from '../../BD/notificati
 import { getCurrentUid } from '../../BD/shared/userScope';
 import { getUserProfile } from '../../BD/profile/userProfile';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
+import { getWatchStreak } from '../../BD/series/yourfavsSerie';
 import { readProviderState, writeProviderState, type ProviderSnapEntry } from '../../BD/notifications/providerState';
 import { appDateParts } from '../../../utils/appTime';
 
@@ -28,6 +29,7 @@ const TYPE_TO_PREF: Record<NotifType, string> = {
     person_release: 'releases',
     anniversary: 'anniversary',
     platform_change: 'platform',
+    streak: 'streak',
 };
 
 // Firestore no admite '/' en el id de documento.
@@ -103,6 +105,30 @@ export async function syncNotifications(platforms: number[] = [], force = false)
             items.push(...await platformChangeItems(platforms, day));
         } catch (error) {
             console.error('[notifications] platform_change:', (error as Error).message);
+        }
+    }
+
+    // Racha en peligro (§6 detalles con alma) — OFF por defecto (solo si el usuario lo
+    // activa). Si la racha sigue viva pero la última actividad fue AYER (nada hoy),
+    // avisamos para que no se rompa. Id determinista por día → como mucho 1 aviso/día.
+    if (prefs?.streak === true) {
+        try {
+            const st = await getWatchStreak();
+            if (st.current > 0 && st.lastDay) {
+                const lastNum = appDateParts(new Date(st.lastDay).getTime()).dayNum;
+                if (lastNum === appDateParts(Date.now()).dayNum - 1) {
+                    items.push({
+                        id: safeId(`streak:${day}`),
+                        type: 'streak',
+                        title: `Tu racha de ${st.current} ${st.current === 1 ? 'día' : 'días'} está en peligro`,
+                        subtitle: 'Mira algo hoy para no romperla',
+                        href: '/mislistas/siguiendo',
+                        poster_path: null,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('[notifications] streak:', (error as Error).message);
         }
     }
 

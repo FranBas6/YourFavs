@@ -226,9 +226,112 @@ function showcaseHref(s: ItemShowcase): string {
                                 {topDirector && <li>Tu director: {topDirector.name}</li>}
                                 {rc && <li>{ratingDiff > 0 ? '+' : ''}{ratingDiff} vs TMDB</li>}
                             </ul>
+                            <button type="button" id="yf-share-card"
+                                data-name={archetype.name}
+                                data-desc={archetype.description}
+                                data-titles={String(totalTitles)}
+                                data-hours={String(stats.totalHours)}
+                                data-streak={String(streak.max)}
+                                data-genre={dnaGenres[0] ? getGenreName(dnaGenres[0].id) : ''}
+                                data-director={topDirector?.name || ''}
+                                data-ratingdiff={rc ? `${ratingDiff > 0 ? '+' : ''}${ratingDiff}` : ''}
+                                class="mt-4 inline-flex items-center gap-2 rounded-lg border border-white/25 px-3 py-2 text-xs font-semibold text-white/90 hover:bg-white/10 transition-colors self-start"
+                                style="font-family:'JetBrains Mono',monospace;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>
+                                Descargar imagen
+                            </button>
                         </div>
                     </section>
                 )}
+
+                {/* Export PNG del arquetipo (§6 detalles con alma): tarjeta compartible
+                    dibujada en canvas, sin dependencias. Los datos llegan por data-* del botón. */}
+                <script is:inline>
+                    (function () {
+                        var btn = document.getElementById('yf-share-card');
+                        if (!btn) return;
+
+                        function wrap(ctx, text, x, y, maxW, lh) {
+                            var words = String(text || '').split(' '), line = '', yy = y;
+                            for (var n = 0; n < words.length; n++) {
+                                var test = line ? line + ' ' + words[n] : words[n];
+                                if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); line = words[n]; yy += lh; }
+                                else line = test;
+                            }
+                            if (line) { ctx.fillText(line, x, yy); yy += lh; }
+                            return yy;
+                        }
+
+                        function draw() {
+                            var d = btn.dataset;
+                            var W = 1080, H = 1350, PAD = 96;
+                            var c = document.createElement('canvas');
+                            c.width = W; c.height = H;
+                            var ctx = c.getContext('2d');
+                            if (!ctx) return;
+
+                            var g = ctx.createLinearGradient(0, 0, W, H);
+                            g.addColorStop(0, '#16130f'); g.addColorStop(1, '#2a2118');
+                            ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+                            ctx.strokeStyle = 'rgba(224,168,107,.35)'; ctx.lineWidth = 3;
+                            ctx.strokeRect(40, 40, W - 80, H - 80);
+                            ctx.textBaseline = 'top';
+
+                            ctx.fillStyle = 'rgba(255,255,255,.55)';
+                            ctx.font = '500 26px "JetBrains Mono", monospace';
+                            ctx.fillText('YOURFAVS · TU CINE EN NÚMEROS', PAD, 120);
+
+                            ctx.fillStyle = 'rgba(255,255,255,.6)';
+                            ctx.font = '600 30px Poppins, sans-serif';
+                            ctx.fillText('Tu arquetipo cinéfilo', PAD, 300);
+
+                            ctx.fillStyle = '#e0a86b';
+                            ctx.font = '700 84px Poppins, serif';
+                            var yName = wrap(ctx, d.name || 'Cinéfilo', PAD, 348, W - PAD * 2, 92);
+
+                            ctx.fillStyle = 'rgba(255,255,255,.8)';
+                            ctx.font = '400 34px Poppins, sans-serif';
+                            var yDesc = wrap(ctx, d.desc || '', PAD, yName + 24, W - PAD * 2, 46);
+
+                            var yDiv = Math.max(yDesc + 56, 800);
+                            ctx.strokeStyle = 'rgba(255,255,255,.15)'; ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.moveTo(PAD, yDiv); ctx.lineTo(W - PAD, yDiv); ctx.stroke();
+
+                            var lines = [];
+                            lines.push((d.titles || '0') + ' títulos · ' + (d.hours || '0') + ' h vistas');
+                            lines.push('Racha máxima: ' + (d.streak || '0') + ' día' + (d.streak === '1' ? '' : 's'));
+                            if (d.genre) lines.push('Género estrella: ' + d.genre);
+                            if (d.director) lines.push('Tu director: ' + d.director);
+                            if (d.ratingdiff) lines.push(d.ratingdiff + ' vs TMDB');
+                            ctx.fillStyle = 'rgba(255,255,255,.85)';
+                            ctx.font = '400 36px Poppins, sans-serif';
+                            var y = yDiv + 40;
+                            for (var i = 0; i < lines.length; i++) { ctx.fillText('·  ' + lines[i], PAD, y); y += 58; }
+
+                            ctx.fillStyle = '#e0a86b';
+                            ctx.font = '700 42px Poppins, sans-serif';
+                            ctx.fillText('YourFavs', PAD, H - 150);
+
+                            c.toBlob(function (blob) {
+                                if (!blob) return;
+                                var url = URL.createObjectURL(blob);
+                                var a = document.createElement('a');
+                                a.href = url; a.download = 'yourfavs-arquetipo.png';
+                                document.body.appendChild(a); a.click(); a.remove();
+                                setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+                            }, 'image/png');
+                        }
+
+                        btn.addEventListener('click', function () {
+                            btn.disabled = true;
+                            var done = function () { btn.disabled = false; };
+                            // Esperar a que las fuentes estén listas para que el texto no salga con fallback.
+                            if (document.fonts && document.fonts.ready) {
+                                document.fonts.ready.then(function () { try { draw(); } catch (e) {} done(); });
+                            } else { try { draw(); } catch (e) {} done(); }
+                        });
+                    })();
+                </script>
 
                 {/* Destacados de siempre */}
                 {(stats.showcase.bestUserRated || stats.showcase.bestTmdb || stats.showcase.firstOfYear) && (

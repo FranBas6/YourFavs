@@ -45,6 +45,7 @@ if (Astro.request.method === 'POST') {
             releases: fd.get('notif_releases') != null,
             anniversary: fd.get('notif_anniversary') != null,
             platform: fd.get('notif_platform') != null,
+            streak: fd.get('notif_streak') != null,
         };
         await setUserProfile(patch);
         try {
@@ -193,8 +194,12 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                                 <input type="checkbox" name="notif_platform" checked={profile.notifPrefs?.platform !== false} />
                                 <span>Cambios de plataforma</span>
                             </label>
+                            <label class="plat-chip">
+                                <input type="checkbox" name="notif_streak" checked={profile.notifPrefs?.streak === true} />
+                                <span>Racha en peligro</span>
+                            </label>
                         </div>
-                        <small>Qué te avisa la campana. «Cambios de plataforma» te avisa cuando un pendiente entra o sale de tus plataformas.</small>
+                        <small>Qué te avisa la campana. «Cambios de plataforma» te avisa cuando un pendiente entra o sale de tus plataformas. «Racha en peligro» te recuerda ver algo si tu racha se va a romper hoy (desactivado por defecto).</small>
                     </div>
                 </div>
             </section>

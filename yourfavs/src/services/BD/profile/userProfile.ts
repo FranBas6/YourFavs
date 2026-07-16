@@ -17,7 +17,7 @@ export interface UserProfile {
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     platforms?: number[];       // provider_ids TMDB de "mis plataformas" (Auditoría v2 · 3.2)
     /** Toggles de la campana por tipo (Bloque 4). Ausente = todo activado. */
-    notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean };
+    notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean; streak?: boolean };
     updated_at?: unknown;
 }
 
