@@ -270,6 +270,9 @@ function initOptimisticActions() {
         if (val === 'notification') return handleNotificationForm(form);
         if (val === 'rating') return handleRatingForm(form);
         if (val === 'media_tags') return handleMediaTagsForm(form);
+        // §2 modo sin spoilers: envío NATIVO (no optimista). El servidor redirige con `?sp`
+        // y la ficha muestra su propio toast al cargar (evita el genérico "Quitado de spoiler_pref").
+        if (val === 'spoiler_pref') return;
 
         var actionInput = form.querySelector('input[name="action"]');
         var action = actionInput ? actionInput.value : '';

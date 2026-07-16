@@ -15,9 +15,13 @@ interface Props {
     seasons: { season_number: number; name?: string }[];
     /** season_number → episodios (getEpisodesBySeasonNumber). */
     episodesBySeason: Record<number, any[]>;
+    /** §2 modo sin spoilers: oculta nota+celdas de episodios NO vistos (el heatmap revela calidad = spoiler). */
+    spoilerFree?: boolean;
+    /** "season-episode" de los episodios vistos (para saber qué celdas SÍ mostrar en modo sin spoilers). */
+    watchedSet?: Set<string>;
 }
 
-const { seasons, episodesBySeason } = Astro.props;
+const { seasons, episodesBySeason, spoilerFree = false, watchedSet = new Set<string>() } = Astro.props;
 
 // Escala fija del handoff (6 colores, peor→mejor)
 const SCALE = ['#f46d43', '#fdae61', '#fee08b', '#a6d96a', '#66bd63', '#1a9850'];
@@ -70,7 +74,7 @@ const note = best
             <Stamp color="purple" icon="layout-grid" size={38} />
             <div class="shm-head-text">
                 <h2>Calidad por episodio</h2>
-                {note && <p class="shm-note">{note}</p>}
+                {note && !spoilerFree && <p class="shm-note">{note}</p>}
             </div>
             <svg class="shm-chev" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
         </summary>
@@ -90,6 +94,10 @@ const note = best
                             if (!ep) return <span></span>;
                             if (!rated(ep)) {
                                 return <span class="shm-cell is-empty" title={`T${row.season}·E${ep.episode_number} — sin nota`}>·</span>;
+                            }
+                            // §2 modo sin spoilers: un episodio no visto no revela su nota (ni por color).
+                            if (spoilerFree && !watchedSet.has(`${row.season}-${ep.episode_number}`)) {
+                                return <span class="shm-cell is-empty" title={`T${row.season}·E${ep.episode_number} — oculto (modo sin spoilers)`}>·</span>;
                             }
                             const v = ep.vote_average as number;
                             return (
