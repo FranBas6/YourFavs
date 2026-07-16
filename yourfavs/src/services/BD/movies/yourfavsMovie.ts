@@ -132,6 +132,12 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         // Quitar es un borrado simple: no auto-restaura estados previos.
         await userDoc(collectionName, movieId).delete();
         mutated = true;
+        // §5 · bitácora (best-effort): quitar de una lista es intencional y NO derivable
+        // (se pierde el added_at). Los borrados en cascada del branch 'add' NO llegan aquí.
+        try {
+            const { appendActivity } = await import('../shared/activityLog');
+            await appendActivity({ verb: 'remove', media_type: 'movie', tmdb_id: movieId, meta: { collection: collectionName } });
+        } catch { /* bitácora opcional */ }
     }
 
     // Invalida la cache de "Tus sagas" al cambiar colecciones de movies

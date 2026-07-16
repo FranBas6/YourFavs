@@ -96,7 +96,8 @@ const windowLabel = page === 1
     : `Entre hace ${(page - 1) * DAYS_PER_PAGE} y ${page * DAYS_PER_PAGE} días`;
 
 // Categoría de acción por colección (rediseño "timeline con momentum")
-type Cat = 'visto' | 'fav' | 'like' | 'ep' | 'pend' | 'pronto' | 'seguir' | 'rewatch' | 'rating' | 'person';
+type Cat = 'visto' | 'fav' | 'like' | 'ep' | 'pend' | 'pronto' | 'seguir' | 'rewatch' | 'rating' | 'person'
+    | 'remove' | 'unfollow' | 'abandon' | 'resume' | 'reorder';
 const CAT_BY_COLLECTION: Record<string, Cat> = {
     MoviesVistas: 'visto',     SeriesVistas: 'visto',
     MovieFavs: 'fav',          SeriesFavs: 'fav',
@@ -109,11 +110,18 @@ const CAT_BY_COLLECTION: Record<string, Cat> = {
     Ratings: 'rating',
     FollowPerson: 'person',
     FavPerson: 'person',
+    // §5 · acciones intencionales (bitácora append-only)
+    ActRemove: 'remove',
+    ActUnfollow: 'unfollow',
+    ActAbandon: 'abandon',
+    ActResume: 'resume',
+    ActReorder: 'reorder',
 };
 const catOf = (ev: ActivityEvent): Cat => CAT_BY_COLLECTION[ev.collection] ?? 'visto';
 const CAT_ICON: Record<Cat, string> = {
     visto: 'eye', fav: 'star', like: 'heart', ep: 'play',
     pend: 'bookmark', pronto: 'clock', seguir: 'tv', rewatch: 'repeat', rating: 'medal', person: 'user-plus',
+    remove: 'circle-minus', unfollow: 'user-minus', abandon: 'pause', resume: 'rotate-ccw', reorder: 'arrow-up-down',
 };
 
 // Badges-resumen de cada día (conteo por categoría, en orden de aparición)
@@ -229,7 +237,7 @@ const heatCells: { level: string; off: boolean }[] = [];
 const FILTERS: [Cat, string][] = [
     ['visto', 'Vistas'], ['fav', 'Favoritos'], ['like', 'Me gusta'],
     ['ep', 'Episodios'], ['rating', 'Valoraciones'], ['rewatch', 'Re-visionado'], ['pend', 'Pendientes'],
-    ['person', 'Personas'],
+    ['person', 'Personas'], ['remove', 'Quitados'], ['abandon', 'Abandonadas'],
 ];
 
 // KPIs del periodo (episodios = nº real de episodios, no de eventos)
@@ -441,8 +449,8 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                 </a>
                             )
                         ) : ev.type === 'person' ? (
-                            <a href={`/actor/${ev.id}`} class="ev" data-cat="person" data-ts={ev.timestamp}>
-                                <span class="act-ico" style="background: var(--a-person-bg); color: var(--a-person);"><Icon name="lucide:user-plus" /></span>
+                            <a href={`/actor/${ev.id}`} class="ev" data-cat={cat} data-ts={ev.timestamp}>
+                                <span class="act-ico" style={`background: var(--a-${cat}-bg); color: var(--a-${cat});`}><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
                                 {ev.profile_path ? (
                                     <img src={posterUrl(ev.profile_path, 'w92')} alt={ev.name} class="poster avatar" loading="lazy"/>
                                 ) : (
@@ -451,7 +459,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                 <span class="meta">
                                     <span class="t">{ev.name}</span>
                                     <span class="sub">
-                                        <span class="verb" style="color: var(--a-person);">{ev.action}</span>
+                                        <span class="verb" style={`color: var(--a-${cat});`}>{ev.action}</span>
                                         <span class="sep"></span>
                                         <span>Persona</span>
                                     </span>

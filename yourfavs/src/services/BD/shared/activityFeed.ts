@@ -36,27 +36,65 @@ function dayKey(ts: number): string {
     return appDateParts(ts).key; // agrupado por día en hora de Madrid (no UTC del servidor)
 }
 
-async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
+// Episodios vistos → append-only. Fuente PRIMARIA = `WatchLog` (una entrada por
+// visionado, nunca se borra al desmarcar), así el diario del feed no se pierde
+// cuando se vacía el progreso. `WatchedEpisodes` (estado vivo) SOLO aporta los
+// episodios que WatchLog nunca vio (marcados antes de existir el diario / Fase L5):
+// así arreglamos el bug de pérdida de historial sin perder el histórico previo.
+async function fetchWatchedEpisodeEvents(
+    logDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    liveDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+): Promise<ActivityEvent[]> {
     try {
-        const snap = await userCol('WatchedEpisodes').get();
-        const events: ActivityEvent[] = [];
-        for (const docSnap of snap.docs) {
+        // serieId → { covered: claves "s:e" ya cubiertas por WatchLog,
+        //             byDay: buckets por día calendario }
+        const bySerie = new Map<string, {
+            covered: Set<string>;
+            byDay: Map<string, { ts: number; eps: { season: number; episode: number }[] }>;
+        }>();
+        const bucketFor = (id: string) => {
+            let s = bySerie.get(id);
+            if (!s) { s = { covered: new Set(), byDay: new Map() }; bySerie.set(id, s); }
+            return s;
+        };
+        const pushEp = (serie: { byDay: Map<string, { ts: number; eps: { season: number; episode: number }[] }> }, ts: number, season: number, episode: number) => {
+            const key = dayKey(ts);
+            const bucket = serie.byDay.get(key);
+            if (bucket) {
+                bucket.eps.push({ season, episode });
+                if (ts > bucket.ts) bucket.ts = ts;
+            } else {
+                serie.byDay.set(key, { ts, eps: [{ season, episode }] });
+            }
+        };
+
+        // 1) WatchLog (fuente primaria). Solo entradas de episodio (tv con season+episode).
+        for (const docSnap of logDocs) {
+            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; episode?: number; watched_on?: string; logged_at?: unknown };
+            if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
+            let ts = x.watched_on ? new Date(x.watched_on + 'T12:00:00').getTime() : 0;
+            if (!ts || isNaN(ts)) ts = getFirebaseTimestamp(x.logged_at);
+            if (!ts) continue;
+            const serie = bucketFor(String(x.tmdb_id));
+            serie.covered.add(`${x.season}:${x.episode}`);
+            pushEp(serie, ts, x.season, x.episode);
+        }
+
+        // 2) WatchedEpisodes (relleno): solo episodios que WatchLog nunca vio.
+        for (const docSnap of liveDocs) {
             const data = docSnap.data() as { watched_episodes?: { season: number; episode: number; watched_at?: string }[] };
-            const eps = data.watched_episodes || [];
-            // Agrupar por día calendario
-            const byDay = new Map<string, { ts: number; eps: { season: number; episode: number }[] }>();
-            for (const ep of eps) {
+            const serie = bucketFor(docSnap.id);
+            for (const ep of data.watched_episodes || []) {
+                if (serie.covered.has(`${ep.season}:${ep.episode}`)) continue; // ya cubierto por WatchLog
                 const ts = ep.watched_at ? new Date(ep.watched_at).getTime() : 0;
                 if (!ts || isNaN(ts)) continue;
-                const key = dayKey(ts);
-                const bucket = byDay.get(key);
-                if (bucket) {
-                    bucket.eps.push({ season: ep.season, episode: ep.episode });
-                    if (ts > bucket.ts) bucket.ts = ts;
-                } else {
-                    byDay.set(key, { ts, eps: [{ season: ep.season, episode: ep.episode }] });
-                }
+                pushEp(serie, ts, ep.season, ep.episode);
             }
+        }
+
+        // 3) Un evento por (serie, día), con el mismo etiquetado agrupado de antes.
+        const events: ActivityEvent[] = [];
+        for (const [serieId, { byDay }] of bySerie) {
             for (const { ts, eps: dayEps } of byDay.values()) {
                 dayEps.sort((a, b) => a.season - b.season || a.episode - b.episode);
                 const seasons = Array.from(new Set(dayEps.map(e => e.season))).sort((a, b) => a - b);
@@ -77,7 +115,7 @@ async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
                 }
                 events.push({
                     type: 'serie',
-                    id: docSnap.id,
+                    id: serieId,
                     collection: 'WatchedEpisodes',
                     action,
                     timestamp: ts,
@@ -87,7 +125,7 @@ async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
         }
         return events;
     } catch (error) {
-        console.error('Error al leer WatchedEpisodes:', error);
+        console.error('Error al leer episodios vistos (WatchLog∪WatchedEpisodes):', error);
         return [];
     }
 }
@@ -95,11 +133,12 @@ async function fetchWatchedEpisodeEvents(): Promise<ActivityEvent[]> {
 // Re-visionados explícitos del botón "Vuelto a ver" (WatchLog): pelis con
 // rewatch=true y "pases" de serie (entradas a nivel serie, sin season). NO los
 // episodios sueltos (esos ya salen vía WatchedEpisodes; no duplicamos).
-async function fetchRewatchEvents(): Promise<ActivityEvent[]> {
+async function fetchRewatchEvents(
+    logDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+): Promise<ActivityEvent[]> {
     try {
-        const snap = await userCol('WatchLog').get();
         const events: ActivityEvent[] = [];
-        for (const docSnap of snap.docs) {
+        for (const docSnap of logDocs) {
             const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; rewatch?: boolean; logged_at?: unknown; watched_on?: string; note?: string };
             const isMovieRewatch = x.media_type === 'movie' && x.rewatch === true;
             const isSeriesPass = x.media_type === 'tv' && x.season == null;
@@ -210,17 +249,76 @@ async function fetchActorFavEvents(): Promise<ActivityEvent[]> {
     }
 }
 
+// §5 · acciones intencionales no derivables (colección `Activity` append-only):
+// quitar de una lista, dejar de seguir, abandonar/retomar, reordenar favoritos.
+// Cada verbo se traduce a un `collection` propio que la página de Actividad colorea.
+const REMOVE_LABEL: Record<string, string> = {
+    MovieFavs: 'Quitada de Favoritos', SeriesFavs: 'Quitada de Favoritos',
+    MoviesPendientes: 'Quitada de Pendientes', SeriesPendiente: 'Quitada de Pendientes',
+    MoviesVistas: 'Quitada de Vistas', SeriesVistas: 'Quitada de Vistas',
+    MoviesVerPronto: 'Quitada de Ver Pronto', SeriesVerPronto: 'Quitada de Ver Pronto',
+    LikedMovies: 'Quitada de Me gusta', LikedSeries: 'Quitada de Me gusta',
+};
+
+async function fetchMutationEvents(): Promise<ActivityEvent[]> {
+    try {
+        const { listActivity } = await import('./activityLog');
+        const records = await listActivity();
+        const out: ActivityEvent[] = [];
+        for (const r of records) {
+            const timestamp = getFirebaseTimestamp(r.logged_at);
+            if (!timestamp) continue;
+            const type: ActivityEvent['type'] = r.media_type === 'person' ? 'person' : r.media_type === 'movie' ? 'movie' : 'serie';
+            const id = String(r.tmdb_id);
+            const meta = (r.meta || {}) as Record<string, any>;
+            switch (r.verb) {
+                case 'remove':
+                    out.push({ type, id, collection: 'ActRemove', timestamp,
+                        action: meta.custom ? 'Quitada de una colección' : (REMOVE_LABEL[meta.collection] || 'Quitada de una lista') });
+                    break;
+                case 'unfollow':
+                    out.push({ type, id, collection: 'ActUnfollow', action: 'Dejaste de seguir', timestamp,
+                        ...(type === 'person' ? { name: meta.name || 'Persona', profile_path: meta.profile_path ?? null } : {}) });
+                    break;
+                case 'abandon':
+                    out.push({ type, id, collection: 'ActAbandon', action: 'Abandonaste', timestamp });
+                    break;
+                case 'resume':
+                    out.push({ type, id, collection: 'ActResume', action: 'Retomaste', timestamp });
+                    break;
+                case 'reorder':
+                    out.push({ type, id, collection: 'ActReorder', action: `Moviste a #${meta.to ?? '?'}`, timestamp });
+                    break;
+            }
+        }
+        return out;
+    } catch (error) {
+        console.error('Error al leer Activity (mutaciones):', error);
+        return [];
+    }
+}
+
 export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (!getCurrentUid()) return [];
-    // Las 11 listas salen del snapshot compartido (1 lectura), no colección a colección.
-    const [snapshot, episodeEvents, rewatchEvents, ratingEvents, personEvents, favPersonEvents] = await Promise.all([
-        getLibrarySnapshot(),
-        fetchWatchedEpisodeEvents(),
-        fetchRewatchEvents(),
+    // WatchLog se lee UNA sola vez y se comparte entre episodios vistos y re-visionados
+    // (antes se escaneaba dos veces → doble de lecturas en la colección más grande).
+    const [snapshot, logSnap, liveSnap] = await Promise.all([
+        getLibrarySnapshot(),          // las 11 listas (1 lectura cacheada)
+        userCol('WatchLog').get(),
+        userCol('WatchedEpisodes').get(),
+    ]);
+    const [episodeEvents, rewatchEvents, ratingEvents, personEvents, favPersonEvents, mutationEvents] = await Promise.all([
+        fetchWatchedEpisodeEvents(logSnap.docs, liveSnap.docs),
+        fetchRewatchEvents(logSnap.docs),
         fetchRatingEvents(),
         fetchFollowPersonEvents(),
         fetchActorFavEvents(),
+        fetchMutationEvents(),
     ]);
+    // Al retomar una serie abandonada vuelve a SeriesSiguiendo con added_at nuevo → el
+    // alta derivada "Empezaste a seguir" duplicaría el evento "Retomaste". La suprimimos:
+    // el evento 'resume' es dueño de la vuelta al seguimiento.
+    const resumedSerieIds = new Set(mutationEvents.filter(e => e.collection === 'ActResume').map(e => e.id));
     const collectionEvents = COLLECTIONS.flatMap(c =>
         (snapshot[c.key] || [])
             .map((d: any) => ({
@@ -231,6 +329,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
                 timestamp: getFirebaseTimestamp(d.added_at),
             }))
             .filter(e => e.timestamp > 0)
+            .filter(e => !(e.collection === 'SeriesSiguiendo' && resumedSerieIds.has(e.id)))
     );
-    return [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents];
+    return [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
 }

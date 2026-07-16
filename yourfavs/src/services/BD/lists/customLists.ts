@@ -244,12 +244,27 @@ export async function removeItemFromList(listId: string, itemId: string): Promis
     requireUid();
     const listRef = userDoc(COLLECTION, listId);
     const itemRef = listRef.collection(ITEMS).doc(itemId);
-    if (!(await itemRef.get()).exists) return; // ya no está → nada que decrementar
+    const itemSnap = await itemRef.get();
+    if (!itemSnap.exists) return; // ya no está → nada que decrementar
+    const item = itemSnap.data() as { media_type?: string; tmdb_id?: number };
 
     const batch = adminDb.batch();
     batch.delete(itemRef);
     batch.update(listRef, { itemCount: FieldValue.increment(-1), updated_at: new Date() });
     await batch.commit();
+
+    // §5 · bitácora (best-effort): quitar un título de una colección es intencional.
+    try {
+        if (item.tmdb_id != null) {
+            const { appendActivity } = await import('../shared/activityLog');
+            await appendActivity({
+                verb: 'remove',
+                media_type: item.media_type === 'movie' ? 'movie' : 'tv',
+                tmdb_id: item.tmdb_id,
+                meta: { custom: true, listId },
+            });
+        }
+    } catch { /* bitácora opcional */ }
 }
 
 /** Reordena los items de una lista: `orderedItemIds` = nuevo orden completo. */

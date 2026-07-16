@@ -118,6 +118,39 @@ export async function appendEpisodes(
     await batch.commit();
 }
 
+/**
+ * Corrección de un episodio marcado por error: borra su entrada MÁS RECIENTE del
+ * diario (no todas), de modo que desmarcar "deshace" solo la última marca y
+ * conserva re-visionados anteriores del mismo episodio. Es la ÚNICA excepción a la
+ * regla append-only, y solo la dispara el toggle de UN episodio en la ficha
+ * (los vaciados en bloque —temporada/serie— NO tocan el diario: son "volver a ver").
+ */
+export async function removeEpisodeFromLog(
+    serieId: number | string,
+    season: number,
+    episode: number
+): Promise<void> {
+    if (!getCurrentUid()) return;
+    const tmdbId = Number(serieId);
+    if (!Number.isFinite(tmdbId)) return;
+
+    const snap = await userCol(COLLECTION).where('tmdb_id', '==', tmdbId).get();
+    const matches = snap.docs.filter((d) => {
+        const x = d.data();
+        return x.media_type === 'tv' && x.season === Number(season) && x.episode === Number(episode);
+    });
+    if (!matches.length) return;
+
+    const tsOf = (d: (typeof matches)[number]): number => {
+        const x = d.data() as { logged_at?: { toMillis?: () => number }; watched_on?: string };
+        if (x.logged_at && typeof x.logged_at.toMillis === 'function') return x.logged_at.toMillis();
+        if (x.watched_on) return new Date(x.watched_on).getTime() || 0;
+        return 0;
+    };
+    matches.sort((a, b) => tsOf(b) - tsOf(a)); // más reciente primero
+    await matches[0].ref.delete();
+}
+
 /** Nº de veces visto + última fecha (para "La has visto N veces" en la ficha). */
 export async function countWatches(
     media_type: 'movie' | 'tv',

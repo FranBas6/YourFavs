@@ -26,7 +26,23 @@ export async function addFollowedPerson(id: string, name: string, profilePath: s
 }
 
 export async function removeFollowedPerson(id: string): Promise<void> {
-    await userDoc(COLLECTION, id).delete();
+    const ref = userDoc(COLLECTION, id);
+    // Capturamos nombre/foto ANTES de borrar, para que la bitácora (§5) pueda pintar
+    // el avatar sin re-fetch a TMDB (igual que el evento de "empezaste a seguir").
+    let meta: Record<string, unknown> = {};
+    try {
+        const snap = await ref.get();
+        if (snap.exists) {
+            const d = snap.data() as FollowedPerson;
+            meta = { name: d.name, profile_path: d.profile_path ?? null };
+        }
+    } catch { /* metadatos opcionales */ }
+    await ref.delete();
+    // §5 · bitácora (best-effort): dejar de seguir es intencional y borra el added_at.
+    try {
+        const { appendActivity } = await import('../shared/activityLog');
+        await appendActivity({ verb: 'unfollow', media_type: 'person', tmdb_id: id, meta });
+    } catch { /* bitácora opcional */ }
 }
 
 export async function getFollowedPerson(id: string): Promise<FollowedPerson | null> {

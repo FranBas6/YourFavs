@@ -2,7 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 import { adminDb } from "../../../utils/firebaseAdmin";
 import { getTransition } from "../shared/stateTransitions";
-import { appendWatchLog, appendEpisodes } from "../lists/watchLog";
+import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../lists/watchLog";
 import { appDateParts } from "../../../utils/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
@@ -14,6 +14,12 @@ async function logEpisode(serieId: string, season: number, episode: number): Pro
 }
 async function logSeasonEpisodes(serieId: string, eps: { season: number; episode: number }[]): Promise<void> {
     try { await appendEpisodes(serieId, eps); } catch { /* diario opcional */ }
+}
+// Desmarcar UN episodio = corregir un error → quitar también su última entrada del
+// diario, para que no siga apareciendo en Actividad. Solo el toggle individual; los
+// vaciados en bloque conservan el diario (son "volver a ver"). Best-effort.
+async function unlogEpisode(serieId: string, season: number, episode: number): Promise<void> {
+    try { await removeEpisodeFromLog(serieId, season, episode); } catch { /* diario opcional */ }
 }
 
 const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto', 'SeriesAbandonadas'];
@@ -169,8 +175,33 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         }
         await batch.commit();
 
+        // §5 · bitácora de acciones de estado intencionales (best-effort, no derivables):
+        // abandonar una serie a medias, o retomar una que estaba abandonada. El alta
+        // "normal" (empezar a seguir, marcar vista…) ya se deriva de added_at → no va aquí.
+        try {
+            const wasAbandoned = snapByCol.get('SeriesAbandonadas')?.exists ?? false;
+            if (coleccion === 'SeriesAbandonadas') {
+                const { appendActivity } = await import('../shared/activityLog');
+                await appendActivity({ verb: 'abandon', media_type: 'tv', tmdb_id: serieId });
+            } else if (coleccion === 'SeriesSiguiendo' && wasAbandoned) {
+                const { appendActivity } = await import('../shared/activityLog');
+                await appendActivity({ verb: 'resume', media_type: 'tv', tmdb_id: serieId });
+            }
+        } catch { /* bitácora opcional */ }
+
     } else if (action === 'remove' && serieExiste) {
         await docRef.delete();
+
+        // §5 · bitácora (best-effort): quitar de una lista es intencional y NO derivable
+        // (se pierde el added_at). Dejar de seguir tiene verbo propio; el resto, 'remove'.
+        // Los borrados en CASCADA (al mover con 'add') NO pasan por aquí → no se registran.
+        try {
+            const { appendActivity } = await import('../shared/activityLog');
+            await appendActivity({
+                verb: coleccion === 'SeriesSiguiendo' ? 'unfollow' : 'remove',
+                media_type: 'tv', tmdb_id: serieId, meta: { collection: coleccion },
+            });
+        } catch { /* bitácora opcional */ }
 
         if (coleccion === 'SeriesFavs') {
             const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
@@ -213,6 +244,11 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
                 }
             }
             await docRef.update({ position: newPos });
+            // §5 · bitácora (best-effort): mover un favorito de sitio es intencional.
+            try {
+                const { appendActivity } = await import('../shared/activityLog');
+                await appendActivity({ verb: 'reorder', media_type: 'tv', tmdb_id: serieId, meta: { from: oldPos, to: newPos } });
+            } catch { /* bitácora opcional */ }
         }
     }
 
@@ -468,12 +504,14 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
     const idx = episodes.findIndex(e => e.season === season && e.episode === episode);
 
     if (idx >= 0) {
-        // Ya visto — quitar (no toca el diario: es append-only)
+        // Ya visto — quitar. Corrección de un error: también quitamos su última
+        // entrada del diario, para que deje de aparecer en Actividad.
         episodes.splice(idx, 1);
         await ref.update({
             watched_episodes: episodes,
             last_watched: episodes.length > 0 ? episodes[episodes.length - 1] : null,
         });
+        await unlogEpisode(serieId, season, episode);
     } else {
         // No visto — añadir
         const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
