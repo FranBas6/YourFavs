@@ -19,6 +19,7 @@ export interface UserProfile {
     /** Toggles de la campana por tipo (Bloque 4). Ausente = todo activado. */
     notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean; streak?: boolean };
     spoilerFree?: boolean;   // §2 modo sin spoilers (OFF por defecto; solo true lo activa)
+    homeLayout?: { key: string; hidden?: boolean }[];   // §4 home a tu medida (mostrar/ocultar bloques)
     updated_at?: unknown;
 }
 

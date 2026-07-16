@@ -9,6 +9,7 @@ interface SessionUser {
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     platforms?: number[];  // provider_ids de "mis plataformas" (Auditoría v2 · 3.2)
     spoilerFree?: boolean;  // §2 modo sin spoilers (OFF por defecto; solo true lo activa)
+    homeLayout?: { key: string; hidden?: boolean }[];  // §4 home a tu medida (bloques ocultos)
 }
 
 declare namespace App {

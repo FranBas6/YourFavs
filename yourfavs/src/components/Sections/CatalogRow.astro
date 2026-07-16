@@ -1,0 +1,96 @@
+---
+/**
+ * Fila de catálogo de la Home (tendencias, populares, top…), extraída de index.astro
+ * para poder renderizarla dentro del bucle ordenable de "Home a tu medida" (§4).
+ */
+import SectionHeader from "../SectionHeader.astro";
+import HoverPreview from "../HoverPreview.astro";
+import CardMovie from "../Cards/CardMovie.astro";
+import CardSerie from "../Cards/CardSerie.astro";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { getGenreName } from "../../utils/constants/genres";
+
+interface Props { section: any; }
+const { section } = Astro.props;
+---
+<article class={`section-card ${section.priority === 'high' ? 'featured-section' : ''}`}>
+    <SectionHeader
+        title={section.title}
+        link={section.link}
+        color={section.color as any}
+        icon={section.lucide}
+        count={section.movies.length + section.series.length}
+        featured={section.priority === 'high'}
+    />
+
+    <div class="section-content">
+        {section.movies.length > 0 && (
+                <div class="content-category">
+                    <h3 class="category-title">
+                        <svg class="category-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                        </svg>
+                        <span>Películas</span>
+                        <span class="item-count">({section.movies.length})</span>
+                    </h3>
+                    <div class="cards-grid">
+                        {section.movies.slice(0, 10).map((item: any) => (
+                                <div class="card-container">
+                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            title={item.title}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            release_date={item.release_date}
+                                            genres={item.genre_ids?.map((id: number) => ({
+                                                id,
+                                                name: getGenreName(id)
+                                            }))}
+                                    /></HoverPreview>
+                                </div>
+                        ))}
+                    </div>
+                </div>
+        )}
+
+        {section.series.length > 0 && (
+                <div class="content-category">
+                    <h3 class="category-title">
+                        <svg class="category-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                            <line x1="8" y1="21" x2="16" y2="21"/>
+                            <line x1="12" y1="17" x2="12" y2="21"/>
+                            <circle cx="17" cy="8" r="1"/>
+                            <circle cx="17" cy="16" r="1"/>
+                        </svg>
+                        <span>Series</span>
+                        <span class="item-count">({section.series.length})</span>
+                    </h3>
+                    <div class="cards-grid">
+                        {section.series.slice(0, 10).map((item: any) => (
+                                <div class="card-container">
+                                    <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            name={item.name}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            first_air_date={item.first_air_date}
+                                            seasons={item.seasons}
+                                            last_episode_to_air={item.last_episode_to_air}
+                                            next_episode_to_air={item.next_episode_to_air}
+                                            genres={item.genre_ids?.map((id: number) => ({
+                                                id,
+                                                name: getGenreName(id)
+                                            }))}
+                                    /></HoverPreview>
+                                </div>
+                        ))}
+                    </div>
+                </div>
+        )}
+    </div>
+</article>

@@ -6,6 +6,7 @@ import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
 import { STREAMING_PLATFORMS, STREAMING_PLATFORM_IDS } from "../utils/constants/streamingPlatforms";
 import { genresMap } from "../utils/constants/genres";
 import { posterUrl } from "../services/API/shared/tmdbClient";
+import { HOME_SECTIONS } from "../utils/constants/homeSections";
 
 // Protegida por el middleware (/mislistas/* sin sesión → redirige). Aquí ya hay user.
 const user = Astro.locals.user!;
@@ -49,6 +50,12 @@ if (Astro.request.method === 'POST') {
         };
         // Modo sin spoilers (§2): OFF por defecto; se activa solo si marcas el checkbox.
         patch.spoilerFree = fd.get('spoiler_free') != null;
+        // Home a tu medida (§4): el ORDEN sale de los inputs `home_order` (en orden del DOM, que
+        // refleja el reordenado con ↑/↓); la visibilidad, del checkbox `home_{key}` (marcado = visible).
+        const knownHomeKeys = new Set(HOME_SECTIONS.map((s) => s.key));
+        const homeOrder = fd.getAll('home_order').map(String).filter((k) => knownHomeKeys.has(k));
+        const orderKeys = homeOrder.length ? homeOrder : HOME_SECTIONS.map((s) => s.key);
+        patch.homeLayout = orderKeys.map((key) => ({ key, hidden: fd.get(`home_${key}`) == null }));
         await setUserProfile(patch);
         try {
             const { invalidateNotifSync } = await import('../services/API/notifications/generator');
@@ -214,6 +221,58 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                         </div>
                         <small>En las fichas de serie difumina el fotograma y la sinopsis de los episodios no vistos; toca «Mostrar» para revelar uno. Desactivado por defecto.</small>
                     </div>
+
+                    <div class="perfil-field perfil-field-wide">
+                        <span>Home a tu medida</span>
+                        <div class="home-layout" id="home-layout">
+                            {(() => {
+                                const saved = (profile.homeLayout || []).map((x) => x.key).filter((k) => HOME_SECTIONS.some((s) => s.key === k));
+                                const order = [...saved, ...HOME_SECTIONS.map((s) => s.key).filter((k) => !saved.includes(k))];
+                                return order.map((key) => {
+                                    const def = HOME_SECTIONS.find((s) => s.key === key)!;
+                                    const pref = (profile.homeLayout || []).find((x) => x.key === key);
+                                    return { key, label: def.label, visible: !(pref && pref.hidden) };
+                                });
+                            })().map((s) => (
+                                <div class="home-row" data-key={s.key}>
+                                    <span class="home-move">
+                                        <button type="button" class="home-up" aria-label="Subir">↑</button>
+                                        <button type="button" class="home-down" aria-label="Bajar">↓</button>
+                                    </span>
+                                    <input type="hidden" name="home_order" value={s.key} />
+                                    <label class="home-row-label">
+                                        <input type="checkbox" name={`home_${s.key}`} checked={s.visible} />
+                                        <span>{s.label}</span>
+                                    </label>
+                                </div>
+                            ))}
+                        </div>
+                        <small>Ordena con ↑/↓ y desmarca los bloques que no quieras. El hero de arriba se queda fijo.</small>
+                    </div>
+
+                    <style>
+                        .home-layout { display: flex; flex-direction: column; gap: 6px; }
+                        .home-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+                        .home-move { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+                        .home-move button { width: 24px; height: 18px; line-height: 1; border: 1px solid var(--border); border-radius: 5px; background: var(--bg-elev); color: var(--text-3); cursor: pointer; font-size: 11px; padding: 0; }
+                        .home-move button:hover { color: var(--text); border-color: var(--text-4); }
+                        .home-row-label { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; font-size: 14px; color: var(--text); }
+                    </style>
+                    <script is:inline>
+                        (function () {
+                            var box = document.getElementById('home-layout');
+                            if (!box) return;
+                            box.addEventListener('click', function (e) {
+                                var up = e.target.closest && e.target.closest('.home-up');
+                                var down = e.target.closest && e.target.closest('.home-down');
+                                if (!up && !down) return;
+                                var row = e.target.closest('.home-row');
+                                if (!row) return;
+                                if (up && row.previousElementSibling) box.insertBefore(row, row.previousElementSibling);
+                                else if (down && row.nextElementSibling) box.insertBefore(row.nextElementSibling, row);
+                            });
+                        })();
+                    </script>
                 </div>
             </section>
 

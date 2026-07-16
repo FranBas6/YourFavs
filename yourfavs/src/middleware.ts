@@ -76,6 +76,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 context.locals.user.onboarding = profile?.onboarding; // gating onboarding (Fase F)
                 context.locals.user.platforms = profile?.platforms ?? []; // "mis plataformas" (3.2)
                 context.locals.user.spoilerFree = profile?.spoilerFree; // §2 modo sin spoilers (undefined = OFF)
+                context.locals.user.homeLayout = profile?.homeLayout; // §4 home a tu medida (bloques ocultos)
                 // Idioma/región del perfil → contexto del request (los leen tmdbFetch y providers).
                 setRequestPrefs({ language: profile?.language, region: profile?.region });
             } catch { /* perfil opcional */ }
