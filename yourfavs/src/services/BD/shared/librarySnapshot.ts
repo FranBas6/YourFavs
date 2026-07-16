@@ -4,7 +4,7 @@ import {
 } from '../movies/yourfavsMovie';
 import {
     getSerieFav, getSeriesPendientes, getSeriesVistas, getSeriesSiguiendo,
-    getLikedSeries, getSeriesVerPronto
+    getLikedSeries, getSeriesVerPronto, getSeriesAbandonadas
 } from '../series/yourfavsSerie';
 
 /**
@@ -26,12 +26,12 @@ const TTL_MS = 5 * 60 * 1000;
 
 export interface LibrarySnapshot {
     movFavs: any[]; movPend: any[]; movVistos: any[]; movLike: any[]; movVerPronto: any[];
-    tvFavs: any[]; tvPend: any[]; tvVistos: any[]; tvSig: any[]; tvLike: any[]; tvVerPronto: any[];
+    tvFavs: any[]; tvPend: any[]; tvVistos: any[]; tvSig: any[]; tvLike: any[]; tvVerPronto: any[]; tvAbandonadas: any[];
 }
 
 const EMPTY: LibrarySnapshot = {
     movFavs: [], movPend: [], movVistos: [], movLike: [], movVerPronto: [],
-    tvFavs: [], tvPend: [], tvVistos: [], tvSig: [], tvLike: [], tvVerPronto: [],
+    tvFavs: [], tvPend: [], tvVistos: [], tvSig: [], tvLike: [], tvVerPronto: [], tvAbandonadas: [],
 };
 
 const cache = new Map<string, { data: LibrarySnapshot; expires: number }>();
@@ -50,14 +50,14 @@ export async function getLibrarySnapshot(): Promise<LibrarySnapshot> {
     const [movFavs, movPend, movVistos, movLike, movVerPronto] = await Promise.all([
         getMovieFav(), getMoviesPendientes(), getMoviesVistas(), getLikedMovies(), getMoviesVerPronto()
     ]);
-    const [tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto] = await Promise.all([
+    const [tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto, tvAbandonadas] = await Promise.all([
         getSerieFav(), getSeriesPendientes(), getSeriesVistas(),
-        getSeriesSiguiendo(), getLikedSeries(), getSeriesVerPronto()
+        getSeriesSiguiendo(), getLikedSeries(), getSeriesVerPronto(), getSeriesAbandonadas()
     ]);
 
     const data: LibrarySnapshot = {
         movFavs, movPend, movVistos, movLike, movVerPronto,
-        tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto,
+        tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto, tvAbandonadas,
     };
     cache.set(uid, { data, expires: now + TTL_MS });
     return data;

@@ -68,7 +68,7 @@ export async function buildPersonalIndex(): Promise<PersonalIndexItem[]> {
 
     const {
         movFavs, movPend, movVistos, movLike, movVerPronto,
-        tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto,
+        tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto, tvAbandonadas,
     } = await getLibrarySnapshot();
 
     const movieAgg = aggregate([
@@ -80,6 +80,7 @@ export async function buildPersonalIndex(): Promise<PersonalIndexItem[]> {
         { items: tvFavs, label: 'Favoritos' }, { items: tvSig, label: 'Siguiendo' },
         { items: tvLike, label: 'Me gusta' }, { items: tvVistos, label: 'Vistos' },
         { items: tvPend, label: 'Pendientes' }, { items: tvVerPronto, label: 'Ver pronto' },
+        { items: tvAbandonadas, label: 'Abandonadas' },
     ], 'tv');
 
     // Tags por título (una lectura de toda la colección MediaTags)

@@ -11,6 +11,8 @@ import {getTrending} from "../services/API/shared/tmdbDiscoverService";
 import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
 import {getMoviesViendoDetailed} from "../services/API/Movies/viendoMovies";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
+import RescatarSeries from "../components/Sections/RescatarSeries.astro";
+import { getStalledSeries } from "../services/API/Series/stalledSeries";
 import RecommendedForYou from "../components/Sections/RecommendedForYou.astro";
 import BriefDiario from "../components/Sections/BriefDiario.astro";
 import { getForYouRecommendations } from "../services/API/shared/forYouRecommendations";
@@ -49,6 +51,7 @@ const [
     continueWatching,
     viendoMovies,
     forYou,
+    stalledSeries,
 ] = await Promise.all([
     safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
     safeFetch(getTrending<Serie>('tv', 'week'), 'home/trendingSeries', [] as Serie[]),
@@ -68,6 +71,10 @@ const [
     // si el cómputo falla/tarda en frío, la home renderiza sin esta sección.
     Astro.locals.user
         ? safeFetch(getForYouRecommendations(12), 'home/forYou', [] as any[])
+        : Promise.resolve([] as any[]),
+    // "¿Retomamos alguna?" (§1): series a medias e inactivas. Solo con sesión; degrada a [] si falla.
+    Astro.locals.user
+        ? safeFetch(getStalledSeries(), 'home/stalled', [] as any[])
         : Promise.resolve([] as any[]),
 ]);
 
@@ -248,6 +255,13 @@ const sections = [
         {(continueWatching.length > 0 || viendoMovies.length > 0) && (
             <div class="content-wrapper">
                 <NextEpisode items={continueWatching} movies={viendoMovies} title="Estás viendo" />
+            </div>
+        )}
+
+        <!-- ¿Retomamos alguna? (§1): series a medias e inactivas (>4 semanas). Solo con sesión. -->
+        {stalledSeries.length > 0 && (
+            <div class="content-wrapper">
+                <RescatarSeries series={stalledSeries} />
             </div>
         )}
 

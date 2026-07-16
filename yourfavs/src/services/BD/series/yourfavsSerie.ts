@@ -16,7 +16,7 @@ async function logSeasonEpisodes(serieId: string, eps: { season: number; episode
     try { await appendEpisodes(serieId, eps); } catch { /* diario opcional */ }
 }
 
-const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'];
+const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto', 'SeriesAbandonadas'];
 
 const ACTION_TYPE_MAP: Record<string, string> = {
     'favs': 'SeriesFavs',
@@ -25,6 +25,7 @@ const ACTION_TYPE_MAP: Record<string, string> = {
     'siguiendo': 'SeriesSiguiendo',
     'liked': 'LikedSeries',
     'verpronto': 'SeriesVerPronto',
+    'abandonada': 'SeriesAbandonadas',
 };
 
 export async function handleSerieFavAction(formData: FormData): Promise<string> {
@@ -291,6 +292,7 @@ export const getSeriesVistas = () => getSeriesCollection<SeriesInterface>("Serie
 export const getSeriesSiguiendo = () => getSeriesCollection<SeriesInterface>("SeriesSiguiendo");
 export const getLikedSeries = () => getSeriesCollection<SeriesInterface>("LikedSeries");
 export const getSeriesVerPronto = () => getSeriesCollection<SeriesInterface>("SeriesVerPronto");
+export const getSeriesAbandonadas = () => getSeriesCollection<SeriesInterface>("SeriesAbandonadas");
 
 /**
  * Vistas "a secas": consumido SIN opinión más fuerte (excluye Favoritos y Me gusta).

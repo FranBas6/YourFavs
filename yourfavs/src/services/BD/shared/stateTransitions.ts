@@ -45,10 +45,15 @@ const MOVIE: Record<string, Transition> = {
 const SERIE: Record<string, Transition> = {
     SeriesPendiente: { remove: [], alsoAdd: [], logPase: false },
     SeriesVerPronto: { remove: [], alsoAdd: [], logPase: false },
-    SeriesSiguiendo: { remove: ['SeriesPendiente', 'SeriesVerPronto'], alsoAdd: [], logPase: false },
-    SeriesVistas: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesSiguiendo'], alsoAdd: [], logPase: false },
-    SeriesFavs: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesSiguiendo', 'LikedSeries'], alsoAdd: ['SeriesVistas'], logPase: false },
-    LikedSeries: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesSiguiendo', 'SeriesFavs'], alsoAdd: ['SeriesVistas'], logPase: false },
+    SeriesSiguiendo: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesAbandonadas'], alsoAdd: [], logPase: false },
+    SeriesVistas: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesSiguiendo', 'SeriesAbandonadas'], alsoAdd: [], logPase: false },
+    SeriesFavs: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesSiguiendo', 'SeriesAbandonadas', 'LikedSeries'], alsoAdd: ['SeriesVistas'], logPase: false },
+    LikedSeries: { remove: ['SeriesPendiente', 'SeriesVerPronto', 'SeriesSiguiendo', 'SeriesAbandonadas', 'SeriesFavs'], alsoAdd: ['SeriesVistas'], logPase: false },
+    // "Abandonada" (§1 rescate): sale del progreso ACTIVO (Siguiendo/Pendiente/Ver pronto),
+    // pero CONSERVA el progreso de episodios (WatchedEpisodes, no es colección de este mapa) y
+    // la opinión (Favs/Like/nota, que NO están en su `remove`). Reanudar = marcar Siguiendo, que
+    // la quita de aquí. Marcarla Vista/Fav/Like también la des-abandona.
+    SeriesAbandonadas: { remove: ['SeriesSiguiendo', 'SeriesPendiente', 'SeriesVerPronto'], alsoAdd: [], logPase: false },
 };
 
 const EMPTY: Transition = { remove: [], alsoAdd: [], logPase: false };

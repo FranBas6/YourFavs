@@ -2,7 +2,7 @@ import type { DocumentSnapshot } from "firebase-admin/firestore";
 import { userDoc, getCurrentUid } from "./userScope";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'] as const;
-const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto'] as const;
+const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto', 'SeriesAbandonadas'] as const;
 
 export type MovieCollection = typeof MOVIE_COLLECTIONS[number];
 export type SerieCollection = typeof SERIE_COLLECTIONS[number];

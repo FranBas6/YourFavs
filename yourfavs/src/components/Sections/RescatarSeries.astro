@@ -1,0 +1,137 @@
+---
+/**
+ * "¿Retomamos alguna?" (§1) — bloque suave en la Home para rescatar series a medias.
+ * Cada tarjeta: Reanudar (→ ficha) · Abandonar (optimista, no sale de la Home) ·
+ * Recordar en un mes (pospone el aviso, flag en localStorage).
+ */
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import type { StalledSerie } from "../../services/API/Series/stalledSeries";
+
+interface Props { series: StalledSerie[]; }
+const { series } = Astro.props;
+---
+<section class="resc-section" data-rescatar>
+    <div class="resc-head">
+        <h2>¿Retomamos alguna?</h2>
+        <p>Empezaste estas series y las dejaste a medias.</p>
+    </div>
+    <div class="resc-scroll">
+        {series.map((s) => (
+            <article class="resc-card" data-resc-card data-id={s.id}>
+                <a href={`/serie/${s.id}`} class="resc-poster" aria-label={s.name}>
+                    {s.poster_path
+                        ? <img src={posterUrl(s.poster_path, 'w185')} alt={s.name} loading="lazy" />
+                        : <span class="resc-noposter"></span>}
+                </a>
+                <div class="resc-body">
+                    <h3 class="resc-title">{s.name}</h3>
+                    <p class="resc-meta">Lo dejaste en la T{s.lastSeason} · {s.watched} eps · {s.label}</p>
+                    <div class="resc-actions">
+                        <a href={`/serie/${s.id}`} class="resc-btn resc-primary">Reanudar</a>
+                        <button type="button" class="resc-btn" data-resc-abandon={s.id}>Abandonar</button>
+                        <button type="button" class="resc-btn resc-ghost" data-resc-snooze={s.id}>Recordar en un mes</button>
+                    </div>
+                </div>
+            </article>
+        ))}
+    </div>
+</section>
+
+<style>
+    .resc-section { margin: 0 0 1.5rem; }
+    .resc-head h2 { font-size: 1.15rem; font-weight: 700; color: var(--text); margin: 0; }
+    .resc-head p { font-size: .85rem; color: var(--text-3); margin: 2px 0 12px; }
+    .resc-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+    .resc-scroll::-webkit-scrollbar { height: 6px; }
+    .resc-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .resc-card {
+        flex: 0 0 auto; width: min(340px, 86vw); display: flex; gap: 12px;
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: 14px;
+        padding: 12px; scroll-snap-align: start;
+    }
+    .resc-poster { flex-shrink: 0; display: block; }
+    .resc-poster img, .resc-noposter {
+        width: 60px; height: 90px; border-radius: 8px; object-fit: cover;
+        background: var(--bg-tint); display: block;
+    }
+    .resc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .resc-title { font-size: .95rem; font-weight: 700; color: var(--text); margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .resc-meta { font-size: .78rem; color: var(--text-3); margin: 3px 0 10px; }
+    .resc-actions { display: flex; gap: 6px; margin-top: auto; flex-wrap: wrap; }
+    .resc-btn {
+        font-size: .72rem; font-weight: 600; padding: 5px 10px; border-radius: 8px;
+        border: 1px solid var(--border); background: none; color: var(--text); cursor: pointer;
+        text-decoration: none; white-space: nowrap; transition: border-color .15s, background .15s;
+    }
+    .resc-btn:hover { border-color: var(--text-4); }
+    .resc-primary { background: #E63946; border-color: #E63946; color: #fff; }
+    .resc-primary:hover { background: #C7283A; border-color: #C7283A; }
+    .resc-ghost { color: var(--text-3); }
+    .resc-btn:disabled { opacity: .5; cursor: default; }
+</style>
+
+<script is:inline>
+    (function () {
+        var section = document.querySelector('[data-rescatar]');
+        if (!section) return;
+        var MONTH = 30 * 24 * 60 * 60 * 1000;
+
+        function checkEmpty() {
+            var visible = section.querySelectorAll('[data-resc-card]:not(.is-gone)');
+            if (visible.length === 0) section.style.display = 'none';
+        }
+        function removeCard(card) {
+            if (!card) return;
+            card.classList.add('is-gone');
+            card.style.transition = 'opacity .3s ease, transform .3s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(.96)';
+            setTimeout(function () { card.style.display = 'none'; checkEmpty(); }, 300);
+        }
+        function toast(msg) {
+            var c = document.getElementById('toast-container');
+            if (!c) return;
+            var t = document.createElement('div');
+            t.className = 'toast toast-success';
+            t.textContent = msg;
+            c.appendChild(t);
+            setTimeout(function () { t.style.animation = 'toastOut 0.3s ease forwards'; setTimeout(function () { t.remove(); }, 300); }, 2500);
+        }
+
+        // Ocultar al cargar las series pospuestas ("Recordar en un mes") aún vigentes.
+        section.querySelectorAll('[data-resc-card]').forEach(function (card) {
+            try {
+                var until = Number(localStorage.getItem('yf_rescate_snooze_' + card.getAttribute('data-id')) || 0);
+                if (until > Date.now()) { card.classList.add('is-gone'); card.style.display = 'none'; }
+            } catch (e) {}
+        });
+        checkEmpty();
+
+        section.addEventListener('click', function (e) {
+            var ab = e.target.closest && e.target.closest('[data-resc-abandon]');
+            if (ab) {
+                e.preventDefault();
+                if (ab.disabled) return;
+                var id = ab.getAttribute('data-resc-abandon');
+                var card = ab.closest('[data-resc-card]');
+                ab.disabled = true;
+                fetch('/api/series/state', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: id, actionType: 'abandonada', action: 'add' }),
+                })
+                    .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+                    .then(function (res) { if (!res.ok) throw new Error(); toast('Abandonada · ya no te la recordamos'); removeCard(card); })
+                    .catch(function () { ab.disabled = false; toast('No se pudo abandonar'); });
+                return;
+            }
+            var sn = e.target.closest && e.target.closest('[data-resc-snooze]');
+            if (sn) {
+                var sid = sn.getAttribute('data-resc-snooze');
+                try { localStorage.setItem('yf_rescate_snooze_' + sid, String(Date.now() + MONTH)); } catch (e2) {}
+                toast('Te lo recordamos en un mes');
+                removeCard(sn.closest('[data-resc-card]'));
+                return;
+            }
+        });
+    })();
+</script>
