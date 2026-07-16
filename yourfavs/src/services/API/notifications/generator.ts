@@ -15,7 +15,7 @@
 import { getRadar } from '../shared/radar';
 import { anniversarySignal, getLibraryOnMyPlatforms, type LibraryOrigin } from '../shared/dailyBrief';
 import { upsertMany, type NotifInput, type NotifType } from '../../BD/notifications/notifications';
-import { getCurrentUid } from '../../BD/shared/userScope';
+import { getCurrentUid, userDoc } from '../../BD/shared/userScope';
 import { getUserProfile } from '../../BD/profile/userProfile';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getWatchStreak } from '../../BD/series/yourfavsSerie';
@@ -43,7 +43,22 @@ export async function syncNotifications(platforms: number[] = [], force = false)
     const uid = getCurrentUid();
     if (!uid) return;
     const day = appDateParts(Date.now()).key;
-    if (!force && syncedDay.get(uid) === day) return;
+    if (!force && syncedDay.get(uid) === day) return; // fast-path (proceso caliente)
+
+    // Guard PERSISTENTE (dieta de lecturas): en serverless cada cold start reinicia el
+    // Map en memoria → sin esto, el generador (radar + snapshot + efeméride + platform
+    // diff) se re-ejecutaría en CADA arranque de instancia. Un doc meta barato recuerda
+    // el último día materializado entre instancias: si ya es de hoy, salimos con 1 lectura.
+    const syncMetaRef = userDoc('meta', 'notifSync');
+    if (!force) {
+        try {
+            const metaSnap = await syncMetaRef.get();
+            if (metaSnap.exists && (metaSnap.data() as { day?: string })?.day === day) {
+                syncedDay.set(uid, day);
+                return;
+            }
+        } catch { /* si el meta falla, materializamos igualmente */ }
+    }
 
     // Preferencias por tipo (si no hay, todo activado).
     let prefs: Record<string, boolean> | null = null;
@@ -135,6 +150,7 @@ export async function syncNotifications(platforms: number[] = [], force = false)
     try {
         await upsertMany(items);
         syncedDay.set(uid, day);
+        try { await syncMetaRef.set({ day }); } catch { /* meta best-effort */ }
     } catch (error) {
         console.error('[notifications] upsert:', (error as Error).message);
     }

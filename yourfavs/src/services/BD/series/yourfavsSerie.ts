@@ -277,6 +277,10 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             const { invalidateLibrarySnapshot } = await import('../shared/librarySnapshot');
             invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
         } catch { /* ignore */ }
+        try {
+            const { invalidateActivityFeed } = await import('../shared/activityFeed');
+            invalidateActivityFeed(); // §5 · altas/bajas/abandono/reorden salen en el feed
+        } catch { /* ignore */ }
     }
 
     return `/serie/${serieId}`;

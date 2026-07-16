@@ -54,7 +54,6 @@ const myListsItems = [
     { href: "/mislistas/verpronto",  color: "purple", icon: "clock",    title: "Ver pronto", desc: "En tu radar" },
     { href: "/mislistas/siguiendo",  color: "pink",   icon: "tv",       title: "Siguiendo",  desc: "Series al día" },
     { href: "/mislistas/actores",    color: "slate",  icon: "user",     title: "Actores",    desc: "Quienes sigues" },
-    { href: "/mislistas/radar",      color: "red",    icon: "radar",    title: "Radar",      desc: "No te pierdas lo tuyo" },
     { href: "/mislistas/colecciones", color: "purple", icon: "library", title: "Mis colecciones", desc: "Listas personalizadas" },
     { href: "/mislistas/actividad",  color: "green",  icon: "activity", title: "Actividad",  desc: "Tu historial" },
 ];
@@ -112,7 +111,6 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                             id="mislistas-btn" aria-haspopup="true" aria-expanded="false">
                         <Icon name="lucide:bookmark" class="w-4 h-4" />
                         Mis listas
-                        <span class="header-radar-badge js-radar-badge" hidden aria-label="novedades en el radar"></span>
                         <svg class="header-discover-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
@@ -641,12 +639,24 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
         var txt = n > 9 ? '9+' : String(n);
         badges.forEach(function (b) { if (n > 0) { b.textContent = txt; b.hidden = false; } else { b.hidden = true; } });
     }
-    // Badge independiente del desplegable → se rellena también en móvil (donde la
-    // campana del header está oculta pero el badge de la hoja de cuenta existe).
-    fetch('/api/notifications/count', { headers: { Accept: 'application/json' } })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) { if (d) setBadge(d.count | 0); })
-        .catch(function () {});
+    // Dieta de lecturas: el badge se cachea en localStorage. Las notificaciones se
+    // materializan 1×/día (dentro de /api/notifications/count), así que consultarlo en
+    // CADA navegación es tirar lecturas de Firestore a la basura. Solo consultamos si el
+    // caché es de OTRO día (para disparar la materialización diaria) o si venció el TTL.
+    // Leer / leer-todo actualizan el caché al instante → el badge siempre va fino.
+    var NKEY = 'yf_notif_badge', NTTL = 30 * 60 * 1000;
+    function nToday() { return new Date().toISOString().slice(0, 10); }
+    function nCacheGet() { try { var o = JSON.parse(localStorage.getItem(NKEY) || 'null'); return (o && typeof o.count === 'number') ? o : null; } catch (e) { return null; } }
+    function nCacheSet(n) { try { localStorage.setItem(NKEY, JSON.stringify({ count: n | 0, ts: Date.now(), day: nToday() })); } catch (e) { } }
+    function nFetch() {
+        fetch('/api/notifications/count', { headers: { Accept: 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (d) { if (d) { setBadge(d.count | 0); nCacheSet(d.count | 0); } })
+            .catch(function () { });
+    }
+    var nc = nCacheGet();
+    if (nc && nc.day === nToday() && (Date.now() - nc.ts) < NTTL) setBadge(nc.count | 0);
+    else nFetch();
 
     var btn = document.getElementById('notif-toggle-btn');
     var drop = document.getElementById('notif-dropdown');
@@ -694,6 +704,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 if (!d || !d.ok) { list.innerHTML = '<p class="notif-empty">No se pudieron cargar.</p>'; return; }
                 render(d.items || []);
                 setBadge(d.unread | 0);
+                nCacheSet(d.unread | 0); // el desplegable trae el conteo fresco → refresca caché
             })
             .catch(function () { list.innerHTML = '<p class="notif-empty">No se pudieron cargar.</p>'; });
     }
@@ -722,6 +733,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
         if (!item || !item.classList.contains('is-unread')) return;
         item.classList.remove('is-unread');
         var dot = item.querySelector('.notif-dot'); if (dot) dot.remove();
+        var _c = nCacheGet(); var _n = Math.max(0, ((_c && _c.count) || 1) - 1); nCacheSet(_n); setBadge(_n);
         fetch('/api/notifications', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read', id: item.getAttribute('data-id') }) }).catch(function () {});
     });
 
@@ -729,52 +741,14 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
         fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read_all' }) })
             .then(function () {
                 list.querySelectorAll('.notif-item.is-unread').forEach(function (el) { el.classList.remove('is-unread'); var d = el.querySelector('.notif-dot'); if (d) d.remove(); });
-                setBadge(0);
+                setBadge(0); nCacheSet(0);
             }).catch(function () {});
     });
 })();
 </script>
 
-<script is:inline>
-    // Badge del Radar (② · "El salto"): nº de novedades SIN VER. Se ve estés donde
-    // estés y se apaga al visitar el Radar (la página fija `yf_radar_ack = count`).
-    // Vuelve a salir solo si el conteo sube. (/api/radar/count, día-cacheado.)
-    (function () {
-        var badges = document.querySelectorAll('.js-radar-badge');
-        if (!badges.length) return;
-        fetch('/api/radar/count', { headers: { Accept: 'application/json' } })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) {
-                if (!d) return;
-                var count = d.count | 0;
-                var seen = parseInt(localStorage.getItem('yf_radar_ack') || '0', 10) || 0;
-                if (count > seen && count > 0) {
-                    var txt = count > 9 ? '9+' : String(count);
-                    badges.forEach(function (b) { b.textContent = txt; b.hidden = false; });
-                }
-            })
-            .catch(function () {});
-    })();
-</script>
 
 <style>
-    .header-radar-badge {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 18px;
-        height: 18px;
-        padding: 0 5px;
-        margin-left: 2px;
-        border-radius: 9999px;
-        background: var(--accent);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
-        line-height: 1;
-    }
-    .header-radar-badge[hidden] { display: none; }
-
     /* === Auth en el header (B.3) === */
 
     /* "Entrar" (sin sesión) — píldora blanca sobre el header azul */

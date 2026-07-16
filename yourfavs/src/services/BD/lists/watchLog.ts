@@ -18,6 +18,40 @@ import { userCol, getCurrentUid } from '../shared/userScope';
 
 const COLLECTION = 'WatchLog';
 
+// Dieta de lecturas: los contadores de ficha (countWatches/Passes) consultan TODAS
+// las entradas de un título en cada carga de ficha — para una serie enorme (Naruto,
+// ~220 episodios) eso son ~220 lecturas por apertura, solo para contar 0-3 "pases".
+// Cacheamos las filas por (uid, tmdb_id) con TTL corto; cualquier append/borrado del
+// mismo título invalida su entrada. Así abrir una ficha varias veces no re-escanea.
+const ROWS_TTL_MS = 5 * 60 * 1000;
+const rowsCache = new Map<string, { rows: Record<string, any>[]; expires: number }>();
+function rowsKey(uid: string, tmdbId: number): string { return `${uid}:${tmdbId}`; }
+function invalidateTitleRows(tmdb_id: number | string): void {
+    const uid = getCurrentUid();
+    if (uid) rowsCache.delete(rowsKey(uid, Number(tmdb_id)));
+}
+// Cualquier escritura del diario cambia el feed de Actividad → invalidamos su caché.
+// Import dinámico para NO crear ciclo (activityFeed → librarySnapshot → yourfavsSerie →
+// watchLog importaría de vuelta a activityFeed).
+async function bustActivityFeed(): Promise<void> {
+    try { const m = await import('../shared/activityFeed'); m.invalidateActivityFeed(); } catch { /* ignore */ }
+}
+async function getTitleRows(tmdb_id: number | string): Promise<Record<string, any>[]> {
+    const uid = getCurrentUid();
+    if (!uid) return [];
+    const id = Number(tmdb_id);
+    if (!Number.isFinite(id)) return [];
+    const key = rowsKey(uid, id);
+    const cached = rowsCache.get(key);
+    if (cached && cached.expires > Date.now()) return cached.rows;
+    const snap = await userCol(COLLECTION).where('tmdb_id', '==', id).get();
+    // Incluimos el id del doc en cada fila → permite borrar sin re-consultar (ver
+    // removeEpisodeFromLog). Los contadores solo leen campos, así que el id extra es inocuo.
+    const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    rowsCache.set(key, { rows, expires: Date.now() + ROWS_TTL_MS });
+    return rows;
+}
+
 export interface WatchLogEntry {
     id: string;
     media_type: 'movie' | 'tv';
@@ -74,6 +108,8 @@ export async function appendWatchLog(e: AppendInput): Promise<{ rewatch: boolean
     if (e.note) doc.note = String(e.note).slice(0, 500);
 
     await userCol(COLLECTION).add(doc);
+    invalidateTitleRows(tmdbId);
+    await bustActivityFeed();
     return { rewatch, added: true };
 }
 
@@ -116,6 +152,8 @@ export async function appendEpisodes(
         seen.add(key); // por si el lote trae duplicados
     }
     await batch.commit();
+    invalidateTitleRows(tmdbId);
+    await bustActivityFeed();
 }
 
 /**
@@ -134,21 +172,21 @@ export async function removeEpisodeFromLog(
     const tmdbId = Number(serieId);
     if (!Number.isFinite(tmdbId)) return;
 
-    const snap = await userCol(COLLECTION).where('tmdb_id', '==', tmdbId).get();
-    const matches = snap.docs.filter((d) => {
-        const x = d.data();
-        return x.media_type === 'tv' && x.season === Number(season) && x.episode === Number(episode);
-    });
+    // Reutiliza la caché por título (la ficha ya la cargó al contar "N veces") → 0
+    // lecturas en caliente, en vez de re-escanear todo el WatchLog de la serie.
+    const rows = await getTitleRows(tmdbId);
+    const matches = rows.filter((x) => x.media_type === 'tv' && x.season === Number(season) && x.episode === Number(episode));
     if (!matches.length) return;
 
-    const tsOf = (d: (typeof matches)[number]): number => {
-        const x = d.data() as { logged_at?: { toMillis?: () => number }; watched_on?: string };
+    const tsOf = (x: Record<string, any>): number => {
         if (x.logged_at && typeof x.logged_at.toMillis === 'function') return x.logged_at.toMillis();
         if (x.watched_on) return new Date(x.watched_on).getTime() || 0;
         return 0;
     };
     matches.sort((a, b) => tsOf(b) - tsOf(a)); // más reciente primero
-    await matches[0].ref.delete();
+    await userCol(COLLECTION).doc(matches[0].id).delete();
+    invalidateTitleRows(tmdbId);
+    await bustActivityFeed();
 }
 
 /** Nº de veces visto + última fecha (para "La has visto N veces" en la ficha). */
@@ -157,8 +195,7 @@ export async function countWatches(
     tmdb_id: number | string
 ): Promise<{ count: number; last: string | null }> {
     if (!getCurrentUid()) return { count: 0, last: null };
-    const snap = await userCol(COLLECTION).where('tmdb_id', '==', Number(tmdb_id)).get();
-    const rows = snap.docs.map((d) => d.data()).filter((x) => x.media_type === media_type);
+    const rows = (await getTitleRows(tmdb_id)).filter((x) => x.media_type === media_type);
     if (!rows.length) return { count: 0, last: null };
     const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
     return { count: rows.length, last };
@@ -184,8 +221,7 @@ export async function countSeriesPasses(
     serieId: number | string
 ): Promise<{ passes: number; last: string | null }> {
     if (!getCurrentUid()) return { passes: 0, last: null };
-    const snap = await userCol(COLLECTION).where('tmdb_id', '==', Number(serieId)).get();
-    const rows = snap.docs.map((d) => d.data()).filter((x) => x.media_type === 'tv' && x.season == null);
+    const rows = (await getTitleRows(serieId)).filter((x) => x.media_type === 'tv' && x.season == null);
     if (!rows.length) return { passes: 0, last: null };
     const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
     return { passes: rows.length, last };
@@ -203,8 +239,7 @@ export async function countMoviePasses(
     tmdb_id: number | string
 ): Promise<{ passes: number; last: string | null; first: string | null }> {
     if (!getCurrentUid()) return { passes: 0, last: null, first: null };
-    const snap = await userCol(COLLECTION).where('tmdb_id', '==', Number(tmdb_id)).get();
-    const all = snap.docs.map((d) => d.data()).filter((x) => x.media_type === 'movie');
+    const all = (await getTitleRows(tmdb_id)).filter((x) => x.media_type === 'movie');
     // `first` = primer visionado registrado (incluye la entrada base, no solo re-visionados),
     // para la efeméride "La viste por primera vez en…" (§6). Sin lecturas extra.
     const first = all.length ? (all.map((x) => x.watched_on as string).filter(Boolean).sort()[0] || null) : null;

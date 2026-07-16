@@ -72,9 +72,12 @@ async function fetchWatchedEpisodeEvents(
         for (const docSnap of logDocs) {
             const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; episode?: number; watched_on?: string; logged_at?: unknown };
             if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
-            let ts = x.watched_on ? new Date(x.watched_on + 'T12:00:00').getTime() : 0;
-            if (!ts || isNaN(ts)) ts = getFirebaseTimestamp(x.logged_at);
-            if (!ts) continue;
+            // Hora REAL de marcado desde logged_at (instante absoluto de Firestore).
+            // watched_on es solo fecha → usarlo daba las 12:00 (comodín) y, peor, variaba
+            // con la tz del runtime (12:00 en dev / 14:00 en prod). logged_at no ambiguo.
+            let ts = getFirebaseTimestamp(x.logged_at);
+            if (!ts && x.watched_on) ts = new Date(x.watched_on + 'T12:00:00').getTime(); // fallback entradas viejas sin logged_at
+            if (!ts || isNaN(ts)) continue;
             const serie = bucketFor(String(x.tmdb_id));
             serie.covered.add(`${x.season}:${x.episode}`);
             pushEp(serie, ts, x.season, x.episode);
@@ -298,8 +301,22 @@ async function fetchMutationEvents(): Promise<ActivityEvent[]> {
     }
 }
 
+// Dieta de lecturas: el feed escanea WatchLog + WatchedEpisodes + 11 listas + Ratings +
+// personas → la página más cara. Cache por uid para abrirla varias veces sin re-escanear.
+// A diferencia de un TTL "a secas", se INVALIDA en las mutaciones que cambian el feed
+// (episodios marcar/desmarcar y listas añadir/quitar/abandonar/…), así nunca muestra
+// historial desfasado justo tras una acción. El TTL es solo un backstop.
+const FEED_TTL_MS = 60 * 1000;
+const feedCache = new Map<string, { data: ActivityEvent[]; expires: number }>();
+export function invalidateActivityFeed(uid?: string): void {
+    if (uid) feedCache.delete(uid); else feedCache.clear();
+}
+
 export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
-    if (!getCurrentUid()) return [];
+    const uid = getCurrentUid();
+    if (!uid) return [];
+    const cachedFeed = feedCache.get(uid);
+    if (cachedFeed && cachedFeed.expires > Date.now()) return cachedFeed.data;
     // WatchLog se lee UNA sola vez y se comparte entre episodios vistos y re-visionados
     // (antes se escaneaba dos veces → doble de lecturas en la colección más grande).
     const [snapshot, logSnap, liveSnap] = await Promise.all([
@@ -331,5 +348,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
             .filter(e => e.timestamp > 0)
             .filter(e => !(e.collection === 'SeriesSiguiendo' && resumedSerieIds.has(e.id)))
     );
-    return [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
+    const events = [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
+    feedCache.set(uid, { data: events, expires: Date.now() + FEED_TTL_MS });
+    return events;
 }

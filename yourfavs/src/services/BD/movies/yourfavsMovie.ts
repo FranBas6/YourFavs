@@ -170,6 +170,10 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
             const { invalidateLibrarySnapshot } = await import('../shared/librarySnapshot');
             invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
         } catch { /* ignore */ }
+        try {
+            const { invalidateActivityFeed } = await import('../shared/activityFeed');
+            invalidateActivityFeed(); // §5 · altas/bajas salen en el feed
+        } catch { /* ignore */ }
     }
 
     return `/movie/${movieId}`;

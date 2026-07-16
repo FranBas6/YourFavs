@@ -62,6 +62,10 @@ export async function appendActivity(e: ActivityInput): Promise<void> {
     if (e.meta && Object.keys(e.meta).length) doc.meta = e.meta;
 
     await userCol(COLLECTION).add(doc);
+    // Toda acción intencional (quitar/dejar de seguir/abandonar/retomar/reordenar) pasa
+    // por aquí → invalidamos la caché del feed de Actividad en un solo sitio (import
+    // dinámico para evitar ciclo; activityFeed importa activityLog dinámicamente también).
+    try { const m = await import('./activityFeed'); m.invalidateActivityFeed(); } catch { /* ignore */ }
 }
 
 /** Todas las entradas de la bitácora (el feed las ordena/mezcla con el resto de fuentes). */
