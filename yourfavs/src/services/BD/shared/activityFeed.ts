@@ -72,11 +72,19 @@ async function fetchWatchedEpisodeEvents(
         for (const docSnap of logDocs) {
             const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; episode?: number; watched_on?: string; logged_at?: unknown };
             if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
-            // Hora REAL de marcado desde logged_at (instante absoluto de Firestore).
-            // watched_on es solo fecha → usarlo daba las 12:00 (comodín) y, peor, variaba
-            // con la tz del runtime (12:00 en dev / 14:00 en prod). logged_at no ambiguo.
-            let ts = getFirebaseTimestamp(x.logged_at);
-            if (!ts && x.watched_on) ts = new Date(x.watched_on + 'T12:00:00').getTime(); // fallback entradas viejas sin logged_at
+            // El DÍA lo manda watched_on = fecha REAL del visionado (el backfill del diario
+            // la conserva desde watched_at, aunque su logged_at sea la fecha del backfill).
+            // La HORA la da logged_at SOLO si cae ese mismo día (marcado normal → hora real);
+            // si logged_at es de otro día (backfill/edición de fecha) usamos mediodía UTC,
+            // estable entre zonas horarias (evita el desfase 12:00 dev / 14:00 prod de antes).
+            const loggedMs = getFirebaseTimestamp(x.logged_at);
+            let ts: number;
+            if (x.watched_on) {
+                const noonMs = new Date(x.watched_on + 'T12:00:00Z').getTime();
+                ts = (loggedMs && dayKey(loggedMs) === dayKey(noonMs)) ? loggedMs : noonMs;
+            } else {
+                ts = loggedMs;
+            }
             if (!ts || isNaN(ts)) continue;
             const serie = bucketFor(String(x.tmdb_id));
             serie.covered.add(`${x.season}:${x.episode}`);
