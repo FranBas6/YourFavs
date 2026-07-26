@@ -38,15 +38,28 @@ const SLUG_TO_PROVIDER_ID: Record<string, number> = {
     filmin: PROVIDERS.FILMIN,
 };
 
+// "Mis plataformas": intersección de las plataformas del perfil (locals.user.platforms,
+// ids de proveedor TMDB) con las que soporta esta página. Si el usuario tiene alguna,
+// el chip filtra el catálogo a la UNIÓN de esas; si no, el chip lleva a /perfil a elegirlas.
+const KNOWN_PROVIDER_IDS = new Set(Object.values(SLUG_TO_PROVIDER_ID));
+const myProviderIds: number[] = ((Astro.locals.user as any)?.platforms ?? [])
+    .map((x: any) => Number(x))
+    .filter((id: number) => KNOWN_PROVIDER_IDS.has(id));
+const hasMine = myProviderIds.length > 0;
+const isMine = platformParam === 'mine' && hasMine;
+
 let movies: Movie[] = [];
 let series: Serie[] = [];
 
-if (filtersActive || filters.sort) {
-    // Con filtros u orden: discover directo combinando with_watch_providers + watch_region + filtros.
-    // Si platform === 'all', combinamos TODOS los providers con OR (pipe).
-    const providerIds = platformParam === 'all'
-        ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
-        : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
+if (filtersActive || filters.sort || isMine) {
+    // Con filtros u orden (o "Mis plataformas"): discover directo combinando
+    // with_watch_providers + watch_region + filtros. platform 'all' → todos los providers;
+    // 'mine' → solo los del perfil; ambos combinados con OR (pipe).
+    const providerIds = isMine
+        ? myProviderIds.join('|')
+        : platformParam === 'all'
+            ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
+            : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
 
     const buildParams = (mt: 'movie' | 'tv') => ({
         page: pageStr,
@@ -77,12 +90,14 @@ if (filtersActive || filters.sort) {
 }
 
 const totalPages = 190;
-const activePlatform = platformParam === 'all' ? 'Todas' : platformList.find(p => p.slug === platformParam)?.name || platformParam;
+const activePlatform = isMine ? 'Mis plataformas' : platformParam === 'all' ? 'Todas' : platformList.find(p => p.slug === platformParam)?.name || platformParam;
 
 // Contexto para el contador en vivo del sheet (2.3b): mismos providers + región que el discover.
-const _provIds = platformParam === 'all'
-    ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
-    : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
+const _provIds = isMine
+    ? myProviderIds.join('|')
+    : platformParam === 'all'
+        ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
+        : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
 const _provBase = { with_watch_providers: _provIds, watch_region: 'ES' };
 const countCtx = _provIds ? [
     ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: _provBase }] : []),
@@ -131,6 +146,16 @@ function buildPlatformUrl(slug: string) {
                 </svg>
             </summary>
             <div class="flex flex-wrap gap-2 mt-2 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                {Astro.locals.user && (
+                    <a href={hasMine ? buildPlatformUrl('mine') : '/perfil'}
+                       class={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all border
+                           ${isMine
+                               ? 'bg-[#111827] text-white border-[#111827]'
+                               : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:border-indigo-400'}`}>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                        Mis plataformas
+                    </a>
+                )}
                 <a href={buildPlatformUrl('all')}
                    class={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border
                        ${platformParam === 'all'
@@ -151,6 +176,16 @@ function buildPlatformUrl(slug: string) {
             </div>
         </details>
         <div class="hidden sm:flex flex-wrap gap-2 mb-6">
+            {Astro.locals.user && (
+                <a href={hasMine ? buildPlatformUrl('mine') : '/perfil'}
+                   class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
+                       ${isMine
+                           ? 'bg-[#111827] text-white border-[#111827] shadow-sm'
+                           : 'bg-indigo-50 text-indigo-700 border-indigo-200 hover:border-indigo-400 hover:shadow-sm'}`}>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.783-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                    Mis plataformas
+                </a>
+            )}
             <a href={buildPlatformUrl('all')}
                class={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-sm font-medium transition-all border
                    ${platformParam === 'all'

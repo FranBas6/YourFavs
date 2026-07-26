@@ -68,39 +68,36 @@ async function fetchWatchedEpisodeEvents(
             }
         };
 
-        // 1) WatchLog (fuente primaria). Solo entradas de episodio (tv con season+episode).
-        for (const docSnap of logDocs) {
-            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; episode?: number; watched_on?: string; logged_at?: unknown };
-            if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
-            // El DÍA lo manda watched_on = fecha REAL del visionado (el backfill del diario
-            // la conserva desde watched_at, aunque su logged_at sea la fecha del backfill).
-            // La HORA la da logged_at SOLO si cae ese mismo día (marcado normal → hora real);
-            // si logged_at es de otro día (backfill/edición de fecha) usamos mediodía UTC,
-            // estable entre zonas horarias (evita el desfase 12:00 dev / 14:00 prod de antes).
-            const loggedMs = getFirebaseTimestamp(x.logged_at);
-            let ts: number;
-            if (x.watched_on) {
-                const noonMs = new Date(x.watched_on + 'T12:00:00Z').getTime();
-                ts = (loggedMs && dayKey(loggedMs) === dayKey(noonMs)) ? loggedMs : noonMs;
-            } else {
-                ts = loggedMs;
-            }
-            if (!ts || isNaN(ts)) continue;
-            const serie = bucketFor(String(x.tmdb_id));
-            serie.covered.add(`${x.season}:${x.episode}`);
-            pushEp(serie, ts, x.season, x.episode);
-        }
-
-        // 2) WatchedEpisodes (relleno): solo episodios que WatchLog nunca vio.
+        // 1) WatchedEpisodes (fuente PRIMARIA de la HORA). watched_at es el instante REAL
+        //    de cada visionado (ISO absoluto) → el reloj cliente lo pinta bien en Madrid,
+        //    sin el desfase de mediodía. Cubre lo que sigue marcado (el caso normal).
         for (const docSnap of liveDocs) {
             const data = docSnap.data() as { watched_episodes?: { season: number; episode: number; watched_at?: string }[] };
             const serie = bucketFor(docSnap.id);
             for (const ep of data.watched_episodes || []) {
-                if (serie.covered.has(`${ep.season}:${ep.episode}`)) continue; // ya cubierto por WatchLog
                 const ts = ep.watched_at ? new Date(ep.watched_at).getTime() : 0;
                 if (!ts || isNaN(ts)) continue;
+                serie.covered.add(`${ep.season}:${ep.episode}`);
                 pushEp(serie, ts, ep.season, ep.episode);
             }
+        }
+
+        // 2) WatchLog (relleno append-only): SOLO episodios que ya NO están en
+        //    WatchedEpisodes (desmarcados para volver a ver) → así no se pierde el
+        //    historial (bug §5). Su HORA: logged_at real si no es del backfill; los del
+        //    backfill (o sin hora) caen a mediodía UTC del watched_on (día real, estable).
+        for (const docSnap of logDocs) {
+            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; episode?: number; watched_on?: string; logged_at?: unknown; source?: string };
+            if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
+            const serie = bucketFor(String(x.tmdb_id));
+            if (serie.covered.has(`${x.season}:${x.episode}`)) continue; // ya cubierto por watched_at
+            const loggedMs = getFirebaseTimestamp(x.logged_at);
+            const ts = (loggedMs && x.source !== 'backfill')
+                ? loggedMs
+                : (x.watched_on ? new Date(x.watched_on + 'T12:00:00Z').getTime() : loggedMs);
+            if (!ts || isNaN(ts)) continue;
+            serie.covered.add(`${x.season}:${x.episode}`);
+            pushEp(serie, ts, x.season, x.episode);
         }
 
         // 3) Un evento por (serie, día), con el mismo etiquetado agrupado de antes.
@@ -356,7 +353,23 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
             .filter(e => e.timestamp > 0)
             .filter(e => !(e.collection === 'SeriesSiguiendo' && resumedSerieIds.has(e.id)))
     );
-    const events = [...collectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
+    // Añadir a Favoritos / Me gusta arrastra el título a "Vistas" en cascada (alsoAdd),
+    // con el MISMO added_at → generaba 2 eventos ("Añadida a Favoritos" + "Marcada como
+    // vista") por una sola acción. Suprimimos el de "Vistas" cuando existe un Fav/Like del
+    // mismo título en el mismo instante (±5s): esa marca de vista es consecuencia, no acción.
+    const FAV_LIKE = new Set(['MovieFavs', 'SeriesFavs', 'LikedMovies', 'LikedSeries']);
+    const favLikeStamps = new Map<string, number[]>(); // "type:id" → timestamps de fav/like
+    for (const e of collectionEvents) {
+        if (!FAV_LIKE.has(e.collection)) continue;
+        const k = `${e.type}:${e.id}`;
+        (favLikeStamps.get(k) ?? favLikeStamps.set(k, []).get(k)!).push(e.timestamp);
+    }
+    const dedupedCollectionEvents = collectionEvents.filter(e => {
+        if (e.collection !== 'MoviesVistas' && e.collection !== 'SeriesVistas') return true;
+        const stamps = favLikeStamps.get(`${e.type}:${e.id}`);
+        return !stamps?.some(t => Math.abs(t - e.timestamp) < 5000); // cascada → fuera
+    });
+    const events = [...dedupedCollectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
     feedCache.set(uid, { data: events, expires: Date.now() + FEED_TTL_MS });
     return events;
 }
