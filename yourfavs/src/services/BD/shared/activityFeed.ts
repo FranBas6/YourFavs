@@ -1,15 +1,18 @@
 import { userCol, getCurrentUid } from "./userScope";
 import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
-import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
-import { appDateParts } from "../../../utils/appTime";
+import { getFirebaseTimestamp, formatScore } from "../../../utils/constants/helpers/media-helpers";
 
 export interface ActivityEvent {
     type: 'movie' | 'serie' | 'person';
     id: string;
     collection: string;
     action: string;
+    /** Instante del evento. En una sesión de episodios, el del ÚLTIMO marcado. */
     timestamp: number;
-    episodes?: { season: number; episode: number }[];
+    /** Solo sesiones de episodios: instante del PRIMER episodio de la tanda (para el rango de horas). */
+    startTs?: number;
+    /** `ts` = instante real de cada episodio (falta si viene del backfill sin hora fiable). */
+    episodes?: { season: number; episode: number; ts?: number }[];
     /** Solo eventos de persona: llevan su nombre/foto (no se resuelven por TMDB). */
     name?: string;
     profile_path?: string | null;
@@ -32,40 +35,54 @@ const COLLECTIONS: { name: string; key: keyof LibrarySnapshot; type: 'movie' | '
     { name: 'SeriesVerPronto', key: 'tvVerPronto', type: 'serie', action: 'Añadida a Ver Pronto' },
 ];
 
-function dayKey(ts: number): string {
-    return appDateParts(ts).key; // agrupado por día en hora de Madrid (no UTC del servidor)
+/**
+ * Corte de sesión: hueco máximo entre dos episodios para seguir considerándolos la
+ * misma tanda. Agrupar por día natural mentía sobre el "cuándo" (3 episodios a las
+ * 00:50 y otros 3 a las 23:58 del mismo día salían como un solo evento a las 23:58).
+ */
+const SESSION_GAP_MS = 4 * 60 * 60 * 1000;
+/**
+ * Margen para no cortar por la propia cascada de una acción: añadir a Favoritos
+ * arrastra el título a Vistas con el MISMO instante, y eso no es "algo que hiciste
+ * entre dos episodios".
+ */
+const CUT_EPSILON_MS = 1000;
+
+/** Instante que puede partir una sesión: otro evento del feed, o un episodio de otra serie. */
+type CutPoint = { ts: number; serie: string | null };
+
+/** Primer índice con ts >= v (los cut points llegan ya ordenados). */
+function lowerBound(arr: CutPoint[], v: number): number {
+    let lo = 0, hi = arr.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (arr[mid].ts < v) lo = mid + 1; else hi = mid;
+    }
+    return lo;
 }
 
-// Episodios vistos → append-only. Fuente PRIMARIA = `WatchLog` (una entrada por
-// visionado, nunca se borra al desmarcar), así el diario del feed no se pierde
-// cuando se vacía el progreso. `WatchedEpisodes` (estado vivo) SOLO aporta los
-// episodios que WatchLog nunca vio (marcados antes de existir el diario / Fase L5):
-// así arreglamos el bug de pérdida de historial sin perder el histórico previo.
+// Episodios vistos → append-only. Fuente PRIMARIA de la HORA = `WatchedEpisodes`
+// (`watched_at` es el instante real); `WatchLog` solo rellena los episodios que ya no
+// están marcados, para no perder historial al vaciar el progreso (bug §5).
+//
+// Agrupado por SESIÓN, no por día: se corta cuando hay un hueco > SESSION_GAP_MS o
+// cuando entre dos episodios ocurrió otra cosa (guardar en una lista, valorar, ver un
+// episodio de otra serie…). La segunda regla usa una señal real en vez de adivinar.
 async function fetchWatchedEpisodeEvents(
     logDocs: FirebaseFirestore.QueryDocumentSnapshot[],
     liveDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    cutPoints: CutPoint[] = [],
 ): Promise<ActivityEvent[]> {
     try {
-        // serieId → { covered: claves "s:e" ya cubiertas por WatchLog,
-        //             byDay: buckets por día calendario }
-        const bySerie = new Map<string, {
-            covered: Set<string>;
-            byDay: Map<string, { ts: number; eps: { season: number; episode: number }[] }>;
-        }>();
+        // serieId → { covered: claves "s:e" ya contabilizadas, eps: episodios con su instante }
+        // `synthetic` = la hora no es real (backfill anclado a mediodía) → no participa en
+        // la regla de interleaving, solo en la del hueco.
+        type EpEntry = { season: number; episode: number; ts: number; synthetic: boolean };
+        const bySerie = new Map<string, { covered: Set<string>; eps: EpEntry[] }>();
         const bucketFor = (id: string) => {
             let s = bySerie.get(id);
-            if (!s) { s = { covered: new Set(), byDay: new Map() }; bySerie.set(id, s); }
+            if (!s) { s = { covered: new Set(), eps: [] }; bySerie.set(id, s); }
             return s;
-        };
-        const pushEp = (serie: { byDay: Map<string, { ts: number; eps: { season: number; episode: number }[] }> }, ts: number, season: number, episode: number) => {
-            const key = dayKey(ts);
-            const bucket = serie.byDay.get(key);
-            if (bucket) {
-                bucket.eps.push({ season, episode });
-                if (ts > bucket.ts) bucket.ts = ts;
-            } else {
-                serie.byDay.set(key, { ts, eps: [{ season, episode }] });
-            }
         };
 
         // 1) WatchedEpisodes (fuente PRIMARIA de la HORA). watched_at es el instante REAL
@@ -78,7 +95,7 @@ async function fetchWatchedEpisodeEvents(
                 const ts = ep.watched_at ? new Date(ep.watched_at).getTime() : 0;
                 if (!ts || isNaN(ts)) continue;
                 serie.covered.add(`${ep.season}:${ep.episode}`);
-                pushEp(serie, ts, ep.season, ep.episode);
+                serie.eps.push({ season: ep.season, episode: ep.episode, ts, synthetic: false });
             }
         }
 
@@ -92,44 +109,79 @@ async function fetchWatchedEpisodeEvents(
             const serie = bucketFor(String(x.tmdb_id));
             if (serie.covered.has(`${x.season}:${x.episode}`)) continue; // ya cubierto por watched_at
             const loggedMs = getFirebaseTimestamp(x.logged_at);
-            const ts = (loggedMs && x.source !== 'backfill')
+            const realHour = Boolean(loggedMs) && x.source !== 'backfill';
+            const ts = realHour
                 ? loggedMs
                 : (x.watched_on ? new Date(x.watched_on + 'T12:00:00Z').getTime() : loggedMs);
             if (!ts || isNaN(ts)) continue;
             serie.covered.add(`${x.season}:${x.episode}`);
-            pushEp(serie, ts, x.season, x.episode);
+            serie.eps.push({ season: x.season, episode: x.episode, ts, synthetic: !realHour });
         }
 
-        // 3) Un evento por (serie, día), con el mismo etiquetado agrupado de antes.
-        const events: ActivityEvent[] = [];
-        for (const [serieId, { byDay }] of bySerie) {
-            for (const { ts, eps: dayEps } of byDay.values()) {
-                dayEps.sort((a, b) => a.season - b.season || a.episode - b.episode);
-                const seasons = Array.from(new Set(dayEps.map(e => e.season))).sort((a, b) => a - b);
-                const isContiguous = seasons.every((s, i) => i === 0 || s === seasons[i - 1] + 1);
-                const seasonLabel = seasons.length === 1
-                    ? `T${seasons[0]}`
-                    : isContiguous
-                        ? `T${seasons[0]}-T${seasons[seasons.length - 1]}`
-                        : seasons.map(s => `T${s}`).join(', ');
-                let action: string;
-                if (dayEps.length === 1) {
-                    action = `Episodio T${dayEps[0].season} E${dayEps[0].episode} visto`;
-                } else if (seasons.length === 1 && dayEps.length <= 4) {
-                    const list = dayEps.map(e => `E${e.episode}`).join(', ');
-                    action = `${seasonLabel} ${list} vistos (${dayEps.length})`;
-                } else {
-                    action = `${dayEps.length} episodios vistos · ${seasonLabel}`;
-                }
-                events.push({
-                    type: 'serie',
-                    id: serieId,
-                    collection: 'WatchedEpisodes',
-                    action,
-                    timestamp: ts,
-                    episodes: dayEps,
-                });
+        // 3) Cut points: los eventos ajenos ya resueltos + los episodios de OTRAS series.
+        //    No hay circularidad: se comparan instantes individuales, nunca grupos ya formados.
+        const cuts: CutPoint[] = [...cutPoints];
+        for (const [serieId, { eps }] of bySerie) {
+            for (const ep of eps) if (!ep.synthetic) cuts.push({ ts: ep.ts, serie: serieId });
+        }
+        cuts.sort((a, b) => a.ts - b.ts);
+        /** ¿Ocurrió algo ajeno a esta serie estrictamente entre estos dos instantes? */
+        const hasCutBetween = (from: number, to: number, serieId: string): boolean => {
+            for (let i = lowerBound(cuts, from + CUT_EPSILON_MS); i < cuts.length; i++) {
+                if (cuts[i].ts > to - CUT_EPSILON_MS) return false;
+                if (cuts[i].serie !== serieId) return true;
             }
+            return false;
+        };
+
+        // 4) Un evento por SESIÓN, con el mismo etiquetado agrupado de antes.
+        const events: ActivityEvent[] = [];
+        const pushSession = (serieId: string, group: EpEntry[]) => {
+            const startTs = group[0].ts;                    // group viene ordenado por ts
+            const endTs = group[group.length - 1].ts;
+            const eps = [...group].sort((a, b) => a.season - b.season || a.episode - b.episode);
+            const seasons = Array.from(new Set(eps.map(e => e.season))).sort((a, b) => a - b);
+            const isContiguous = seasons.every((s, i) => i === 0 || s === seasons[i - 1] + 1);
+            const seasonLabel = seasons.length === 1
+                ? `T${seasons[0]}`
+                : isContiguous
+                    ? `T${seasons[0]}-T${seasons[seasons.length - 1]}`
+                    : seasons.map(s => `T${s}`).join(', ');
+            let action: string;
+            if (eps.length === 1) {
+                action = `Episodio T${eps[0].season} E${eps[0].episode} visto`;
+            } else if (seasons.length === 1 && eps.length <= 4) {
+                const list = eps.map(e => `E${e.episode}`).join(', ');
+                action = `${seasonLabel} ${list} vistos (${eps.length})`;
+            } else {
+                action = `${eps.length} episodios vistos · ${seasonLabel}`;
+            }
+            events.push({
+                type: 'serie',
+                id: serieId,
+                collection: 'WatchedEpisodes',
+                action,
+                timestamp: endTs,
+                startTs,
+                // Los del backfill no llevan hora fiable → sin `ts` para que la UI no la pinte.
+                episodes: eps.map(e => (e.synthetic ? { season: e.season, episode: e.episode } : { season: e.season, episode: e.episode, ts: e.ts })),
+            });
+        };
+
+        for (const [serieId, { eps }] of bySerie) {
+            eps.sort((a, b) => a.ts - b.ts);
+            let group: EpEntry[] = [];
+            for (let i = 0; i < eps.length; i++) {
+                if (group.length > 0) {
+                    const prev = eps[i - 1];
+                    const cur = eps[i];
+                    const gapCut = cur.ts - prev.ts > SESSION_GAP_MS;
+                    const interleaveCut = !prev.synthetic && !cur.synthetic && hasCutBetween(prev.ts, cur.ts, serieId);
+                    if (gapCut || interleaveCut) { pushSession(serieId, group); group = []; }
+                }
+                group.push(eps[i]);
+            }
+            if (group.length > 0) pushSession(serieId, group);
         }
         return events;
     } catch (error) {
@@ -188,7 +240,7 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
                 type: x.media_type === 'movie' ? 'movie' : 'serie',
                 id: String(x.tmdb_id || docSnap.id.replace(/^(movie|tv)_/, '')),
                 collection: 'Ratings',
-                action: `${edited ? 'Nota actualizada' : 'Has valorado'} · ★ ${x.score}`,
+                action: `${edited ? 'Nota actualizada' : 'Has valorado'} · ★ ${formatScore(x.score)}`,
                 timestamp: ts,
             });
         }
@@ -329,8 +381,10 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
         userCol('WatchLog').get(),
         userCol('WatchedEpisodes').get(),
     ]);
-    const [episodeEvents, rewatchEvents, ratingEvents, personEvents, favPersonEvents, mutationEvents] = await Promise.all([
-        fetchWatchedEpisodeEvents(logSnap.docs, liveSnap.docs),
+    // Los episodios se agrupan AL FINAL: necesitan conocer el resto de eventos para poder
+    // cortar la sesión cuando entre dos episodios ocurrió otra cosa. El builder de episodios
+    // no lee Firestore (recibe los docs), así que sacarlo del Promise.all no cuesta nada.
+    const [rewatchEvents, ratingEvents, personEvents, favPersonEvents, mutationEvents] = await Promise.all([
         fetchRewatchEvents(logSnap.docs),
         fetchRatingEvents(),
         fetchFollowPersonEvents(),
@@ -369,6 +423,12 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
         const stamps = favLikeStamps.get(`${e.type}:${e.id}`);
         return !stamps?.some(t => Math.abs(t - e.timestamp) < 5000); // cascada → fuera
     });
+    // Ya tenemos todo lo ajeno a los episodios (y sin los duplicados de cascada, que si no
+    // partirían sesiones por una acción que en realidad fue una sola) → cut points.
+    const cutPoints: CutPoint[] = [...dedupedCollectionEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents]
+        .filter(e => e.timestamp > 0)
+        .map(e => ({ ts: e.timestamp, serie: null }));
+    const episodeEvents = await fetchWatchedEpisodeEvents(logSnap.docs, liveSnap.docs, cutPoints);
     const events = [...dedupedCollectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
     feedCache.set(uid, { data: events, expires: Date.now() + FEED_TTL_MS });
     return events;

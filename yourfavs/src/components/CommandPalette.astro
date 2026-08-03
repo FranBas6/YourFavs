@@ -329,7 +329,7 @@ const isLogged = !!Astro.locals.user;
                 html += '<span class="cmdk-item-title">' + escapeHtml(it.title) + '</span>';
                 html += '<span class="cmdk-item-meta">' + escapeHtml(it.subtitle) + '</span>';
                 html += '</span>';
-                if (it.rating != null) html += '<span class="cmdk-item-rating">★ ' + it.rating.toFixed(1) + '</span>';
+                if (it.rating != null) html += '<span class="cmdk-item-rating">★ ' + it.rating.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '</span>';
                 html += '</a>';
             });
         });
@@ -475,7 +475,7 @@ const isLogged = !!Astro.locals.user;
                 : '<span class="cmdk-thumb is-empty" aria-hidden="true">' + EMPTY_ICONS[it.media_type] + '</span>';
             html += '<span class="cmdk-item-body"><span class="cmdk-item-title">' + escapeHtml(it.title) + '</span>' +
                 '<span class="cmdk-item-meta">' + escapeHtml(sub) + '</span></span>';
-            if (it.rating != null) html += '<span class="cmdk-item-rating">★ ' + it.rating.toFixed(1) + '</span>';
+            if (it.rating != null) html += '<span class="cmdk-item-rating">★ ' + it.rating.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '</span>';
             html += '</a>';
         });
         results.innerHTML = html;

@@ -63,6 +63,30 @@ export const getSeriesById = async ({ id }: { id: string }) => {
     return serie;
 };
 
+/**
+ * Providers de UNA temporada concreta.
+ *
+ * Por qué existe: `/tv/{id}/watch/providers` devuelve la UNIÓN de todas las temporadas, así que
+ * una serie cuya T1 está en Prime y cuyo resto solo está en Apple TV aparecía como si toda
+ * estuviera incluida en Prime (caso real: Silo en España). TMDB sí expone el dato por temporada
+ * y con el mismo shape, así que se reutilizan los tres builders de título tal cual.
+ */
+export const getSeasonWatchProviders = async (
+    serieId: string | number,
+    seasonNumber: number,
+): Promise<{ providersByCountry: Record<string, any[]>; linkByCountry: Record<string, string> }> => {
+    try {
+        const data = await tmdbFetch<{ results: any }>(`/tv/${serieId}/season/${seasonNumber}/watch/providers`, {});
+        return {
+            providersByCountry: buildProvidersByCountry(data.results),
+            linkByCountry: buildProviderLinksByCountry(data.results),
+        };
+    } catch (error) {
+        console.error(`Error al obtener providers de T${seasonNumber} de la serie ${serieId}:`, error);
+        return { providersByCountry: {}, linkByCountry: {} };
+    }
+};
+
 interface CastMember {
     id: number;
     name: string;

@@ -79,12 +79,19 @@ function dayLabel(key: string, ts: number): string {
 // ordenados desc por ts) deja los grupos de más reciente a más antiguo.
 const groups = new Map<string, { label: string; events: ActivityEvent[] }>();
 for (const ev of windowEvents) {
-    const key = appDateParts(ev.timestamp).key;
+    // Una sesión se archiva en el día en que EMPEZÓ: un maratón de 23:30 a 01:10 pertenece
+    // a esa noche, no a la madrugada siguiente.
+    const anchor = ev.startTs ?? ev.timestamp;
+    const key = appDateParts(anchor).key;
     let g = groups.get(key);
-    if (!g) { g = { label: dayLabel(key, ev.timestamp), events: [] }; groups.set(key, g); }
+    if (!g) { g = { label: dayLabel(key, anchor), events: [] }; groups.set(key, g); }
     g.events.push(ev);
 }
-const groupEntries = Array.from(groups.values()).map(g => [g.label, g.events] as [string, ActivityEvent[]]);
+// Ordenar por clave (YYYY-MM-DD, lexicográfico = cronológico) en vez de confiar en el orden
+// de inserción: anclar al inicio puede crear el grupo de ayer antes que el de hoy.
+const groupEntries = Array.from(groups.entries())
+    .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
+    .map(([, g]) => [g.label, g.events] as [string, ActivityEvent[]]);
 
 // Medianoche local del servidor — la usa el heatmap/racha de abajo (se conserva
 // su cálculo previo; el agrupado del feed ya no depende de esto).
@@ -134,21 +141,37 @@ function daySummary(events: ActivityEvent[]): [Cat, number][] {
     return Array.from(counts.entries());
 }
 
-// Chips de la fila-binge: episodios agrupados por temporada (ya vienen ordenados)
-function seasonGroups(eps: { season: number; episode: number }[]): [number, number[]][] {
-    const bySeason = new Map<number, number[]>();
+// Chips de la fila-binge: episodios agrupados por temporada (ya vienen ordenados).
+// Se conserva el `ts` de cada episodio para poder desplegar su hora exacta.
+type EpRef = { episode: number; ts?: number };
+function seasonGroups(eps: { season: number; episode: number; ts?: number }[]): [number, EpRef[]][] {
+    const bySeason = new Map<number, EpRef[]>();
     for (const e of eps) {
         if (!bySeason.has(e.season)) bySeason.set(e.season, []);
-        bySeason.get(e.season)!.push(e.episode);
+        bySeason.get(e.season)!.push({ episode: e.episode, ts: e.ts });
     }
     return Array.from(bySeason.entries());
+}
+
+/**
+ * Hora del evento. En una sesión que duró algo, un RANGO ("00:47–00:53"): la app agrupaba
+ * por día y sellaba con la hora del último episodio, así que el "cuándo" quedaba borroso.
+ * Umbral bajo para no pintar rangos absurdos en marcados en bloque (mismo instante).
+ */
+const RANGE_MIN_MS = 2 * 60 * 1000;
+const fmtHm = (ts: number) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: APP_TZ });
+function timeText(ev: ActivityEvent): string {
+    const end = fmtHm(ev.timestamp);
+    if (ev.startTs == null || ev.timestamp - ev.startTs < RANGE_MIN_MS) return end;
+    const start = fmtHm(ev.startTs);
+    return start === end ? end : `${start}–${end}`;
 }
 
 // Regla por volumen de los binges (§6 del handoff): el render depende de CUÁNTO
 // se marcó ese día — texto / chips de episodio / chips de temporada / resumen+barra.
 type BingeView =
     | { mode: 'single'; verb: string }
-    | { mode: 'episodes'; groups: [number, number[]][]; verb: string }
+    | { mode: 'episodes'; groups: [number, EpRef[]][]; verb: string; times: { label: string; ts: number }[] }
     | { mode: 'season'; season: number; verb: string }
     | { mode: 'summary'; verb: string; meta: string; pct: number | null; breakdown: { label: string; done: boolean }[] };
 
@@ -159,7 +182,7 @@ function bingeView(ev: ActivityEvent, detail?: Detail): BingeView {
 
     const groups = seasonGroups(eps);
     const totals = detail?.seasons ?? {};
-    const isComplete = (s: number, marked: number[]) => (totals[s] ?? 0) > 0 && marked.length >= totals[s];
+    const isComplete = (s: number, marked: EpRef[]) => (totals[s] ?? 0) > 0 && marked.length >= totals[s];
     const completeCount = groups.filter(([s, list]) => isComplete(s, list)).length;
     const allComplete = completeCount === groups.length;
 
@@ -168,9 +191,15 @@ function bingeView(ev: ActivityEvent, detail?: Detail): BingeView {
         const s = groups[0][0];
         return { mode: 'season', season: s, verb: `Temporada ${s} completa · ${n} episodios` };
     }
-    // pocos episodios de una temporada → chips de episodio
+    // pocos episodios de una temporada → chips de episodio + horas desplegables
     if (groups.length === 1 && n <= 6) {
-        return { mode: 'episodes', groups, verb: `${n} episodios vistos` };
+        const stamped = eps
+            .filter((e): e is { season: number; episode: number; ts: number } => typeof e.ts === 'number')
+            .map(e => ({ label: `T${e.season} E${e.episode}`, ts: e.ts }))
+            .sort((a, b) => a.ts - b.ts);
+        // Marcados en bloque comparten instante → listar N horas idénticas sería ruido.
+        const times = new Set(stamped.map(t => t.ts)).size > 1 ? stamped : [];
+        return { mode: 'episodes', groups, verb: `${n} episodios vistos`, times };
     }
     // resto (serie entera / ≥2 temporadas completas / muchos sueltos) → resumen + desglose
     const seriesSeasonNums = Object.keys(totals).map(Number);
@@ -349,13 +378,13 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                         const title = d?.title || 'Título desconocido';
                         const poster = d?.poster;
                         const href = ev.type === 'movie' ? `/movie/${ev.id}` : `/serie/${ev.id}`;
-                        const time = new Date(ev.timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                        const time = timeText(ev);
                         const cat = catOf(ev);
                         const isBinge = ev.collection === 'WatchedEpisodes' && (ev.episodes?.length ?? 0) > 0;
                         const binge = isBinge ? bingeView(ev, d) : null;
                         return binge ? (
                             binge.mode === 'single' ? (
-                                <a href={href} class="ev" data-cat="ep" data-ts={ev.timestamp}>
+                                <a href={href} class="ev" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -374,7 +403,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                     <Icon name="lucide:chevron-right" class="chev" />
                                 </a>
                             ) : binge.mode === 'episodes' ? (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp}>
+                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -390,15 +419,25 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                             {binge.groups.map(([season, eps]) => (
                                                 <>
                                                     <span class="ep-chip season">T{season}</span>
-                                                    {eps.map(e => <span class="ep-chip">E{e}</span>)}
+                                                    {eps.map(e => <span class="ep-chip">E{e.episode}</span>)}
                                                 </>
                                             ))}
                                         </span>
+                                        {binge.times.length > 1 && (
+                                            <>
+                                                <button class="ev-disclose" type="button">Ver horas <Icon name="lucide:chevron-down" /></button>
+                                                <span class="ev-times">
+                                                    {binge.times.map(t => (
+                                                        <span class="ev-time-row"><b>{t.label}</b><i data-ts={t.ts}>{fmtHm(t.ts)}</i></span>
+                                                    ))}
+                                                </span>
+                                            </>
+                                        )}
                                     </span>
                                     <span class="time">{time}</span>
                                 </a>
                             ) : binge.mode === 'season' ? (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp}>
+                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -417,7 +456,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                                     <span class="time">{time}</span>
                                 </a>
                             ) : (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp}>
+                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
                                     <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
                                     {poster ? (
                                         <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
@@ -528,21 +567,39 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                 if (k === yKey) return 'Ayer';
                 return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
             };
+            // Una sesión de episodios se pinta como RANGO ("00:47–00:53"): data-ts es el
+            // último episodio y data-ts-start el primero. Umbral igual al del servidor.
+            const RANGE_MIN_MS = 2 * 60 * 1000;
             document.querySelectorAll('.act-timeline .ev[data-ts]').forEach((ev) => {
                 const ts = Number(ev.dataset.ts);
                 if (!ts) return;
                 const t = ev.querySelector('.time');
-                if (t) t.textContent = fmtTime(ts);
+                if (!t) return;
+                const start = Number(ev.dataset.tsStart || 0);
+                const end = fmtTime(ts);
+                if (start && ts - start >= RANGE_MIN_MS) {
+                    const from = fmtTime(start);
+                    t.textContent = from === end ? end : from + '–' + end;
+                } else {
+                    t.textContent = end;
+                }
+            });
+            // Hora de cada episodio dentro del desplegable "Ver horas".
+            document.querySelectorAll('.act-timeline .ev-times i[data-ts]').forEach((el) => {
+                const ts = Number(el.dataset.ts);
+                if (ts) el.textContent = fmtTime(ts);
             });
             document.querySelectorAll('.act-timeline .tl-day').forEach((day) => {
-                // ts representativo del grupo = el más reciente de sus filas
-                let maxTs = 0;
+                // ts representativo del grupo = el INICIO más temprano de sus filas: una
+                // sesión que cruza medianoche se archiva en la noche en que empezó, y el
+                // servidor ya la agrupó así.
+                let minTs = Infinity;
                 day.querySelectorAll('.ev[data-ts]').forEach((ev) => {
-                    const ts = Number(ev.dataset.ts);
-                    if (ts > maxTs) maxTs = ts;
+                    const ts = Number(ev.dataset.tsStart || ev.dataset.ts);
+                    if (ts && ts < minTs) minTs = ts;
                 });
                 const label = day.querySelector('.tl-day-head .d');
-                if (maxTs && label) label.textContent = fmtDay(new Date(maxTs));
+                if (minTs !== Infinity && label) label.textContent = fmtDay(new Date(minTs));
             });
 
             const groups = document.querySelectorAll('.act-filters');

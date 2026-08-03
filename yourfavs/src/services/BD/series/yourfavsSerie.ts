@@ -3,6 +3,7 @@ import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 import { adminDb } from "../../../utils/firebaseAdmin";
 import { getTransition } from "../shared/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../lists/watchLog";
+import { normalizeScore } from "../../../utils/constants/helpers/media-helpers";
 import { appDateParts } from "../../../utils/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
@@ -52,9 +53,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         return `/serie/${serieId}`;
     }
 
-    // Guardar rating 1-10 en todas las colecciones
+    // Guardar rating 0,5-10 (medios puntos) en todas las colecciones
     if (action === 'save_rating' || actionType === 'rating') {
-        const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
+        const ratingNum = normalizeScore(formData.get('rating'));
         if (!ratingNum) return `/serie/${serieId}`;
         const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
         const snaps = await Promise.all(refs.map(ref => ref.get()));

@@ -11,20 +11,64 @@ interface RawProvider {
     type: 'flatrate' | 'rent' | 'buy';
 }
 
+interface ScopeData {
+    providersByCountry: Record<string, RawProvider[]>;
+    linkByCountry: Record<string, string>;
+}
+
 interface Props {
     /** Diccionario país → lista de providers deduplicados (ver buildProvidersByCountry). */
     providersByCountry: Record<string, RawProvider[]>;
     /** Enlace JustWatch del título por país (results.{code}.link) — fallback. */
     linkByCountry?: Record<string, string>;
     title?: string;
+    /**
+     * Plataformas del perfil (`UserProfile.platforms`). Sin esto la etiqueta verde solo puede
+     * decir "incluido en suscripción" — antes decía "en TU suscripción" sin comprobarlo.
+     */
+    myPlatformIds?: number[];
+    /** Series con más de una temporada: chips para trocear la disponibilidad. */
+    seasons?: number[];
+    /** Temporada mostrada al abrir (la que estás viendo). `null` = toda la serie. */
+    initialSeason?: number | null;
+    /** Datos de `initialSeason`, ya resueltos en el servidor. */
+    seasonData?: ScopeData | null;
+    /**
+     * país → provider_id → temporadas que cubre en suscripción (ver buildProviderCoverage).
+     * Sirve para decir "Prime: T1-T3" en la vista de toda la serie, en vez de dar por hecho
+     * que cada plataforma la tiene entera.
+     */
+    coverage?: Record<string, Record<number, number[]>>;
+    totalSeasons?: number;
+    /** Necesario para pedir las demás temporadas a /api/serie/[id]/providers. */
+    serieId?: string | number;
 }
 
-const { providersByCountry, linkByCountry = {}, title = "Dónde ver" } = Astro.props;
+const {
+    providersByCountry,
+    linkByCountry = {},
+    title = "Dónde ver",
+    myPlatformIds = [],
+    seasons = [],
+    initialSeason = null,
+    seasonData = null,
+    coverage = {},
+    totalSeasons = 0,
+    serieId,
+} = Astro.props;
 
+const hasSeasonPicker = seasons.length > 1 && Boolean(serieId);
+/** Ámbito activo: 'all' (todo el título) o 's{N}' (una temporada). */
+const activeScope = hasSeasonPicker && initialSeason !== null && seasonData ? `s${initialSeason}` : 'all';
+const activeData: ScopeData = activeScope === 'all'
+    ? { providersByCountry, linkByCountry }
+    : seasonData!;
+
+// Los países disponibles se calculan sobre el ámbito ACTIVO; el selector de país sigue
+// funcionando igual, solo cambia de qué conjunto de datos sale.
 const availableCountries = SUPPORTED_COUNTRIES.filter(
-    (c) => providersByCountry[c.code] && providersByCountry[c.code].length > 0
+    (c) => activeData.providersByCountry[c.code] && activeData.providersByCountry[c.code].length > 0
 );
-
 const userRegion = getCurrentRegion();
 const defaultCountry = availableCountries.some((c) => c.code === userRegion)
     ? userRegion
@@ -32,13 +76,62 @@ const defaultCountry = availableCountries.some((c) => c.code === userRegion)
         ? 'ES'
         : availableCountries[0]?.code;
 
+const knowsMyPlatforms = myPlatformIds.length > 0;
+const mySet = new Set(myPlatformIds);
+
 /** Enlace por proveedor: homepage conocida o, si no, la página JustWatch del título. */
 function linkFor(p: RawProvider, countryCode: string): string {
-    return providerLinks[p.provider_name] || linkByCountry[countryCode] || '#';
+    return providerLinks[p.provider_name] || activeData.linkByCountry[countryCode] || linkByCountry[countryCode] || '#';
 }
+const scopeLabel = (scope: string) => (scope === 'all' ? 'Esta serie' : `La T${scope.slice(1)}`);
+
+/**
+ * Hasta dónde llega una plataforma. Solo tiene sentido en la vista de toda la serie: dentro de
+ * una temporada concreta el dato ya está implícito. `full` = la cubre entera → se pinta apagado;
+ * si es parcial, en ámbar, que es la información que faltaba.
+ */
+function coverageBadge(countryCode: string, providerId: number): { label: string; full: boolean; tip: string } | null {
+    if (activeScope !== 'all' || totalSeasons < 2) return null;
+    const list = coverage[countryCode]?.[providerId];
+    if (!list || list.length === 0) return null;
+    const sorted = [...list].sort((a, b) => a - b);
+    const full = sorted.length >= totalSeasons;
+    const contiguous = sorted.every((v, i) => i === 0 || v === sorted[i - 1] + 1);
+    // Con huecos NO se listan las temporadas: en una serie larga eso son 18 números que
+    // no caben y no dicen nada. El recuento sí ("18/23"), y el detalle va al tooltip.
+    const label = sorted.length === 1
+        ? `T${sorted[0]}`
+        : contiguous
+            ? `T${sorted[0]}-T${sorted[sorted.length - 1]}`
+            : `${sorted.length}/${totalSeasons}`;
+    const listed = sorted.slice(0, 12).map((s) => `T${s}`).join(', ') + (sorted.length > 12 ? '…' : '');
+    const tip = full
+        ? 'Cubre todas las temporadas'
+        : contiguous
+            ? `Solo ${label} está incluida en esta plataforma`
+            : `Incluye ${sorted.length} de ${totalSeasons} temporadas: ${listed}`;
+    return { label, full, tip };
+}
+
+// El cliente re-renderiza al cambiar de temporada: necesita los mismos datos que el servidor
+// (para no re-pedir la temporada inicial) y el catálogo de plataformas del perfil.
+const clientPayload = {
+    serieId: serieId != null ? String(serieId) : null,
+    myPlatformIds,
+    countries: SUPPORTED_COUNTRIES,
+    // Va el mapa de homepages (~1,7 KB) para que una temporada pintada en cliente enlace al
+    // mismo sitio que la pintada en servidor, y no caiga siempre al enlace de JustWatch.
+    providerLinks,
+    coverage,
+    totalSeasons,
+    scopes: {
+        all: { providersByCountry, linkByCountry },
+        ...(activeScope !== 'all' ? { [activeScope]: activeData } : {}),
+    },
+};
 ---
 {availableCountries.length > 0 && defaultCountry && (
-    <div class="bg-white rounded-xl border border-gray-200 p-4" data-streaming-providers>
+    <div class="bg-white rounded-xl border border-gray-200 p-4" data-streaming-providers data-scope={activeScope} data-country={defaultCountry}>
         <div class="flex items-baseline justify-between gap-2 mb-3">
             <h3 class="text-base font-semibold text-gray-800">{title}</h3>
             <span class="text-[10px] text-gray-400 font-mono">vía JustWatch</span>
@@ -71,88 +164,331 @@ function linkFor(p: RawProvider, countryCode: string): string {
             </details>
         )}
 
-        {availableCountries.map((c) => {
-            const list = providersByCountry[c.code];
-            const flatrate = list.filter((p) => p.type === 'flatrate');
-            const rentBuy = list.filter((p) => p.type === 'rent' || p.type === 'buy');
-            const hidden = c.code !== defaultCountry;
-            return (
-                <div data-country={c.code} class:list={["space-y-4", hidden && "hidden"]}>
-                    {flatrate.length > 0 && (
-                        <div>
-                            <p class="text-[10px] font-mono font-semibold text-emerald-600 uppercase tracking-[.12em] mb-1.5">✓ Incluido en tu suscripción</p>
-                            <div class="space-y-2">
-                                {flatrate.map((p) => (
-                                    <a
-                                        href={linkFor(p, c.code)}
-                                        target="_blank"
-                                        rel="noopener"
-                                        class="flex items-center gap-3 px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 hover:border-blue-300 hover:bg-blue-50/40 transition-colors group/row"
-                                    >
-                                        {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt="" class="w-8 h-8 rounded-md flex-shrink-0" />}
-                                        <span class="text-sm font-semibold text-gray-800 truncate">{p.provider_name}</span>
-                                        <span class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-600 whitespace-nowrap">
-                                            Ver ahora
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
-                                        </span>
-                                    </a>
-                                ))}
-                            </div>
-                        </div>
-                    )}
+        {/*
+          Chips de temporada. El endpoint de título devuelve la UNIÓN de todas las temporadas,
+          así que "Toda la serie" puede mostrar plataformas que en realidad solo tienen algunas.
+          Por defecto se abre en la temporada que estás viendo, que es la que te importa.
+        */}
+        {hasSeasonPicker && (
+            <div class="flex flex-wrap gap-1.5 mb-3" data-season-chips>
+                <button type="button" data-scope-btn="all"
+                        class:list={["season-chip", activeScope === 'all' && "is-active"]}>Toda la serie</button>
+                {seasons.map((s) => (
+                    <button type="button" data-scope-btn={`s${s}`}
+                            class:list={["season-chip", activeScope === `s${s}` && "is-active"]}>T{s}</button>
+                ))}
+            </div>
+        )}
 
-                    {rentBuy.length > 0 && (
-                        <div>
-                            <p class="text-[10px] font-mono font-semibold text-gray-400 uppercase tracking-[.12em] mb-1.5">Alquiler / Compra</p>
-                            <div class="flex flex-wrap gap-2">
-                                {rentBuy.map((p) => (
-                                    <a
-                                        href={linkFor(p, c.code)}
-                                        target="_blank"
-                                        rel="noopener"
-                                        class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400 transition-colors"
-                                    >
-                                        {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt="" class="w-5 h-5 rounded flex-shrink-0" />}
-                                        <span class="text-xs font-medium text-gray-700">{p.provider_name}</span>
-                                        <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
-                                    </a>
-                                ))}
+        <div data-provider-body>
+            {availableCountries.map((c) => {
+                const list = activeData.providersByCountry[c.code];
+                const flatrate = list.filter((p) => p.type === 'flatrate');
+                const mine = knowsMyPlatforms ? flatrate.filter((p) => mySet.has(p.provider_id)) : [];
+                const otherSubs = knowsMyPlatforms ? flatrate.filter((p) => !mySet.has(p.provider_id)) : flatrate;
+                const rentBuy = list.filter((p) => p.type === 'rent' || p.type === 'buy');
+                const hidden = c.code !== defaultCountry;
+                return (
+                    <div data-country-pane={c.code} class:list={["space-y-4", hidden && "hidden"]}>
+                        {/* Filas grandes: lo que puedes ver YA sin pagar nada más. */}
+                        {mine.length > 0 && (
+                            <div>
+                                <p class="text-[10px] font-mono font-semibold text-emerald-600 uppercase tracking-[.12em] mb-1.5">✓ En tus plataformas</p>
+                                <div class="space-y-2">
+                                    {mine.map((p) => (
+                                        <a href={linkFor(p, c.code)} target="_blank" rel="noopener"
+                                           class="flex items-center gap-3 px-3 py-2.5 border border-emerald-200 rounded-lg bg-emerald-50/50 hover:border-emerald-300 transition-colors">
+                                            {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt="" class="w-8 h-8 rounded-md flex-shrink-0" />}
+                                            <span class="text-sm font-semibold text-gray-800 truncate">{p.provider_name}</span>
+                                            {(() => {
+                                                const cov = coverageBadge(c.code, p.provider_id);
+                                                return cov ? (
+                                                    <span class:list={["cov-badge", !cov.full && "is-partial"]} title={cov.tip}>{cov.label}</span>
+                                                ) : null;
+                                            })()}
+                                            <span class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 whitespace-nowrap">
+                                                Ver ahora
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
+                                            </span>
+                                        </a>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
-            );
-        })}
+                        )}
+
+                        {/* Aviso honesto: sabemos tus plataformas y esto NO está en ninguna. */}
+                        {knowsMyPlatforms && mine.length === 0 && (
+                            <p class="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>
+                                <span data-no-mine-msg>{scopeLabel(activeScope)} no está en tus plataformas</span>
+                            </p>
+                        )}
+
+                        {otherSubs.length > 0 && (
+                            <div>
+                                <p class="text-[10px] font-mono font-semibold text-gray-400 uppercase tracking-[.12em] mb-1.5">
+                                    {knowsMyPlatforms ? 'Con otra suscripción' : '✓ Incluido en suscripción'}
+                                </p>
+                                <div class:list={[knowsMyPlatforms ? "flex flex-wrap gap-2" : "space-y-2"]}>
+                                    {otherSubs.map((p) => (
+                                        <a href={linkFor(p, c.code)} target="_blank" rel="noopener"
+                                           class:list={[knowsMyPlatforms
+                                               ? "inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400 transition-colors"
+                                               : "flex items-center gap-3 px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"]}>
+                                            {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt="" class:list={[knowsMyPlatforms ? "w-5 h-5 rounded flex-shrink-0" : "w-8 h-8 rounded-md flex-shrink-0"]} />}
+                                            <span class:list={[knowsMyPlatforms ? "text-xs font-medium text-gray-700" : "text-sm font-semibold text-gray-800 truncate"]}>{p.provider_name}</span>
+                                            {(() => {
+                                                const cov = coverageBadge(c.code, p.provider_id);
+                                                return cov ? (
+                                                    <span class:list={["cov-badge", !cov.full && "is-partial"]} title={cov.tip}>{cov.label}</span>
+                                                ) : null;
+                                            })()}
+                                            {!knowsMyPlatforms && (
+                                                <span class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-blue-600 whitespace-nowrap">
+                                                    Ver ahora
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
+                                                </span>
+                                            )}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {rentBuy.length > 0 && (
+                            <div>
+                                <p class="text-[10px] font-mono font-semibold text-gray-400 uppercase tracking-[.12em] mb-1.5">Alquiler / Compra</p>
+                                <div class="flex flex-wrap gap-2">
+                                    {rentBuy.map((p) => (
+                                        <a href={linkFor(p, c.code)} target="_blank" rel="noopener"
+                                           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
+                                            {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt="" class="w-5 h-5 rounded flex-shrink-0" />}
+                                            <span class="text-xs font-medium text-gray-700">{p.provider_name}</span>
+                                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+
+        {/* Sin plataformas en el perfil no podemos afirmar nada sobre "las tuyas". */}
+        {!knowsMyPlatforms && (
+            <a href="/perfil" class="mt-3 inline-block text-[11px] text-blue-600 hover:underline">
+                Dinos tus plataformas y te decimos qué puedes ver ya
+            </a>
+        )}
+
+        <script type="application/json" data-provider-payload set:html={JSON.stringify(clientPayload)}></script>
     </div>
 )}
+
+<style>
+    .season-chip {
+        display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px;
+        font-size: 11px; font-weight: 600; font-family: var(--font-mono, monospace);
+        border: 1px solid #e5e7eb; background: #fff; color: #6b7280; cursor: pointer;
+        transition: border-color .15s, color .15s;
+    }
+    .season-chip:hover { border-color: #9ca3af; color: #374151; }
+    .season-chip.is-active { background: #111827; border-color: #111827; color: #fff; }
+    .season-chip[disabled] { opacity: .5; cursor: progress; }
+
+    /* Hasta dónde llega la plataforma. Apagado si la cubre entera; ámbar si es parcial,
+       que es justo el caso que el dato de título ocultaba. */
+    .cov-badge {
+        flex-shrink: 0; padding: 1px 6px; border-radius: 999px;
+        font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 600;
+        background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb;
+    }
+    .cov-badge.is-partial { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+</style>
 
 <script is:inline>
     (function () {
         document.querySelectorAll('[data-streaming-providers]').forEach(function (root) {
+            var payloadEl = root.querySelector('[data-provider-payload]');
+            if (!payloadEl) return;
+            var payload;
+            try { payload = JSON.parse(payloadEl.textContent || '{}'); } catch (e) { return; }
+
+            var body = root.querySelector('[data-provider-body]');
             var label = root.querySelector('[data-country-label]');
             var picker = root.querySelector('[data-country-picker]');
+            var mine = new Set(payload.myPlatformIds || []);
+            var knowsMine = mine.size > 0;
+
+            // Astro aísla el CSS del componente con un atributo (`.cov-badge[data-astro-cid-x]`),
+            // que el HTML generado aquí no tiene → los estilos propios no se aplicaban y el badge
+            // salía sin píldora en cuanto se repintaba. Se lee el atributo de la raíz y se replica
+            // en todo lo que se genere: así vale para esta clase y para cualquiera que se añada.
+            var CID = (root.getAttributeNames().filter(function (n) {
+                return n.indexOf('data-astro-cid-') === 0;
+            })[0]) || '';
+            function applyScope(container) {
+                if (!CID) return;
+                container.setAttribute(CID, '');
+                container.querySelectorAll('*').forEach(function (el) { el.setAttribute(CID, ''); });
+            }
+            var cache = payload.scopes || {};          // scope → {providersByCountry, linkByCountry}
+            var IMG = 'https://image.tmdb.org/t/p/w200';
+
+            function scopeLabel(scope) { return scope === 'all' ? 'Esta serie' : 'La T' + scope.slice(1); }
+            function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
+
+            // Mismo orden de preferencia que en el servidor: homepage conocida del proveedor,
+            // y si no la hay, la página de JustWatch del país.
+            var HOMEPAGES = payload.providerLinks || {};
+            function linkFor(p, data, code) {
+                return HOMEPAGES[p.provider_name] || (data.linkByCountry && data.linkByCountry[code]) || '#';
+            }
+
+            var ARROW = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>';
+
+            // Misma regla que en el servidor (coverageBadge): solo en la vista de toda la serie.
+            var COVERAGE = payload.coverage || {};
+            var TOTAL_SEASONS = payload.totalSeasons || 0;
+            function covBadge(scope, code, providerId) {
+                if (scope !== 'all' || TOTAL_SEASONS < 2) return '';
+                var list = (COVERAGE[code] || {})[providerId];
+                if (!list || !list.length) return '';
+                var s = list.slice().sort(function (a, b) { return a - b; });
+                var full = s.length >= TOTAL_SEASONS;
+                var contiguous = s.every(function (v, i) { return i === 0 || v === s[i - 1] + 1; });
+                // Con huecos, recuento en vez de lista (ver coverageBadge en el servidor).
+                var text = s.length === 1 ? 'T' + s[0]
+                    : contiguous ? 'T' + s[0] + '-T' + s[s.length - 1]
+                    : s.length + '/' + TOTAL_SEASONS;
+                var listed = s.slice(0, 12).map(function (n) { return 'T' + n; }).join(', ') + (s.length > 12 ? '…' : '');
+                var tip = full ? 'Cubre todas las temporadas'
+                    : contiguous ? 'Solo ' + text + ' está incluida en esta plataforma'
+                    : 'Incluye ' + s.length + ' de ' + TOTAL_SEASONS + ' temporadas: ' + listed;
+                return '<span class="cov-badge' + (full ? '' : ' is-partial') + '" title="' + esc(tip) + '">' + esc(text) + '</span>';
+            }
+
+            function rowBig(p, href, tone, badge) {
+                var border = tone === 'mine' ? 'border-emerald-200 bg-emerald-50/50 hover:border-emerald-300' : 'border-gray-200 bg-gray-50 hover:border-blue-300';
+                var cta = tone === 'mine' ? 'text-emerald-700' : 'text-blue-600';
+                return '<a href="' + esc(href) + '" target="_blank" rel="noopener" class="flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-colors ' + border + '">'
+                    + (p.logo_path ? '<img src="' + IMG + esc(p.logo_path) + '" alt="" class="w-8 h-8 rounded-md flex-shrink-0">' : '')
+                    + '<span class="text-sm font-semibold text-gray-800 truncate">' + esc(p.provider_name) + '</span>'
+                    + (badge || '')
+                    + '<span class="ml-auto inline-flex items-center gap-1 text-xs font-semibold whitespace-nowrap ' + cta + '">Ver ahora' + ARROW + '</span></a>';
+            }
+            function chipSmall(p, href, badge) {
+                return '<a href="' + esc(href) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">'
+                    + (p.logo_path ? '<img src="' + IMG + esc(p.logo_path) + '" alt="" class="w-5 h-5 rounded flex-shrink-0">' : '')
+                    + '<span class="text-xs font-medium text-gray-700">' + esc(p.provider_name) + '</span>'
+                    + (badge || '') + '</a>';
+            }
+            function section(title, cls, inner) {
+                return '<div><p class="text-[10px] font-mono font-semibold uppercase tracking-[.12em] mb-1.5 ' + cls + '">' + title + '</p>' + inner + '</div>';
+            }
+
+            /** Reconstruye el cuerpo con la misma estructura que el servidor (todos los países). */
+            function render(scope, country) {
+                var data = cache[scope];
+                if (!data) return;
+                var html = '';
+                var codes = (payload.countries || []).map(function (c) { return c.code; });
+                var firstWithData = null;
+                codes.forEach(function (code) {
+                    var list = (data.providersByCountry || {})[code];
+                    if (!list || !list.length) return;
+                    if (!firstWithData) firstWithData = code;
+                    var flat = list.filter(function (p) { return p.type === 'flatrate'; });
+                    var isMine = knowsMine ? flat.filter(function (p) { return mine.has(p.provider_id); }) : [];
+                    var others = knowsMine ? flat.filter(function (p) { return !mine.has(p.provider_id); }) : flat;
+                    var rentBuy = list.filter(function (p) { return p.type === 'rent' || p.type === 'buy'; });
+                    var href = function (p) { return linkFor(p, data, code); };
+
+                    var badge = function (p) { return covBadge(scope, code, p.provider_id); };
+
+                    var inner = '';
+                    if (isMine.length) {
+                        inner += section('✓ En tus plataformas', 'text-emerald-600',
+                            '<div class="space-y-2">' + isMine.map(function (p) { return rowBig(p, href(p), 'mine', badge(p)); }).join('') + '</div>');
+                    } else if (knowsMine) {
+                        inner += '<p class="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">'
+                            + '<svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/></svg>'
+                            + '<span>' + esc(scopeLabel(scope)) + ' no está en tus plataformas</span></p>';
+                    }
+                    if (others.length) {
+                        inner += knowsMine
+                            ? section('Con otra suscripción', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + others.map(function (p) { return chipSmall(p, href(p), badge(p)); }).join('') + '</div>')
+                            : section('✓ Incluido en suscripción', 'text-emerald-600', '<div class="space-y-2">' + others.map(function (p) { return rowBig(p, href(p), 'other', badge(p)); }).join('') + '</div>');
+                    }
+                    if (rentBuy.length) {
+                        inner += section('Alquiler / Compra', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + rentBuy.map(function (p) { return chipSmall(p, href(p)); }).join('') + '</div>');
+                    }
+                    html += '<div data-country-pane="' + code + '" class="space-y-4' + (code === country ? '' : ' hidden') + '">' + inner + '</div>';
+                });
+
+                if (!html) {
+                    html = '<p class="text-xs text-gray-500">Sin datos de disponibilidad para esta temporada.</p>';
+                }
+                body.innerHTML = html;
+                applyScope(body);
+                // Si el país elegido no tiene datos en esta temporada, caer al primero que sí.
+                if (firstWithData && !body.querySelector('[data-country-pane="' + country + '"]')) {
+                    setCountry(firstWithData, true);
+                }
+            }
+
+            function setCountry(code, skipRender) {
+                root.dataset.country = code;
+                root.querySelectorAll('[data-country-pane]').forEach(function (el) {
+                    el.classList.toggle('hidden', el.getAttribute('data-country-pane') !== code);
+                });
+                var btn = root.querySelector('[data-country-btn="' + code + '"]');
+                if (label && btn) label.textContent = btn.textContent.trim();
+                root.querySelectorAll('[data-country-btn]').forEach(function (b) {
+                    var on = b.getAttribute('data-country-btn') === code;
+                    b.classList.toggle('bg-gray-800', on);
+                    b.classList.toggle('text-white', on);
+                    b.classList.toggle('border-gray-800', on);
+                    b.classList.toggle('bg-white', !on);
+                    b.classList.toggle('text-gray-500', !on);
+                    b.classList.toggle('border-gray-200', !on);
+                });
+                if (!skipRender) { /* el pane ya existe: basta con el toggle */ }
+            }
+
             root.querySelectorAll('[data-country-btn]').forEach(function (btn) {
                 btn.addEventListener('click', function () {
-                    var code = btn.getAttribute('data-country-btn');
-                    // Toggle visibility de secciones por país
-                    root.querySelectorAll('[data-country]').forEach(function (el) {
-                        if (el.getAttribute('data-country') === code) el.classList.remove('hidden');
-                        else el.classList.add('hidden');
-                    });
-                    // Actualizar label del summary
-                    if (label) label.textContent = btn.textContent.trim();
-                    // Actualizar estilo activo de los botones
-                    root.querySelectorAll('[data-country-btn]').forEach(function (b) {
-                        var isActive = b === btn;
-                        b.classList.toggle('bg-gray-800', isActive);
-                        b.classList.toggle('text-white', isActive);
-                        b.classList.toggle('border-gray-800', isActive);
-                        b.classList.toggle('bg-white', !isActive);
-                        b.classList.toggle('text-gray-500', !isActive);
-                        b.classList.toggle('border-gray-200', !isActive);
-                    });
-                    // Cerrar el details
+                    setCountry(btn.getAttribute('data-country-btn'));
                     if (picker) picker.open = false;
+                });
+            });
+
+            root.querySelectorAll('[data-scope-btn]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var scope = btn.getAttribute('data-scope-btn');
+                    if (scope === root.dataset.scope) return;
+
+                    var apply = function () {
+                        root.dataset.scope = scope;
+                        root.querySelectorAll('[data-scope-btn]').forEach(function (b) {
+                            b.classList.toggle('is-active', b === btn);
+                        });
+                        render(scope, root.dataset.country);
+                    };
+
+                    if (cache[scope]) return apply();
+                    if (!payload.serieId) return;
+                    btn.disabled = true;
+                    fetch('/api/serie/' + encodeURIComponent(payload.serieId) + '/providers?season=' + encodeURIComponent(scope.slice(1)))
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (!d || !d.ok) throw new Error('bad payload');
+                            cache[scope] = { providersByCountry: d.providersByCountry || {}, linkByCountry: d.linkByCountry || {} };
+                            apply();
+                        })
+                        .catch(function () { /* se mantiene la vista actual */ })
+                        .finally(function () { btn.disabled = false; });
                 });
             });
         });

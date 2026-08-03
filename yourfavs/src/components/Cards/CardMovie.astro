@@ -1,6 +1,7 @@
 ---
 import '../../styles/components/cards.css';
 import {formatCardDate, getRatingColor, isRecentRelease} from "../../utils/constants/helpers/card-helpers";
+import { formatScore } from "../../utils/constants/helpers/media-helpers";
 
 interface Props {
     id: string;
@@ -59,7 +60,7 @@ const showSaveBtn = !_p.startsWith('/mislistas') || _p.startsWith('/mislistas/re
                 {vote_average ? vote_average.toFixed(1) : "N/A"}
             </div>
 
-            {userRating && <div class="user-rating-badge">★ {userRating}</div>}
+            {userRating && <div class="user-rating-badge">★ {formatScore(userRating)}</div>}
 
             <div class="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-[#0F172A] to-transparent"></div>
 

@@ -173,8 +173,11 @@ function handleRatingForm(form) {
         successMsg: function (formData) {
             var action = formData.get('action');
             if (action === 'delete_rating') return 'Nota eliminada';
-            var r = formData.get('rating');
-            return r ? 'Nota ' + r + '/10 guardada' : 'Nota guardada';
+            // La escala admite medios puntos (7,5) → con coma, como se escribe en español.
+            var r = Number(formData.get('rating'));
+            return isFinite(r) && r > 0
+                ? 'Nota ' + r.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '/10 guardada'
+                : 'Nota guardada';
         },
         reload: true,
         reloadDelay: 400

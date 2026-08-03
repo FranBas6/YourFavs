@@ -7,24 +7,30 @@ interface Props {
 }
 const { currentRating, tmdbRating, itemId, mediaType } = Astro.props;
 const isSerie = mediaType === 'serie';
-const stars = [1, 2, 3, 4, 5];
+/**
+ * DIEZ estrellas, una por punto. Con 5 estrellas cada una valía 2 puntos y medio punto salía
+ * un CUARTO de estrella: el corte vertical al 25/75 % cae en el brazo de la estrella y la deja
+ * partida. Con 10, la única fracción posible es la media estrella — el corte va por el centro.
+ */
+const stars = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 const diff = currentRating !== null ? currentRating - tmdbRating : null;
 
-function fillState(rating: number | null, starIdx: number): 'empty' | 'half' | 'full' {
-    if (rating === null) return 'empty';
-    const right = starIdx * 2;
-    const left = starIdx * 2 - 1;
-    if (rating >= right) return 'full';
-    if (rating === left) return 'half';
-    return 'empty';
+/** Relleno de la estrella `starIdx` (0 · 50 · 100 %, nada más es alcanzable con paso 0,5). */
+function fillPct(rating: number | null, starIdx: number): number {
+    if (rating === null) return 0;
+    return Math.max(0, Math.min(1, rating - (starIdx - 1))) * 100;
 }
+/** 7,5 · 7 · 10 — con coma, como se escribe en español. */
+const fmtScore = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+const label = currentRating !== null ? fmtScore(currentRating) : '';
+
 const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z";
 ---
 <div class="bg-white rounded-xl border border-gray-200 p-4">
     <div class="flex items-center justify-between mb-3">
         <h3 class="text-base font-semibold text-gray-800">Tu nota</h3>
-        <span class="rating-label text-sm font-bold text-yellow-500" data-default-label={currentRating !== null ? `${currentRating}/10` : ''}>
-            {currentRating !== null ? `${currentRating}/10` : ''}
+        <span class="text-sm font-bold text-yellow-500">
+            <span class="rating-label" data-default-label={label}>{label}</span><span class="rating-scale text-[11px] font-medium text-gray-400" hidden={currentRating === null}>/10</span>
         </span>
     </div>
 
@@ -34,34 +40,42 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
         <input type="hidden" name="action" value="save_rating" />
         <input type="hidden" name="actionType" value="rating" />
 
-        <div class="rating-stars flex items-center gap-1" role="radiogroup" aria-label="Puntuación de 1 a 10">
+        <div class="rating-stars">
             {stars.map((starIdx) => {
-                const leftVal = starIdx * 2 - 1;
-                const rightVal = starIdx * 2;
-                const initial = fillState(currentRating, starIdx);
+                const pct = fillPct(currentRating, starIdx);
                 return (
-                    <span class="star-pair relative inline-block w-10 h-10 md:w-8 md:h-8" data-star={starIdx} data-fill={initial}>
-                        <svg class="star-svg star-empty absolute inset-0 w-full h-full text-gray-200 pointer-events-none" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d={STAR_PATH}/>
-                        </svg>
-                        <svg class="star-svg star-half absolute inset-0 w-full h-full text-yellow-400 pointer-events-none" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" style="clip-path: inset(0 50% 0 0);">
-                            <path d={STAR_PATH}/>
-                        </svg>
-                        <svg class="star-svg star-full absolute inset-0 w-full h-full text-yellow-400 pointer-events-none" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d={STAR_PATH}/>
-                        </svg>
-                        <button type="submit" name="rating" value={leftVal}
-                                data-val={leftVal}
-                                class="star-btn absolute left-0 top-0 w-1/2 h-full cursor-pointer bg-transparent border-0 p-0"
-                                aria-label={`Puntuar ${leftVal} de 10`}></button>
-                        <button type="submit" name="rating" value={rightVal}
-                                data-val={rightVal}
-                                class="star-btn absolute right-0 top-0 w-1/2 h-full cursor-pointer bg-transparent border-0 p-0"
-                                aria-label={`Puntuar ${rightVal} de 10`}></button>
+                    <span class="star-pair" data-star={starIdx}>
+                        <svg class="star-base" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d={STAR_PATH}/></svg>
+                        <svg class="star-fill" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" style={`clip-path: inset(0 ${100 - pct}% 0 0);`}><path d={STAR_PATH}/></svg>
                     </span>
                 );
             })}
+            {/*
+              El deslizador va TRANSPARENTE encima de las estrellas: tocar cualquier punto fija
+              esa nota y arrastrar la ajusta de 0,5 en 0,5. Antes cada estrella tenía dos botones
+              de 20 px sin ninguna pista visual, así que la granularidad fina era invisible en móvil.
+              Es un <input type=range> nativo → funciona sin JS y con teclado (flechas = 0,5).
+
+              `min="0"` (y no 0,5) para que la posición mapee EXACTO con las estrellas: tocar el
+              final de la 5ª estrella da 5, no 5,5. El 0 no es una nota válida → al soltar se
+              sube a 0,5, y el servidor lo descarta igualmente (normalizeScore).
+            */}
+            <input
+                type="range"
+                class="rating-range"
+                name="rating"
+                min="0"
+                max="10"
+                step="0.5"
+                value={currentRating ?? 0}
+                aria-label="Tu nota, de 0,5 a 10 en pasos de medio punto"
+                aria-valuetext={currentRating !== null ? `${fmtScore(currentRating)} de 10` : 'sin nota'}
+            />
         </div>
+
+        <button type="submit" class="rating-save min-h-[44px] md:min-h-0 mt-3 w-full md:w-auto px-4 py-2.5 md:px-3 md:py-1.5 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800">
+            Guardar nota
+        </button>
     </form>
 
     <div class="mt-3 text-xs text-gray-500 space-y-0.5">
@@ -69,8 +83,8 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
         {diff !== null && diff !== 0 && (
             <p>
                 {diff > 0
-                    ? <><span class="text-green-600 font-medium">+{diff.toFixed(1)}</span> sobre TMDB</>
-                    : <><span class="text-red-600 font-medium">{diff.toFixed(1)}</span> bajo TMDB</>}
+                    ? <><span class="text-green-600 font-medium">+{fmtScore(Math.round(diff * 10) / 10)}</span> sobre TMDB</>
+                    : <><span class="text-red-600 font-medium">{fmtScore(Math.round(diff * 10) / 10)}</span> bajo TMDB</>}
             </p>
         )}
     </div>
@@ -87,12 +101,34 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
 </div>
 
 <style>
-    .star-svg { display: none; }
-    .star-pair[data-fill="empty"] .star-empty { display: block; }
-    .star-pair[data-fill="half"] .star-empty { display: block; }
-    .star-pair[data-fill="half"] .star-half { display: block; }
-    .star-pair[data-fill="full"] .star-full { display: block; }
-    .star-btn:hover { background-color: rgba(250, 204, 21, 0.08); }
+    /* Las 10 estrellas se REPARTEN el ancho disponible (flex: 1) en vez de tener un tamaño
+       fijo: así entran igual en la tarjeta ancha de escritorio que en un móvil de 360 px,
+       y el deslizador —que ocupa el 100 %— coincide exactamente con la fila de estrellas. */
+    .rating-stars { position: relative; display: flex; align-items: center; gap: 2px; width: 100%; max-width: 20rem; }
+    .star-pair { position: relative; flex: 1 1 0; min-width: 0; aspect-ratio: 1; }
+    .star-pair svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    .star-base { color: #e5e7eb; }
+    .star-fill { color: #facc15; }
+
+    /* Deslizador invisible sobre las estrellas. Pulgar de 1 px para que el valor mapee
+       linealmente de borde a borde (un pulgar ancho desplaza los extremos). */
+    .rating-range {
+        position: absolute;
+        inset: -8px 0;
+        width: 100%;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+        -webkit-appearance: none;
+        appearance: none;
+        background: transparent;
+    }
+    .rating-range::-webkit-slider-thumb { -webkit-appearance: none; width: 1px; height: 100%; }
+    .rating-range::-moz-range-thumb { width: 1px; height: 100%; border: 0; }
+    /* Foco de teclado: el range es invisible, así que el aro lo pintan las estrellas. */
+    .rating-range:focus-visible { outline: none; }
+    .rating-stars:has(.rating-range:focus-visible) { outline: 2px solid #2563eb; outline-offset: 3px; border-radius: 6px; }
+
     .rating-form:has(button.is-submitting) .rating-stars {
         pointer-events: none;
         opacity: 0.5;
@@ -103,47 +139,42 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
     function initStarRating(root: HTMLElement) {
         if (root.dataset.starInit === '1') return;
         root.dataset.starInit = '1';
-        const real = parseInt(root.dataset.rating || '0');
-        const pairs = root.querySelectorAll<HTMLElement>('.star-pair');
-        const btns = root.querySelectorAll<HTMLButtonElement>('.star-btn');
-        const label = root.parentElement?.querySelector<HTMLElement>('.rating-label');
-        const defaultLabel = label?.dataset.defaultLabel || '';
 
+        const range = root.querySelector<HTMLInputElement>('.rating-range');
+        const save = root.querySelector<HTMLButtonElement>('.rating-save');
+        if (!range) return;
+
+        const fills = root.querySelectorAll<HTMLElement>('.star-fill');
+        const wrap = root.parentElement;
+        const label = wrap?.querySelector<HTMLElement>('.rating-label');
+        const scale = wrap?.querySelector<HTMLElement>('.rating-scale');
+        const fmt = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+
+        // Una estrella = un punto → el relleno solo puede ser 0, 50 o 100 %.
         const paint = (rating: number) => {
-            pairs.forEach(span => {
-                const idx = parseInt(span.dataset.star || '0');
-                const right = idx * 2;
-                const left = idx * 2 - 1;
-                let fill: 'empty' | 'half' | 'full' = 'empty';
-                if (rating >= right) fill = 'full';
-                else if (rating === left) fill = 'half';
-                span.dataset.fill = fill;
+            fills.forEach((el, i) => {
+                const pct = Math.max(0, Math.min(1, rating - i)) * 100;
+                el.style.clipPath = `inset(0 ${100 - pct}% 0 0)`;
             });
+            if (label) label.textContent = rating > 0 ? fmt(rating) : '';
+            if (scale) scale.hidden = rating <= 0;
+            range.setAttribute('aria-valuetext', rating > 0 ? `${fmt(rating)} de 10` : 'sin nota');
         };
 
-        btns.forEach(btn => {
-            btn.addEventListener('mouseenter', () => {
-                const v = parseInt(btn.dataset.val || '0');
-                paint(v);
-                if (label) label.textContent = `${v}/10`;
-            });
-            btn.addEventListener('focus', () => {
-                const v = parseInt(btn.dataset.val || '0');
-                paint(v);
-                if (label) label.textContent = `${v}/10`;
-            });
+        // `input` = pintar mientras se arrastra. `change` = al soltar, guardar.
+        range.addEventListener('input', () => paint(Number(range.value)));
+        range.addEventListener('change', () => {
+            // El 0 existe solo para que la posición cuadre con las estrellas; como nota no
+            // vale, se sube al mínimo real antes de enviar.
+            if (Number(range.value) < 0.5) { range.value = '0.5'; paint(0.5); }
+            // Se dispara un click en el botón (en vez de requestSubmit) porque la capa
+            // optimista lee `e.submitter`: sin botón asociado abortaría el envío.
+            if (save) save.click();
         });
-        root.addEventListener('mouseleave', () => {
-            paint(real);
-            if (label) label.textContent = defaultLabel;
-        });
-        root.addEventListener('focusout', (e) => {
-            const next = e.relatedTarget as HTMLElement | null;
-            if (!next || !root.contains(next)) {
-                paint(real);
-                if (label) label.textContent = defaultLabel;
-            }
-        });
+
+        // Con JS el guardado es automático al soltar → el botón solo existe para el
+        // camino sin JS y para que la capa optimista tenga un `submitter`.
+        if (save) save.hidden = true;
     }
 
     function initAllStarRatings() {

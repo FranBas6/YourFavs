@@ -10,7 +10,7 @@ import CardMovie from "../../components/Cards/CardMovie.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName, genresMap } from "../../utils/constants/genres";
 import { sortBycriterion } from "../../utils/sorting";
-import { calculateAge } from "../../utils/constants/helpers/actor-helpers";
+import { calculateAge, getCareerRange } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import EmptyState from "../../components/EmptyState.astro";
 import ActorDubbingSection from "../../components/detail/ActorDubbingSection.astro";
@@ -139,12 +139,11 @@ const bestMovie = movies.length > 0
     ? movies.reduce((best: any, m: any) => (m.vote_average > best.vote_average ? m : best))
     : null;
 
-const movieDates = movies.map((m: any) => m.release_date).filter(Boolean).map((d: string) => new Date(d).getFullYear());
-const seriesDates = series.map((s: any) => s.first_air_date).filter(Boolean).map((d: string) => new Date(d).getFullYear());
-const allYears = [...movieDates, ...seriesDates].filter(y => y > 1900);
-const careerStart = allYears.length > 0 ? Math.min(...allYears) : null;
-const careerEnd = allYears.length > 0 ? Math.max(...allYears) : null;
-const careerYears = careerStart && careerEnd ? careerEnd - careerStart : null;
+// Rango de años en activo (ver getCareerRange): antes era un Math.min/Math.max crudo sobre
+// TODOS los créditos, y salía "1952 - 2028 · 76 años" en una actriz de 41 — se leía como su
+// edad. El saneado vive en el helper porque la basura de TMDB es sutil (apariciones como sí
+// mismo, metraje de archivo, y el año de la SERIE en vez del episodio).
+const career = getCareerRange([...movies, ...series], actorInfo.fechaNacimiento, actorInfo.fechaFallecimiento);
 
 // Tu historia con esta persona (§6 detalles con alma): cruza su filmografía (ya cargada)
 // con tu biblioteca vista (snapshot cacheado, cero coste TMDB). "Vista" = Vistas ∪
@@ -237,9 +236,9 @@ const jsonLd = {
                         {avgRating && (
                             <span class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full">Nota media {avgRating.toFixed(1)}</span>
                         )}
-                        {careerStart && careerEnd && (
-                            <span class="px-2 py-0.5 bg-green-50 text-green-700 rounded-full">
-                                {careerStart === careerEnd ? careerStart : `${careerStart} - ${careerEnd}`}{careerYears ? ` · ${careerYears} años` : ''}
+                        {career && (
+                            <span class="px-2 py-0.5 bg-green-50 text-green-700 rounded-full" title="Rango de años de su filmografía según TMDB">
+                                {career.start === career.end ? `En activo en ${career.start}` : `En activo ${career.start} – ${career.end}`}
                             </span>
                         )}
                     </div>

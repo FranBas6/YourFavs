@@ -17,6 +17,7 @@ import {
     fetchAllSeriesPosters, getSerieRecommendationsOrSimilar, getSeriesAdditionalInfo,
     getSeriesVideos
 } from "../../services/API/Series/InfoSeries";
+import { getAllSeasonProviders, buildProviderCoverage } from "../../services/API/Series/seasonProviders";
 import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
 import { getTitleLogo } from "../../services/API/shared/tmdbInfoService";
 import { peekTopActors } from "../../utils/topActorsLibrary";
@@ -185,6 +186,27 @@ if (watchedProgress?.watched_episodes) {
     }
 }
 const totalWatchedEpisodes = watchedSet.size;
+
+// "Dónde ver" por temporada: el endpoint de título devuelve la UNIÓN de todas las temporadas,
+// así que una serie con la T1 en Prime y el resto solo en Apple TV se anunciaba entera en
+// Prime. Se abre en la temporada que estás VIENDO (la primera con episodios sin ver), que es
+// la que te importa; las demás las pide el chip a /api/serie/[id]/providers. +1 llamada TMDB.
+const providerSeasons: number[] = regularSeasons.map((s: any) => s.season_number);
+// Si no has empezado la serie, la vista útil es la UNIÓN ("Toda la serie"): aún no hay una
+// temporada "tuya". En cuanto hay progreso, se abre en la primera con episodios sin ver.
+const hasProgress = watchedSet.size > 0;
+const targetSeason: number | null = providerSeasons.length > 1 && hasProgress
+    ? (providerSeasons.find((n) => (allSeasonEpisodes[n] || []).some((ep: any) => !watchedSet.has(`${n}-${ep.episode_number}`)))
+        ?? providerSeasons[providerSeasons.length - 1])
+    : null;
+// Todas las temporadas (cacheadas 24 h) para saber HASTA DÓNDE llega cada plataforma: el
+// endpoint de título dice "Netflix y Prime" sin contar que Prime se queda en la T3.
+const seasonProviderMap = providerSeasons.length > 1
+    ? await safeFetch(getAllSeasonProviders(id, providerSeasons), `serie/${id}/providers/all`, {} as any)
+    : {};
+const providerCoverage = buildProviderCoverage(seasonProviderMap);
+const seasonProviderData = targetSeason !== null ? (seasonProviderMap[targetSeason] ?? null) : null;
+const myPlatformIds: number[] = ((Astro.locals.user as any)?.platforms ?? []).map(Number).filter(Number.isFinite);
 
 // Modo sin spoilers (§2): solo con sesión. La SERIE manda sobre el global (parada 2): si hay
 // override por serie se usa; si no, el ajuste del perfil (OFF por defecto). Difumina fotograma +
@@ -670,7 +692,17 @@ const jsonLd = item ? {
                     })()}
 
                     <!-- Dónde ver -->
-                    <StreamingProviders providersByCountry={(item as any)?.providersByCountry || {}} linkByCountry={(item as any)?.providerLinksByCountry || {}} />
+                    <StreamingProviders
+                        providersByCountry={(item as any)?.providersByCountry || {}}
+                        linkByCountry={(item as any)?.providerLinksByCountry || {}}
+                        myPlatformIds={myPlatformIds}
+                        seasons={providerSeasons}
+                        initialSeason={targetSeason}
+                        seasonData={seasonProviderData}
+                        coverage={providerCoverage}
+                        totalSeasons={providerSeasons.length}
+                        serieId={id}
+                    />
 
                     <!-- Nota personal -->
                     {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (

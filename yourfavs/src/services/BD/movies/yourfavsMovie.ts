@@ -2,6 +2,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
 import { adminDb } from "../../../utils/firebaseAdmin";
 import { getTransition } from "../shared/stateTransitions";
+import { normalizeScore } from "../../../utils/constants/helpers/media-helpers";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
 
@@ -66,7 +67,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     }
 
     if (action === 'save_rating') {
-        const ratingNum = Math.max(1, Math.min(10, Number(formData.get('rating') || 0)));
+        const ratingNum = normalizeScore(formData.get('rating'));
         if (!ratingNum) return `/movie/${movieId}`;
         await updateExisting({ rating: ratingNum });
         // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).

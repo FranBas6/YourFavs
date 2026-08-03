@@ -564,7 +564,11 @@ const jsonLd = item ? {
                     })()}
 
                     <!-- Dónde ver -->
-                    <StreamingProviders providersByCountry={item?.providersByCountry || {}} linkByCountry={item?.providerLinksByCountry || {}} />
+                    <StreamingProviders
+                        providersByCountry={item?.providersByCountry || {}}
+                        linkByCountry={item?.providerLinksByCountry || {}}
+                        myPlatformIds={((Astro.locals.user as any)?.platforms ?? []).map(Number).filter(Number.isFinite)}
+                    />
 
                     <!-- Nota personal -->
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (

@@ -212,6 +212,40 @@ export function formatFirebaseDate(dateValue: any): string {
     return 'Fecha desconocida';
 }
 
+/** Escala de notas del usuario: 0,5-10 en pasos de medio punto (20 valores posibles). */
+export const RATING_STEP = 0.5;
+export const RATING_MIN = 0.5;
+export const RATING_MAX = 10;
+
+/**
+ * Normaliza la nota que llega del formulario: acota a 0,5-10 y **cuantiza a medio punto**.
+ * La escala pasó de enteros a medios puntos (poder poner un 7,5); cuantizar impide que
+ * entren decimales arbitrarios (7,37) por un input manipulado o un redondeo del navegador.
+ * Devuelve `null` si no hay número válido → el handler entonces no escribe nada.
+ * Vive aquí (y no en `BD/lists/ratings.ts`) por ser pura: así no arrastra firebase-admin.
+ */
+export function normalizeScore(raw: unknown): number | null {
+    const n = Number(raw);
+    if (!isFinite(n) || n <= 0) return null;
+    const clamped = Math.min(RATING_MAX, Math.max(RATING_MIN, n));
+    return Math.round(clamped / RATING_STEP) * RATING_STEP;
+}
+
+/**
+ * Formatea una nota del usuario (escala 0,5-10 en medios puntos) para mostrarla:
+ * "7,5" con coma y sin decimales de relleno ("7", no "7,0").
+ * Antes las notas eran enteras y se imprimían crudas; al admitir medios puntos, sin esto
+ * aparecería "7.5" con punto en las cards, en Actividad y en la búsqueda personal.
+ */
+export function formatScore(score: number | string | null | undefined): string {
+    // Ojo: `Number(null)` y `Number('')` son 0 (finito), así que hay que descartarlos antes
+    // o una nota inexistente se pintaría como "0".
+    if (score === null || score === undefined || score === '') return '';
+    const n = Number(score);
+    if (!isFinite(n)) return '';
+    return n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+}
+
 export function getFirebaseTimestamp(dateValue: any): number {
     if (!dateValue) return 0;
     if (dateValue && typeof dateValue === 'object' && 'seconds' in dateValue) {

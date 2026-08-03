@@ -9,6 +9,7 @@
 import type { APIRoute } from 'astro';
 import { posterUrl } from '../../../services/API/shared/tmdbClient';
 import { buildPersonalIndex, foldText } from '../../../services/BD/shared/personalIndex';
+import { formatScore } from '../../../utils/constants/helpers/media-helpers';
 
 export const prerender = false;
 
@@ -41,7 +42,7 @@ export const GET: APIRoute = async ({ url, locals }) => {
             id: Number(i.id),
             media_type: i.media_type,
             title: i.title,
-            subtitle: [i.lists.join(' · '), i.rating ? `★ ${i.rating}` : ''].filter(Boolean).join('  ·  '),
+            subtitle: [i.lists.join(' · '), i.rating ? `★ ${formatScore(i.rating)}` : ''].filter(Boolean).join('  ·  '),
             image: i.poster_path ? posterUrl(i.poster_path, 'w92') : null,
             poster_path: i.poster_path,
             rating: i.rating,
