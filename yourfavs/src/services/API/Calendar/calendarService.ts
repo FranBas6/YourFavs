@@ -47,7 +47,34 @@ function isInMonth(dateStr: string | undefined, year: number, month: number): bo
     return d.getFullYear() === year && d.getMonth() + 1 === month;
 }
 
-export async function getCalendarData(year: number, month: number): Promise<CalendarData> {
+/**
+ * ¿Hay que ocultar el nombre del episodio para este usuario? En un helper para que las tres
+ * puertas de entrada al calendario (página, endpoint del mes y feed .ics) digan lo mismo: si una
+ * se olvidara, el .ics filtraría por correo justo lo que la web tapa.
+ */
+export function hideEpisodeTitlesFor(user: SessionUser | null | undefined): boolean {
+    const s = user?.spoilers;
+    return s?.enabled === true && s.hideCalendarTitles === true;
+}
+
+export interface CalendarOptions {
+    /**
+     * Modo sin spoilers (§2 · A3b): la etiqueta del episodio se queda en "T2 E5" sin el nombre.
+     * Se resuelve en el llamante desde `locals.user.spoilers`, porque este servicio también lo
+     * consume el feed .ics y conviene que los dos digan lo mismo.
+     */
+    hideEpisodeTitles?: boolean;
+}
+
+export async function getCalendarData(
+    year: number,
+    month: number,
+    opts: CalendarOptions = {},
+): Promise<CalendarData> {
+    // Etiqueta de episodio: "T2 E5" y, si se permite, " - Nombre del episodio".
+    const epLabel = (s: number | string, e: number | string, name?: string | null) =>
+        `T${s} E${e}${name && !opts.hideEpisodeTitles ? ' - ' + name : ''}`;
+
     const { start, end } = getMonthRange(year, month);
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
 
@@ -244,7 +271,7 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
                                 title: serie.name,
                                 poster_path: posterUrl(serie.poster_path),
                                 event_type: 'episode',
-                                label: `T${ep.season_number} E${ep.episode_number}${ep.name ? ' - ' + ep.name : ''}`,
+                                label: epLabel(ep.season_number, ep.episode_number, ep.name),
                                 is_subscribed: isSub,
                                 is_following: isFollowing,
                             });
@@ -264,7 +291,7 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
                 title: serie.name,
                 poster_path: posterUrl(serie.poster_path),
                 event_type: 'episode',
-                label: `T${nextEp.season_number} E${nextEp.episode_number}${nextEp.name ? ' - ' + nextEp.name : ''}`,
+                label: epLabel(nextEp.season_number, nextEp.episode_number, nextEp.name),
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });
@@ -277,7 +304,7 @@ export async function getCalendarData(year: number, month: number): Promise<Cale
                 title: serie.name,
                 poster_path: posterUrl(serie.poster_path),
                 event_type: 'episode',
-                label: `T${lastEp.season_number} E${lastEp.episode_number}${lastEp.name ? ' - ' + lastEp.name : ''}`,
+                label: epLabel(lastEp.season_number, lastEp.episode_number, lastEp.name),
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });

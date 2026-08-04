@@ -1,0 +1,384 @@
+---
+/**
+ * Diálogo de avatar: caras de tus actores favoritos, pósters de tus listas o una foto tuya.
+ *
+ * Cambio de fondo respecto a A1: **elegir ya no guarda**. Antes, tocar una cara enviaba un POST
+ * y recargaba la página, así que curiosear era irreversible. Ahora se selecciona, la franja de
+ * arriba muestra qué quedará, y «Usar este avatar» confirma con un `PATCH` — sin recarga.
+ *
+ * La lógica de recorte (canvas + Pointer Events, salida 256×256 JPEG) se conserva tal cual de
+ * la versión que llevaba meses funcionando; solo cambia el envoltorio.
+ *
+ * El anillo del recorte es una VISTA PREVIA de cómo se verá, no el límite de lo que se guarda:
+ * se sube el cuadrado completo y el círculo lo hace el CSS en cada sitio donde aparece.
+ */
+interface Props {
+    /** `avatar_url` guardado (no la foto de Google): lo que hay que restaurar al deshacer. */
+    currentUrl: string | null;
+    /** Foto que se está mostrando ahora mismo (perfil o Google). */
+    currentPicture: string | null;
+    /** Foto de Google: a lo que hay que volver si se quita el avatar propio. */
+    fallbackPicture: string | null;
+    initial: string;
+    displayName: string;
+}
+const { currentUrl, currentPicture, fallbackPicture, initial, displayName } = Astro.props;
+---
+<div class="av2-overlay" id="avatar-modal" role="dialog" aria-modal="true" aria-labelledby="av2-title" hidden
+     data-avatar-url={currentUrl ?? ''} data-fallback={fallbackPicture ?? ''} data-initial={initial}>
+    <div class="av2-card">
+        <div class="av2-head">
+            <h3 id="av2-title">Tu avatar</h3>
+            <button type="button" class="av2-close" id="avatar-close" aria-label="Cerrar">✕</button>
+        </div>
+
+        <div class="av2-tabs" role="tablist">
+            <button type="button" class="av2-tab is-active" data-av-tab="gallery" role="tab" aria-selected="true">De tus pelis y series</button>
+            <button type="button" class="av2-tab" data-av-tab="upload" role="tab" aria-selected="false">Subir una foto</button>
+        </div>
+
+        <div class="av2-current">
+            <span class="av2-current-pic" id="av2-preview">
+                {currentPicture
+                    ? <img src={currentPicture} alt="" referrerpolicy="no-referrer" />
+                    : initial}
+            </span>
+            <span class="av2-current-text">
+                <span class="av2-current-title">{displayName}</span>
+                <p class="av2-current-sub" id="av2-hint">Así te verás en el header y en tu perfil.</p>
+            </span>
+        </div>
+
+        <!-- Pestaña: galería TMDB -->
+        <div class="av2-panel" data-av-panel="gallery">
+            <div class="av2-body" id="avatar-grid"><p class="av2-state">Cargando…</p></div>
+        </div>
+
+        <!-- Pestaña: subir foto propia -->
+        <div class="av2-panel" data-av-panel="upload" hidden>
+            <div id="av-upload-start">
+                <label class="av2-drop">
+                    <input type="file" id="av-file" accept="image/*" hidden />
+                    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <strong>Elige una foto</strong>
+                    <small>Cámara o galería</small>
+                </label>
+            </div>
+            <div id="av-upload-edit" hidden>
+                <div class="av2-crop-wrap">
+                    <div class="av2-crop" id="av-crop">
+                        <canvas id="av-canvas" width="240" height="240"></canvas>
+                        <span class="av2-crop-veil"></span>
+                        <span class="av2-crop-ring"></span>
+                    </div>
+                </div>
+                <label class="av2-zoom">
+                    <span>Zoom</span>
+                    <input type="range" id="av-zoom" min="1" max="3" step="0.01" value="1" aria-label="Zoom de la foto" />
+                </label>
+                <p class="av2-note" style="padding: 8px 20px 0;">Arrastra la foto para encuadrar. Se guarda a 256×256.</p>
+            </div>
+            <p class="av2-msg" id="av-upload-msg" hidden></p>
+        </div>
+
+        <div class="av2-foot">
+            <span class="av2-note" id="av2-foot-note">Puedes cambiarlo cuando quieras.</span>
+            <span class="av2-foot-actions">
+                <button type="button" class="aj-btn" id="avatar-cancel">Cancelar</button>
+                <button type="button" class="av2-primary" id="avatar-apply" disabled>Usar este avatar</button>
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const modal = document.getElementById('avatar-modal');
+    const openBtn = document.getElementById('avatar-open');
+    const closeBtn = document.getElementById('avatar-close');
+    const cancelBtn = document.getElementById('avatar-cancel');
+    const applyBtn = document.getElementById('avatar-apply') as HTMLButtonElement | null;
+    const grid = document.getElementById('avatar-grid');
+    const preview = document.getElementById('av2-preview');
+    const hint = document.getElementById('av2-hint');
+
+    if (modal) {
+        /** URL guardada en el perfil (no la de Google). '' = no hay avatar propio. */
+        let savedUrl = modal.dataset.avatarUrl || '';
+        /** Selección pendiente de confirmar: URL de la galería, o un Blob si es foto propia. */
+        let pending: { kind: 'url'; value: string } | { kind: 'blob'; value: Blob } | null = null;
+        let loaded = false;
+
+        const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] || c));
+
+        function setPreview(src: string | null) {
+            if (!preview) return;
+            preview.innerHTML = src ? `<img src="${esc(src)}" alt="" referrerpolicy="no-referrer" />` : preview.textContent || '';
+        }
+
+        function markPending(p: typeof pending, previewSrc: string | null, note: string) {
+            pending = p;
+            if (applyBtn) applyBtn.disabled = p === null;
+            if (previewSrc !== null) setPreview(previewSrc);
+            if (hint) hint.textContent = note;
+        }
+
+        // ---- apertura / cierre ----
+        function open() {
+            modal.hidden = false;
+            document.body.style.overflow = 'hidden';
+            if (!loaded) load();
+            closeBtn?.focus();
+        }
+        function close() {
+            modal.hidden = true;
+            document.body.style.overflow = '';
+            markPending(null, null, 'Así te verás en el header y en tu perfil.');
+        }
+        openBtn?.addEventListener('click', open);
+        closeBtn?.addEventListener('click', close);
+        cancelBtn?.addEventListener('click', close);
+        modal.addEventListener('mousedown', (e) => { if (e.target === modal) close(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !modal.hidden) close(); });
+
+        // ---- pestañas ----
+        const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.av2-tab'));
+        const panels = Array.from(document.querySelectorAll<HTMLElement>('.av2-panel'));
+        function selectTab(name: string) {
+            tabs.forEach((t) => {
+                const on = t.dataset.avTab === name;
+                t.classList.toggle('is-active', on);
+                t.setAttribute('aria-selected', String(on));
+            });
+            panels.forEach((p) => { p.hidden = p.dataset.avPanel !== name; });
+        }
+        tabs.forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.avTab || 'gallery')));
+
+        // ---- galería ----
+        async function load() {
+            if (!grid) return;
+            try {
+                const res = await fetch('/api/profile/avatar-options');
+                const data = await res.json();
+                const actors: string[] = data.actors || [];
+                const posters: string[] = data.posters || [];
+                loaded = true;
+                if (!actors.length && !posters.length) {
+                    grid.innerHTML = '<p class="av2-state">Guarda actores, pelis o series y aquí saldrán sus caras y pósters… o sube una foto tuya.</p>';
+                    return;
+                }
+                const cell = (u: string) => `<button type="button" class="av2-pick" data-url="${esc(u)}"><img src="${esc(u)}" alt="" loading="lazy" /></button>`;
+                let html = '';
+                if (actors.length) html += `<p class="aj-grpt">Caras de tus actores favoritos</p><div class="av2-grid">${actors.map(cell).join('')}</div>`;
+                if (posters.length) html += `<p class="aj-grpt">Pósters de tus listas</p><div class="av2-grid">${posters.map(cell).join('')}</div>`;
+                grid.innerHTML = html;
+            } catch {
+                grid.innerHTML = '<p class="av2-state">No se pudieron cargar las imágenes.</p>';
+            }
+        }
+
+        grid?.addEventListener('click', (e) => {
+            const btn = (e.target as HTMLElement).closest<HTMLElement>('.av2-pick');
+            if (!btn) return;
+            grid.querySelectorAll('.av2-pick').forEach((b) => b.classList.remove('is-sel'));
+            btn.classList.add('is-sel');
+            const url = btn.getAttribute('data-url') || '';
+            markPending({ kind: 'url', value: url }, url, 'Pulsa «Usar este avatar» para confirmarlo.');
+        });
+
+        // ---- confirmar ----
+        /** Actualiza los avatares que ya están en la página, para no tener que recargar. */
+        function paintEverywhere(src: string | null) {
+            const initial = modal.dataset.initial || '?';
+            document.querySelectorAll<HTMLElement>('.aj-avatar, .aj-me-avatar, .header-avatar-btn, .account-menu-avatar')
+                .forEach((host) => {
+                    if (!src) { host.innerHTML = esc(initial); return; }   // sin foto → iniciales
+                    const img = host.querySelector('img');
+                    if (img) img.setAttribute('src', src);
+                    else host.innerHTML = `<img src="${esc(src)}" alt="" referrerpolicy="no-referrer" />`;
+                });
+        }
+
+        async function patchAvatar(url: string | null): Promise<boolean> {
+            const res = await fetch('/api/profile/preferences', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ avatar_url: url }),
+            });
+            const data = await res.json().catch(() => ({}));
+            return res.ok && Boolean(data.ok);
+        }
+
+        applyBtn?.addEventListener('click', async () => {
+            if (!pending) return;
+            const original = applyBtn.textContent;
+            applyBtn.disabled = true;
+            applyBtn.textContent = 'Guardando…';
+            try {
+                let url: string;
+                if (pending.kind === 'url') {
+                    if (!(await patchAvatar(pending.value))) throw new Error();
+                    url = pending.value;
+                } else {
+                    // Foto propia: el endpoint la guarda, escribe `avatar_url` él mismo y
+                    // devuelve la URL ya con cache-buster (la ruta del avatar propio es siempre
+                    // la misma, así que sin `?v=` se vería la foto anterior). No hay que PATCHear.
+                    const fd = new FormData();
+                    fd.append('avatar', pending.value, 'avatar.jpg');
+                    const res = await fetch('/api/profile/avatar-upload', { method: 'POST', body: fd });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok || !data.ok || !data.url) throw new Error(data.error || 'fallo');
+                    url = data.url;
+                }
+                savedUrl = url;
+                modal.dataset.avatarUrl = url;
+                paintEverywhere(url);
+                close();
+            } catch (err) {
+                applyBtn.disabled = false;
+                applyBtn.textContent = original || 'Usar este avatar';
+                showMsg((err as Error).message || 'No se pudo guardar el avatar.');
+            }
+        });
+
+        // ---- quitar avatar (desde la sección Perfil) ----
+        document.getElementById('avatar-clear')?.addEventListener('click', async () => {
+            const previous = savedUrl;
+            if (!(await patchAvatar(null))) { alert('No se pudo quitar el avatar.'); return; }
+            savedUrl = '';
+            modal.dataset.avatarUrl = '';
+            // Al quitar el avatar propio se vuelve a la foto del proveedor (Google) y, si no
+            // hay, a las iniciales. El middleware expone esa foto en `providerPicture`; sin
+            // ella el cliente no tendría a qué volver y habría que recargar para verlo.
+            paintEverywhere(modal.dataset.fallback || null);
+            document.dispatchEvent(new CustomEvent('yf:undo', {
+                detail: {
+                    label: 'Quitaste tu avatar',
+                    revert: async () => {
+                        if (previous && await patchAvatar(previous)) {
+                            savedUrl = previous;
+                            modal.dataset.avatarUrl = previous;
+                            paintEverywhere(previous);
+                        } else {
+                            location.reload();   // no se pudo restaurar: que mande el servidor
+                        }
+                    },
+                },
+            }));
+        });
+
+        // ---- Subir foto: selección → recorte (canvas) → Blob ----
+        const avFile = document.getElementById('av-file') as HTMLInputElement | null;
+        const avStart = document.getElementById('av-upload-start');
+        const avEdit = document.getElementById('av-upload-edit');
+        const avCanvas = document.getElementById('av-canvas') as HTMLCanvasElement | null;
+        const avZoom = document.getElementById('av-zoom') as HTMLInputElement | null;
+        const avMsg = document.getElementById('av-upload-msg');
+
+        const V = 240; // lado del visor (px); la salida final es 256×256
+        let avImg: HTMLImageElement | null = null;
+        let baseScale = 1, zoom = 1, ox = 0, oy = 0;
+        let dragging = false, lastX = 0, lastY = 0;
+
+        function showMsg(text: string) {
+            if (!avMsg) return;
+            avMsg.textContent = text;
+            avMsg.hidden = false;
+        }
+        function clampOffset() {
+            if (!avImg) return;
+            const w = avImg.width * baseScale * zoom;
+            const h = avImg.height * baseScale * zoom;
+            ox = Math.min(0, Math.max(V - w, ox));
+            oy = Math.min(0, Math.max(V - h, oy));
+        }
+        function draw() {
+            if (!avCanvas || !avImg) return;
+            const ctx = avCanvas.getContext('2d');
+            if (!ctx) return;
+            const w = avImg.width * baseScale * zoom;
+            const h = avImg.height * baseScale * zoom;
+            ctx.clearRect(0, 0, V, V);
+            ctx.drawImage(avImg, ox, oy, w, h);
+            queueBlob();
+        }
+
+        /**
+         * El recorte se convierte a Blob al vuelo (con retardo, para no hacerlo en cada píxel
+         * del arrastre), así «Usar este avatar» es instantáneo y la franja de arriba puede
+         * mostrar el encuadre real mientras lo mueves.
+         */
+        let blobTimer = 0;
+        let previewUrl = '';
+        function queueBlob() {
+            window.clearTimeout(blobTimer);
+            blobTimer = window.setTimeout(() => {
+                if (!avImg) return;
+                const O = 256, k = O / V;
+                const out = document.createElement('canvas');
+                out.width = O; out.height = O;
+                const octx = out.getContext('2d');
+                if (!octx) return;
+                octx.drawImage(avImg, ox * k, oy * k, avImg.width * baseScale * zoom * k, avImg.height * baseScale * zoom * k);
+                out.toBlob((blob) => {
+                    if (!blob) return;
+                    // Liberar el object URL anterior: se genera uno por cada reencuadre.
+                    if (previewUrl) URL.revokeObjectURL(previewUrl);
+                    previewUrl = URL.createObjectURL(blob);
+                    markPending({ kind: 'blob', value: blob }, previewUrl, 'Pulsa «Usar este avatar» para confirmarlo.');
+                }, 'image/jpeg', 0.85);
+            }, 120);
+        }
+
+        avFile?.addEventListener('change', () => {
+            const f = avFile.files && avFile.files[0];
+            if (!f) return;
+            if (!f.type.startsWith('image/')) { showMsg('Elige un archivo de imagen.'); return; }
+            if (avMsg) avMsg.hidden = true;
+            const img = new Image();
+            img.onload = () => {
+                avImg = img;
+                baseScale = Math.max(V / img.width, V / img.height); // "cover" del visor
+                zoom = 1;
+                if (avZoom) avZoom.value = '1';
+                ox = (V - img.width * baseScale) / 2;
+                oy = (V - img.height * baseScale) / 2;
+                clampOffset();
+                draw();
+                if (avStart) avStart.hidden = true;
+                if (avEdit) avEdit.hidden = false;
+            };
+            img.onerror = () => showMsg('No se pudo leer la imagen.');
+            img.src = URL.createObjectURL(f);
+        });
+
+        avZoom?.addEventListener('input', () => {
+            if (!avImg) return;
+            // Mantener el centro del visor al hacer zoom
+            const cx = (V / 2 - ox), cy = (V / 2 - oy);
+            const prev = baseScale * zoom;
+            zoom = Number(avZoom.value);
+            const next = baseScale * zoom;
+            ox = V / 2 - cx * (next / prev);
+            oy = V / 2 - cy * (next / prev);
+            clampOffset();
+            draw();
+        });
+
+        // Arrastrar para reposicionar (ratón + táctil con Pointer Events)
+        const crop = document.getElementById('av-crop');
+        crop?.addEventListener('pointerdown', (e) => {
+            if (!avImg) return;
+            dragging = true; lastX = e.clientX; lastY = e.clientY;
+            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        });
+        crop?.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            ox += e.clientX - lastX; oy += e.clientY - lastY;
+            lastX = e.clientX; lastY = e.clientY;
+            clampOffset(); draw();
+        });
+        const stopDrag = () => { dragging = false; };
+        crop?.addEventListener('pointerup', stopDrag);
+        crop?.addEventListener('pointercancel', stopDrag);
+    }
+</script>

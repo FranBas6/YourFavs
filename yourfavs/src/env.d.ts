@@ -5,10 +5,24 @@ interface SessionUser {
     email: string | null;
     name: string | null;
     picture: string | null;
+    /** Foto del proveedor (Google), antes de que `avatar_url` del perfil la sustituya. */
+    providerPicture?: string | null;
     region?: string;   // preferencia del perfil (para el menú de cuenta)
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     platforms?: number[];  // provider_ids de "mis plataformas" (Auditoría v2 · 3.2)
-    spoilerFree?: boolean;  // §2 modo sin spoilers (OFF por defecto; solo true lo activa)
+    /** Catálogo y ruleta arrancan ya filtrados a `platforms` (Ajustes · A3b). */
+    platformsFilterDefault?: boolean;
+    /**
+     * §2 modo sin spoilers, ya RESUELTO por el middleware (`resolveSpoilerSettings`): quien
+     * tenga el booleano viejo `spoilerFree` llega aquí con el desglose equivalente, así que
+     * las páginas nunca tienen que mirar el campo antiguo.
+     */
+    spoilers?: {
+        enabled: boolean;
+        hideStills: boolean;
+        hideSynopsis: boolean;
+        hideCalendarTitles: boolean;
+    };
     homeLayout?: { key: string; hidden?: boolean }[];  // §4 home a tu medida (bloques ocultos)
 }
 

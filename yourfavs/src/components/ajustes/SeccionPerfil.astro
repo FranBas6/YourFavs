@@ -1,0 +1,105 @@
+---
+/**
+ * Identidad pública: avatar y nombre visible; el correo es de solo lectura.
+ *
+ * El botón de cámara sobre el avatar y el de «Cambiar avatar» abren el MISMO diálogo: dos
+ * formas de llegar, un solo `#avatar-open` — el de la cámara reenvía el clic.
+ */
+import type { UserProfile } from "../../services/BD/profile/userProfile";
+import AvatarDialog from "./AvatarDialog.astro";
+
+interface Props {
+    profile: UserProfile;
+    user: { email?: string | null; name?: string | null; picture?: string | null; providerPicture?: string | null };
+}
+const { profile, user } = Astro.props;
+
+const displayName = profile.display_name || user.name || (user.email ? user.email.split('@')[0] : 'Tú');
+const NAME_MAX = 32;
+
+const initial = (() => {
+    const base = (profile.display_name || user.name || user.email || '?').trim();
+    return base.slice(0, 1).toUpperCase();
+})();
+---
+<form method="POST" data-autosave-form>
+    <input type="hidden" name="action" value="save_section" />
+    <input type="hidden" name="section" value="perfil" />
+
+    <div class="aj-card">
+        <div class="aj-card-body">
+            <div class="aj-identity">
+                <span class="aj-avatar-wrap">
+                    <span class="aj-avatar">
+                        {user.picture
+                            ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
+                            : initial}
+                    </span>
+                    <button type="button" class="aj-cam" id="avatar-open-cam" aria-label="Cambiar avatar">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h3l2-2h8l2 2h3v12H3z"/><circle cx="12" cy="13" r="3.2"/></svg>
+                    </button>
+                </span>
+                <div class="aj-identity-body">
+                    <h2 class="aj-identity-title">Tu avatar</h2>
+                    <p class="aj-identity-help">
+                        Puedes usar la cara de uno de tus actores favoritos, un póster de tus listas o una foto tuya.
+                    </p>
+                    <div class="aj-btns">
+                        <button type="button" class="aj-btn" id="avatar-open">Cambiar avatar</button>
+                        {user.picture && <button type="button" class="aj-btn aj-btn-ghost" id="avatar-clear">Quitar</button>}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="aj-card-body">
+            <div class="aj-fields">
+                <label class="aj-field">
+                    <span class="aj-field-label">
+                        Nombre visible
+                        <span class="aj-field-count" id="name-count">{displayName.length}/{NAME_MAX}</span>
+                    </span>
+                    <input
+                        type="text" name="display_name" value={displayName} maxlength={NAME_MAX}
+                        placeholder="Tu nombre" data-save="display_name" data-save-debounce="600" />
+                    <span class="aj-field-help">Vacío = se usa el nombre de tu cuenta de Google.</span>
+                </label>
+                <div class="aj-field">
+                    <span class="aj-field-label">Correo de la cuenta</span>
+                    <div class="aj-ro">
+                        <span class="aj-ro-value">{user.email}</span>
+                        <span class="aj-verified">VERIFICADO</span>
+                    </div>
+                    <span class="aj-field-help">El correo no se puede cambiar.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="aj-fallback">
+        <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
+    </div>
+</form>
+
+<AvatarDialog
+    currentUrl={profile.avatar_url ?? null}
+    currentPicture={user.picture ?? null}
+    fallbackPicture={user.providerPicture ?? null}
+    initial={initial}
+    displayName={displayName}
+/>
+
+<script>
+    // Contador del campo de nombre.
+    const nameInput = document.querySelector<HTMLInputElement>('input[name="display_name"]');
+    const nameCount = document.getElementById('name-count');
+    nameInput?.addEventListener('input', () => {
+        if (nameCount) nameCount.textContent = `${nameInput.value.length}/${nameInput.maxLength}`;
+    });
+
+    // La cámara es un segundo disparador del mismo diálogo.
+    document.getElementById('avatar-open-cam')?.addEventListener('click', () => {
+        document.getElementById('avatar-open')?.click();
+    });
+    // El botón «Quitar» lo maneja AvatarDialog (necesita la URL guardada para el Deshacer).
+</script>

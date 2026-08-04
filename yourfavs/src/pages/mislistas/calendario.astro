@@ -1,6 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import { getCalendarData } from "../../services/API/Calendar/calendarService";
+import { getCalendarData, hideEpisodeTitlesFor } from "../../services/API/Calendar/calendarService";
 import type { CalendarEvent } from "../../services/API/Calendar/calendarService";
 import EmptyState from "../../components/EmptyState.astro";
 
@@ -14,7 +14,9 @@ let calendarData;
 let errorMessage = "";
 
 try {
-    calendarData = await getCalendarData(year, month);
+    calendarData = await getCalendarData(year, month, {
+        hideEpisodeTitles: hideEpisodeTitlesFor(Astro.locals.user),
+    });
 } catch (error) {
     console.error("Error al cargar calendario:", error);
     errorMessage = error instanceof Error ? error.message : "Error al cargar el calendario";

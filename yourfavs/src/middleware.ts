@@ -11,7 +11,7 @@
 import { defineMiddleware } from 'astro:middleware';
 import { adminAuth } from './utils/firebaseAdmin';
 import { runWithUser, setRequestPrefs } from './services/BD/shared/userScope';
-import { getUserProfile } from './services/BD/profile/userProfile';
+import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
 
 export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = null;
@@ -71,11 +71,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
             try {
                 const profile = await getUserProfile();
                 if (profile?.display_name) context.locals.user.name = profile.display_name;
+                // `providerPicture` guarda la foto del proveedor ANTES de que la pise el perfil:
+                // es lo que hay que volver a pintar si el usuario quita su avatar, y el cliente
+                // no tiene otra forma de conocerla.
+                context.locals.user.providerPicture = context.locals.user.picture;
                 if (profile?.avatar_url) context.locals.user.picture = profile.avatar_url;
                 context.locals.user.region = profile?.region ?? 'ES'; // para el menú de cuenta
                 context.locals.user.onboarding = profile?.onboarding; // gating onboarding (Fase F)
                 context.locals.user.platforms = profile?.platforms ?? []; // "mis plataformas" (3.2)
-                context.locals.user.spoilerFree = profile?.spoilerFree; // §2 modo sin spoilers (undefined = OFF)
+                context.locals.user.platformsFilterDefault = profile?.platformsFilterDefault === true;
+                // §2 modo sin spoilers: se resuelve AQUÍ (maestro + desglose, con la
+                // retrocompatibilidad del booleano viejo) para que ninguna página tenga que
+                // saber que existió un formato anterior.
+                context.locals.user.spoilers = resolveSpoilerSettings(profile);
                 context.locals.user.homeLayout = profile?.homeLayout; // §4 home a tu medida (bloques ocultos)
                 // Idioma/región del perfil → contexto del request (los leen tmdbFetch y providers).
                 setRequestPrefs({ language: profile?.language, region: profile?.region });

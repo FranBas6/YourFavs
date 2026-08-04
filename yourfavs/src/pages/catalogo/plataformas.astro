@@ -21,7 +21,13 @@ import '../../styles/pages/catalogo/shared.css';
 const urlParams = new URL(Astro.url, Astro.request.url).searchParams;
 const page = Number(urlParams.get('page')) || 1;
 const pageStr = page.toString();
-const platformParam = urlParams.get('platform') || 'all';
+// Sin `?platform` arranca en "Mis plataformas" si tienes puesto «Filtrar siempre por mis
+// plataformas» (y alguna elegida); si no, en "Todas". Aquí el selector ya es explícito, así que
+// no hace falta un valor de apagado: elegir otra pestaña sobrescribe el parámetro.
+const defaultPlatform = Astro.locals.user?.platformsFilterDefault === true
+    && (Astro.locals.user?.platforms?.length ?? 0) > 0
+    ? 'mine' : 'all';
+const platformParam = urlParams.get('platform') || defaultPlatform;
 const type = urlParams.get('type') || 'all';
 
 const filters = parseAdvancedFilters(urlParams);
@@ -38,13 +44,15 @@ const SLUG_TO_PROVIDER_ID: Record<string, number> = {
     filmin: PROVIDERS.FILMIN,
 };
 
-// "Mis plataformas": intersección de las plataformas del perfil (locals.user.platforms,
-// ids de proveedor TMDB) con las que soporta esta página. Si el usuario tiene alguna,
-// el chip filtra el catálogo a la UNIÓN de esas; si no, el chip lleva a /perfil a elegirlas.
-const KNOWN_PROVIDER_IDS = new Set(Object.values(SLUG_TO_PROVIDER_ID));
+// "Mis plataformas": las del perfil (locals.user.platforms, ids de proveedor TMDB). Si el
+// usuario tiene alguna, el chip filtra el catálogo a la UNIÓN de esas; si no, lleva a /perfil.
+//
+// Ojo: antes esto se cruzaba con los 7 slugs que tienen página propia aquí, así que una
+// plataforma añadida a mano (Crunchyroll, MUBI…) se descartaba EN SILENCIO del filtro.
+// `with_watch_providers` de TMDB acepta cualquier provider_id, así que no hace falta filtrar.
 const myProviderIds: number[] = ((Astro.locals.user as any)?.platforms ?? [])
     .map((x: any) => Number(x))
-    .filter((id: number) => KNOWN_PROVIDER_IDS.has(id));
+    .filter((id: number) => Number.isInteger(id) && id > 0);
 const hasMine = myProviderIds.length > 0;
 const isMine = platformParam === 'mine' && hasMine;
 

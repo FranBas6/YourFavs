@@ -1,0 +1,104 @@
+---
+/**
+ * Sesión y lo que no tiene vuelta atrás.
+ *
+ * Las tres acciones irreversibles viven bajo «Opciones avanzadas», cerradas y en gris: solo
+ * toman color al pasar por encima. Antes «Eliminar cuenta» era un botón rojo permanente
+ * compitiendo por la atención con todo lo demás.
+ *
+ * «Descargar tus datos» se pinta pero va deshabilitada: volcar listas + notas + valoraciones
+ * es la operación más caro-en-lecturas de la app y venimos de ponerla a dieta. Anotada en
+ * `docs/TODO.md` con el guard que necesitaría.
+ */
+interface Props {
+    user: { email?: string | null };
+}
+const { user } = Astro.props;
+---
+<div class="aj-card">
+    <div class="aj-row">
+        <span class="aj-row-ico" style="--ico: var(--a-person); --ico-bg: var(--a-person-bg);" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0"/></svg>
+        </span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">Sesión iniciada con Google</span>
+            <p class="aj-row-desc">{user.email}</p>
+        </span>
+        <button type="button" class="aj-btn" data-auth-logout>Cerrar sesión</button>
+    </div>
+</div>
+
+<details class="aj-adv">
+    <summary>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        Opciones avanzadas
+    </summary>
+
+    <div class="aj-adv-list">
+        <div class="aj-adv-row">
+            <span class="aj-adv-row-text">
+                <span class="aj-row-title">Descargar tus datos <span class="aj-soon">Pronto</span></span>
+                <p class="aj-row-desc">Un JSON con tus listas, notas y valoraciones.</p>
+            </span>
+            <button type="button" class="aj-adv-btn" disabled>Descargar</button>
+        </div>
+
+        <div class="aj-adv-row">
+            <span class="aj-adv-row-text">
+                <span class="aj-row-title">Reiniciar tus gustos</span>
+                <p class="aj-row-desc">Borra géneros, pelis y actores favoritos. Las recomendaciones empiezan de cero.</p>
+            </span>
+            <button type="button" class="aj-adv-btn" id="taste-reset">Reiniciar</button>
+        </div>
+
+        <div class="aj-adv-row">
+            <span class="aj-adv-row-text">
+                <span class="aj-row-title">Eliminar la cuenta</span>
+                <p class="aj-row-desc">Se borra todo, sin vuelta atrás.</p>
+            </span>
+            <button type="button" class="aj-adv-btn" id="account-delete">Eliminar</button>
+        </div>
+    </div>
+</details>
+
+<script>
+    // --- Reiniciar gustos ---
+    const resetBtn = document.getElementById('taste-reset') as HTMLButtonElement | null;
+    resetBtn?.addEventListener('click', async () => {
+        if (!confirm('¿Reiniciar tus gustos? Se borrarán los géneros, títulos y actores elegidos. Podrás volver a configurarlos.')) return;
+        resetBtn.disabled = true;
+        resetBtn.textContent = 'Reiniciando…';
+        try {
+            const res = await fetch('/api/profile/taste-reset', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) throw new Error();
+            location.href = '/perfil/gustos?saved=1';
+        } catch {
+            resetBtn.disabled = false;
+            resetBtn.textContent = 'Reiniciar';
+            alert('No se pudieron reiniciar tus gustos. Inténtalo de nuevo.');
+        }
+    });
+
+    // --- Eliminar cuenta ---
+    const delBtn = document.getElementById('account-delete') as HTMLButtonElement | null;
+    delBtn?.addEventListener('click', async () => {
+        if (!confirm('¿Eliminar tu cuenta? Se borrarán TODAS tus listas y tu perfil. Esta acción NO se puede deshacer.')) return;
+        delBtn.disabled = true;
+        delBtn.textContent = 'Eliminando…';
+        try {
+            const res = await fetch('/api/auth/delete-account', { method: 'POST' });
+            if (!res.ok) throw new Error();
+            try {
+                const { clientAuth } = await import('../../utils/firebaseAuthClient');
+                const { signOut } = await import('firebase/auth');
+                await signOut(clientAuth);
+            } catch { /* la cuenta ya no existe; da igual */ }
+            location.href = '/';
+        } catch {
+            delBtn.disabled = false;
+            delBtn.textContent = 'Eliminar';
+            alert('No se pudo eliminar la cuenta. Inténtalo de nuevo.');
+        }
+    });
+</script>

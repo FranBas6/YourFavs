@@ -37,7 +37,7 @@ import StreamingProviders from "../../components/detail/StreamingProviders.astro
 import SeasonHeatmap from "../../components/detail/SeasonHeatmap.astro";
 import StarRating from "../../components/detail/StarRating.astro";
 import {safeFetch} from "../../utils/safeFetch";
-import { getSpoilerPref, setSpoilerPref } from "../../services/BD/shared/spoilerPrefs";
+import { getSpoilerPref, setSpoilerPref, clearSpoilerPref } from "../../services/BD/shared/spoilerPrefs";
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 
@@ -101,7 +101,13 @@ if (Astro.request.method === 'POST') {
 
         if (actionType === 'spoiler_pref') {
             // Override por serie (§2 · parada 2): la serie manda sobre el global.
-            const on = String(formData.get('value')) === 'on';
+            const value = String(formData.get('value'));
+            if (value === 'inherit') {
+                // Volver a seguir el ajuste global (borra el override, no lo pone en false).
+                await clearSpoilerPref(id);
+                return Astro.redirect(`/serie/${id}?sp=inherit`);
+            }
+            const on = value === 'on';
             await setSpoilerPref(id, on);
             // Flag para el toast de confirmación tras la recarga (el blur es SSR → hace falta recargar).
             return Astro.redirect(`/serie/${id}?sp=${on ? 'on' : 'off'}`);
@@ -209,10 +215,14 @@ const seasonProviderData = targetSeason !== null ? (seasonProviderMap[targetSeas
 const myPlatformIds: number[] = ((Astro.locals.user as any)?.platforms ?? []).map(Number).filter(Number.isFinite);
 
 // Modo sin spoilers (§2): solo con sesión. La SERIE manda sobre el global (parada 2): si hay
-// override por serie se usa; si no, el ajuste del perfil (OFF por defecto). Difumina fotograma +
-// sinopsis de episodios NO vistos (revelable con «Mostrar»). Invitados: sin blur.
+// override por serie se usa; si no, el maestro del perfil (OFF por defecto). Invitados: sin blur.
 const spoilerFree = !!Astro.locals.user
-    && (spoilerPref !== null ? spoilerPref : Astro.locals.user.spoilerFree === true);
+    && (spoilerPref !== null ? spoilerPref : Astro.locals.user.spoilers?.enabled === true);
+// Qué se tapa cuando está activo, del desglose global (A3b). El override por serie decide SI se
+// tapa, no QUÉ. El heatmap sigue colgando del maestro: una nota no es un fotograma ni una
+// sinopsis, pero un 9,8 en el último episodio también cuenta lo que pasa.
+const hideStills = spoilerFree && Astro.locals.user?.spoilers?.hideStills !== false;
+const hideSynopsis = spoilerFree && Astro.locals.user?.spoilers?.hideSynopsis !== false;
 
 // Todos los episodios regulares para "marcar todo"
 const allRegularEpisodesFlat: { season: number; episode: number }[] = [];
@@ -941,16 +951,36 @@ const jsonLd = item ? {
                                 • <span data-total-count>{totalWatchedEpisodes}/{totalRegularEpisodes}</span> vistos (<span data-total-pct>{totalRegularEpisodes > 0 ? Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100) : 0}</span>%)
                             </span>
                             {Astro.locals.user && (
-                                <form method="POST" class="flex-shrink-0 ml-auto">
-                                    <input type="hidden" name="actionType" value="spoiler_pref" />
-                                    <input type="hidden" name="value" value={spoilerFree ? 'off' : 'on'} />
-                                    <button type="submit"
-                                        class={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${spoilerFree ? 'border-[#E63946] text-[#E63946] bg-red-50' : 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'}`}
-                                        title="Difumina el fotograma y la sinopsis de los episodios que no has visto en esta serie">
-                                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-                                        {spoilerFree ? 'Sin spoilers: activo' : 'Modo sin spoilers'}
-                                    </button>
-                                </form>
+                                <div class="flex-shrink-0 ml-auto flex items-center gap-2 flex-wrap justify-end">
+                                    <form method="POST">
+                                        <input type="hidden" name="actionType" value="spoiler_pref" />
+                                        <input type="hidden" name="value" value={spoilerFree ? 'off' : 'on'} />
+                                        <button type="submit"
+                                            class={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${spoilerFree ? 'border-[#E63946] text-[#E63946] bg-red-50' : 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'}`}
+                                            title={spoilerPref !== null
+                                                ? 'Esta serie tiene su propio ajuste y no sigue el de tu perfil'
+                                                : 'Difumina el fotograma y la sinopsis de los episodios que no has visto en esta serie'}>
+                                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
+                                            {spoilerFree ? 'Sin spoilers: activo' : (spoilerPref === false ? 'Spoilers visibles' : 'Modo sin spoilers')}
+                                        </button>
+                                    </form>
+                                    {/* Tercer estado: hay override, así que esta serie IGNORA el global. Sin esto,
+                                        "override en off" y "sigo el global (off)" se ven idénticos.
+                                        La pastilla enuncia el hecho y la × lo deshace — mismo patrón que los chips
+                                        de filtro activo del catálogo, en vez de un enlace compitiendo con el botón. */}
+                                    {spoilerPref !== null && (
+                                        <form method="POST">
+                                            <input type="hidden" name="actionType" value="spoiler_pref" />
+                                            <input type="hidden" name="value" value="inherit" />
+                                            <button type="submit"
+                                                class="inline-flex items-center gap-1 text-[11px] leading-none px-2 py-[5px] rounded-md bg-gray-50 border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                                                title="Esta serie tiene su propio ajuste y no sigue el de tu perfil. Quítalo para volver a seguirlo.">
+                                                solo en esta serie
+                                                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
                             )}
                         </div>
                         {/* Barra de progreso global */}
@@ -1079,8 +1109,8 @@ const jsonLd = item ? {
                                                                 </button>
                                                             </form>
                                                         </summary>
-                                                        <div class={`mt-2 mx-3 p-4 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'} ${spoilerFree && !isWatched ? 'yf-spoil' : ''}`}>
-                                                            {spoilerFree && !isWatched && (
+                                                        <div class={`mt-2 mx-3 p-4 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'} ${(hideStills || hideSynopsis) && !isWatched ? 'yf-spoil' : ''}`}>
+                                                            {(hideStills || hideSynopsis) && !isWatched && (
                                                                 <button type="button" class="yf-spoil-btn" aria-label="Mostrar contenido con posibles spoilers">
                                                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
                                                                     Mostrar (spoilers)
@@ -1088,17 +1118,18 @@ const jsonLd = item ? {
                                                             )}
                                                             {/* Imagen */}
                                                             {episode.still_path && (
-                                                                <div class="flex justify-center mb-3">
+                                                                <div class={`flex justify-center mb-3 ${hideStills && !isWatched ? 'yf-blur' : ''}`}>
                                                                     <img src={posterUrl(episode.still_path, 'w500')} alt={episode.name} loading="lazy" class="rounded-lg shadow-md w-full max-w-md" />
                                                                 </div>
                                                             )}
 
                                                             {/* Sinopsis */}
-                                                            <p class="text-sm text-gray-700 leading-relaxed mb-3">{episode.overview || "No hay descripción disponible."}</p>
+                                                            <p class={`text-sm text-gray-700 leading-relaxed mb-3 ${hideSynopsis && !isWatched ? 'yf-blur' : ''}`}>{episode.overview || "No hay descripción disponible."}</p>
 
-                                                            {/* Estrellas invitadas */}
+                                                            {/* Estrellas invitadas — van con la sinopsis: un nombre en el reparto
+                                                                de un episodio cuenta tanto como el texto (o más). */}
                                                             {episode.guest_stars && episode.guest_stars.length > 0 && (
-                                                                <div>
+                                                                <div class={hideSynopsis && !isWatched ? 'yf-blur' : ''}>
                                                                     <p class={`text-sm font-semibold mb-2 ${season.season_number === 0 ? 'text-purple-700' : 'text-blue-700'}`}>Estrellas invitadas:</p>
                                                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                                         {episode.guest_stars.map((star: GuestStar) => (
@@ -1160,10 +1191,13 @@ const jsonLd = item ? {
 </Layout>
 
 <style is:global>
-    /* Modo sin spoilers (§2): difumina el cuerpo del episodio no visto; «Mostrar» revela. */
+    /* Modo sin spoilers (§2): difumina el episodio no visto; «Mostrar» revela.
+       El blur es SELECTIVO (A3b): solo lo marcado con `.yf-blur`, que la ficha pone en el
+       fotograma y/o en la sinopsis según el desglose del perfil. Antes se difuminaba todo hijo
+       directo del contenedor, así que no había forma de tapar una cosa y dejar la otra. */
     .yf-spoil { position: relative; }
-    .yf-spoil > *:not(.yf-spoil-btn) { filter: blur(15px); pointer-events: none; user-select: none; transition: filter .35s ease; }
-    .yf-spoil.revealed > *:not(.yf-spoil-btn) { filter: none; pointer-events: auto; user-select: auto; }
+    .yf-spoil .yf-blur { filter: blur(15px); pointer-events: none; user-select: none; transition: filter .35s ease; }
+    .yf-spoil.revealed .yf-blur { filter: none; pointer-events: auto; user-select: auto; }
     .yf-spoil-btn {
         position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2;
         display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
@@ -1172,7 +1206,7 @@ const jsonLd = item ? {
     }
     .yf-spoil-btn:hover { background: rgba(17, 24, 39, .94); }
     .yf-spoil.revealed .yf-spoil-btn { display: none; }
-    @media (prefers-reduced-motion: reduce) { .yf-spoil > *:not(.yf-spoil-btn) { transition: none; } }
+    @media (prefers-reduced-motion: reduce) { .yf-spoil .yf-blur { transition: none; } }
 </style>
 <script is:inline>
     // Revelar el episodio difuminado (§2 modo sin spoilers) al tocar «Mostrar».
@@ -1193,7 +1227,8 @@ const jsonLd = item ? {
             var qs = params.toString();
             history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
             var msg = sp === 'on' ? 'Modo sin spoilers activado en esta serie'
-                    : sp === 'off' ? 'Spoilers visibles de nuevo en esta serie' : '';
+                    : sp === 'off' ? 'Spoilers visibles de nuevo en esta serie'
+                    : sp === 'inherit' ? 'Esta serie vuelve a seguir tu ajuste general' : '';
             if (!msg) return;
             var c = document.getElementById('toast-container');
             if (!c) return;

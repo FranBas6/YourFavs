@@ -12,6 +12,7 @@ import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Movie} from "../../types/ApiMovie";
 import '../../styles/pages/catalogo/shared.css';
+import { resolveMineFilter } from "../../utils/platformFilter";
 
 const urlParams = new URL(Astro.request.url).searchParams;
 const page = Number(urlParams.get('page') || 1);
@@ -20,7 +21,9 @@ const pageStr = page.toString();
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
 // "Solo en mis plataformas" (3.2b).
-const mine = urlParams.get('mine') === '1';
+// Filtro por plataformas: la URL manda (`mine=0|1`); sin parámetro decide el perfil
+// («Filtrar siempre por mis plataformas»). Ver utils/platformFilter.ts.
+const { mine, mineDefault } = resolveMineFilter(urlParams, Astro.locals.user);
 const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
 const myRegion = Astro.locals.user?.region || 'ES';
 const useDiscover = filtersActive || !!filters.sort || !!myProviders;
@@ -54,7 +57,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
         />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showCert order="Nota" countCtx={countCtx}
-                         mine={mine} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
+                         mine={mine} mineDefault={mineDefault} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
                          sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

@@ -20,11 +20,22 @@ interface Props {
     /** Filtro "Solo en mis plataformas" (3.2): estado actual + plataformas del perfil + región.
      *  Si `myPlatforms` está vacío, el chip no se muestra. */
     mine?: boolean;
+    /**
+     * Valor de «Solo en mis plataformas» cuando la URL no dice nada (ajuste del perfil). Sirve
+     * para dos cosas: que el chip pueda escribir el valor contrario EXPLÍCITO, y que tu propio
+     * valor por defecto no cuente como "filtro activo" (si no, el panel saldría siempre abierto
+     * con un badge permanente por no haber tocado nada).
+     */
+    mineDefault?: boolean;
     myPlatforms?: number[];
     region?: string;
 }
 
-const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [], mine = false, myPlatforms = [], region = 'ES' } = Astro.props;
+const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [], mine = false, mineDefault = false, myPlatforms = [], region = 'ES' } = Astro.props;
+
+// «Mis plataformas» solo cuenta como filtro activo si ESTRECHA respecto a tu norma: con el
+// ajuste del perfil encendido es tu línea base, y apagarlo ensancha los resultados.
+const mineNarrows = mine && !mineDefault;
 const showMine = myPlatforms.length > 0;
 
 const RUNTIMES = [
@@ -54,7 +65,7 @@ const yearRangeActive = !!(filters.yearFrom || filters.yearTo);
 const activeCount = [
     yearRangeActive || filters.year || filters.decade,
     filters.rating, filters.runtime, filters.language, filters.status, (showCert && filters.cert),
-    (showMine && mine),
+    (showMine && mineNarrows),
 ].filter(Boolean).length;
 // Orden actual (sort seleccionado o el por defecto de la página).
 const currentOrderLabel = sortOptions.find((o) => o.value === filters.sort)?.label || order;
@@ -72,13 +83,16 @@ if (filters.runtime) activeChips.push({ label: String(labelOf(RUNTIMES, filters.
 if (filters.language) activeChips.push({ label: String(labelOf(LANGUAGES, filters.language)), remove: { language: null } });
 if (filters.status) activeChips.push({ label: String(labelOf(STATUSES, filters.status)), remove: { status: null } });
 if (showCert && filters.cert) activeChips.push({ label: String(labelOf(CERTS, filters.cert)), remove: { cert: null } });
-if (showMine && mine) activeChips.push({ label: 'Mis plataformas', remove: { mine: null } });
+// Al quitarlo hay que escribir `mine=0`, no borrar el parámetro: con el ajuste del perfil
+// encendido, borrarlo lo dejaría igual de activo.
+if (showMine && mineNarrows) activeChips.push({ label: 'Mis plataformas', remove: { mine: '0' } });
 
 const clearAll = { decade: null, year: null, yearFrom: null, yearTo: null, rating: null, runtime: null, language: null, status: null, cert: null, mine: null };
 const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
 ---
 <div class="yf-adv-wrap" data-adv data-count-ctx={countCtx.length ? JSON.stringify(countCtx) : undefined}
-     data-my-platforms={showMine ? myPlatforms.join(',') : undefined} data-region={region}>
+     data-my-platforms={showMine ? myPlatforms.join(',') : undefined} data-region={region}
+     data-mine-default={mineDefault ? '1' : '0'}>
     <div class="yf-adv-backdrop" data-adv-backdrop hidden></div>
     <details class="yf-adv" open={hasActive}>
         <summary class="yf-adv-trigger">
@@ -110,7 +124,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                 <div class="yf-filter-group">
                     <p class="yf-group-label">Dónde ver</p>
                     <div class="yf-chips">
-                        <a href={buildUrl({ mine: mine ? null : '1' })} class={chipClass(mine)} data-fkey="mine" data-fval="1">Solo en mis plataformas</a>
+                        <a href={buildUrl({ mine: mine ? '0' : '1' })} class={chipClass(mine)} data-fkey="mine" data-fval="1">Solo en mis plataformas</a>
                     </div>
                 </div>
             )}
@@ -281,6 +295,11 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
             pending = {};
             var p = new URL(location.href).searchParams;
             FILTER_KEYS.forEach(function (k) { var v = p.get(k); if (v) pending[k] = v; });
+            // Sin `mine` en la URL manda el ajuste del perfil. Hay que sembrarlo o el chip
+            // saldría apagado en la hoja mientras la página SÍ está filtrando.
+            if (pending.mine == null) {
+                pending.mine = root.getAttribute('data-mine-default') === '1' ? '1' : '0';
+            }
         }
         function refreshChips() {
             root.querySelectorAll('.yf-chip[data-fkey]').forEach(function (chip) {
@@ -359,7 +378,11 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                 if (!inSheet()) return;                // desktop: deja navegar el <a>
                 e.preventDefault();
                 var k = chip.getAttribute('data-fkey'), v = chip.getAttribute('data-fval');
-                if (pending[k] === v) delete pending[k]; else pending[k] = v;
+                // `mine` es el único que necesita un "apagado" explícito: borrarlo devolvería
+                // el control al ajuste del perfil en vez de apagarlo.
+                if (k === 'mine') pending.mine = pending.mine === '1' ? '0' : '1';
+                else if (pending[k] === v) delete pending[k];
+                else pending[k] = v;
                 refreshChips();
                 updateCount();
             });

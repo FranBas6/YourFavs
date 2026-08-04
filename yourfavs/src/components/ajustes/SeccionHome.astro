@@ -1,0 +1,88 @@
+---
+/**
+ * «Tu Home»: orden y visibilidad de los bloques de la portada. El hero (brief/trending) queda
+ * fijo y NO entra en la lista.
+ *
+ * Cómo viaja el estado: el ORDEN es el orden de las filas en el DOM y la VISIBILIDAD el checkbox
+ * de cada una; `autosave.ts` lee las dos cosas del DOM y manda el array entero a
+ * `PATCH /api/profile/home-layout`. Los inputs `home_order` siguen ahí para el POST sin JS.
+ *
+ * Las filas apagadas NO desaparecen: bajan bajo el separador «Ocultos» y se recuperan
+ * arrastrándolas arriba (o con su interruptor — es la misma operación).
+ */
+import type { UserProfile } from "../../services/BD/profile/userProfile";
+import { homeRowsFor, HOME_SECTIONS } from "../../utils/constants/homeSections";
+
+interface Props { profile: UserProfile; }
+const { profile } = Astro.props;
+
+const rows = homeRowsFor(profile.homeLayout);
+const visibleCount = rows.filter((r) => !r.hidden).length;
+const hiddenCount = rows.length - visibleCount;
+---
+<form method="POST" data-autosave-form>
+    <input type="hidden" name="action" value="save_section" />
+    <input type="hidden" name="section" value="home" />
+
+    <div class="aj-home-bar">
+        <span class="aj-home-count">
+            <strong id="home-visible-count">{visibleCount}</strong> de {rows.length} bloques visibles
+        </span>
+        <span class="aj-home-actions">
+            <button type="button" class="aj-btn aj-btn-ghost" id="home-reset">Restablecer orden</button>
+            <a href="/" class="aj-btn">Ver mi Home</a>
+        </span>
+    </div>
+
+    <div class="aj-home-list" id="home-layout">
+        {rows.map((s, i) => (
+            <Fragment>
+                {/* El separador se pinta justo antes de la primera oculta. Si no hay ninguna,
+                    va al final del todo (más abajo), para que siempre exista un sitio donde
+                    soltar una fila para apagarla. */}
+                {s.hidden && i === visibleCount && (
+                    <div class="aj-home-sep" data-home-sep>
+                        Ocultos · <span data-hidden-count>{hiddenCount}</span>
+                        <em>Arrástralos arriba para recuperarlos</em>
+                    </div>
+                )}
+                <!-- `data-default` = posición canónica en HOME_SECTIONS, para «Restablecer orden». -->
+                <div class:list={["aj-home-row", { "is-off": s.hidden }]} data-key={s.key}
+                     data-default={HOME_SECTIONS.findIndex((d) => d.key === s.key)}>
+                    <button type="button" class="aj-home-handle" data-home-handle
+                            aria-label={`Mover ${s.label}. Usa las flechas arriba y abajo para cambiar su posición.`}>
+                        <span aria-hidden="true"></span>
+                    </button>
+                    <span class="aj-home-index" data-home-index>{s.hidden ? '—' : i + 1}</span>
+                    <span class="aj-home-thumb" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                    <span class="aj-home-text">
+                        <span class="aj-home-title">{s.label}</span>
+                        <p class="aj-home-desc">{s.desc}</p>
+                    </span>
+                    <input type="hidden" name="home_order" value={s.key} />
+                    <label class="aj-switch">
+                        <input type="checkbox" role="switch" name={`home_${s.key}`} checked={!s.hidden}
+                               aria-label={`Mostrar ${s.label} en la portada`} />
+                        <span class="aj-switch-track"></span>
+                    </label>
+                </div>
+            </Fragment>
+        ))}
+        {hiddenCount === 0 && (
+            <div class="aj-home-sep" data-home-sep>
+                Ocultos · <span data-hidden-count>0</span>
+                <em>Arrastra aquí abajo un bloque para apagarlo</em>
+            </div>
+        )}
+    </div>
+
+    <div class="aj-fallback">
+        <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
+    </div>
+</form>
+
+<div class="sr-only" aria-live="polite" id="home-live"></div>
+
+<script>
+    import "../../scripts/ajustes/home-reorder";
+</script>

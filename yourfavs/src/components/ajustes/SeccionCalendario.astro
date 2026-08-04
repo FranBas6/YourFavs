@@ -1,0 +1,57 @@
+---
+/**
+ * Enlace .ics para suscribir tus estrenos. Solo lectura: el feed se genera en
+ * `/api/calendar/subscribe.ics` a partir de lo que sigues, así que el enlace no caduca ni hay
+ * nada que configurar — de ahí el chip «EN VIVO».
+ */
+interface Props { icsUrl: string; }
+const { icsUrl } = Astro.props;
+---
+<div class="aj-card">
+    <div class="aj-card-head">
+        <div>
+            <h2>Tu calendario de estrenos</h2>
+            <p>Se actualiza solo con lo que sigues.</p>
+        </div>
+        <span class="aj-live">EN VIVO</span>
+    </div>
+    <div class="aj-card-body">
+        <div class="aj-copy-row">
+            <input type="text" id="ics-url" value={icsUrl} readonly aria-label="Enlace de suscripción" />
+            <button type="button" id="ics-copy" class="aj-btn">Copiar</button>
+        </div>
+
+        <div class="aj-steps">
+            <div>
+                <p class="aj-step-t">1 · Copia el enlace</p>
+                <p class="aj-step-d">El botón lo deja en el portapapeles.</p>
+            </div>
+            <div>
+                <p class="aj-step-t">2 · Añádelo</p>
+                <p class="aj-step-d">En Google, Apple u Outlook: «suscribirse a un calendario» y pega la URL.</p>
+            </div>
+            <div>
+                <p class="aj-step-t">3 · Listo</p>
+                <p class="aj-step-d">Los estrenos aparecen entre tus eventos, sin volver aquí.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const icsBtn = document.getElementById('ics-copy');
+    const icsInput = document.getElementById('ics-url') as HTMLInputElement | null;
+    icsBtn?.addEventListener('click', async () => {
+        if (!icsInput) return;
+        try {
+            await navigator.clipboard.writeText(icsInput.value);
+            icsBtn.textContent = '¡Copiado!';
+        } catch {
+            // Reserva para navegadores sin Clipboard API (o sin permiso).
+            icsInput.select();
+            document.execCommand('copy');
+            icsBtn.textContent = '¡Copiado!';
+        }
+        setTimeout(() => { icsBtn.textContent = 'Copiar'; }, 1800);
+    });
+</script>

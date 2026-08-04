@@ -1,0 +1,227 @@
+---
+/**
+ * Panel de Ajustes — handoff `design_handoff_ajustes`.
+ *
+ * Una ruta, una sección por URL (`/perfil/plataformas`), para que cada sección sea
+ * enlazable y el botón atrás del móvil funcione. `/perfil` a secas manda las DOS caras en
+ * el HTML: el índice (móvil) y la sección "Perfil" (escritorio), y las alterna el CSS. No
+ * hay redirección por viewport porque en SSR no se conoce el tamaño de pantalla.
+ *
+ * GUARDADO (A1, provisional): sigue siendo POST + redirect, pero **por secciones**. El
+ * formulario único anterior reescribía plataformas, campana, spoilers y homeLayout en CADA
+ * guardado (checkbox ausente = desactivado), así que un formulario parcial podía vaciar lo
+ * que no llevaba dentro. Ahora el campo oculto `section` decide qué se escribe y nada más.
+ * A2 lo sustituye por autoguardado con PATCH y deja este POST como reserva sin JS.
+ */
+import Layout from "../../layouts/Layout.astro";
+import "../../styles/pages/ajustes.css";
+
+import { getUserProfile, setUserProfile, type UserProfile } from "../../services/BD/profile/userProfile";
+import { clearUserTaste } from "../../services/BD/profile/userTaste";
+import { sanitizePlatformIds } from "../../services/API/shared/watchProviders";
+import { HOME_SECTIONS } from "../../utils/constants/homeSections";
+import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
+import { CONTENT_LANGUAGE_CODES } from "../../utils/constants/languages";
+import {
+    DEFAULT_SETTINGS_SECTION,
+    SETTINGS_SECTION_KEYS,
+    findSettingsSection,
+} from "../../utils/constants/settingsSections";
+
+import SettingsNav from "../../components/ajustes/SettingsNav.astro";
+import SeccionPerfil from "../../components/ajustes/SeccionPerfil.astro";
+import SeccionGustos from "../../components/ajustes/SeccionGustos.astro";
+import SeccionHome from "../../components/ajustes/SeccionHome.astro";
+import SeccionPlataformas from "../../components/ajustes/SeccionPlataformas.astro";
+import SeccionNotificaciones from "../../components/ajustes/SeccionNotificaciones.astro";
+import SeccionContenido from "../../components/ajustes/SeccionContenido.astro";
+import SeccionApariencia from "../../components/ajustes/SeccionApariencia.astro";
+import SeccionCalendario from "../../components/ajustes/SeccionCalendario.astro";
+import SeccionCuenta from "../../components/ajustes/SeccionCuenta.astro";
+
+// Protegida por el middleware (`/perfil*` sin sesión → redirige a /). Aquí ya hay user.
+const user = Astro.locals.user!;
+
+// --- Resolución de sección --------------------------------------------------
+const raw = Astro.params.seccion;                 // undefined en `/perfil`
+const requested = typeof raw === 'string' ? raw.replace(/\/+$/, '') : '';
+const isIndex = requested === '';                 // móvil: índice; escritorio: primera sección
+
+if (!isIndex && !SETTINGS_SECTION_KEYS.includes(requested)) {
+    return Astro.redirect('/perfil');
+}
+const activeKey = isIndex ? DEFAULT_SETTINGS_SECTION : requested;
+const section = findSettingsSection(activeKey)!;
+
+// --- POST (reserva sin JS; A2 lo relega al autoguardado) --------------------
+if (Astro.request.method === 'POST') {
+    const fd = await Astro.request.formData();
+    const action = String(fd.get('action') || '');
+
+    if (action === 'save_avatar') {
+        const avatarUrl = String(fd.get('avatar_url') || '').trim();
+        await setUserProfile({ avatar_url: avatarUrl || null });
+        return Astro.redirect('/perfil/perfil?saved=1');
+    }
+
+    if (action === 'reset_taste') {
+        await clearUserTaste();
+        // Los gustos alimentan el motor de recomendaciones → invalidar sus cachés.
+        try {
+            const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
+                import('../../utils/genrePreferences'),
+                import('../../utils/personalRecommendations'),
+            ]);
+            invalidateGenrePreferencesCache();
+            invalidatePersonalRecsCache();
+        } catch { /* la caché caduca sola igualmente */ }
+        return Astro.redirect('/perfil/gustos?saved=1');
+    }
+
+    if (action === 'save_section') {
+        const posted = String(fd.get('section') || '');
+        const target = SETTINGS_SECTION_KEYS.includes(posted) ? posted : DEFAULT_SETTINGS_SECTION;
+        const patch: Partial<UserProfile> = {};
+        let touchedNotifs = false;
+
+        switch (target) {
+            case 'perfil':
+                // Vacío = volver al nombre de Google (el middleware solo lo usa si hay valor).
+                // Ojo: NO puede ser `undefined` — Firestore rechaza undefined sin
+                // `ignoreUndefinedProperties`, y así vaciar el campo devolvía un 500.
+                patch.display_name = String(fd.get('display_name') || '').trim().slice(0, 60);
+                break;
+
+            case 'plataformas':
+                // [] es un estado válido (= no sé dónde puedes ver) → se escribe siempre.
+                // Mismo saneado que el endpoint: cualquier plataforma del catálogo de la
+                // región vale, no solo las siete habituales.
+                patch.platforms = sanitizePlatformIds(fd.getAll('platforms'));
+                patch.platformsFilterDefault = fd.get('platforms_filter_default') != null;
+                break;
+
+            case 'notificaciones':
+                patch.notifPrefs = {
+                    episodes: fd.get('notif_episodes') != null,
+                    releases: fd.get('notif_releases') != null,
+                    anniversary: fd.get('notif_anniversary') != null,
+                    platform: fd.get('notif_platform') != null,
+                    streak: fd.get('notif_streak') != null,
+                };
+                touchedNotifs = true;
+                break;
+
+            case 'contenido': {
+                const region = String(fd.get('region') || '');
+                if (SUPPORTED_COUNTRIES.some((c) => c.code === region)) patch.region = region;
+                const language = String(fd.get('language') || '');
+                if (CONTENT_LANGUAGE_CODES.has(language)) patch.language = language;
+                // Maestro + desglose. Checkbox ausente = desactivado, así que van los cuatro.
+                const enabled = fd.get('spoiler_enabled') != null;
+                patch.spoilers = {
+                    enabled,
+                    hideStills: fd.get('spoiler_stills') != null,
+                    hideSynopsis: fd.get('spoiler_synopsis') != null,
+                    hideCalendarTitles: fd.get('spoiler_calendar') != null,
+                };
+                patch.spoilerFree = enabled;   // espejo del formato viejo (lo retira A7)
+                break;
+            }
+
+            case 'apariencia': {
+                const theme = String(fd.get('theme') || '');
+                if (theme === 'light' || theme === 'dark' || theme === 'system') patch.theme = theme;
+                break;
+            }
+
+            case 'home': {
+                // El orden lo da el orden de los inputs en el DOM; la visibilidad, el checkbox.
+                const known = new Set(HOME_SECTIONS.map((s) => s.key));
+                const order = fd.getAll('home_order').map(String).filter((k) => known.has(k));
+                const keys = order.length ? order : HOME_SECTIONS.map((s) => s.key);
+                patch.homeLayout = keys.map((key) => ({ key, hidden: fd.get(`home_${key}`) == null }));
+                break;
+            }
+        }
+
+        if (Object.keys(patch).length > 0) await setUserProfile(patch);
+
+        // Solo si cambiaron los toggles: re-materializa la campana con las nuevas
+        // preferencias (antes se invalidaba en cualquier guardado del perfil).
+        if (touchedNotifs) {
+            try {
+                const { invalidateNotifSync } = await import('../../services/API/notifications/generator');
+                invalidateNotifSync();
+            } catch { /* se re-sincroniza igual al día siguiente */ }
+        }
+
+        return Astro.redirect(`/perfil/${target}?saved=1`);
+    }
+}
+
+const profile = (await getUserProfile()) ?? {};
+const saved = Astro.url.searchParams.get('saved') === '1';
+const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
+---
+<Layout title={`${section.title} — Ajustes · YourFavs`}>
+    <div class:list={["aj-root", { "is-index": isIndex }]} data-autosave>
+        <!-- Índice móvil: solo se ve en `/perfil` a secas y por debajo de 1024px. -->
+        <SettingsNav variant="index" profile={profile} user={user} />
+
+        <div class="aj-shell">
+            <SettingsNav variant="nav" active={activeKey} profile={profile} user={user} />
+
+            <div class="aj-content">
+                <div class="aj-content-inner">
+                    <a href="/perfil" class="aj-back">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                        Ajustes
+                    </a>
+
+                    <div class="aj-head">
+                        <div>
+                            <h1>{section.title}</h1>
+                            <p>{section.description}</p>
+                        </div>
+                        <!-- Indicador de guardado. El servidor solo lo enciende cuando el
+                             guardado vino por POST (sin JS); con JS lo gobierna autosave.ts. -->
+                        <span class="aj-saved" id="aj-saved" data-state="saved" hidden={!saved} aria-live="polite">
+                            <svg class="aj-saved-ico" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                            <span class="aj-saved-msg">Guardado</span>
+                            <button type="button" class="aj-saved-retry" hidden>Reintentar</button>
+                        </span>
+                    </div>
+
+                    {activeKey === 'perfil' && <SeccionPerfil profile={profile} user={user} />}
+                    {activeKey === 'gustos' && <SeccionGustos />}
+                    {activeKey === 'home' && <SeccionHome profile={profile} />}
+                    {activeKey === 'plataformas' && <SeccionPlataformas profile={profile} />}
+                    {activeKey === 'notificaciones' && <SeccionNotificaciones profile={profile} />}
+                    {activeKey === 'contenido' && <SeccionContenido profile={profile} />}
+                    {activeKey === 'apariencia' && <SeccionApariencia profile={profile} />}
+                    {activeKey === 'calendario' && <SeccionCalendario icsUrl={icsUrl} />}
+                    {activeKey === 'cuenta' && <SeccionCuenta user={user} />}
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Deshacer: una sola en la página, la gobierna autosave.ts. Solo aparece
+             en acciones con consecuencia visible (ocultar un bloque, quitar una plataforma). -->
+        <div class="aj-undo" id="aj-undo" role="status" aria-live="polite" hidden>
+            <span class="aj-undo-msg" id="aj-undo-msg"></span>
+            <button type="button" class="aj-undo-btn" id="aj-undo-do">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-4"/></svg>
+                Deshacer
+            </button>
+            <button type="button" class="aj-undo-close" id="aj-undo-close" aria-label="Cerrar">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    // Autoguardado por campo. Si esto no corre (sin JS), los formularios siguen haciendo
+    // POST a esta misma ruta y el guardado va por recarga.
+    import "../../scripts/ajustes/autosave";
+</script>

@@ -1,0 +1,59 @@
+---
+/**
+ * Tema: tres tarjetas con vista previa y radio.
+ *
+ * La vista previa usa los colores REALES de cada tema en hex fijo a propósito: no debe seguir
+ * al tema activo, sino representar el que ofrece.
+ *
+ * El cambio se aplica al INSTANTE sobre `<html data-theme>` + `localStorage` (igual que el
+ * toggle del header, para que no haya parpadeo al navegar) y además se guarda en el perfil
+ * para que viaje entre dispositivos.
+ */
+import type { UserProfile } from "../../services/BD/profile/userProfile";
+
+interface Props { profile: UserProfile; }
+const { profile } = Astro.props;
+const theme = profile.theme || 'system';
+
+const OPTIONS = [
+    { value: 'light', label: 'Claro', prev: 'is-light' },
+    { value: 'dark', label: 'Oscuro', prev: 'is-dark' },
+    { value: 'system', label: 'Según el sistema', prev: 'is-system' },
+] as const;
+---
+<form method="POST" data-autosave-form>
+    <input type="hidden" name="action" value="save_section" />
+    <input type="hidden" name="section" value="apariencia" />
+
+    <div class="aj-themes" id="aj-theme-cards">
+        {OPTIONS.map((o) => (
+            <label class="aj-theme">
+                <input type="radio" name="theme" value={o.value} checked={theme === o.value} data-save="theme" />
+                <span class:list={["aj-theme-prev", o.prev]} aria-hidden="true">
+                    <span class="aj-theme-prev-bar"></span>
+                    <span class="aj-theme-prev-line"></span>
+                    <span class="aj-theme-prev-cards"><span></span><span></span><span></span></span>
+                </span>
+                <span class="aj-theme-foot">
+                    <span class="aj-theme-radio"></span>
+                    {o.label}
+                </span>
+            </label>
+        ))}
+    </div>
+
+    <div class="aj-fallback">
+        <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
+    </div>
+</form>
+
+<script>
+    // Aplicar al instante. `change` en un grupo de radios solo dispara en el que se marca.
+    document.getElementById('aj-theme-cards')?.addEventListener('change', (e) => {
+        const el = e.target as HTMLInputElement;
+        if (!el || el.name !== 'theme') return;
+        const effective = el.value === 'system' ? 'light' : el.value; // 'system' → claro, igual que el Layout
+        document.documentElement.setAttribute('data-theme', effective);
+        try { localStorage.setItem('theme', effective); } catch { /* noop */ }
+    });
+</script>

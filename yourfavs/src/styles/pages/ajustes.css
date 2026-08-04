@@ -1,0 +1,910 @@
+/* ============================================================================
+   Ajustes (`/perfil/[seccion]`) — handoff `design_handoff_ajustes`
+   Importado SOLO por `pages/perfil/[...seccion].astro`.
+
+   Todo con tokens de tokens.css → el modo oscuro sale gratis. Si aparece la
+   necesidad de escribir `[data-theme="dark"] .aj-*`, es que se ha colado un hex
+   donde tocaba un token.
+
+   Estructura: (1) armazón · (2) navegación · (3) índice móvil · (4) cabecera y
+   tarjetas · (5) controles · (6) piezas de secciones concretas.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------- 1 · Armazón */
+
+.aj-shell {
+    display: grid;
+    grid-template-columns: 264px 1fr;
+    gap: 0;
+    align-items: start;
+}
+
+.aj-nav-col {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 22px 14px;
+    position: sticky;
+    top: 84px;
+}
+
+.aj-content {
+    padding: 12px 0 0 44px;
+    min-width: 0;               /* sin esto, un hijo con nowrap desborda el grid */
+}
+
+.aj-content-inner { max-width: 720px; }
+
+/* ------------------------------------------------------------ 2 · Navegación */
+
+.aj-me {
+    display: flex; align-items: center; gap: 11px;
+    padding: 0 8px 18px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+.aj-me-avatar {
+    width: 38px; height: 38px; border-radius: var(--r-full); flex-shrink: 0;
+    background: linear-gradient(135deg, #F59E0B, var(--accent));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 15px; font-weight: 600; overflow: hidden;
+}
+.aj-me-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* Columna: sin `flex-direction`, los dos <span> hijos son inline y salen en la MISMA
+   línea; y el ellipsis necesita un bloque con ancho acotado para recortar. */
+.aj-me-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.aj-me-name { font-size: 13.5px; font-weight: 600; color: var(--text); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-me-mail { font-size: 11.5px; color: var(--text-4); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.aj-group + .aj-group { margin-top: 16px; }
+.aj-group-title {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--text-4);
+    padding: 0 8px; margin: 12px 0 6px;
+}
+
+.aj-nav-item {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 38px; padding: 0 8px;
+    border-radius: var(--r-md);
+    font-size: 13.5px; font-weight: 500; color: var(--text-2);
+    text-decoration: none;
+    transition: background-color .15s ease, color .15s ease;
+}
+.aj-nav-item:hover { background: var(--bg-tint); color: var(--text); }
+.aj-nav-item.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.aj-nav-item svg { width: 17px; height: 17px; flex-shrink: 0; }
+.aj-nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-nav-value {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4);
+    flex-shrink: 0; white-space: nowrap;
+}
+.aj-nav-item.is-active .aj-nav-value { color: var(--accent); }
+
+/* --------------------------------------------------------- 3 · Índice móvil */
+
+/* En escritorio manda la navegación lateral; el índice no existe. */
+.aj-index { display: none; }
+
+@media (max-width: 1023px) {
+    .aj-shell { grid-template-columns: 1fr; }
+    .aj-nav-col { display: none; }
+    .aj-content { padding: 0; }
+
+    /* `/perfil` a secas: se pinta el índice y se esconde la sección. Con sección
+       en la URL, al revés. La clase la pone el servidor en el <div> raíz. */
+    .aj-root.is-index .aj-index { display: block; }
+    .aj-root.is-index .aj-content { display: none; }
+}
+
+.aj-index-list {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    margin-bottom: 18px;
+}
+.aj-index-group {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--text-4);
+    background: var(--bg-tint);
+    padding: 9px 16px;
+    border-top: 1px solid var(--border);
+}
+.aj-index-list > .aj-index-group:first-child { border-top: 0; }
+.aj-index-row {
+    display: flex; align-items: center; gap: 12px;
+    min-height: 56px; padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    text-decoration: none; color: var(--text);
+}
+.aj-index-row:active { background: var(--bg-tint); }
+.aj-index-row svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-3); }
+.aj-index-row-label { flex: 1; min-width: 0; font-size: 14px; font-weight: 500; }
+.aj-index-row-value { font-size: 12.5px; color: var(--text-3); flex-shrink: 0; }
+.aj-index-row-chev { color: var(--text-4); flex-shrink: 0; }
+
+/* Cabecera de detalle en móvil (flecha atrás + título). Oculta en escritorio. */
+.aj-back { display: none; }
+@media (max-width: 1023px) {
+    .aj-back {
+        display: inline-flex; align-items: center; gap: 6px;
+        margin-bottom: 12px; padding: 6px 0;
+        font-size: 13px; font-weight: 600; color: var(--text-3);
+        text-decoration: none; background: none; border: 0; font-family: inherit; cursor: pointer;
+    }
+    .aj-back:hover { color: var(--text); }
+}
+
+/* ------------------------------------------------- 4 · Cabecera y tarjetas */
+
+.aj-head {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; margin-bottom: 20px;
+}
+.aj-head h1 {
+    font-size: 27px; font-weight: 600; letter-spacing: -.02em;
+    color: var(--text); margin: 0 0 6px;
+}
+.aj-head p { font-size: 13.5px; line-height: 1.5; color: var(--text-3); margin: 0; max-width: 58ch; }
+
+/* Indicador de guardado — tres estados, gobernados por `data-state` desde autosave.ts.
+   `hidden` funciona porque no se fuerza `display` fuera del propio atributo. */
+.aj-saved {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    font-size: 12.5px; font-weight: 600; padding-top: 6px;
+    transition: color .15s ease;
+}
+.aj-saved[hidden] { display: none; }
+.aj-saved .aj-saved-ico { flex-shrink: 0; }
+
+/* Guardando: sin marca de verificación (aún no hay nada que confirmar). */
+.aj-saved[data-state="saving"] { color: var(--text-3); }
+.aj-saved[data-state="saving"] .aj-saved-ico { display: none; }
+
+.aj-saved[data-state="saved"] { color: var(--ok); }
+
+.aj-saved[data-state="error"] { color: var(--accent); }
+.aj-saved[data-state="error"] .aj-saved-ico { display: none; }
+
+.aj-saved-retry {
+    border: 1px solid var(--accent); background: none; color: var(--accent);
+    font-family: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer;
+    padding: 3px 9px; border-radius: var(--r-full);
+}
+.aj-saved-retry[hidden] { display: none; }
+.aj-saved-retry:hover { background: var(--accent-soft); }
+
+.aj-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    margin-bottom: 16px;
+}
+.aj-card-body { padding: 20px; }
+.aj-card-body + .aj-card-body { border-top: 1px solid var(--border); }
+.aj-card-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.aj-card-head h2 { font-size: 14.5px; font-weight: 600; color: var(--text); margin: 0; }
+.aj-card-head p { font-size: 12px; color: var(--text-3); margin: 3px 0 0; }
+
+@media (max-width: 560px) {
+    .aj-head h1 { font-size: 22px; }
+    .aj-card-body { padding: 16px; }
+}
+
+/* ============================================================================
+   5 · CONTROLES — cada ajuste con la forma que le toca (A3)
+
+   Interruptor para lo que se enciende y se apaga, mosaico con logo para las
+   plataformas, tarjetas con vista previa para el tema. El chip-checkbox genérico
+   solo sobrevive donde de verdad es una selección múltiple de etiquetas.
+   ============================================================================ */
+
+/* --- Epígrafe de bloque (mono, mayúsculas) --- */
+.aj-grpt {
+    font-family: var(--font-mono);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--text-4);
+    margin: 0 0 10px;
+}
+
+/* --- Fila de ajuste: [icono] título+descripción [control] --- */
+.aj-row {
+    display: flex; align-items: center; gap: 13px;
+    padding: 14px 20px;
+}
+.aj-row + .aj-row { border-top: 1px solid var(--border); }
+.aj-row-ico {
+    width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    /* El color lo pone cada fila con --ico / --ico-bg (familias de tokens.css). */
+    background: var(--ico-bg, var(--bg-tint));
+    color: var(--ico, var(--text-3));
+}
+.aj-row-ico svg { width: 17px; height: 17px; }
+.aj-row-text { flex: 1; min-width: 0; }
+.aj-row-title { font-size: 13.5px; font-weight: 500; color: var(--text); }
+.aj-row-desc { font-size: 11.8px; line-height: 1.45; color: var(--text-3); margin: 2px 0 0; }
+
+/* Una fila sin motor detrás: se ve, explica lo que hará, y no se puede tocar. */
+.aj-row.is-soon { opacity: .55; }
+.aj-row.is-soon .aj-switch { pointer-events: none; }
+.aj-soon {
+    font-family: var(--font-mono); font-size: 9.5px; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-4); border: 1px solid var(--border-strong);
+    border-radius: var(--r-full); padding: 2px 7px; margin-left: 7px;
+    white-space: nowrap;
+}
+
+/* --- Interruptor 42×25 --- */
+.aj-switch { position: relative; flex-shrink: 0; display: inline-flex; }
+.aj-switch input {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    margin: 0; opacity: 0; cursor: pointer;
+}
+.aj-switch-track {
+    width: 42px; height: 25px; border-radius: var(--r-full);
+    background: var(--border-strong);
+    transition: background-color .18s ease;
+    position: relative; pointer-events: none;
+}
+.aj-switch-track::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 19px; height: 19px; border-radius: var(--r-full);
+    background: #fff; box-shadow: var(--sh-md);
+    transition: transform .18s ease;
+}
+.aj-switch input:checked + .aj-switch-track { background: var(--ok); }
+.aj-switch input:checked + .aj-switch-track::after { transform: translateX(17px); }
+.aj-switch input:focus-visible + .aj-switch-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.aj-switch input:disabled { cursor: not-allowed; }
+/* El maestro de spoilers va en accent: manda sobre el bloque anidado. */
+.aj-switch.is-accent input:checked + .aj-switch-track { background: var(--accent); }
+
+/* Sub-ajustes anidados bajo un maestro. Cuando el maestro está apagado NO se
+   deshabilitan: se colapsan (un control gris que no explica por qué es peor). */
+.aj-sub {
+    background: var(--bg-tint);
+    border-top: 1px solid var(--border);
+}
+.aj-sub .aj-row { padding: 11px 20px 11px 30px; }
+.aj-sub .aj-switch { transform: scale(.88); transform-origin: right center; }
+
+/* --- Mosaico de plataformas --- */
+.aj-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+@media (max-width: 640px) { .aj-tiles { grid-template-columns: 1fr 1fr; } }
+
+.aj-tile {
+    position: relative;
+    min-height: 92px; padding: 13px 12px;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    background: var(--bg-elev);
+    display: flex; flex-direction: column; gap: 9px;
+    cursor: pointer; opacity: .55;
+    transition: opacity .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+.aj-tile:hover { opacity: .8; }
+/* Toda la tarjeta es el objetivo del clic, no solo la casilla. */
+.aj-tile input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.aj-tile:has(input:checked) {
+    opacity: 1; border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.aj-tile:has(input:focus-visible) { box-shadow: 0 0 0 3px var(--accent-soft); }
+.aj-tile-name { font-size: 12.5px; font-weight: 500; color: var(--text); }
+.aj-tile:has(input:checked) .aj-tile-name { font-weight: 600; }
+
+/* Chip de logo SIEMPRE claro: los SVG oficiales son negros monocromos y sobre
+   superficie oscura desaparecerían. Mismo recurso que `.dark-logo-chip`. */
+.aj-tile-logo {
+    height: 30px; border-radius: var(--r-sm);
+    background: #EEF0F4;
+    display: flex; align-items: center; justify-content: center;
+    padding: 4px 8px;
+}
+.aj-tile-logo img { max-height: 100%; max-width: 100%; object-fit: contain; }
+
+.aj-tile-check {
+    position: absolute; top: 8px; right: 8px;
+    width: 18px; height: 18px; border-radius: var(--r-full);
+    background: var(--accent); color: #fff;
+    display: none; align-items: center; justify-content: center;
+}
+.aj-tile:has(input:checked) .aj-tile-check { display: flex; }
+
+/* Última celda: añadir una plataforma que no está en el mosaico */
+.aj-tile-add {
+    min-height: 92px; padding: 13px 12px;
+    border: 1px dashed var(--border-strong); border-radius: var(--r-md);
+    background: none; font-family: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    color: var(--text-4); font-size: 11.5px; line-height: 1.35; text-align: center;
+    transition: border-color .15s ease, color .15s ease;
+}
+.aj-tile-add:hover { border-color: var(--accent); color: var(--accent); }
+.aj-tile-add strong { font-size: 12.5px; font-weight: 600; }
+
+/* --- Selector de plataformas (modal con buscador) --- */
+.aj-picker {
+    position: fixed; inset: 0; z-index: 10002;
+    background: rgba(11, 17, 32, .55); backdrop-filter: blur(2px);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 8vh 16px 16px;
+}
+.aj-picker[hidden] { display: none; }
+.aj-picker-card {
+    width: 520px; max-width: 100%; max-height: 78vh;
+    background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: var(--r-xl); box-shadow: var(--sh-lg);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.aj-picker-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.aj-picker-head h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.aj-picker-head p { margin: 3px 0 0; font-size: 12px; color: var(--text-3); }
+.aj-picker-close {
+    width: 30px; height: 30px; border-radius: var(--r-full); flex-shrink: 0;
+    border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-3);
+    cursor: pointer; font-size: 14px; line-height: 1;
+}
+.aj-picker-search { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.aj-picker-search input {
+    width: 100%; height: 42px; padding: 0 12px; border-radius: 9px;
+    border: 1px solid var(--border-strong); background: var(--bg); color: var(--text);
+    font-size: 14px; font-family: inherit;
+}
+.aj-picker-search input:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.aj-picker-list { overflow-y: auto; padding: 8px; flex: 1; }
+.aj-picker-item {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    padding: 9px 12px; border: 0; border-radius: var(--r-md);
+    background: none; font-family: inherit; text-align: left; cursor: pointer;
+    color: var(--text);
+}
+.aj-picker-item:hover { background: var(--bg-tint); }
+.aj-picker-item[disabled] { opacity: .45; cursor: default; }
+.aj-picker-item[disabled]:hover { background: none; }
+/* Chip claro fijo, por lo mismo que en el mosaico: los logos son monocromos oscuros. */
+.aj-picker-logo {
+    width: 34px; height: 34px; border-radius: var(--r-sm); flex-shrink: 0;
+    background: #EEF0F4; display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+}
+.aj-picker-logo img { width: 100%; height: 100%; object-fit: contain; }
+.aj-picker-name { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 500; }
+.aj-picker-tag { font-size: 11px; color: var(--text-4); flex-shrink: 0; }
+.aj-picker-state { padding: 26px 12px; text-align: center; font-size: 13px; color: var(--text-3); }
+
+/* --- Tarjetas de tema --- */
+.aj-themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+@media (max-width: 560px) { .aj-themes { grid-template-columns: 1fr; } }
+
+.aj-theme {
+    position: relative; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--r-md);
+    overflow: hidden; background: var(--bg-elev);
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.aj-theme input { position: absolute; opacity: 0; width: 0; height: 0; margin: 0; }
+.aj-theme:has(input:checked) { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Vista previa con los colores REALES de cada tema (por eso van en hex fijo: no
+   deben seguir al tema activo, sino representar al que ofrecen). */
+.aj-theme-prev { height: 76px; padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+.aj-theme-prev-bar { height: 12px; border-radius: 3px; background: #3B82F6; flex-shrink: 0; }
+.aj-theme-prev-line { height: 5px; width: 60%; border-radius: 3px; }
+.aj-theme-prev-cards { display: flex; gap: 4px; flex: 1; }
+.aj-theme-prev-cards span { flex: 1; border-radius: 3px; }
+
+.aj-theme-prev.is-light { background: #F3F4F6; }
+.aj-theme-prev.is-light .aj-theme-prev-line { background: #D1D5DB; }
+.aj-theme-prev.is-light .aj-theme-prev-cards span { background: #FFFFFF; border: 1px solid #E5E7EB; }
+
+.aj-theme-prev.is-dark { background: #0B1120; }
+.aj-theme-prev.is-dark .aj-theme-prev-bar { background: #1E3A8A; }
+.aj-theme-prev.is-dark .aj-theme-prev-line { background: #34425A; }
+.aj-theme-prev.is-dark .aj-theme-prev-cards span { background: #141D2E; border: 1px solid #243044; }
+
+/* "Según el sistema": mitad y mitad, para que se lea que depende de fuera. */
+.aj-theme-prev.is-system { background: linear-gradient(105deg, #F3F4F6 0 50%, #0B1120 50% 100%); }
+.aj-theme-prev.is-system .aj-theme-prev-bar { background: linear-gradient(105deg, #3B82F6 0 50%, #1E3A8A 50% 100%); }
+.aj-theme-prev.is-system .aj-theme-prev-line { background: linear-gradient(105deg, #D1D5DB 0 50%, #34425A 50% 100%); }
+.aj-theme-prev.is-system .aj-theme-prev-cards span:first-child { background: #FFFFFF; }
+.aj-theme-prev.is-system .aj-theme-prev-cards span:nth-child(2) { background: linear-gradient(105deg, #FFFFFF 0 50%, #141D2E 50% 100%); }
+.aj-theme-prev.is-system .aj-theme-prev-cards span:last-child { background: #141D2E; }
+
+.aj-theme-foot {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 12px; border-top: 1px solid var(--border);
+    font-size: 12.5px; font-weight: 500; color: var(--text-2);
+}
+.aj-theme-radio {
+    width: 15px; height: 15px; border-radius: var(--r-full); flex-shrink: 0;
+    border: 1.5px solid var(--border-strong);
+    display: flex; align-items: center; justify-content: center;
+}
+.aj-theme:has(input:checked) .aj-theme-foot { color: var(--text); font-weight: 600; }
+.aj-theme:has(input:checked) .aj-theme-radio { border-color: var(--accent); }
+.aj-theme:has(input:checked) .aj-theme-radio::after {
+    content: ''; width: 7px; height: 7px; border-radius: var(--r-full); background: var(--accent);
+}
+
+/* --- Campos (nuevo estilo: input 42px, label 12/600) --- */
+.aj-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 560px) { .aj-fields { grid-template-columns: 1fr; } }
+
+.aj-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.aj-field-label {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.aj-field-count { font-family: var(--font-mono); font-size: 11.5px; font-weight: 400; color: var(--text-4); }
+.aj-field input, .aj-field select {
+    width: 100%; height: 42px; padding: 0 12px; border-radius: 9px;
+    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    font-size: 14px; font-family: inherit;
+}
+.aj-field select { padding-right: 30px; }
+.aj-field input:focus, .aj-field select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.aj-field-help { font-size: 11.5px; line-height: 1.45; color: var(--text-4); max-width: 40ch; }
+
+/* Campo de solo lectura (el correo) */
+.aj-ro {
+    display: flex; align-items: center; gap: 10px;
+    height: 42px; padding: 0 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-3);
+    font-size: 14px;
+}
+.aj-ro-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aj-verified {
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+    background: var(--ok-soft); color: var(--ok-ink);
+    padding: 3px 7px; border-radius: var(--r-full); flex-shrink: 0;
+}
+
+/* --- Identidad: avatar 96 + botón cámara --- */
+.aj-identity { display: flex; gap: 18px; align-items: flex-start; flex-wrap: wrap; }
+.aj-avatar-wrap { position: relative; flex-shrink: 0; }
+.aj-avatar {
+    width: 96px; height: 96px; border-radius: var(--r-full); overflow: hidden;
+    background: linear-gradient(135deg, #F59E0B, var(--accent));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 34px; font-weight: 600;
+}
+.aj-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.aj-cam {
+    position: absolute; right: -2px; bottom: -2px;
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    background: var(--bg-elev); border: 1px solid var(--border);
+    box-shadow: var(--sh-sm); color: var(--text-2);
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.aj-cam:hover { color: var(--accent); border-color: var(--accent); }
+
+.aj-identity-body { flex: 1; min-width: 240px; }
+.aj-identity-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 4px; }
+.aj-identity-help { font-size: 11.5px; line-height: 1.45; color: var(--text-4); max-width: 36ch; margin: 0 0 12px; }
+.aj-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* --- Diálogo de avatar (A6) ------------------------------------------------
+   Elegir NO guarda: selecciona. La franja de arriba muestra qué quedará y el pie
+   confirma — así se puede mirar sin miedo a dejarlo cambiado. */
+.av2-overlay {
+    position: fixed; inset: 0; z-index: 10002;
+    background: rgba(11, 17, 32, .55); backdrop-filter: blur(2px);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 110px 16px 16px;
+    overflow-y: auto;
+}
+.av2-overlay[hidden] { display: none; }
+
+.av2-card {
+    width: 720px; max-width: 100%;
+    background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: var(--r-xl); box-shadow: var(--sh-lg);
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.av2-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 16px 20px;
+}
+.av2-head h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.av2-close {
+    width: 30px; height: 30px; border-radius: var(--r-full); flex-shrink: 0;
+    border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-3);
+    cursor: pointer; font-size: 14px; line-height: 1;
+}
+
+/* Pestañas tipo pastilla */
+.av2-tabs { display: flex; gap: 6px; padding: 0 20px 14px; }
+.av2-tab {
+    height: 34px; padding: 0 15px; border-radius: var(--r-full);
+    border: 1px solid var(--border); background: none; color: var(--text-3);
+    font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.av2-tab:hover { color: var(--text-2); }
+.av2-tab.is-active { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+
+/* Franja "esto es lo que quedará" */
+.av2-current {
+    display: flex; align-items: center; gap: 14px;
+    margin: 0 20px 16px; padding: 12px 14px;
+    background: var(--bg-tint); border-radius: var(--r-md);
+}
+.av2-current-pic {
+    width: 52px; height: 52px; border-radius: var(--r-full); flex-shrink: 0; overflow: hidden;
+    outline: 2.5px solid var(--accent); outline-offset: 2px;
+    background: linear-gradient(135deg, #F59E0B, var(--accent));
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 19px; font-weight: 600;
+}
+.av2-current-pic img { width: 100%; height: 100%; object-fit: cover; }
+.av2-current-text { min-width: 0; }
+.av2-current-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.av2-current-sub { font-size: 11.5px; line-height: 1.45; color: var(--text-4); margin: 2px 0 0; }
+
+/* Cuerpo con las rejillas */
+.av2-body { padding: 0 20px 4px; max-height: 46vh; overflow-y: auto; }
+.av2-grid {
+    display: grid; grid-template-columns: repeat(8, 1fr); gap: 12px;
+    margin: 0 0 18px;
+}
+@media (max-width: 640px) { .av2-grid { grid-template-columns: repeat(5, 1fr); gap: 10px; } }
+
+.av2-pick {
+    aspect-ratio: 1; padding: 0; border: 0; border-radius: var(--r-full);
+    background: var(--bg-tint); overflow: hidden; cursor: pointer; position: relative;
+}
+.av2-pick img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.av2-pick:hover { outline: 2px solid var(--border-strong); outline-offset: 2px; }
+.av2-pick.is-sel { outline: 2.5px solid var(--accent); outline-offset: 3px; }
+.av2-pick.is-sel::after {
+    content: ''; position: absolute; right: -1px; bottom: -1px;
+    width: 18px; height: 18px; border-radius: var(--r-full);
+    background: var(--accent); border: 2px solid var(--bg-elev);
+}
+.av2-state { padding: 26px 0; text-align: center; font-size: 13px; color: var(--text-3); }
+
+/* Pie */
+.av2-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 14px 20px; background: var(--bg-tint); border-top: 1px solid var(--border);
+}
+.av2-note { font-size: 11.5px; color: var(--text-4); }
+.av2-foot-actions { display: flex; gap: 8px; margin-left: auto; }
+.av2-primary {
+    height: 38px; padding: 0 18px; border: 0; border-radius: 9px;
+    background: var(--accent); color: #fff;
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.av2-primary:hover { background: var(--accent-dark); }
+.av2-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* --- Subir foto: recorte --------------------------------------------------
+   El anillo es una VISTA PREVIA de cómo se verá (el avatar se pinta en círculo en
+   toda la app), no el límite del recorte: se guarda el cuadrado de 256×256 y el
+   círculo lo hace el CSS allá donde se muestre. */
+.av2-crop-wrap {
+    height: 330px; background: #0B1120;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+}
+.av2-crop {
+    width: 240px; height: 240px; position: relative;
+    touch-action: none; cursor: grab;
+}
+.av2-crop:active { cursor: grabbing; }
+.av2-crop canvas { display: block; width: 100%; height: 100%; }
+/* Velo con un agujero circular: deja ver el encuadre completo y resalta el círculo. */
+.av2-crop-veil {
+    position: absolute; inset: 0; pointer-events: none;
+    background: rgba(11, 17, 32, .62);
+    -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 118px, #000 118.5px);
+    mask: radial-gradient(circle at 50% 50%, transparent 0 118px, #000 118.5px);
+}
+.av2-crop-ring {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 236px; height: 236px; border-radius: var(--r-full);
+    border: 2px solid rgba(255, 255, 255, .9); pointer-events: none;
+}
+.av2-zoom {
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 20px 0; font-size: 12px; font-weight: 600; color: var(--text-2);
+}
+.av2-zoom input[type="range"] { flex: 1; accent-color: var(--accent); }
+.av2-drop {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    margin: 0 20px 16px; padding: 34px 16px;
+    border: 1.5px dashed var(--border-strong); border-radius: var(--r-md);
+    color: var(--text-3); cursor: pointer; text-align: center;
+}
+.av2-drop:hover { border-color: var(--accent); color: var(--text-2); }
+.av2-drop strong { font-size: 14px; font-weight: 600; color: var(--text-2); }
+.av2-drop small { font-size: 12px; color: var(--text-4); }
+.av2-msg {
+    margin: 0 20px 12px; font-size: 12.5px; padding: 9px 12px; border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+}
+
+@media (max-width: 640px) {
+    /* A pantalla completa: el recorte necesita sitio y el modal flotante estorba. */
+    .av2-overlay { padding: 0; }
+    .av2-card { min-height: 100vh; border-radius: 0; border: 0; }
+    .av2-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+    .av2-tab { width: 100%; }
+    .av2-body { max-height: none; }
+    .av2-foot { position: sticky; bottom: 0; }
+    .av2-foot-actions { width: 100%; }
+    .av2-foot-actions > * { flex: 1; }
+    .av2-primary { height: 48px; }
+    .av2-note { display: none; }
+}
+
+/* --- Barra de Deshacer ----------------------------------------------------
+   Solo para acciones con consecuencia visible. Una acción nueva REEMPLAZA la
+   barra; nunca se apilan (dos avisos a la vez y ya no sabes qué deshaces). */
+.aj-undo {
+    position: fixed; z-index: 20;
+    left: 50%; bottom: 26px; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 12px;
+    /* `--card` es el navy de las cards y vale igual en claro y en oscuro: la barra flota
+       sobre la página y no debe cambiar de identidad con el tema. */
+    background: var(--card); color: #fff;
+    font-size: 13px;
+    padding: 11px 12px 11px 20px;
+    border-radius: var(--r-full);
+    box-shadow: var(--sh-lg);
+    animation: aj-undo-in .18s ease;
+}
+.aj-undo[hidden] { display: none; }
+.aj-undo-msg { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aj-undo-btn {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+    height: 30px; padding: 0 13px; border: 0; border-radius: var(--r-full);
+    background: rgba(255, 255, 255, .13); color: #fff;
+    font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.aj-undo-btn:hover { background: rgba(255, 255, 255, .22); }
+.aj-undo-close {
+    flex-shrink: 0; width: 26px; height: 26px; border: 0; border-radius: var(--r-full);
+    background: none; color: rgba(255, 255, 255, .5); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.aj-undo-close:hover { color: #fff; background: rgba(255, 255, 255, .1); }
+
+@keyframes aj-undo-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+@media (prefers-reduced-motion: reduce) { .aj-undo { animation: none; } }
+
+@media (max-width: 767px) {
+    /* A ancho completo con márgenes y por encima de la tab bar inferior. Misma altura que
+       `.toast-container` en MobileTabBar.astro, para no inventar otra medida. */
+    .aj-undo {
+        left: 14px; right: 14px; transform: none;
+        bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+        justify-content: space-between;
+    }
+    .aj-undo-msg { white-space: normal; }
+}
+/* La entrada sin `translateX` en móvil (ahí la barra no está centrada por transform). */
+@media (max-width: 767px) {
+    @keyframes aj-undo-in { from { opacity: 0; transform: translateY(8px); } }
+}
+
+/* --- «Tu Home»: lista reordenable ----------------------------------------- */
+
+.aj-home-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.aj-home-count { font-size: 13.5px; color: var(--text-3); }
+.aj-home-count strong { font-weight: 600; color: var(--text); }
+.aj-home-actions { display: flex; gap: 8px; }
+
+.aj-home-list {
+    background: var(--bg-elev);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    /* Sin `overflow: hidden`: la fila levantada tiene que poder salirse. */
+}
+
+.aj-home-row {
+    display: flex; align-items: center; gap: 13px;
+    padding: 12px 16px;
+    background: var(--bg-elev);
+    border-top: 1px solid var(--border);
+    /* La fila se mueve con transform durante el arrastre; sin esto el z-index no aplica. */
+    position: relative;
+}
+/* Redondeos sobre CUALQUIER primer/último hijo: el separador puede quedar el último
+   (cuando no hay bloques ocultos) o el primero (si se ocultan todos). */
+.aj-home-list > *:first-child { border-top: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.aj-home-list > *:last-child { border-radius: 0 0 var(--r-lg) var(--r-lg); }
+
+/* Asa: tres barras con dos box-shadow (el truco de siempre para no meter 3 nodos). */
+.aj-home-handle {
+    width: 26px; height: 34px; flex-shrink: 0;
+    border: 0; background: none; border-radius: var(--r-sm);
+    cursor: grab; touch-action: none;   /* imprescindible: si no, el navegador se queda el gesto */
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-4);
+}
+.aj-home-handle:hover { background: var(--bg-tint); color: var(--text-3); }
+.aj-home-handle:active { cursor: grabbing; }
+.aj-home-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.aj-home-handle span {
+    display: block; width: 12px; height: 2px; border-radius: 1px;
+    background: currentColor; box-shadow: 0 5px 0 currentColor, 0 -5px 0 currentColor;
+}
+
+.aj-home-index {
+    width: 16px; flex-shrink: 0; text-align: right;
+    font-family: var(--font-mono); font-size: 11px; color: var(--text-4);
+}
+.aj-home-text { flex: 1; min-width: 0; }
+.aj-home-title { font-size: 13.5px; font-weight: 500; color: var(--text); }
+.aj-home-desc { font-size: 11.6px; line-height: 1.4; color: var(--text-3); margin: 2px 0 0; }
+
+/* Miniatura: cuatro barritas que insinúan un carrusel. */
+.aj-home-thumb {
+    width: 60px; height: 34px; flex-shrink: 0;
+    border: 1px solid var(--border); border-radius: 5px; background: var(--bg-tint);
+    display: flex; align-items: flex-end; gap: 3px; padding: 5px;
+}
+.aj-home-thumb i { flex: 1; background: var(--border-strong); border-radius: 1px; }
+.aj-home-thumb i:nth-child(1) { height: 60%; }
+.aj-home-thumb i:nth-child(2) { height: 85%; }
+.aj-home-thumb i:nth-child(3) { height: 70%; }
+.aj-home-thumb i:nth-child(4) { height: 45%; }
+
+/* Fila levantada */
+.aj-home-row.is-dragging {
+    z-index: 5;
+    border-radius: var(--r-md);
+    border: 1px solid var(--accent);
+    box-shadow: var(--sh-lg);
+    transform: rotate(-.5deg) scale(1.012);
+    cursor: grabbing;
+}
+.aj-home-row.is-dragging .aj-home-handle { color: var(--accent); background: var(--accent-soft); }
+/* Las vecinas se recolocan animadas (FLIP); la arrastrada nunca lleva transición. */
+.aj-home-row.is-shifting { transition: transform 160ms ease; }
+
+/* Separador de ocultos */
+.aj-home-sep {
+    display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+    padding: 9px 16px;
+    background: var(--bg-tint);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase; color: var(--text-4);
+}
+.aj-home-sep em {
+    font-family: var(--font); font-size: 11px; font-weight: 400;
+    letter-spacing: 0; text-transform: none; font-style: normal; color: var(--text-4);
+}
+
+/* Filas apagadas: se quedan en la lista, atenuadas. */
+.aj-home-row.is-off { background: var(--bg-tint); }
+.aj-home-row.is-off .aj-home-title,
+.aj-home-row.is-off .aj-home-desc { color: var(--text-4); }
+.aj-home-row.is-off .aj-home-thumb { opacity: .4; }
+
+@media (max-width: 640px) {
+    /* Objetivo táctil ≥44px y fuera lo accesorio. */
+    .aj-home-handle { width: 34px; height: 44px; }
+    .aj-home-thumb, .aj-home-index { display: none; }
+    .aj-home-desc { display: none; }
+    .aj-home-row { padding: 10px 12px; gap: 10px; }
+}
+
+/* --- Opciones avanzadas: lo irreversible, apagado y al final ---------------
+   Sin marcos rojos permanentes compitiendo con el resto de la página: filas con
+   borde fino y botones en gris que solo toman color al pasar por encima. */
+.aj-adv { margin-top: 38px; padding-top: 22px; border-top: 1px solid var(--border); }
+.aj-adv > summary {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12.5px; color: var(--text-4); cursor: pointer; list-style: none;
+}
+.aj-adv > summary::-webkit-details-marker { display: none; }
+.aj-adv > summary:hover { color: var(--text-2); }
+.aj-adv > summary svg { transition: transform .18s ease; }
+.aj-adv[open] > summary svg { transform: rotate(90deg); }
+
+.aj-adv-list { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+.aj-adv-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.aj-adv-row-text { flex: 1; min-width: 0; }
+.aj-adv-btn {
+    flex-shrink: 0; height: 32px; padding: 0 13px; border-radius: 8px;
+    border: 1px solid var(--border-strong); background: none; color: var(--text-3);
+    font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    transition: color .15s ease, border-color .15s ease;
+}
+.aj-adv-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.aj-adv-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* --- Pasos numerados (suscripción al calendario) --- */
+.aj-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 20px; }
+@media (max-width: 560px) { .aj-steps { grid-template-columns: 1fr; gap: 12px; } }
+.aj-step-t { font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--text-4); margin: 0 0 5px; }
+.aj-step-d { font-size: 11.8px; line-height: 1.45; color: var(--text-3); margin: 0; }
+
+.aj-live {
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+    background: var(--ok-soft); color: var(--ok-ink);
+    padding: 3px 7px; border-radius: var(--r-full);
+}
+
+.aj-copy-row { display: flex; gap: 8px; align-items: center; }
+.aj-copy-row input {
+    flex: 1; min-width: 0; height: 42px; padding: 0 12px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-3);
+    font-family: var(--font-mono); font-size: 12px;
+}
+
+/* --- Botones --- */
+.aj-btn {
+    height: 32px; padding: 0 13px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-2);
+    font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; text-decoration: none;
+    white-space: nowrap;
+}
+.aj-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.aj-btn-ghost { background: none; border-color: transparent; color: var(--text-3); }
+.aj-btn-ghost:hover { color: var(--text); border-color: var(--border); }
+
+/* ============================================================================
+   6 · Piezas propias de secciones concretas
+   ============================================================================ */
+
+/* Botón de guardar de reserva: solo se ve SIN JavaScript (con JS lo esconde
+   autosave.ts, porque cada control guarda solo). */
+.aj-fallback { margin-top: 20px; display: flex; justify-content: flex-end; }
+.aj-fallback-btn {
+    height: 38px; padding: 0 22px; border: 0; border-radius: var(--r-full);
+    background: var(--accent); color: #fff;
+    font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.aj-fallback-btn:hover { background: var(--accent-dark); }
+
+/* Resumen de "Tus gustos" */
+.aj-taste { display: flex; flex-direction: column; gap: 18px; }
+.aj-taste-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.aj-taste-chip {
+    padding: 5px 11px; border-radius: var(--r-full);
+    background: var(--bg-tint); border: 1px solid var(--border);
+    font-size: 12.5px; color: var(--text-2);
+}
+.aj-taste-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.aj-taste-poster {
+    width: 46px; height: 69px; object-fit: cover; display: block;
+    border-radius: var(--r-sm); border: 1px solid var(--border);
+}
+.aj-taste-face {
+    width: 48px; height: 48px; object-fit: cover; display: block;
+    border-radius: var(--r-full); border: 1px solid var(--border);
+}
+.aj-taste-noimg {
+    width: 46px; height: 69px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--bg-tint); border: 1px solid var(--border); border-radius: var(--r-sm);
+    font-size: 13px; font-weight: 600; color: var(--text-3);
+}
+.aj-taste-noimg.is-round { width: 48px; height: 48px; border-radius: var(--r-full); }
+
+.aj-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+.aj-link:hover { text-decoration: underline; }

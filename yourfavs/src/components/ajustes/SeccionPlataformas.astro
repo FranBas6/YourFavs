@@ -1,0 +1,239 @@
+---
+/**
+ * Mosaico de plataformas + selector para añadir cualquiera del catálogo de tu región.
+ *
+ * Un solo mosaico: primero las siete habituales (con su SVG oficial de `public/logos/`, que se
+ * ve mejor que el logo de TMDB) y detrás las que hayas añadido tú, resueltas por nombre y logo
+ * desde el catálogo cacheado. Para ti son todas "tus plataformas", sin jerarquías.
+ *
+ * El perfil sigue guardando SOLO ids. Los nombres y logos se resuelven aquí en servidor, así
+ * que el documento `users/{uid}` — que el middleware lee en cada request — no engorda.
+ *
+ * Los logos van sobre un chip claro fijo: los SVG oficiales son monocromos oscuros y sobre
+ * superficie oscura desaparecerían (mismo recurso que `.dark-logo-chip`).
+ */
+import type { UserProfile } from "../../services/BD/profile/userProfile";
+import { STREAMING_PLATFORMS, platformLogo } from "../../utils/constants/streamingPlatforms";
+import { resolveProviderNames } from "../../services/API/shared/watchProviders";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import FilaAjuste from "./FilaAjuste.astro";
+
+interface Props { profile: UserProfile; }
+const { profile } = Astro.props;
+
+const selected = profile.platforms ?? [];
+const curatedIds = new Set(STREAMING_PLATFORMS.map((p) => p.id));
+
+// Ids guardados que NO son de las siete habituales → hay que pedirle a TMDB su nombre y logo.
+// Si no hay ninguno (el caso normal), esto no hace ni una llamada.
+const extraIds = selected.filter((id) => !curatedIds.has(id));
+const extras = extraIds.length > 0
+    ? await resolveProviderNames(extraIds, profile.region || 'ES')
+    : new Map();
+
+type Tile = { id: number; label: string; logo: string | null };
+
+const tiles: Tile[] = [
+    ...STREAMING_PLATFORMS.map((p) => ({ id: p.id, label: p.label, logo: platformLogo(p.slug) })),
+    ...extraIds.map((id) => {
+        const p = extras.get(id);
+        return {
+            id,
+            label: p?.name ?? `Plataforma ${id}`,
+            logo: p?.logo_path ? posterUrl(p.logo_path, 'w92') : null,
+        };
+    }),
+];
+---
+<form method="POST" data-autosave-form>
+    <input type="hidden" name="action" value="save_section" />
+    <input type="hidden" name="section" value="plataformas" />
+
+    <p class="aj-grpt">Dónde puedes ver</p>
+    <div class="aj-tiles" data-save-group="platforms" id="aj-platform-tiles">
+        {tiles.map((t) => (
+            <label class="aj-tile">
+                <input type="checkbox" name="platforms" value={t.id} checked={selected.includes(t.id)} />
+                <span class="aj-tile-check" aria-hidden="true">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                </span>
+                <span class="aj-tile-logo">
+                    {t.logo
+                        ? <img src={t.logo} alt="" loading="lazy" />
+                        : <span class="aj-tile-name">{t.label.slice(0, 2)}</span>}
+                </span>
+                <span class="aj-tile-name">{t.label}</span>
+            </label>
+        ))}
+
+        <button type="button" class="aj-tile-add" id="aj-platform-add">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <strong>Añadir plataforma</strong>
+            ¿Tienes Crunchyroll, MUBI…?
+        </button>
+    </div>
+
+    <p class="aj-field-help" style="margin-top: 12px;" id="aj-platform-empty" hidden={selected.length > 0}>
+        Marca al menos una para afinar las recomendaciones, la ruleta y el «dónde ver» de cada ficha.
+    </p>
+
+    <div class="aj-card" style="margin-top: 20px;">
+        <FilaAjuste
+            icon="filter" tone="visto"
+            title="Filtrar siempre por mis plataformas"
+            desc="El catálogo arranca ya filtrado a lo que puedes ver esta noche. En la ruleta, tus plataformas siguen puntuando más alto, pero no descarta el resto."
+            name="platforms_filter_default"
+            save="platformsFilterDefault"
+            checked={profile.platformsFilterDefault === true}
+        />
+    </div>
+
+    <div class="aj-fallback">
+        <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
+    </div>
+</form>
+
+<!-- Selector: catálogo de la región, bajo demanda -->
+<div class="aj-picker" id="aj-picker" role="dialog" aria-modal="true" aria-label="Añadir plataforma" hidden>
+    <div class="aj-picker-card">
+        <div class="aj-picker-head">
+            <div>
+                <h3>Añadir plataforma</h3>
+                <p>Las que hay disponibles en tu región según TMDB.</p>
+            </div>
+            <button type="button" class="aj-picker-close" id="aj-picker-close" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="aj-picker-search">
+            <input type="search" id="aj-picker-q" placeholder="Buscar plataforma…" autocomplete="off" />
+        </div>
+        <div class="aj-picker-list" id="aj-picker-list">
+            <p class="aj-picker-state">Cargando…</p>
+        </div>
+    </div>
+</div>
+
+<script>
+    const picker = document.getElementById('aj-picker');
+    const openBtn = document.getElementById('aj-platform-add');
+    const closeBtn = document.getElementById('aj-picker-close');
+    const list = document.getElementById('aj-picker-list');
+    const search = document.getElementById('aj-picker-q') as HTMLInputElement | null;
+    const grid = document.getElementById('aj-platform-tiles');
+
+    interface Option { id: number; name: string; logo_path: string | null; channel: boolean; channelHost: string | null; base: string }
+    let catalog: Option[] = [];
+    let loaded = false;
+
+    const has = (id: number) => Boolean(grid?.querySelector(`input[value="${id}"]`));
+    const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] || c));
+
+    function render(query: string) {
+        if (!list) return;
+        const q = query.trim().toLowerCase();
+
+        // Las variantes "X Amazon Channel" no son plataformas aparte: son canales que se
+        // contratan dentro de Prime, y son un tercio del catálogo. Sin búsqueda se esconden.
+        //
+        // Al buscar se comparan contra su nombre BASE ("Crunchyroll Amazon Channel" →
+        // "Crunchyroll"). Si se comparara con el nombre completo, teclear "amazon" devolvería
+        // las 27 variantes y enterraría Prime Video, que es justo lo que se buscaba.
+        const rows = catalog.filter((p) => {
+            if (!q) return !p.channel;
+            if (!p.channel) return p.name.toLowerCase().includes(q);
+            // Un canal solo sale si buscas su marca, o si pides "channel" explícitamente.
+            return p.base.toLowerCase().includes(q) || q.includes('channel');
+        });
+
+        // Los canales, siempre detrás. `sort` es estable, así que dentro de cada grupo se
+        // conserva el orden de relevancia que da TMDB.
+        rows.sort((a, b) => Number(a.channel) - Number(b.channel));
+
+        if (rows.length === 0) {
+            list.innerHTML = '<p class="aj-picker-state">Ninguna plataforma coincide.</p>';
+            return;
+        }
+
+        list.innerHTML = rows.map((p) => {
+            const already = has(p.id);
+            const logo = p.logo_path
+                ? `<img src="https://image.tmdb.org/t/p/w92${p.logo_path}" alt="" loading="lazy" />`
+                : '';
+            // El anfitrión sale del sufijo, no se supone: hay canales de Apple TV y de Roku,
+            // no solo de Prime.
+            const tag = already
+                ? '<span class="aj-picker-tag">Ya está</span>'
+                : (p.channel && p.channelHost
+                    ? `<span class="aj-picker-tag">se contrata en ${esc(p.channelHost)}</span>`
+                    : '');
+            return `<button type="button" class="aj-picker-item" data-id="${p.id}" data-name="${esc(p.name)}" data-logo="${p.logo_path || ''}"${already ? ' disabled' : ''}>
+                <span class="aj-picker-logo">${logo}</span>
+                <span class="aj-picker-name">${esc(p.name)}</span>
+                ${tag}
+            </button>`;
+        }).join('');
+    }
+
+    async function load() {
+        if (loaded || !list) return;
+        try {
+            const res = await fetch('/api/profile/platform-options');
+            const data = await res.json();
+            if (!res.ok || !data.ok) throw new Error();
+            catalog = data.providers || [];
+            loaded = true;
+            render(search?.value || '');
+        } catch {
+            list.innerHTML = '<p class="aj-picker-state">No se pudo cargar el catálogo de plataformas.</p>';
+        }
+    }
+
+    function open() {
+        if (!picker) return;
+        picker.hidden = false;
+        document.body.style.overflow = 'hidden';
+        load();
+        search?.focus();
+    }
+    function close() {
+        if (!picker) return;
+        picker.hidden = true;
+        document.body.style.overflow = '';
+    }
+
+    openBtn?.addEventListener('click', open);
+    closeBtn?.addEventListener('click', close);
+    picker?.addEventListener('mousedown', (e) => { if (e.target === picker) close(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && picker && !picker.hidden) close(); });
+    search?.addEventListener('input', () => render(search.value));
+
+    // Elegir una plataforma la añade YA MARCADA: si la has buscado es porque la tienes.
+    // El `change` que se dispara al final es lo que hace que el autoguardado la persista
+    // (lee el grupo del DOM, así que basta con haber insertado la casilla).
+    list?.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest('.aj-picker-item') as HTMLButtonElement | null;
+        if (!btn || btn.disabled || !grid) return;
+
+        const id = btn.dataset.id!;
+        const name = btn.dataset.name || `Plataforma ${id}`;
+        const logo = btn.dataset.logo;
+
+        const label = document.createElement('label');
+        label.className = 'aj-tile';
+        label.innerHTML = `
+            <input type="checkbox" name="platforms" value="${id}" checked />
+            <span class="aj-tile-check" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            </span>
+            <span class="aj-tile-logo">${logo ? `<img src="https://image.tmdb.org/t/p/w92${logo}" alt="" loading="lazy" />` : `<span class="aj-tile-name">${esc(name).slice(0, 2)}</span>`}</span>
+            <span class="aj-tile-name">${esc(name)}</span>`;
+
+        // Antes del botón "Añadir plataforma", que va siempre al final.
+        grid.insertBefore(label, document.getElementById('aj-platform-add'));
+
+        const empty = document.getElementById('aj-platform-empty');
+        if (empty) empty.hidden = true;
+
+        label.querySelector('input')?.dispatchEvent(new Event('change', { bubbles: true }));
+        close();
+    });
+</script>

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { getCalendarData } from '../../../services/API/Calendar/calendarService';
+import { getCalendarData, hideEpisodeTitlesFor } from '../../../services/API/Calendar/calendarService';
 
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, locals }) => {
     const { yearMonth } = params;
     if (!yearMonth || !/^\d{4}-\d{2}$/.test(yearMonth)) {
         return new Response(JSON.stringify({ error: 'Formato inválido. Usa YYYY-MM' }), {
@@ -13,7 +13,9 @@ export const GET: APIRoute = async ({ params }) => {
     const [year, month] = yearMonth.split('-').map(Number);
 
     try {
-        const data = await getCalendarData(year, month);
+        const data = await getCalendarData(year, month, {
+            hideEpisodeTitles: hideEpisodeTitlesFor(locals.user),
+        });
         return new Response(JSON.stringify(data), {
             headers: { 'Content-Type': 'application/json' },
         });

@@ -17,6 +17,7 @@ import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/card-animations.css';
+import { resolveMineFilter } from "../../utils/platformFilter";
 
 const urlParams = new URL(Astro.request.url).searchParams;
 const page = Number(urlParams.get('page') || 1);
@@ -26,7 +27,9 @@ const pageStr = page.toString();
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
 // "Solo en mis plataformas" (3.2b): with_watch_providers desde el perfil.
-const mine = urlParams.get('mine') === '1';
+// Filtro por plataformas: la URL manda (`mine=0|1`); sin parámetro decide el perfil
+// («Filtrar siempre por mis plataformas»). Ver utils/platformFilter.ts.
+const { mine, mineDefault } = resolveMineFilter(urlParams, Astro.locals.user);
 const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
 const myRegion = Astro.locals.user?.region || 'ES';
 // Si hay filtros, orden o "mis plataformas", vamos por discover (que respeta esos params).
@@ -85,7 +88,7 @@ function buildTypeUrl(t: string) {
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}
-                         mine={mine} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
+                         mine={mine} mineDefault={mineDefault} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
                          sortOptions={[{ value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
 
         <div class="flex items-center justify-between mb-6 text-sm text-gray-500">

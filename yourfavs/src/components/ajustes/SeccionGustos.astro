@@ -1,0 +1,95 @@
+---
+/**
+ * Resumen de "Tus gustos" (Fase F · Acceso B). Editar reabre el wizard `/gustos` ya
+ * prerrellenado; reiniciar es irreversible y vive en Cuenta › Opciones avanzadas.
+ *
+ * Los gustos están en `users/{uid}/taste/current`, un documento aparte del perfil a propósito
+ * (el middleware lee el perfil en CADA request y no conviene engordarlo). La lectura se hace
+ * AQUÍ, no en la página: así `/perfil/apariencia` no paga por unos gustos que no va a pintar.
+ */
+import { getUserTaste } from "../../services/BD/profile/userTaste";
+import { genresMap } from "../../utils/constants/genres";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+
+const taste = await getUserTaste();
+// F.7: los géneros se guardan partidos en movieGenres/tvGenres; `genres` es pre-F.7.
+const tasteGenres = ((taste?.movieGenres ?? taste?.genres) ?? []).map((id) => genresMap[id]).filter(Boolean);
+const tasteTitles = taste?.titles ?? [];
+const tasteMovies = tasteTitles.filter((t) => t.media_type === 'movie');
+const tasteSeries = tasteTitles.filter((t) => t.media_type === 'tv');
+const tastePeople = taste?.people ?? [];
+const hasTaste = tasteGenres.length > 0 || tasteTitles.length > 0 || tastePeople.length > 0;
+---
+<div class="aj-card">
+    <div class="aj-card-head">
+        <div>
+            <h2>Tus gustos</h2>
+            <p>Lo que usamos para personalizar tus recomendaciones «Para ti».</p>
+        </div>
+        <a href="/gustos" class="aj-btn">{hasTaste ? 'Editar gustos' : 'Configurar'}</a>
+    </div>
+
+    <div class="aj-card-body">
+        {hasTaste ? (
+            <div class="aj-taste">
+                {tasteGenres.length > 0 && (
+                    <div>
+                        <p class="aj-grpt">Géneros · {tasteGenres.length}</p>
+                        <div class="aj-taste-chips">
+                            {tasteGenres.map((g) => <span class="aj-taste-chip">{g}</span>)}
+                        </div>
+                    </div>
+                )}
+                {tasteMovies.length > 0 && (
+                    <div>
+                        <p class="aj-grpt">Películas · {tasteMovies.length}</p>
+                        <div class="aj-taste-row">
+                            {tasteMovies.map((t) => (
+                                t.poster_path
+                                    ? <img class="aj-taste-poster" src={posterUrl(t.poster_path, 'w92')} alt={t.title} title={t.title} loading="lazy" />
+                                    : <span class="aj-taste-noimg" title={t.title}>{t.title.slice(0, 2)}</span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {tasteSeries.length > 0 && (
+                    <div>
+                        <p class="aj-grpt">Series · {tasteSeries.length}</p>
+                        <div class="aj-taste-row">
+                            {tasteSeries.map((t) => (
+                                t.poster_path
+                                    ? <img class="aj-taste-poster" src={posterUrl(t.poster_path, 'w92')} alt={t.title} title={t.title} loading="lazy" />
+                                    : <span class="aj-taste-noimg" title={t.title}>{t.title.slice(0, 2)}</span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                {tastePeople.length > 0 && (
+                    <div>
+                        <p class="aj-grpt">Actores · {tastePeople.length}</p>
+                        <div class="aj-taste-row">
+                            {tastePeople.map((p) => (
+                                p.profile_path
+                                    ? <img class="aj-taste-face" src={posterUrl(p.profile_path, 'w92')} alt={p.name} title={p.name} loading="lazy" />
+                                    : <span class="aj-taste-noimg is-round" title={p.name}>{p.name.slice(0, 1)}</span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        ) : (
+            <p class="aj-field-help">
+                Aún no nos has contado tus gustos. <a href="/gustos" class="aj-link">Cuéntanoslos →</a> y «Para ti» arrancará personalizado.
+            </p>
+        )}
+    </div>
+
+    {hasTaste && (
+        <div class="aj-card-body">
+            <p class="aj-field-help">
+                «Editar gustos» reabre el mismo flujo, ya prerrellenado. Para empezar de cero,
+                <a href="/perfil/cuenta" class="aj-link">reinicia tus gustos</a> en Cuenta y datos.
+            </p>
+        </div>
+    )}
+</div>

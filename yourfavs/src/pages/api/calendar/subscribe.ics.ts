@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getCalendarData } from '../../../services/API/Calendar/calendarService';
+import { getCalendarData, hideEpisodeTitlesFor } from '../../../services/API/Calendar/calendarService';
 
 export const prerender = false;
 
@@ -24,8 +24,11 @@ function nextDay(yyyymmdd: string): string {
     return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
 }
 
-export const GET: APIRoute = async ({ url }) => {
+export const GET: APIRoute = async ({ url, locals }) => {
     try {
+        // El feed va a una app de calendario ajena: si la web tapa los títulos de episodio,
+        // aquí también, o el modo sin spoilers se filtraría por la puerta de atrás.
+        const hideEpisodeTitles = hideEpisodeTitlesFor(locals.user);
         const baseUrl = `${url.protocol}//${url.host}`;
         const now = new Date();
         const targets: { year: number; month: number }[] = [];
@@ -34,7 +37,9 @@ export const GET: APIRoute = async ({ url }) => {
             targets.push({ year: dt.getFullYear(), month: dt.getMonth() + 1 });
         }
 
-        const monthsData = await Promise.all(targets.map(t => getCalendarData(t.year, t.month)));
+        const monthsData = await Promise.all(
+            targets.map((t) => getCalendarData(t.year, t.month, { hideEpisodeTitles })),
+        );
 
         const lines: string[] = [
             'BEGIN:VCALENDAR',

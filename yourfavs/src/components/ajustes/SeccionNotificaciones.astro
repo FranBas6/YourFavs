@@ -1,0 +1,78 @@
+---
+/**
+ * Qué te avisa la campana.
+ *
+ * Cinco avisos con motor real (`new_episode`, `person_release`, `platform_change`,
+ * `anniversary`, `streak` en `services/API/notifications/generator.ts`) y cuatro que el
+ * diseño pide pero que **no tienen backend**: resumen semanal y correo necesitarían una
+ * Scheduled Function y un proveedor de email, y «nuevas temporadas» todavía llega como un
+ * episodio más. Se pintan en gris con «Pronto» para que se vea a dónde va esto, pero no
+ * guardan nada — un toggle que no hace nada es peor que no tenerlo.
+ *
+ * Semántica del POST de reserva: un checkbox ausente significa DESACTIVADO, así que las
+ * cinco filas reales tienen que estar todas en el formulario.
+ */
+import type { UserProfile } from "../../services/BD/profile/userProfile";
+import FilaAjuste from "./FilaAjuste.astro";
+
+interface Props { profile: UserProfile; }
+const { profile } = Astro.props;
+const np = profile.notifPrefs ?? {};
+---
+<form method="POST" data-autosave-form>
+    <input type="hidden" name="action" value="save_section" />
+    <input type="hidden" name="section" value="notificaciones" />
+
+    <div class="aj-card" data-save-group="notifPrefs">
+        <FilaAjuste
+            icon="tv" tone="ep"
+            title="Estrenos de mis series"
+            desc="Cuando sale un episodio nuevo de algo que sigues."
+            name="notif_episodes" fieldKey="episodes" checked={np.episodes !== false}
+        />
+        <FilaAjuste
+            icon="userPlus" tone="person"
+            title="Estrenos de quien sigo"
+            desc="Cuando se anuncia una película o serie de un actor o director que sigues."
+            name="notif_releases" fieldKey="releases" checked={np.releases !== false}
+        />
+        <FilaAjuste
+            icon="zap" tone="pronto"
+            title="Llega a tus plataformas"
+            desc="Un título de tus pendientes entra (o sale) de tus plataformas."
+            name="notif_platform" fieldKey="platform" checked={np.platform !== false}
+        />
+        <FilaAjuste
+            icon="history" tone="rewatch"
+            title="Efemérides «hace un año»"
+            desc="Lo que estabas viendo por estas fechas."
+            name="notif_anniversary" fieldKey="anniversary" checked={np.anniversary !== false}
+        />
+        <FilaAjuste
+            icon="flame" tone="fav"
+            title="Racha en peligro"
+            desc="Te recuerda ver algo si tu racha se va a romper hoy. Desactivado por defecto."
+            name="notif_streak" fieldKey="streak" checked={np.streak === true}
+        />
+    </div>
+
+    <p class="aj-grpt">En camino</p>
+    <div class="aj-card">
+        <FilaAjuste icon="layers" tone="seguir" soon
+            title="Nuevas temporadas"
+            desc="Cuando se anuncia o se estrena una temporada. Ahora mismo te llega como un episodio más." />
+        <FilaAjuste icon="calendarDays" tone="pend" soon
+            title="Resumen semanal"
+            desc="Los domingos, lo que has visto y lo que te espera." />
+        <FilaAjuste icon="megaphone" tone="reorder" soon
+            title="Novedades de YourFavs"
+            desc="Funciones nuevas. Como mucho una vez al mes." />
+        <FilaAjuste icon="mail" tone="person" soon
+            title="Enviarme también un correo"
+            desc="Solo para estrenos de series que sigues." />
+    </div>
+
+    <div class="aj-fallback">
+        <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
+    </div>
+</form>

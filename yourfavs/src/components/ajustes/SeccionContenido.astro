@@ -1,0 +1,93 @@
+---
+/**
+ * Región, idioma de contenido y modo sin spoilers.
+ *
+ * Región e idioma no son decorativos: el middleware los mete en el contexto del request y los
+ * leen `tmdbFetch` y los proveedores, así que cambiarlos cambia de verdad lo que se ve.
+ *
+ * Los tres sub-ajustes de spoilers son reales (A3b): se guardan en `spoilers.hide*` y los leen
+ * la ficha de serie (fotograma y sinopsis por separado) y el calendario + el feed .ics.
+ */
+import { resolveSpoilerSettings, type UserProfile } from "../../services/BD/profile/userProfile";
+import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
+import { CONTENT_LANGUAGES, DEFAULT_CONTENT_LANGUAGE } from "../../utils/constants/languages";
+import FilaAjuste from "./FilaAjuste.astro";
+
+interface Props { profile: UserProfile; }
+const { profile } = Astro.props;
+const region = profile.region || 'ES';
+const language = profile.language || DEFAULT_CONTENT_LANGUAGE;
+// Resuelto: quien solo tenga el booleano viejo ve el desglose equivalente ya marcado.
+const sp = resolveSpoilerSettings(profile);
+---
+<form method="POST" data-autosave-form>
+    <input type="hidden" name="action" value="save_section" />
+    <input type="hidden" name="section" value="contenido" />
+
+    <div class="aj-card">
+        <div class="aj-card-head">
+            <div>
+                <h2>Región e idioma</h2>
+                <p>De dónde salen las plataformas y en qué idioma llega el contenido.</p>
+            </div>
+        </div>
+        <div class="aj-card-body">
+            <div class="aj-fields">
+                <label class="aj-field">
+                    <span class="aj-field-label">Región de streaming</span>
+                    <select name="region" data-save="region">
+                        {SUPPORTED_COUNTRIES.map((c) => (
+                            <option value={c.code} selected={c.code === region}>{c.label}</option>
+                        ))}
+                    </select>
+                    <span class="aj-field-help">Determina qué plataformas se muestran en «dónde ver».</span>
+                </label>
+                <label class="aj-field">
+                    <span class="aj-field-label">Idioma de contenido</span>
+                    <select name="language" data-save="language">
+                        {CONTENT_LANGUAGES.map((l) => (
+                            <option value={l.code} selected={l.code === language}>{l.label}</option>
+                        ))}
+                    </select>
+                    <span class="aj-field-help">Sinopsis y títulos de TMDB. No cambia el idioma de la interfaz.</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="aj-card" data-save-group="spoilers">
+        <FilaAjuste
+            icon="image" tone="abandon" accent
+            title="Modo sin spoilers"
+            desc="Tapa lo que aún no has visto. Cada serie puede llevar su propio ajuste desde su ficha."
+            name="spoiler_enabled" fieldKey="enabled" checked={sp.enabled}
+        />
+        <!-- Con el maestro apagado el bloque se COLAPSA (no se deshabilita): un control gris
+             que no explica por qué está gris confunde más que desaparecer. -->
+        <div class="aj-sub" id="spoiler-sub" hidden={!sp.enabled}>
+            <FilaAjuste
+                title="Fotogramas de episodios no vistos"
+                desc="Difumina la imagen hasta que toques «Mostrar»."
+                name="spoiler_stills" fieldKey="hideStills" checked={sp.hideStills} />
+            <FilaAjuste
+                title="Sinopsis de episodios no vistos"
+                desc="Tapa el texto y las estrellas invitadas; el fotograma se rige por el ajuste de arriba."
+                name="spoiler_synopsis" fieldKey="hideSynopsis" checked={sp.hideSynopsis} />
+            <FilaAjuste
+                title="Títulos de episodios en el calendario"
+                desc="En el calendario y en el .ics, solo «T2 E5». Desactivado por defecto."
+                name="spoiler_calendar" fieldKey="hideCalendarTitles" checked={sp.hideCalendarTitles} />
+        </div>
+    </div>
+
+    <div class="aj-fallback">
+        <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
+    </div>
+</form>
+
+<script>
+    // El bloque anidado sigue al maestro sin recargar.
+    const master = document.querySelector<HTMLInputElement>('input[name="spoiler_enabled"]');
+    const sub = document.getElementById('spoiler-sub');
+    master?.addEventListener('change', () => { if (sub) sub.hidden = !master.checked; });
+</script>

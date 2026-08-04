@@ -22,6 +22,19 @@ export async function getSpoilerPref(serieId: string | number): Promise<boolean 
     }
 }
 
+/**
+ * Borra el override para que la serie vuelva a seguir el ajuste global.
+ *
+ * Hace falta porque un `false` explícito es indistinguible, de cara al usuario, de "no tengo
+ * override": la serie se quedaba ignorando el global para siempre y sin forma de deshacerlo.
+ */
+export async function clearSpoilerPref(serieId: string | number): Promise<void> {
+    if (!getCurrentUid()) return;
+    try {
+        await userDoc(COLLECTION, `tv_${serieId}`).delete();
+    } catch { /* si no existe, ya está en el estado que queremos */ }
+}
+
 export async function setSpoilerPref(serieId: string | number, value: boolean): Promise<void> {
     await userDoc(COLLECTION, `tv_${serieId}`).set({
         id: `tv_${serieId}`,

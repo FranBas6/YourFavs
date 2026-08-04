@@ -1,0 +1,73 @@
+---
+/**
+ * Fila de ajuste: `[pastilla de icono] título + descripción [interruptor]`.
+ *
+ * El interruptor es un `<input type="checkbox" role="switch">` REAL, no un div con clases:
+ * así funciona el teclado, lo anuncian los lectores de pantalla y el `<form>` sigue
+ * mandándolo en el POST sin JS.
+ *
+ * `soon` es para las filas que el diseño pide pero que todavía no tienen motor detrás
+ * (resumen semanal, correo…): se pintan en gris con el chip «Pronto», el input va
+ * `disabled` y — importante — SIN `data-save`, así que no escriben nada en Firestore.
+ */
+import { SETTING_ICONS } from "./settingIcons";
+
+interface Props {
+    /** Clave de `SETTING_ICONS`. Sin icono, la fila va sin pastilla (sub-ajustes). */
+    icon?: string;
+    /** Sufijo de las familias de color de tokens.css: `--a-{tone}` / `--a-{tone}-bg`. */
+    tone?: string;
+    title: string;
+    desc?: string;
+    /** `name` del checkbox, para el POST de reserva sin JS. */
+    name?: string;
+    checked?: boolean;
+    /** Campo del perfil que guarda el autoguardado (escalares). */
+    save?: string;
+    /**
+     * Clave DENTRO del objeto del grupo, cuando la fila vive en un `data-save-group` que guarda
+     * un objeto (`notifPrefs`, `spoilers`) en vez de un array.
+     */
+    fieldKey?: string;
+    /** Diseñada pero sin backend: gris, chip «Pronto» y no guarda. */
+    soon?: boolean;
+    /** El maestro de un bloque va en accent en vez de verde. */
+    accent?: boolean;
+}
+
+const { icon, tone, title, desc, name, checked = false, save, fieldKey, soon = false, accent = false } = Astro.props;
+const paths = icon ? SETTING_ICONS[icon] : null;
+---
+<div class:list={["aj-row", { "is-soon": soon }]}>
+    {paths && (
+        <span
+            class="aj-row-ico"
+            style={tone ? `--ico: var(--a-${tone}); --ico-bg: var(--a-${tone}-bg);` : undefined}
+            aria-hidden="true"
+        >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                {paths.map((d) => <path d={d} />)}
+            </svg>
+        </span>
+    )}
+    <span class="aj-row-text">
+        <span class="aj-row-title">
+            {title}
+            {soon && <span class="aj-soon">Pronto</span>}
+        </span>
+        {desc && <p class="aj-row-desc">{desc}</p>}
+    </span>
+    <label class:list={["aj-switch", { "is-accent": accent }]}>
+        <input
+            type="checkbox"
+            role="switch"
+            name={soon ? undefined : name}
+            checked={checked}
+            disabled={soon}
+            data-save={soon ? undefined : save}
+            data-key={soon ? undefined : fieldKey}
+            aria-label={title}
+        />
+        <span class="aj-switch-track"></span>
+    </label>
+</div>
