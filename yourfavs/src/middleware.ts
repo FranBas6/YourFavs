@@ -77,6 +77,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 context.locals.user.providerPicture = context.locals.user.picture;
                 if (profile?.avatar_url) context.locals.user.picture = profile.avatar_url;
                 context.locals.user.region = profile?.region ?? 'ES'; // para el menú de cuenta
+                // Tema ELEGIDO (no el aplicado): lo necesita el segmentado de la hoja móvil para
+                // marcar su opción en SSR. Sin elección previa = 'light', que es lo que aplica el
+                // script anti-FOUC del Layout desde siempre.
+                context.locals.user.theme = profile?.theme ?? 'light';
                 context.locals.user.onboarding = profile?.onboarding; // gating onboarding (Fase F)
                 context.locals.user.platforms = profile?.platforms ?? []; // "mis plataformas" (3.2)
                 context.locals.user.platformsFilterDefault = profile?.platformsFilterDefault === true;

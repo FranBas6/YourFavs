@@ -22,6 +22,15 @@ async function logSeasonEpisodes(serieId: string, eps: { season: number; episode
 async function unlogEpisode(serieId: string, season: number, episode: number): Promise<void> {
     try { await removeEpisodeFromLog(serieId, season, episode); } catch { /* diario opcional */ }
 }
+// Cualquier cambio de progreso cambia el resumen anual (episodios, heatmap, top series y
+// el mes a mes). Antes solo lo invalidaban las mutaciones de LISTAS, así que marcar un
+// episodio podía tardar hasta 1 h (el TTL) en verse en "Tu cine en números".
+async function bustYearStats(): Promise<void> {
+    try {
+        const { invalidateYearStatsCache } = await import('../../../utils/yearStats');
+        invalidateYearStatsCache();
+    } catch { /* la caché caduca sola */ }
+}
 
 const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto', 'SeriesAbandonadas'];
 
@@ -501,6 +510,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
             last_watched: ep,
         });
         await logEpisode(serieId, season, episode);
+        await bustYearStats();
         return;
     }
 
@@ -527,6 +537,7 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
         });
         await logEpisode(serieId, season, episode);
     }
+    await bustYearStats();
 }
 
 /**
@@ -542,6 +553,7 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
     if (!snap.exists) {
         await ref.set({ id: serieId, watched_episodes: [ep], last_watched: ep });
         await logEpisode(serieId, season, episode);
+        await bustYearStats();
         return;
     }
 
@@ -552,6 +564,7 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
     episodes.push(ep);
     await ref.update({ watched_episodes: episodes, last_watched: ep });
     await logEpisode(serieId, season, episode);
+    await bustYearStats();
 }
 
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
@@ -565,6 +578,7 @@ export async function markSeasonWatched(serieId: string, season: number, episode
         const last = newEpisodes[newEpisodes.length - 1];
         await ref.set({ id: serieId, watched_episodes: newEpisodes, last_watched: last });
         await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
+        await bustYearStats();
         return;
     }
 
@@ -577,6 +591,7 @@ export async function markSeasonWatched(serieId: string, season: number, episode
         last_watched: allEpisodes[allEpisodes.length - 1],
     });
     await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
+    await bustYearStats();
 }
 
 export async function unmarkSeasonWatched(serieId: string, season: number): Promise<void> {
@@ -590,6 +605,7 @@ export async function unmarkSeasonWatched(serieId: string, season: number): Prom
         watched_episodes: remaining,
         last_watched: remaining.length > 0 ? remaining[remaining.length - 1] : null,
     });
+    await bustYearStats();
 }
 
 export async function markAllWatched(serieId: string, allEpisodes: { season: number; episode: number }[]): Promise<void> {
@@ -599,10 +615,12 @@ export async function markAllWatched(serieId: string, allEpisodes: { season: num
     const last = episodes[episodes.length - 1];
     await ref.set({ id: serieId, watched_episodes: episodes, last_watched: last });
     await logSeasonEpisodes(serieId, allEpisodes.map(e => ({ season: e.season, episode: e.episode })));
+    await bustYearStats();
 }
 
 export async function unmarkAllWatched(serieId: string): Promise<void> {
     await userDoc('WatchedEpisodes', serieId).delete();
+    await bustYearStats();
 }
 
 export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }>> {
@@ -718,60 +736,11 @@ export async function getMaxWatchStreak(): Promise<{ max: number; current: numbe
     }
 }
 
-export interface SerieYearActivity {
-    id: string;
-    lastWatchedAt: number;
-    firstWatchedAtInYear: number;
-    episodesInYear: number;
-    totalWatched: number;
-}
-
-/**
- * Lee todos los WatchedEpisodes y devuelve las series con actividad en el año dado.
- * Una serie entra si tiene al menos 1 episodio cuyo watched_at cae en [year, year+1).
- * lastWatchedAt y firstWatchedAtInYear corresponden a episodios DEL año, no overall.
- * Una sola lectura de colección (snapshot completo) — no se puede filtrar por server-side
- * con Firestore porque watched_at vive dentro de un array, no en un campo top-level.
- */
-export async function getSeriesActivityByYear(year: number): Promise<SerieYearActivity[]> {
-    if (!getCurrentUid()) return [];
-    try {
-        const snap = await userCol('WatchedEpisodes').get();
-        const yearStart = new Date(year, 0, 1).getTime();
-        const yearEnd = new Date(year + 1, 0, 1).getTime();
-        const out: SerieYearActivity[] = [];
-        for (const docSnap of snap.docs) {
-            const data = docSnap.data() as { watched_episodes?: WatchedEpisode[] };
-            const eps = data.watched_episodes || [];
-            let lastWatchedAt = 0;
-            let firstWatchedAtInYear = 0;
-            let episodesInYear = 0;
-            for (const ep of eps) {
-                if (!ep.watched_at) continue;
-                const t = new Date(ep.watched_at).getTime();
-                if (isNaN(t)) continue;
-                if (t >= yearStart && t < yearEnd) {
-                    episodesInYear++;
-                    if (t > lastWatchedAt) lastWatchedAt = t;
-                    if (firstWatchedAtInYear === 0 || t < firstWatchedAtInYear) firstWatchedAtInYear = t;
-                }
-            }
-            if (episodesInYear > 0) {
-                out.push({
-                    id: docSnap.id,
-                    lastWatchedAt,
-                    firstWatchedAtInYear,
-                    episodesInYear,
-                    totalWatched: eps.length,
-                });
-            }
-        }
-        return out;
-    } catch (error) {
-        console.error('Error en getSeriesActivityByYear:', error);
-        return [];
-    }
-}
+// `getSeriesActivityByYear` vivía aquí y alimentaba el "mes a mes" de Tu año. Retirada: leía
+// `WatchedEpisodes` por segunda vez en la misma request (yearStats ya la lee) y colapsaba cada
+// serie a un único instante anual —el de su último episodio—, así que una serie vista entre
+// dos meses solo aparecía en el segundo. Ahora lo calcula `buildTimeline` en `yearStats.ts`,
+// sobre la unión de progreso y diario, con un tramo por serie y mes.
 
 // Re-export del client SDK db por compatibilidad con módulos que aún lo importan de aquí.
 // (El acceso a datos por usuario va por Admin SDK + userScope; esto solo es compat.)

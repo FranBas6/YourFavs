@@ -385,8 +385,9 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
     themeBtns.forEach(function (b) {
         b.addEventListener('click', function () {
             var v = b.getAttribute('data-theme-set');
-            document.documentElement.setAttribute('data-theme', v);
-            try { localStorage.setItem('theme', v); } catch (e) {}
+            // Pasa por yfApplyTheme (Layout) en vez de escribir localStorage a mano: si no,
+            // este botón dejaría `themeChoice` en 'system' y la elección se perdería al recargar.
+            if (window.yfApplyTheme) window.yfApplyTheme(v);
             syncThemeSeg();
             fetch('/api/profile/preferences', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -395,6 +396,8 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
         });
     });
     syncThemeSeg();
+    // El tema puede cambiarlo la hoja móvil o Ajustes; el segmentado se pone al día.
+    document.addEventListener('yf:theme', syncThemeSeg);
 })();
 
 // Calendar dropdown

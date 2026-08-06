@@ -3,7 +3,11 @@ import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
 import { appDateParts } from './appTime';
 import { userCol, getCurrentUid } from '../services/BD/shared/userScope';
-import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
+import { getLibrarySnapshot, type LibrarySnapshot } from '../services/BD/shared/librarySnapshot';
+import {
+    unionEpisodeWatches, watchLogInstant,
+    type EpisodeWatch, type WatchLogRow,
+} from '../services/BD/shared/episodeWatches';
 
 const TTL_MS = 60 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
@@ -25,6 +29,35 @@ export interface SeriesEpsRanking {
     episodesWatched: number;
 }
 
+/**
+ * Una tarjeta del mes a mes. Es un VISIONADO, no un título: la misma serie aparece en
+ * cada mes en que viste algún episodio, y una peli revista sale otra vez en el mes del
+ * nuevo pase.
+ */
+export interface TimelineEntry {
+    id: string;
+    kind: 'movie' | 'tv';
+    title: string;
+    poster_path: string;
+    /** Primer visionado DENTRO del mes: es lo que ordena la fila. */
+    startTs: number;
+    /** Último visionado dentro del mes (si difiere de `startTs`, se pinta un rango). */
+    endTs: number;
+    /** Episodios vistos ESE mes. 0 en películas. */
+    episodes: number;
+    /** Ordinal del visionado de por vida: 2 = «2.ª vez». Ausente en el primero. */
+    pass?: number;
+}
+
+export interface MonthTimeline {
+    month: number;
+    entries: TimelineEntry[];
+    /** Desglose para la cabecera del mes, ya contado en servidor. */
+    series: number;
+    movies: number;
+    episodes: number;
+}
+
 /** Ámbito del cálculo: un año concreto o 'all' (acumulado de por vida). */
 export type StatsScope = number | 'all';
 
@@ -39,6 +72,8 @@ export interface YearStats {
     activeMonth: { month: number; count: number } | null;
     activeWeekday: { weekday: number; count: number } | null;
     monthlyBreakdown: number[];
+    /** Mes a mes de lo que VISTE de verdad (series por episodio + pelis). Vacío si scope='all'. */
+    timeline: MonthTimeline[];
     heatmap: { dayKey: string; count: number }[];
     byDecade: { decade: string; count: number }[];
     byCollection: { key: string; label: string; count: number }[];
@@ -63,7 +98,13 @@ export interface YearStats {
     hasData: boolean;
 }
 
-const cache = new Map<StatsScope, { data: YearStats; expires: number }>();
+/**
+ * Clave `${uid}:${scope}`. Antes era solo el scope: en un proceso caliente de Netlify eso
+ * podía servirle a un usuario las cifras de otro, y ahora que el objeto lleva títulos y
+ * pósters de tu biblioteca el escape sería contenido, no solo números.
+ */
+const cache = new Map<string, { data: YearStats; expires: number }>();
+function cacheKey(scope: StatsScope): string { return `${getCurrentUid() || 'anon'}:${scope}`; }
 
 const COLLECTION_LABELS: Record<string, string> = {
     favs: 'Favoritos', siguiendo: 'Siguiendo', like: 'Me gusta',
@@ -73,7 +114,7 @@ const COLLECTION_LABELS: Record<string, string> = {
 function yearOf(timestamp: number): number { return appDateParts(timestamp).year; }
 function monthOf(timestamp: number): number { return appDateParts(timestamp).month; }
 function weekdayOf(timestamp: number): number { return appDateParts(timestamp).weekday; }
-function dayKey(d: Date): string { return appDateParts(d.getTime()).key; }
+function dayKeyOf(ts: number): string { return appDateParts(ts).key; }
 function decadeOf(year: number): string {
     if (!year || year < 1900) return 'Desconocido';
     return `${Math.floor(year / 10) * 10}s`;
@@ -114,19 +155,180 @@ function buildRawMap(groups: { items: any[]; key: string }[]): Map<string, RawIt
     return map;
 }
 
+/**
+ * Título + póster de todo lo que hay en tus listas, sin pedirle nada a TMDB: los
+ * documentos de lista ya los guardan. Es lo que permite que el mes a mes pinte pelis y
+ * series a coste cero (antes hacía un `fetchSerieDetails` por serie del año).
+ */
+type TitleMeta = { title: string; poster_path: string };
+function buildTitleIndex(s: LibrarySnapshot): Map<string, TitleMeta> {
+    const idx = new Map<string, TitleMeta>();
+    const add = (kind: 'movie' | 'tv', items: any[]) => {
+        for (const it of items || []) {
+            if (!it?.id) continue;
+            const k = `${kind}:${it.id}`;
+            const title = (kind === 'tv' ? it.name : it.title) || '';
+            const poster = it.poster_path || '';
+            const cur = idx.get(k);
+            if (cur) {
+                // Un título puede estar en varias listas y no todas las copias están igual
+                // de completas (las viejas pueden no tener póster): se rellenan huecos.
+                if (!cur.title && title) cur.title = title;
+                if (!cur.poster_path && poster) cur.poster_path = poster;
+                continue;
+            }
+            if (!title && !poster) continue;
+            idx.set(k, { title, poster_path: poster });
+        }
+    };
+    add('movie', s.movFavs); add('movie', s.movLike); add('movie', s.movVistos);
+    add('movie', s.movPend); add('movie', s.movVerPronto);
+    add('tv', s.tvFavs); add('tv', s.tvSig); add('tv', s.tvLike); add('tv', s.tvVistos);
+    add('tv', s.tvPend); add('tv', s.tvVerPronto); add('tv', s.tvAbandonadas);
+    return idx;
+}
+
+/**
+ * Mes a mes de lo que viste de verdad.
+ *
+ * Una tarjeta es un VISIONADO, no un título: una serie sale en CADA mes en que viste algún
+ * episodio (con los episodios de ese mes, no los del año), y una peli revista sale otra vez
+ * en el mes de su nuevo pase. El criterio anterior colapsaba cada serie a un solo instante
+ * al año —el de su último episodio—, así que una serie vista entre mayo y junio aparecía
+ * solo en junio y con el recuento del año entero.
+ */
+function buildTimeline(
+    year: number,
+    watches: EpisodeWatch[],
+    logRows: WatchLogRow[],
+    /** `MoviesVistas`, para las pelis anteriores al diario (su única fecha es `added_at`). */
+    moviesSeen: any[],
+    titles: Map<string, TitleMeta>,
+): MonthTimeline[] {
+    const entries: TimelineEntry[] = [];
+
+    // --- Series: un tramo por (serie, mes) ---
+    const bySerieMonth = new Map<string, TimelineEntry>();
+    for (const w of watches) {
+        const p = appDateParts(w.ts);
+        if (p.year !== year) continue;
+        const k = `${w.serieId}:${p.month}`;
+        const cur = bySerieMonth.get(k);
+        if (cur) {
+            cur.episodes++;
+            if (w.ts < cur.startTs) cur.startTs = w.ts;
+            if (w.ts > cur.endTs) cur.endTs = w.ts;
+            continue;
+        }
+        const meta = titles.get(`tv:${w.serieId}`);
+        bySerieMonth.set(k, {
+            id: w.serieId, kind: 'tv',
+            title: meta?.title || '', poster_path: meta?.poster_path || '',
+            startTs: w.ts, endTs: w.ts, episodes: 1,
+        });
+    }
+
+    // Pases de serie: cada fila de NIVEL SERIE del diario (sin season) es una pulsación de
+    // "Vuelto a ver", que se registra al vaciar el progreso → marca el ARRANQUE de un pase.
+    // La primera vez no deja marca, de ahí el +1.
+    const passMarks = new Map<string, number[]>();
+    for (const x of logRows) {
+        if (x.media_type !== 'tv' || x.season != null) continue;
+        const { ts } = watchLogInstant(x);
+        if (!ts) continue;
+        const id = String(x.tmdb_id);
+        const arr = passMarks.get(id);
+        if (arr) arr.push(ts); else passMarks.set(id, [ts]);
+    }
+    for (const e of bySerieMonth.values()) {
+        const marks = passMarks.get(e.id);
+        if (marks) {
+            const before = marks.filter((t) => t <= e.endTs).length;
+            if (before > 0) e.pass = before + 1;
+        }
+        entries.push(e);
+    }
+
+    // --- Películas: una tarjeta por pase ---
+    // Cada fila del diario es un visionado. Se deduplica por día (un doble registro del
+    // mismo día es el mismo visionado) y el orden de por vida da el ordinal del pase.
+    const movieDays = new Map<string, Map<string, number>>();
+    for (const x of logRows) {
+        if (x.media_type !== 'movie') continue;
+        const { ts } = watchLogInstant(x);
+        if (!ts) continue;
+        const id = String(x.tmdb_id);
+        const day = x.watched_on || dayKeyOf(ts);
+        let days = movieDays.get(id);
+        if (!days) { days = new Map(); movieDays.set(id, days); }
+        const prev = days.get(day);
+        if (prev == null || ts < prev) days.set(day, ts);
+    }
+    for (const [id, days] of movieDays) {
+        const meta = titles.get(`movie:${id}`);
+        const passes = Array.from(days.values()).sort((a, b) => a - b);
+        passes.forEach((ts, i) => {
+            if (appDateParts(ts).year !== year) return;
+            entries.push({
+                id, kind: 'movie',
+                title: meta?.title || '', poster_path: meta?.poster_path || '',
+                startTs: ts, endTs: ts, episodes: 0,
+                ...(i > 0 ? { pass: i + 1 } : {}),
+            });
+        });
+    }
+
+    // Respaldo: pelis marcadas como vistas antes de que el diario existiera. No tienen
+    // ninguna fila, así que su única fecha es cuándo las marcaste.
+    for (const m of moviesSeen || []) {
+        const id = String(m?.id ?? '');
+        if (!id || movieDays.has(id)) continue;
+        const ts = getFirebaseTimestamp(m.added_at);
+        if (!ts || appDateParts(ts).year !== year) continue;
+        const meta = titles.get(`movie:${id}`);
+        entries.push({
+            id, kind: 'movie',
+            title: m.title || meta?.title || '', poster_path: m.poster_path || meta?.poster_path || '',
+            startTs: ts, endTs: ts, episodes: 0,
+        });
+    }
+
+    // --- Agrupar por mes, en orden de visionado dentro de cada uno ---
+    const months = new Map<number, TimelineEntry[]>();
+    for (const e of entries) {
+        const m = appDateParts(e.startTs).month;
+        const arr = months.get(m);
+        if (arr) arr.push(e); else months.set(m, [e]);
+    }
+    return Array.from(months.entries())
+        .sort((a, b) => a[0] - b[0])   // enero arriba → diciembre abajo
+        .map(([month, list]) => {
+            list.sort((a, b) => a.startTs - b.startTs);
+            return {
+                month,
+                entries: list,
+                series: list.filter((e) => e.kind === 'tv').length,
+                movies: list.filter((e) => e.kind === 'movie').length,
+                episodes: list.reduce((s, e) => s + e.episodes, 0),
+            };
+        });
+}
+
 /** Acumulado de por vida: el mismo cálculo sin filtrar por año. */
 export const calculateLifetimeStats = () => calculateYearStats('all');
 
 export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const now = Date.now();
-    const cached = cache.get(year);
+    const key = cacheKey(year);
+    const cached = cache.get(key);
     if (cached && cached.expires > now) return cached.data;
 
     // Lectura compartida de la biblioteca (dedupe de lecturas Firestore).
+    const snapshot = await getLibrarySnapshot();
     const {
         movFavs, movPend, movVistos, movLike, movVerPronto,
         tvFavs, tvPend, tvVistos, tvSig, tvLike, tvVerPronto,
-    } = await getLibrarySnapshot();
+    } = snapshot;
 
     const movieMap = buildRawMap([
         { items: movFavs, key: 'favs' },
@@ -265,36 +467,48 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         .slice(0, 5)
         .map(([code, count]) => ({ code, count }));
 
-    // Watched episodes — heatmap + count + top series + horas vistas en eps + episodios año anterior
+    // Visionados: UNA lectura de cada colección y de ahí sale TODO lo temporal — episodios,
+    // heatmap, top series, revisionados y el mes a mes. Antes `WatchedEpisodes` se leía aquí
+    // y otra vez en la página (vía `getSeriesActivityByYear`), y el diario solo servía para
+    // contar revisionados.
     const heatmapMap = new Map<string, number>();
     const seriesEpsCount = new Map<string, number>();
     let episodesWatched = 0;
     let episodesPrev = 0;
     let hoursFromEpisodes = 0;
+    let watches: EpisodeWatch[] = [];
+    let logRows: WatchLogRow[] = [];
     try {
-        const watchedDocs = getCurrentUid() ? (await userCol('WatchedEpisodes').get()).docs : [];
-        for (const docSnap of watchedDocs) {
-            const data = docSnap.data() as { id?: string; watched_episodes?: { watched_at?: string }[] };
-            const serieId = data.id || docSnap.id;
-            for (const ep of data.watched_episodes || []) {
-                if (!ep.watched_at) continue;
-                const d = new Date(ep.watched_at);
-                if (isNaN(d.getTime())) continue;
-                const y = yearOf(d.getTime());
-                if (year === 'all' || y === year) {
-                    episodesWatched++;
-                    const k = dayKey(d);
-                    heatmapMap.set(k, (heatmapMap.get(k) || 0) + 1);
-                    seriesEpsCount.set(serieId, (seriesEpsCount.get(serieId) || 0) + 1);
-                } else if (y === year - 1) {
-                    episodesPrev++;
-                }
-            }
+        if (getCurrentUid()) {
+            const [watchedSnap, logSnap] = await Promise.all([
+                userCol('WatchedEpisodes').get(),
+                userCol('WatchLog').get(),
+            ]);
+            watches = unionEpisodeWatches(watchedSnap.docs, logSnap.docs);
+            logRows = logSnap.docs.map((d) => d.data() as WatchLogRow);
         }
     } catch (error) {
-        console.error('Error leyendo WatchedEpisodes:', error);
+        console.error('Error leyendo visionados (WatchedEpisodes + WatchLog):', error);
+    }
+    // `watches` ya viene deduplicado por (serie, episodio, día), así que un episodio visto
+    // en dos pases distintos cuenta dos veces — que es lo que se vio.
+    for (const w of watches) {
+        const y = yearOf(w.ts);
+        if (year === 'all' || y === year) {
+            episodesWatched++;
+            const k = dayKeyOf(w.ts);
+            heatmapMap.set(k, (heatmapMap.get(k) || 0) + 1);
+            seriesEpsCount.set(w.serieId, (seriesEpsCount.get(w.serieId) || 0) + 1);
+        } else if (y === year - 1) {
+            episodesPrev++;
+        }
     }
     const heatmap = Array.from(heatmapMap.entries()).map(([dayKey, count]) => ({ dayKey, count }));
+
+    // Mes a mes. Solo para un año concreto: de por vida no significa nada (¿el marzo de qué?).
+    const timeline = year === 'all'
+        ? []
+        : buildTimeline(year, watches, logRows, movVistos, buildTitleIndex(snapshot));
 
     // Horas: runtime de movies del año + (eps × episode_runtime medio por serie del año)
     let hoursFromMovies = 0;
@@ -303,6 +517,35 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         enrichedById.set(e.raw.id, e);
         if (e.raw.kind === 'movie' && e.runtime > 0) hoursFromMovies += e.runtime;
     }
+    // Residuo del mes a mes: lo que viste y ya no está en NINGUNA lista no tiene título ni
+    // póster en el snapshot. Primero se busca entre los detalles que ya tenemos y solo lo que
+    // siga huérfano va a TMDB — en una biblioteca normal, nada.
+    const orphans = new Map<string, TimelineEntry[]>();
+    for (const m of timeline) {
+        for (const e of m.entries) {
+            if (e.title) continue;
+            const known = enrichedById.get(e.id);
+            if (known?.title) { e.title = known.title; e.poster_path = known.poster_path; continue; }
+            const k = `${e.kind}:${e.id}`;
+            const arr = orphans.get(k);
+            if (arr) arr.push(e); else orphans.set(k, [e]);
+        }
+    }
+    if (orphans.size > 0) {
+        await processBatch(Array.from(orphans.keys()), async (k: string) => {
+            const sep = k.indexOf(':');
+            const kind = k.slice(0, sep);
+            const id = k.slice(sep + 1);
+            try {
+                const d: any = await tmdbFetch<any>(kind === 'movie' ? `/movie/${id}` : `/tv/${id}`);
+                const title = (kind === 'movie' ? d?.title : d?.name) || '';
+                const poster = d?.poster_path || '';
+                for (const e of orphans.get(k) || []) { e.title = title; e.poster_path = poster; }
+            } catch { /* sin título: la tarjeta sigue enlazando a su ficha */ }
+            return null;
+        }, 10);
+    }
+
     // Para series, usamos eps vistos en el año × runtime medio (de los detalles que ya tenemos)
     for (const [serieId, eps] of seriesEpsCount.entries()) {
         const detail = enrichedById.get(serieId);
@@ -397,21 +640,12 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         return Math.round(((cur - prev) / prev) * 100);
     };
 
-    // Re-visionados del año: entradas del diario (WatchLog) con rewatch=true.
-    // Aditivo: NO afecta a episodesWatched/totalHours (que salen de WatchedEpisodes),
-    // así que no hay doble conteo; es un número aparte.
+    // Re-visionados del año: entradas del diario con rewatch=true. Reutiliza `logRows`
+    // (el diario ya se leyó arriba para los visionados) en vez de volver a la colección.
     let rewatches = 0;
-    try {
-        if (getCurrentUid()) {
-            const wlSnap = await userCol('WatchLog').get();
-            for (const d of wlSnap.docs) {
-                const x = d.data() as { watched_on?: string; rewatch?: boolean };
-                if (!x.rewatch || !x.watched_on) continue;
-                if (year === 'all' || x.watched_on.slice(0, 4) === String(year)) rewatches++;
-            }
-        }
-    } catch (error) {
-        console.error('Error leyendo WatchLog (rewatches):', error);
+    for (const x of logRows) {
+        if (!x.rewatch || !x.watched_on) continue;
+        if (year === 'all' || x.watched_on.slice(0, 4) === String(year)) rewatches++;
     }
 
     const data: YearStats = {
@@ -425,6 +659,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         activeMonth,
         activeWeekday,
         monthlyBreakdown,
+        timeline,
         heatmap,
         byDecade,
         byCollection,
@@ -441,8 +676,13 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         hasData: moviesAdded + seriesAdded + episodesWatched > 0,
     };
 
-    cache.set(year, { data, expires: now + TTL_MS });
+    cache.set(key, { data, expires: now + TTL_MS });
     return data;
 }
 
-export function invalidateYearStatsCache() { cache.clear(); }
+/** Tira lo cacheado del usuario actual (no el de todos: la clave lleva uid). */
+export function invalidateYearStatsCache() {
+    const uid = getCurrentUid();
+    if (!uid) { cache.clear(); return; }
+    for (const k of cache.keys()) if (k.startsWith(`${uid}:`)) cache.delete(k);
+}

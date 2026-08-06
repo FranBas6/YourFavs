@@ -61,10 +61,16 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <script is:inline>
         (function () {
             try {
-                // Default = claro (ignora el modo oscuro del SO). Solo se usa
-                // oscuro si el usuario lo eligió explícitamente con el toggle.
-                var saved = localStorage.getItem('theme');
-                var theme = saved || 'light';
+                // Dos claves, a propósito:
+                //   themeChoice = lo que ELIGIÓ el usuario ('light'|'dark'|'system')
+                //   theme       = lo que se APLICA ('light'|'dark')
+                // Antes solo existía `theme`, así que quien viene de una versión anterior
+                // no tiene `themeChoice`: se usa su `theme` como elección. Sin nada previo,
+                // claro — el default de siempre, que NO sigue al SO salvo que se pida.
+                var choice = localStorage.getItem('themeChoice') || localStorage.getItem('theme') || 'light';
+                var theme = choice === 'system'
+                    ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                    : choice;
                 document.documentElement.setAttribute('data-theme', theme);
             } catch {}
         })();
@@ -123,13 +129,40 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
             window.addEventListener('scroll', reveal, { passive: true });
         }
 
-        // Theme toggle (múltiples botones: desktop + mobile)
+        // Tema: ÚNICO punto que aplica y persiste. Lo usan el toggle del header, el
+        // segmentado del menú de escritorio, el de la hoja móvil y Ajustes → Apariencia,
+        // para que "según el sistema" signifique lo mismo en los cuatro sitios (antes cada
+        // uno escribía localStorage a su manera y 'system' acababa aplicando claro).
+        function resolveTheme(choice) {
+            return choice === 'system'
+                ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+                : choice;
+        }
+        window.yfApplyTheme = function (choice) {
+            var theme = resolveTheme(choice);
+            document.documentElement.setAttribute('data-theme', theme);
+            try {
+                localStorage.setItem('themeChoice', choice);
+                localStorage.setItem('theme', theme);
+            } catch {}
+            // Avisa a los otros controles para que marquen la misma opción sin recargar.
+            document.dispatchEvent(new CustomEvent('yf:theme', { detail: { choice: choice, theme: theme } }));
+        };
+
+        // Con "según el sistema" elegido, seguir al SO en vivo (sin recargar).
+        try {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () {
+                var c = null;
+                try { c = localStorage.getItem('themeChoice'); } catch {}
+                if (c === 'system') window.yfApplyTheme('system');
+            });
+        } catch {}
+
+        // Toggle binario del header (invitados): claro ⇄ oscuro.
         document.querySelectorAll('.theme-toggle').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                var html = document.documentElement;
-                var next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-                html.setAttribute('data-theme', next);
-                try { localStorage.setItem('theme', next); } catch {}
+                var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+                window.yfApplyTheme(next);
             });
         });
     })();

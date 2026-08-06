@@ -5,15 +5,17 @@
  * La vista previa usa los colores REALES de cada tema en hex fijo a propósito: no debe seguir
  * al tema activo, sino representar el que ofrece.
  *
- * El cambio se aplica al INSTANTE sobre `<html data-theme>` + `localStorage` (igual que el
- * toggle del header, para que no haya parpadeo al navegar) y además se guarda en el perfil
- * para que viaje entre dispositivos.
+ * El cambio se aplica al INSTANTE vía `window.yfApplyTheme` (Layout), que es el único sitio
+ * que resuelve 'system' y escribe `localStorage`, y además se guarda en el perfil para que
+ * viaje entre dispositivos.
  */
 import type { UserProfile } from "../../services/BD/profile/userProfile";
 
 interface Props { profile: UserProfile; }
 const { profile } = Astro.props;
-const theme = profile.theme || 'system';
+// Sin elección previa = claro, que es lo que el Layout aplica de verdad. Marcar aquí
+// "según el sistema" por defecto haría que el panel dijese algo que no está pasando.
+const theme = profile.theme || 'light';
 
 const OPTIONS = [
     { value: 'light', label: 'Claro', prev: 'is-light' },
@@ -52,8 +54,8 @@ const OPTIONS = [
     document.getElementById('aj-theme-cards')?.addEventListener('change', (e) => {
         const el = e.target as HTMLInputElement;
         if (!el || el.name !== 'theme') return;
-        const effective = el.value === 'system' ? 'light' : el.value; // 'system' → claro, igual que el Layout
-        document.documentElement.setAttribute('data-theme', effective);
-        try { localStorage.setItem('theme', effective); } catch { /* noop */ }
+        // 'system' se resuelve contra el SO dentro de yfApplyTheme. Antes se traducía a
+        // 'light' aquí mismo, así que "según el sistema" nunca seguía al sistema.
+        window.yfApplyTheme?.(el.value as 'light' | 'dark' | 'system');
     });
 </script>

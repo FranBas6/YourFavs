@@ -8,6 +8,8 @@ interface SessionUser {
     /** Foto del proveedor (Google), antes de que `avatar_url` del perfil la sustituya. */
     providerPicture?: string | null;
     region?: string;   // preferencia del perfil (para el menú de cuenta)
+    /** Tema ELEGIDO ('system' = seguir al SO), no el aplicado. Lo pinta la hoja móvil en SSR. */
+    theme?: 'light' | 'dark' | 'system';
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     platforms?: number[];  // provider_ids de "mis plataformas" (Auditoría v2 · 3.2)
     /** Catálogo y ruleta arrancan ya filtrados a `platforms` (Ajustes · A3b). */
@@ -31,6 +33,15 @@ declare namespace App {
         /** Usuario de la sesión verificada por el middleware; null si es invitado. */
         user: SessionUser | null;
     }
+}
+
+interface Window {
+    /**
+     * Aplica y persiste el tema. Definida en `Layout.astro` y usada por todos los controles
+     * (toggle del header, segmentado del menú de escritorio, hoja móvil, Ajustes → Apariencia)
+     * para que 'system' signifique lo mismo en todos. Emite `yf:theme` al terminar.
+     */
+    yfApplyTheme?: (choice: 'light' | 'dark' | 'system') => void;
 }
 
 interface ImportMetaEnv {

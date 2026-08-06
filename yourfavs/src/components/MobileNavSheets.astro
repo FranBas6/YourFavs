@@ -11,6 +11,7 @@ import BottomSheet from './BottomSheet.astro';
 import Stamp from './Stamp.astro';
 import { Icon } from 'astro-icon/components';
 import { EXPLORE_ITEMS, MY_LISTS_ITEMS } from '../utils/constants/myLists';
+import { appDateParts } from '../utils/appTime';
 
 const user = Astro.locals.user;
 const displayName = user ? (user.name || user.email?.split('@')[0] || 'Tú') : '';
@@ -22,6 +23,19 @@ function initials(name: string, mail: string): string {
 }
 const avatarInitials = user ? initials(displayName, email) : '';
 const avatarUrl = user?.picture || null;
+
+// El año que verá al entrar en "Tu cine en números" (/mislistas/year redirige al actual).
+// Vía appDateParts, no `new Date().getFullYear()`: el servidor va en UTC y el 31 de
+// diciembre por la noche en Madrid ya sería el año siguiente para el servidor.
+const currentYear = appDateParts(Date.now()).year;
+
+// Tema ELEGIDO, para marcar el segmentado en SSR. 'system' = seguir al SO.
+const themeChoice = user?.theme ?? 'light';
+const THEME_OPTIONS = [
+    { value: 'light', icon: 'sun', label: 'Claro' },
+    { value: 'dark', icon: 'moon', label: 'Oscuro' },
+    { value: 'system', icon: 'monitor', label: 'Según el sistema' },
+] as const;
 ---
 
 <!-- Explorar (público) -->
@@ -54,44 +68,77 @@ const avatarUrl = user?.picture || null;
 )}
 
 {user && (
-    <BottomSheet id="perfil" title="Tu cuenta">
-        <a class="yf-sheet-row" href="/perfil">
+    <BottomSheet id="perfil" title="Tu cuenta" hideTitle>
+        {/* Identidad: quién eres (no navegable) + el enlace a tu ficha, separado, para que
+            "Ver perfil" y "Ajustes" no compitan por el mismo trozo de pantalla. */}
+        <div class="yf-sheet-head">
             <span class="yf-sheet-avatar" aria-hidden="true">
                 {avatarUrl ? <img src={avatarUrl} alt="" /> : <span>{avatarInitials}</span>}
             </span>
-            <span class="yf-sheet-rowtext">
-                <span class="yf-sheet-rowtitle">{displayName} · ver perfil</span>
-                {email && <span class="yf-sheet-rowsub">{email}</span>}
+            <span class="yf-sheet-headtext">
+                <span class="yf-sheet-headname">{displayName}</span>
+                {email && <span class="yf-sheet-headmail">{email}</span>}
             </span>
-        </a>
-        <a class="yf-sheet-row" href="/mislistas/year">
-            <Stamp color="red" icon="bar-chart-3" size={38} />
-            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tu cine en números</span></span>
-        </a>
-        <a class="yf-sheet-row" href="/mislistas/actividad">
-            <Stamp color="green" icon="activity" size={38} />
-            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Actividad</span></span>
+            <a class="yf-sheet-headlink" href="/perfil/perfil">
+                Ver perfil
+                <Icon name="lucide:chevron-right" />
+            </a>
+        </div>
+
+        <a class="yf-sheet-row" href="/gustos">
+            <Stamp color="purple" icon="heart" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tus gustos</span></span>
+            <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
         </a>
         <a class="yf-sheet-row" href="/mislistas/notificaciones">
             <Stamp color="blue" icon="bell" size={38} />
             <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Notificaciones</span></span>
-            <span class="js-notif-badge" hidden aria-label="sin leer" style="margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#E63946;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono,monospace);"></span>
+            <span class="yf-sheet-badge js-notif-badge" hidden aria-label="sin leer"></span>
+            <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
         </a>
-        <a class="yf-sheet-row" href="/gustos">
-            <Stamp color="purple" icon="cake" size={38} />
-            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tus gustos</span></span>
+        <a class="yf-sheet-row" href="/mislistas/actividad">
+            <Stamp color="green" icon="activity" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Actividad</span></span>
+            <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
         </a>
+        <a class="yf-sheet-row" href="/mislistas/year">
+            <Stamp color="red" icon="bar-chart-3" size={38} />
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tu cine en números</span></span>
+            <span class="yf-sheet-value">{currentYear}</span>
+            <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
+        </a>
+
+        <div class="yf-sheet-sep"></div>
+
         <a class="yf-sheet-row" href="/perfil">
             <Stamp color="slate" icon="settings" size={38} />
-            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Configuración</span></span>
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Ajustes</span></span>
+            <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
         </a>
-        <button type="button" class="yf-sheet-row theme-toggle" aria-label="Cambiar tema">
-            <Stamp color="amber" icon="sun-moon" size={38} />
-            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Cambiar tema</span></span>
-        </button>
-        <button type="button" class="yf-sheet-row is-danger" data-auth-logout>
-            <Stamp color="slate" icon="log-out" size={38} />
-            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Cerrar sesión</span></span>
+
+        <div class="yf-sheet-sep"></div>
+
+        {/* El tema se cambia AQUÍ mismo, sin salir de la hoja: es lo único de Ajustes que se
+            toca a menudo y que se ve al instante. Persiste en el perfil, así que viaja de
+            dispositivo (antes esta fila era un toggle binario que además no hacía nada). */}
+        <div class="yf-sheet-row is-static">
+            <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Tema</span></span>
+            <span class="yf-sheet-seg" id="yf-theme-seg" role="group" aria-label="Tema">
+                {THEME_OPTIONS.map((o) => (
+                    <label class="yf-sheet-segopt">
+                        <input type="radio" name="yf-theme" value={o.value} checked={themeChoice === o.value} />
+                        <span aria-hidden="true"><Icon name={`lucide:${o.icon}`} /></span>
+                        <span class="sr-only">{o.label}</span>
+                    </label>
+                ))}
+            </span>
+        </div>
+
+        <div class="yf-sheet-sep"></div>
+
+        <button type="button" class="yf-sheet-foot" data-auth-logout>
+            <Icon name="lucide:log-out" />
+            Cerrar sesión
         </button>
     </BottomSheet>
 )}
@@ -104,6 +151,8 @@ const avatarUrl = user?.picture || null;
         font-size: 13px; font-weight: 700;
     }
     .yf-sheet-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    /* En la cabecera de identidad manda más que una fila cualquiera: es tu cara. */
+    .yf-sheet-head .yf-sheet-avatar { width: 46px; height: 46px; font-size: 16px; }
 </style>
 
 {user && (
@@ -127,6 +176,31 @@ const avatarUrl = user?.picture || null;
                     })
                     .catch(function () { loaded = false; });
             });
+
+            // Tema. Aplicar va por `window.yfApplyTheme` (Layout), que es quien resuelve
+            // 'system' y escribe localStorage; aquí solo se persiste en el perfil para que
+            // la elección viaje entre dispositivos.
+            var seg = document.getElementById('yf-theme-seg');
+            if (seg) {
+                seg.addEventListener('change', function (e) {
+                    var el = e.target;
+                    if (!el || el.name !== 'yf-theme') return;
+                    if (window.yfApplyTheme) window.yfApplyTheme(el.value);
+                    fetch('/api/profile/preferences', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ theme: el.value }),
+                    }).catch(function () { /* el tema ya está aplicado en local */ });
+                });
+                // Si el tema cambia desde otro control (Ajustes, menú de escritorio), el
+                // segmentado se pone al día sin recargar.
+                document.addEventListener('yf:theme', function (e) {
+                    var choice = e.detail && e.detail.choice;
+                    if (!choice) return;
+                    var hit = seg.querySelector('input[value="' + choice + '"]');
+                    if (hit) hit.checked = true;
+                });
+            }
         })();
     </script>
 )}
