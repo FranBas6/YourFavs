@@ -139,7 +139,16 @@ if (Astro.request.method === 'POST') {
                 const known = new Set(HOME_SECTIONS.map((s) => s.key));
                 const order = fd.getAll('home_order').map(String).filter((k) => known.has(k));
                 const keys = order.length ? order : HOME_SECTIONS.map((s) => s.key);
-                patch.homeLayout = keys.map((key) => ({ key, hidden: fd.get(`home_${key}`) == null }));
+                // Sin `home_order` (formulario que no llegó a pintarse) no hay checkboxes que leer, así
+                // que "ausente" no significa "desmarcado": ahí manda el `defaultHidden` del bloque, o los
+                // que nacen apagados se encenderían solos.
+                const blind = order.length === 0;
+                patch.homeLayout = keys.map((key) => ({
+                    key,
+                    hidden: blind
+                        ? HOME_SECTIONS.find((s) => s.key === key)?.defaultHidden === true
+                        : fd.get(`home_${key}`) == null,
+                }));
                 break;
             }
         }

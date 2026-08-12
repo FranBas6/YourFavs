@@ -13,7 +13,10 @@ import {getMoviesViendoDetailed} from "../services/API/Movies/viendoMovies";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
 import RescatarSeries from "../components/Sections/RescatarSeries.astro";
 import HookRow from "../components/Sections/HookRow.astro";
+import RankingRow from "../components/Sections/RankingRow.astro";
 import { readHooksDoc, buildHookRow } from "../services/API/shared/hookRows";
+import { getWeeklyRanking } from "../services/API/shared/weeklyRanking";
+import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
 import CatalogRow from "../components/Sections/CatalogRow.astro";
 import { getStalledSeries } from "../services/API/Series/stalledSeries";
 import { hiddenHomeKeys, HOME_SECTIONS } from "../utils/constants/homeSections";
@@ -106,6 +109,17 @@ const heroMovie = trendingMovies[0] || null;
 // "Enganchan desde el primer episodio": el documento global ya está leído; aquí solo se filtra en
 // memoria a las plataformas del perfil y se descarta lo que ya estás viendo (recomendarte empezar algo
 // que llevas por la mitad no tiene sentido). Coste: cero llamadas.
+// «Lo más popular esta semana»: el bloque nace APAGADO, así que solo se calcula si el usuario lo ha
+// encendido — de nada sirve pagar las llamadas de una fila que no se va a pintar. Una vez por semana y por
+// combinación de región + plataformas; el resto de cargas es una lectura.
+const showRanking = !hiddenHomeKeys(Astro.locals.user?.homeLayout).has('popular-region');
+const rankRegion = Astro.locals.user?.region || 'ES';
+const rankPlatforms = Astro.locals.user?.platforms ?? [];
+const ranking = showRanking
+    ? await safeFetch(getWeeklyRanking(rankRegion, rankPlatforms), 'home/ranking', null)
+    : null;
+const rankRegionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === rankRegion)?.label || rankRegion;
+
 const hookRow = buildHookRow(hooksDoc, {
     platforms: Astro.locals.user?.platforms ?? [],
     region: Astro.locals.user?.region || 'ES',
@@ -332,6 +346,11 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 {key === 'engancha' && hookRow && hookRow.items.length > 0 && (
                     <div class="content-wrapper">
                         <HookRow items={hookRow.items} relaxedPlatforms={hookRow.relaxedPlatforms} updatedAt={hookRow.updatedAt} />
+                    </div>
+                )}
+                {key === 'popular-region' && ranking && ranking.entries.length > 0 && (
+                    <div class="content-wrapper">
+                        <RankingRow entries={ranking.entries} regionLabel={rankRegionLabel} regionOnly={rankPlatforms.length === 0} />
                     </div>
                 )}
                 {key === 'que-veo' && (

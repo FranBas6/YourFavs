@@ -12,7 +12,7 @@
  * memoria — cero lecturas extra de Firestore.
  */
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS } from "../../utils/constants/settingsSections";
-import { HOME_SECTIONS } from "../../utils/constants/homeSections";
+import { HOME_SECTIONS, hiddenHomeKeys } from "../../utils/constants/homeSections";
 import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
 import type { UserProfile } from "../../services/BD/profile/userProfile";
 
@@ -36,10 +36,11 @@ const initial = (() => {
 
 // --- Valores por sección ----------------------------------------------------
 
-// Home: cuántos bloques quedan visibles. Una clave sin preferencia guardada cuenta como
-// visible (es el mismo criterio que usa `hiddenHomeKeys` al pintar la portada).
+// Home: cuántos bloques quedan visibles. Se delega en `hiddenHomeKeys`, que es el MISMO criterio que
+// usa la portada al pintar — antes se recalculaba aquí a mano y con `defaultHidden` habría dado un
+// número distinto al de la realidad.
 const homeTotal = HOME_SECTIONS.length;
-const homeHidden = new Set((profile.homeLayout || []).filter((s) => s?.hidden).map((s) => s.key));
+const homeHidden = hiddenHomeKeys(profile.homeLayout);
 const homeVisible = HOME_SECTIONS.filter((s) => !homeHidden.has(s.key)).length;
 
 const platformCount = (profile.platforms ?? []).length;

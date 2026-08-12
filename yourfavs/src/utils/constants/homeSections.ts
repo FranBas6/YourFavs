@@ -10,6 +10,17 @@ export interface HomeSectionDef {
     label: string;
     /** Una línea de qué es ese bloque, para reconocerlo sin abrir la portada. */
     desc: string;
+    /**
+     * Nace APAGADO: el usuario lo enciende desde Ajustes si le interesa. Para bloques que no todo el
+     * mundo quiere — quien ya tiene «Tendencias» y «Más populares» no necesita una tercera fila de lo
+     * mismo, y meterle contenido que no ha pedido es justo lo contrario de «Tu Home».
+     *
+     * Ojo: el modelo asumía «clave ausente del layout guardado = visible». Esto lo cambia, y hay que
+     * respetarlo en los CUATRO sitios que deciden visibilidad: aquí (`hiddenHomeKeys`), el endpoint
+     * `api/profile/home-layout`, el POST sin JS de `perfil/[...seccion].astro` y el recuento de
+     * `SettingsNav`. Si uno se queda atrás, el bloque se enciende solo.
+     */
+    defaultHidden?: boolean;
 }
 
 export const HOME_SECTIONS: HomeSectionDef[] = [
@@ -25,13 +36,31 @@ export const HOME_SECTIONS: HomeSectionDef[] = [
     { key: 'top-series', label: 'Top series', desc: 'Las series mejor valoradas de la historia.' },
     { key: 'plataforma', label: 'Plataforma destacada', desc: 'Una plataforma distinta cada vez, con su catálogo.' },
     { key: 'categoria', label: 'Categoría destacada', desc: 'Un género rotatorio para picotear.' },
+    {
+        key: 'popular-region',
+        label: 'Lo más popular esta semana',
+        desc: 'Top 10 de tu región entre tus plataformas, con lo que ha subido o bajado.',
+        // Apagado: quien ya tiene Tendencias y Más populares no necesita una tercera fila de lo mismo.
+        defaultHidden: true,
+    },
 ];
 
 export type HomeLayoutPref = { key: string; hidden?: boolean };
 
-/** Set de claves OCULTAS a partir de la preferencia guardada (vacío = todo visible). */
+/**
+ * Set de claves OCULTAS. Una clave presente en la preferencia manda (la eligió el usuario); una clave
+ * AUSENTE cae a su `defaultHidden`, que es como los bloques nuevos pueden nacer apagados.
+ */
 export function hiddenHomeKeys(layout?: HomeLayoutPref[] | null): Set<string> {
-    return new Set((layout || []).filter((s) => s && s.hidden).map((s) => s.key));
+    const saved = new Map((layout || []).filter((s) => s?.key).map((s) => [s.key, s.hidden === true]));
+    const hidden = new Set<string>();
+    for (const def of HOME_SECTIONS) {
+        const explicit = saved.get(def.key);
+        if (explicit === undefined ? def.defaultHidden === true : explicit) hidden.add(def.key);
+    }
+    // Claves guardadas que ya no existen en HOME_SECTIONS: si estaban ocultas, siguen ocultas.
+    for (const [key, isHidden] of saved) if (isHidden) hidden.add(key);
+    return hidden;
 }
 
 /**

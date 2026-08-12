@@ -25,6 +25,25 @@ export interface AppDateParts {
     dayNum: number;  // nº de día absoluto desde época, para rachas consecutivas
 }
 
+/**
+ * Semana ISO 8601 de un instante, en hora de Madrid: `"2026-W33"`.
+ *
+ * ISO empieza las semanas en LUNES, que es justo lo que promete el subtítulo del ranking semanal («se
+ * actualiza los lunes»). El año lo decide el jueves de esa semana, no el 1 de enero: por eso el 31 de
+ * diciembre puede caer en la semana 1 del año siguiente, y esto lo respeta — si no, cada Nochevieja
+ * habría una semana fantasma.
+ */
+export function isoWeekKey(ts: number): string {
+    const { year, month, day } = appDateParts(ts);
+    const d = new Date(Date.UTC(year, month, day));
+    const weekday = d.getUTCDay() || 7;            // 1 = lunes … 7 = domingo
+    d.setUTCDate(d.getUTCDate() + 4 - weekday);    // al jueves de su semana
+    const isoYear = d.getUTCFullYear();
+    const jan1 = Date.UTC(isoYear, 0, 1);
+    const week = Math.ceil(((d.getTime() - jan1) / 86400000 + 1) / 7);
+    return `${isoYear}-W${String(week).padStart(2, '0')}`;
+}
+
 /** Descompone un timestamp (ms) en sus partes de calendario en hora de Madrid. */
 export function appDateParts(ts: number): AppDateParts {
     const iso = _ymd.format(new Date(ts)); // "YYYY-MM-DD" ya en Madrid

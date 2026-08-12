@@ -43,8 +43,11 @@ const handler: APIRoute = async ({ request, locals }) => {
         // Un bloque que el cliente no mandó (versión antigua de la página, o un bloque
         // añadido después) se conserva al final: `index.astro` ya completa las claves que
         // falten, pero guardarlas explícitamente evita que "desaparezcan" del ajuste.
+        // Ojo con `hidden`: poner `false` a lo que el cliente no mandó ENCENDERÍA los bloques que nacen
+        // apagados (`defaultHidden`) en cuanto alguien guardara desde una página vieja. Se respeta su
+        // valor por defecto.
         for (const s of HOME_SECTIONS) {
-            if (!seen.has(s.key)) layout.push({ key: s.key, hidden: false });
+            if (!seen.has(s.key)) layout.push({ key: s.key, hidden: s.defaultHidden === true });
         }
 
         await setUserProfile({ homeLayout: layout });

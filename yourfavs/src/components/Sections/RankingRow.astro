@@ -1,0 +1,169 @@
+---
+/**
+ * «Lo más popular esta semana en {región}» — tratamiento **A, cinta numerada**: placa de puesto sobre la
+ * esquina del póster y, debajo, cuánto ha subido o bajado.
+ *
+ * De los tres tratamientos del handoff se eligió este porque es el único que funciona igual en móvil —que
+ * es donde más se usa esta app— y el que no rompe el ritmo de carruseles de la portada; la tabla vertical
+ * sería el único bloque no-carrusel, y el podio ocupa el doble de alto y necesita un `backdrop_path` que
+ * no siempre existe. El dato del podio se guarda igualmente, así que verlo es añadir un componente.
+ *
+ * **Nota legal, no estética:** no se replica el numeral gigante recortado de Netflix, que es un elemento
+ * de marca suyo.
+ *
+ * Sin etiqueta de plataforma en las cards: la fila ya está filtrada a tus plataformas, así que sería la
+ * misma etiqueta en los diez.
+ */
+import SectionHeader from '../SectionHeader.astro';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import type { RankedEntry } from '../../services/API/shared/weeklyRanking';
+
+interface Props {
+    entries: RankedEntry[];
+    /** Nombre de la región para el título, ya resuelto por la página. */
+    regionLabel: string;
+    /** `true` si el usuario no tiene plataformas: la fila es solo de su región. */
+    regionOnly?: boolean;
+}
+const { entries, regionLabel, regionOnly = false } = Astro.props;
+
+const title = `Lo más popular esta semana en ${regionLabel}`;
+// Literal del handoff, con la única variación honesta: sin plataformas configuradas no se puede decir
+// "entre lo disponible en tus plataformas".
+const subtitle = regionOnly
+    ? 'Ranking de popularidad de TMDB entre lo disponible en tu región. Se actualiza los lunes.'
+    : 'Ranking de popularidad de TMDB entre lo disponible en tus plataformas. Se actualiza los lunes.';
+
+/** El movimiento, en texto y con su clase. `null` = primera semana, sin referencia. */
+function move(e: RankedEntry): { label: string; cls: string } | null {
+    if (e.move === null) return null;
+    if (e.move === 'new') return { label: 'NUEVA', cls: 'is-new' };
+    if (e.move > 0) return { label: `▲ ${e.move}`, cls: 'is-up' };
+    if (e.move < 0) return { label: `▼ ${Math.abs(e.move)}`, cls: 'is-down' };
+    return { label: `— ${e.rank}`, cls: '' };
+}
+---
+<article class="section-card">
+    <SectionHeader
+        title={title}
+        subtitle={subtitle}
+        why="popularidad de TMDB"
+        color="red"
+        icon="bar-chart-3"
+        count={entries.length}
+    />
+
+    <div class="rk-scroll">
+        {entries.map((e) => {
+            const mv = move(e);
+            return (
+                <a class="rk-item" href={`/${e.mediaType === 'movie' ? 'movie' : 'serie'}/${e.id}`}>
+                    <div class="rk-art">
+                        <img src={posterUrl(e.posterPath, 'w185')} alt={`Póster de ${e.title}`} loading="lazy" decoding="async" />
+                        <span class="rk-plate">{e.rank}</span>
+                    </div>
+                    {mv ? <div class:list={['rk-move', mv.cls]}>{mv.label}</div> : <div class="rk-move is-empty">&nbsp;</div>}
+                    <div class="rk-title">{e.title}</div>
+                    <div class="rk-meta">{e.mediaType === 'movie' ? 'Película' : 'Serie'}{e.year ? ` · ${e.year}` : ''}</div>
+                </a>
+            );
+        })}
+    </div>
+</article>
+
+<style>
+    .rk-scroll {
+        display: flex;
+        gap: 14px;
+        overflow-x: auto;
+        padding: 8px 4px 10px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-strong) var(--bg-tint);
+    }
+    .rk-scroll::-webkit-scrollbar { height: 8px; }
+    .rk-scroll::-webkit-scrollbar-track { background: var(--bg-tint); border-radius: 4px; }
+    .rk-scroll::-webkit-scrollbar-thumb { background-color: var(--border-strong); border-radius: 4px; }
+
+    .rk-item {
+        flex: 0 0 auto;
+        width: 132px;
+        position: relative;
+        scroll-snap-align: start;
+        text-decoration: none;
+        color: inherit;
+    }
+    .rk-art {
+        position: relative;
+        aspect-ratio: 2 / 3;
+        border-radius: 8px;
+        overflow: visible;
+    }
+    .rk-art img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 8px;
+        display: block;
+        background: var(--bg-tint);
+    }
+    /* Placa de puesto: sobresale de la esquina, que es lo que la hace legible de un vistazo sin
+       necesitar un numeral gigante. */
+    .rk-plate {
+        position: absolute;
+        left: -6px;
+        top: -6px;
+        min-width: 30px;
+        height: 30px;
+        padding: 0 7px;
+        border-radius: 8px;
+        background: var(--accent);
+        color: #fff;
+        font-family: var(--font-mono);
+        font-size: 14px;
+        font-weight: 700;
+        display: grid;
+        place-items: center;
+        box-shadow: var(--sh-md);
+    }
+
+    .rk-move {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 8px;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-4);
+    }
+    /* Verde de "sube" con el token de la app, no un hex nuevo. Bajar y mantenerse quedan en gris: solo
+       subir y entrar merecen color. */
+    .rk-move.is-up { color: var(--ok-ink); }
+    .rk-move.is-new { color: var(--accent); }
+    /* Hueco reservado la primera semana, para que las cards no bailen de alto sin indicadores. */
+    .rk-move.is-empty { visibility: hidden; }
+
+    .rk-title {
+        margin-top: 4px;
+        font-family: var(--font);
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .rk-meta {
+        font-size: 11.5px;
+        color: var(--text-3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    @media (max-width: 640px) {
+        .rk-item { width: 118px; }
+        .rk-plate { min-width: 26px; height: 26px; font-size: 12.5px; }
+    }
+</style>
