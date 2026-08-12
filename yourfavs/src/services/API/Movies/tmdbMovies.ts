@@ -1,6 +1,6 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
 import { tmdbFetch, tmdbFetchList } from '../shared/tmdbClient';
-import { fetchByProvider, getMostPopular, getTopRated, searchByTitle, PROVIDERS } from '../shared/tmdbDiscoverService';
+import { getMostPopular, getTopRated, searchByTitle } from '../shared/tmdbDiscoverService';
 
 // --- Fetch de detalles (específico de movies por el endpoint) ---
 
@@ -121,10 +121,5 @@ export const getTopRatedMovies = async ({ page }: { page?: string }): Promise<Mo
 export const getMoviesByTitle = async ({ title, page }: { title: string; page?: string }): Promise<Movie[]> =>
     searchByTitle<Movie>('movie', title, page);
 
-export const getNetflixMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.NETFLIX, page);
-export const getAmazonPrimeMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.AMAZON, page);
-export const getDisneyPlusMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.DISNEY, page);
-export const getHBOMaxMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.HBO, page);
-export const getAppleTVMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.APPLE, page);
-export const getMovistarPlusMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.MOVISTAR, page);
-export const getFilminMovies = async (page?: string) => fetchByProvider<Movie>('movie', PROVIDERS.FILMIN, page);
+// Los envoltorios por plataforma (getNetflixMovies, getHBOMaxMovies…) se retiraron: solo los usaba
+// `utils/constants/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.

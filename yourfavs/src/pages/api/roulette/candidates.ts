@@ -99,7 +99,9 @@ function json(data: unknown, status: number, cacheable = false): Response {
         status,
         headers: {
             'Content-Type': 'application/json',
-            ...(cacheable ? { 'Cache-Control': 'public, max-age=1800' } : {}),
+            // `private`: son TUS pendientes. Con `public` un CDN compartido podía guardarlos y
+            // servírselos a otra cuenta.
+            ...(cacheable ? { 'Cache-Control': 'private, max-age=1800' } : {}),
         },
     });
 }

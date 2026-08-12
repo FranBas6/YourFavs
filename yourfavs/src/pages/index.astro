@@ -63,7 +63,7 @@ const [
     safeFetch(getMostPopularSeries({page: pageStr}), 'home/popularSeries', [] as Serie[]),
     safeFetch(getTopRatedMovies({page: pageStr}), 'home/topRatedMovies', [] as Movie[]),
     safeFetch(getTopRatedSeries({page: pageStr}), 'home/topRatedSeries', [] as Serie[]),
-    safeFetch(fetchAllPlatforms(pageStr), 'home/platforms', []),
+    safeFetch(fetchAllPlatforms(pageStr, Astro.locals.user?.region || 'ES'), 'home/platforms', []),
     safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
     safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
     safeFetch(getNextEpisodesData(), 'home/continueWatching', [] as any[]),

@@ -23,35 +23,26 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
-# Cache para páginas de catálogo (contenido público, cambia poco)
-# CDN de Netlify cachea 5 min, browser 1 min
+# La caché de las páginas (portada, catálogo, fichas de peli/serie/actor) YA NO SE DECIDE AQUÍ.
+#
+# Motivo: una regla por ruta no puede saber si hay sesión, y todas esas páginas son personalizadas
+# cuando la hay (la portada lleva tu nombre y tu «Estás viendo»; las fichas, en qué listas tienes el
+# título, tu nota y tu progreso). El `for = "/"` con `public, s-maxage=300` que había aquí hacía la
+# portada personalizada cacheable por el CDN COMPARTIDO de Netlify, y la regla que debía evitarlo
+# apuntaba a `/personal/*`, ruta que dejó de existir al renombrar a `/mislistas/*`.
+#
+# Ahora lo decide `src/middleware.ts::applyCacheHeaders`, que es el único sitio que sabe si hay
+# sesión: invitado → los mismos 5 min de CDN de antes (con `Vary: Cookie`), con sesión →
+# `private, no-store`. Se deja fuera de aquí a propósito para no tener dos fuentes de verdad.
+
+# Las páginas personales NO se cachean (datos del usuario). Redundante con el middleware, pero es
+# el cinturón por si algún día se sirven sin pasar por él.
 [[headers]]
-  for = "/"
+  for = "/mislistas/*"
   [headers.values]
-    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
+    Cache-Control = "private, no-cache, no-store"
 
 [[headers]]
-  for = "/catalogo/*"
-  [headers.values]
-    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/movie/*"
-  [headers.values]
-    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/serie/*"
-  [headers.values]
-    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
-
-[[headers]]
-  for = "/actor/*"
-  [headers.values]
-    Cache-Control = "public, s-maxage=300, max-age=60, stale-while-revalidate=600"
-
-# Las páginas personales NO se cachean (datos del usuario)
-[[headers]]
-  for = "/personal/*"
+  for = "/perfil/*"
   [headers.values]
     Cache-Control = "private, no-cache, no-store"

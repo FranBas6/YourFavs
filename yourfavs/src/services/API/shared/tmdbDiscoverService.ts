@@ -48,12 +48,13 @@ export async function fetchSeriesByNetwork<T>(
 export async function fetchByProvider<T>(
     mediaType: MediaType,
     providerId: number,
-    page: string = "1"
+    page: string = "1",
+    region: string = 'ES'
 ): Promise<T[]> {
     return tmdbFetchList<T>(`/discover/${mediaType}`, {
         page,
         with_watch_providers: providerId.toString(),
-        watch_region: 'ES',
+        watch_region: region,
         sort_by: 'popularity.desc',
     });
 }

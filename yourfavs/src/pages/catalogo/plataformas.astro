@@ -29,6 +29,10 @@ const defaultPlatform = Astro.locals.user?.platformsFilterDefault === true
     ? 'mine' : 'all';
 const platformParam = urlParams.get('platform') || defaultPlatform;
 const type = urlParams.get('type') || 'all';
+// La disponibilidad depende del país: esta página la fijaba a 'ES' a mano (las otras cinco de
+// discover ya usaban la del perfil), así que a un usuario de otra región le enseñaba lo que hay
+// en España.
+const myRegion = Astro.locals.user?.region || 'ES';
 
 const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
@@ -72,7 +76,7 @@ if (filtersActive || filters.sort || isMine) {
     const buildParams = (mt: 'movie' | 'tv') => ({
         page: pageStr,
         sort_by: sortByFor(filters.sort, mt) || 'popularity.desc',
-        watch_region: 'ES',
+        watch_region: myRegion,
         with_watch_providers: providerIds,
         ...buildDiscoverFilterParams(filters, mt),
     });
@@ -82,14 +86,14 @@ if (filtersActive || filters.sort || isMine) {
         safeFetch(tmdbFetchList<Serie>('/discover/tv', buildParams('tv')), 'plataformas/seriesFiltered', [] as Serie[]),
     ]);
 } else if (platformParam === 'all') {
-    const allPlatforms = await safeFetch(fetchAllPlatforms(pageStr), 'plataformas/all', [] as { movies: Movie[]; series: Serie[] }[]);
+    const allPlatforms = await safeFetch(fetchAllPlatforms(pageStr, myRegion), 'plataformas/all', [] as { movies: Movie[]; series: Serie[] }[]);
     const allMovies = allPlatforms.flatMap(p => p.movies);
     const allSeries = allPlatforms.flatMap(p => p.series);
     movies = allMovies.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
     series = allSeries.filter((item, i, self) => i === self.findIndex(t => t.id === item.id));
 } else {
     const result = await safeFetch(
-        fetchPlatformBySlug(platformParam, pageStr),
+        fetchPlatformBySlug(platformParam, pageStr, myRegion),
         `plataformas/${platformParam}`,
         { movies: [] as Movie[], series: [] as Serie[] }
     );
@@ -106,7 +110,7 @@ const _provIds = isMine
     : platformParam === 'all'
         ? Object.values(SLUG_TO_PROVIDER_ID).join('|')
         : String(SLUG_TO_PROVIDER_ID[platformParam] || '');
-const _provBase = { with_watch_providers: _provIds, watch_region: 'ES' };
+const _provBase = { with_watch_providers: _provIds, watch_region: myRegion };
 const countCtx = _provIds ? [
     ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: _provBase }] : []),
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: _provBase }] : []),

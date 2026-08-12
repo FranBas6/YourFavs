@@ -13,6 +13,42 @@ import { adminAuth } from './utils/firebaseAdmin';
 import { runWithUser, setRequestPrefs } from './services/BD/shared/userScope';
 import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
 
+/**
+ * Rutas que para un INVITADO son contenido público y merecen caché de CDN.
+ *
+ * Con sesión, ninguna lo es: la portada lleva tu nombre y tu «Estás viendo», y las fichas de
+ * peli/serie/actor llevan en qué listas tienes el título, tu nota y tu progreso. Antes esto lo
+ * decidía `netlify.toml` por ruta (`for = "/"` con `public, s-maxage=300`), que no puede saber si
+ * hay sesión → la portada personalizada era cacheable por el CDN COMPARTIDO. La regla que debía
+ * evitarlo apuntaba a `/personal/*`, ruta que dejó de existir al renombrar a `/mislistas/*`.
+ *
+ * Ahora la decisión vive aquí, que es el único sitio que sabe si hay sesión, y `netlify.toml` ya
+ * no declara caché para estas rutas (así no hay dos fuentes de verdad peleándose).
+ */
+const PUBLIC_CACHEABLE_PREFIXES = ['/catalogo', '/movie/', '/serie/', '/actor/'];
+const GUEST_CACHE = 'public, s-maxage=300, max-age=60, stale-while-revalidate=600';
+
+function applyCacheHeaders(res: Response, path: string, hasSession: boolean): void {
+    try {
+        // Si la página o el endpoint ya decidió su caché, manda ella.
+        if (res.headers.has('cache-control')) return;
+        if (hasSession) {
+            res.headers.set('Cache-Control', 'private, no-store');
+            return;
+        }
+        const cacheable = path === '/' || PUBLIC_CACHEABLE_PREFIXES.some((p) => path.startsWith(p));
+        if (!cacheable) return;
+        res.headers.set('Cache-Control', GUEST_CACHE);
+        // Sin esto, el CDN podría servirle a un usuario con sesión la versión de invitado que
+        // guardó antes (saldría "desconectado"). Los invitados comparten cabecera de cookie, así
+        // que no fragmenta; y donde sí la tienen (el modo del catálogo) es que el contenido
+        // depende de ella de verdad.
+        res.headers.set('Vary', 'Cookie');
+    } catch {
+        /* respuesta inmutable: se queda como esté */
+    }
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = null;
 
@@ -93,6 +129,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 setRequestPrefs({ language: profile?.language, region: profile?.region });
             } catch { /* perfil opcional */ }
         }
-        return next();
+        const response = await next();
+        applyCacheHeaders(response, path, Boolean(context.locals.user));
+        return response;
     });
 });
