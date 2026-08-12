@@ -69,8 +69,14 @@ export interface YearStats {
     rewatches: number;        // entradas del diario (WatchLog) marcadas como re-visionado
     totalHours: number;
     topGenres: { id: number; count: number }[];
-    activeMonth: { month: number; count: number } | null;
+    /**
+     * El mes que más VISTE (del `timeline`), no el que más guardó en listas. `null` de por vida
+     * (`scope='all'`), donde «el marzo de qué año» no significa nada.
+     */
+    activeMonth: { month: number; count: number; series: number; movies: number } | null;
+    /** El día de la semana con más visionados (episodios + pases de película). */
     activeWeekday: { weekday: number; count: number } | null;
+    /** ALTAS en listas por mes (`added_at`). Es la gráfica de barras, no el visionado. */
     monthlyBreakdown: number[];
     /** Mes a mes de lo que VISTE de verdad (series por episodio + pelis). Vacío si scope='all'. */
     timeline: MonthTimeline[];
@@ -400,28 +406,18 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         10
     );
 
-    // Monthly breakdown + active weekday
+    /**
+     * Altas en listas por mes: cuándo GUARDASTE cada cosa (`added_at`). Alimenta la gráfica de barras,
+     * que se titula «Items añadidos por mes» y por tanto dice la verdad.
+     *
+     * Lo que ya NO sale de aquí es «tu mes más activo»: medía altas y se leía como visionado, así que
+     * si guardabas 40 películas en enero y las veías en agosto, el tile decía enero. Ahora se deriva del
+     * `timeline`, más abajo, cuando ya están leídos los visionados reales.
+     */
     const monthlyBreakdown = new Array(12).fill(0);
-    const weekdayBreakdown = new Array(7).fill(0);
     for (const e of enriched) {
         monthlyBreakdown[monthOf(e.raw.addedAt)]++;
-        weekdayBreakdown[weekdayOf(e.raw.addedAt)]++;
     }
-    let activeMonth: { month: number; count: number } | null = null;
-    for (let m = 0; m < 12; m++) {
-        if (!activeMonth || monthlyBreakdown[m] > activeMonth.count) {
-            activeMonth = { month: m, count: monthlyBreakdown[m] };
-        }
-    }
-    if (activeMonth && activeMonth.count === 0) activeMonth = null;
-
-    let activeWeekday: { weekday: number; count: number } | null = null;
-    for (let w = 0; w < 7; w++) {
-        if (!activeWeekday || weekdayBreakdown[w] > activeWeekday.count) {
-            activeWeekday = { weekday: w, count: weekdayBreakdown[w] };
-        }
-    }
-    if (activeWeekday && activeWeekday.count === 0) activeWeekday = null;
 
     // Top géneros
     const genreCount: Record<number, number> = {};
@@ -509,6 +505,40 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const timeline = year === 'all'
         ? []
         : buildTimeline(year, watches, logRows, movVistos, buildTitleIndex(snapshot));
+
+    /**
+     * «Tu mes más activo» y «tu día de la semana» salen del VISIONADO REAL, no de las altas en listas.
+     *
+     * El mes se saca del `timeline`, que ya reparte cada serie por los meses en que viste algo de ella y
+     * cada pase de película por su fecha del diario. El día de la semana se cuenta sobre los instantes de
+     * visionado: cada episodio y cada pase de película, que es lo que mide «cuándo veo cosas» (una tanda
+     * de seis episodios un domingo pesa seis, y eso es correcto: es lo que se vio).
+     */
+    let activeMonth: { month: number; count: number; series: number; movies: number } | null = null;
+    for (const m of timeline) {
+        const count = m.entries.length;
+        if (count > 0 && (!activeMonth || count > activeMonth.count)) {
+            activeMonth = { month: m.month, count, series: m.series, movies: m.movies };
+        }
+    }
+
+    const weekdayBreakdown = new Array(7).fill(0);
+    const inScope = (ts: number) => !!ts && !isNaN(ts) && (year === 'all' || yearOf(ts) === year);
+    for (const w of watches) {
+        if (inScope(w.ts)) weekdayBreakdown[weekdayOf(w.ts)]++;
+    }
+    for (const row of logRows) {
+        if (row.media_type !== 'movie') continue;
+        const { ts } = watchLogInstant(row);
+        if (inScope(ts)) weekdayBreakdown[weekdayOf(ts)]++;
+    }
+    let activeWeekday: { weekday: number; count: number } | null = null;
+    for (let w = 0; w < 7; w++) {
+        if (!activeWeekday || weekdayBreakdown[w] > activeWeekday.count) {
+            activeWeekday = { weekday: w, count: weekdayBreakdown[w] };
+        }
+    }
+    if (activeWeekday && activeWeekday.count === 0) activeWeekday = null;
 
     // Horas: runtime de movies del año + (eps × episode_runtime medio por serie del año)
     let hoursFromMovies = 0;

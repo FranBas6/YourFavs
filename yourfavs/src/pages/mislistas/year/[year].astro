@@ -185,8 +185,16 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                         <div class="mt-2 text-xl font-bold text-purple-700 truncate">
                             {stats.activeMonth ? MONTH_NAMES[stats.activeMonth.month] : '—'}
                         </div>
-                        <div class="text-xs text-purple-600 font-medium uppercase tracking-wide mt-1">Mes más activo</div>
-                        {stats.activeMonth && <div class="text-[11px] text-purple-500 mt-1">{stats.activeMonth.count} items · {stats.activeWeekday ? `${WEEKDAY_NAMES[stats.activeWeekday.weekday]}s` : ''}</div>}
+                        <div class="text-xs text-purple-600 font-medium uppercase tracking-wide mt-1">Mes más visto</div>
+                        {stats.activeMonth && (
+                            <div class="text-[11px] text-purple-500 mt-1">
+                                {[
+                                    stats.activeMonth.series > 0 ? `${stats.activeMonth.series} ${stats.activeMonth.series === 1 ? 'serie' : 'series'}` : '',
+                                    stats.activeMonth.movies > 0 ? `${stats.activeMonth.movies} ${stats.activeMonth.movies === 1 ? 'película' : 'películas'}` : '',
+                                    stats.activeWeekday ? `${WEEKDAY_NAMES[stats.activeWeekday.weekday]}s` : '',
+                                ].filter(Boolean).join(' · ')}
+                            </div>
+                        )}
                     </div>
                     {stats.rewatches > 0 && (
                         <div class="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 p-4 col-span-2 md:col-span-1">
@@ -420,12 +428,14 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                     )}
                 </div>
 
-                {/* Breakdown mensual */}
+                {/* Altas en listas por mes. Va DESPUÉS del «Mes a mes» y mide otra cosa, así que lo dice
+                    explícitamente: dos bloques mensuales seguidos sin aclararlo se conflaten solos. */}
                 <section>
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
                         <span class="w-1 h-6 bg-indigo-500 rounded-full"></span>
                         Items añadidos por mes
                     </h2>
+                    <p class="text-sm text-gray-500 mb-4">Cuándo guardaste cada cosa en tus listas, no cuándo la viste.</p>
                     <div class="bg-white rounded-xl border border-gray-200 p-4">
                         <div class="grid grid-cols-12 gap-1 items-end h-32">
                             {stats.monthlyBreakdown.map((count, idx) => (

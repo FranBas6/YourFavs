@@ -326,54 +326,55 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
     form.addEventListener('submit', openPalette);
 })();
 
-// Dropdown "Descubrir" (desktop): SOLO click (sin hover, para no abrirse al
-// pasar el ratón). Click en el botón abre/cierra; cierra con click fuera o Esc.
-(function () {
-    var wrap = document.getElementById('discover');
-    var btn = document.getElementById('discover-btn');
-    if (!wrap || !btn) return;
+/**
+ * Los paneles de la cabecera son EXCLUYENTES: abrir uno cierra los demás.
+ *
+ * Son cinco (Descubrir, Mis listas, cuenta, calendario y notificaciones) y cada uno era un bloque
+ * aislado con su propio `isOpen`, sin saber de los otros: se podían abrir a la vez y sus paneles se
+ * solapaban encima. Este registro es el único sitio que sabe de todos; cada panel se apunta con cómo
+ * saber si está abierto y cómo cerrarse, porque no todos usan el mismo mecanismo (tres van con la clase
+ * `is-open`, el calendario y las notificaciones con `style.display`).
+ */
+window.yfHeaderPanels = [];
+function yfClosePanels(except) {
+    window.yfHeaderPanels.forEach(function (p) {
+        if (p !== except && p.isOpen()) p.close();
+    });
+}
+
+/** Registra un desplegable de los que se abren con la clase `is-open`. */
+function yfRegisterDropdown(wrapId, btnId) {
+    var wrap = document.getElementById(wrapId);
+    var btn = document.getElementById(btnId);
+    if (!wrap || !btn) return null;
     var open = false;
     function setOpen(v) {
         open = v;
         wrap.classList.toggle('is-open', v);
         btn.setAttribute('aria-expanded', v ? 'true' : 'false');
     }
-    btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!open); });
+    var panel = { isOpen: function () { return open; }, close: function () { setOpen(false); } };
+    window.yfHeaderPanels.push(panel);
+    // Solo click, sin hover: con hover se abriría al pasar el ratón por encima.
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var next = !open;
+        if (next) yfClosePanels(panel);
+        setOpen(next);
+    });
     document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
-})();
+    return panel;
+}
 
-// Dropdown "Mis listas" (desktop): mismo patrón que "Descubrir".
-(function () {
-    var wrap = document.getElementById('mislistas');
-    var btn = document.getElementById('mislistas-btn');
-    if (!wrap || !btn) return;
-    var open = false;
-    function setOpen(v) {
-        open = v;
-        wrap.classList.toggle('is-open', v);
-        btn.setAttribute('aria-expanded', v ? 'true' : 'false');
-    }
-    btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!open); });
-    document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
-})();
+yfRegisterDropdown('discover', 'discover-btn');
+yfRegisterDropdown('mislistas', 'mislistas-btn');
+yfRegisterDropdown('account', 'account-btn');
 
-// Menú de cuenta (desktop): click abre/cierra; cierra con click fuera o Esc.
-// Mismo patrón que "Descubrir".
+// Extras del menú de cuenta (región e interruptor de tema); su apertura la lleva el registro de arriba.
 (function () {
     var wrap = document.getElementById('account');
-    var btn = document.getElementById('account-btn');
-    if (!wrap || !btn) return;
-    var open = false;
-    function setOpen(v) {
-        open = v;
-        wrap.classList.toggle('is-open', v);
-        btn.setAttribute('aria-expanded', v ? 'true' : 'false');
-    }
-    btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!open); });
-    document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
+    if (!wrap) return;
 
     // Región inline: guarda y recarga (para que los proveedores SSR usen la nueva región).
     var accRegion = document.getElementById('acc-region');
@@ -427,8 +428,15 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
     var calData = null;
     var isOpen = false;
 
+    var panel = {
+        isOpen: function () { return isOpen; },
+        close: function () { isOpen = false; calDrop.style.display = 'none'; },
+    };
+    if (window.yfHeaderPanels) window.yfHeaderPanels.push(panel);
+
     function toggle() {
         isOpen = !isOpen;
+        if (isOpen) yfClosePanels(panel);
         calDrop.style.display = isOpen ? 'block' : 'none';
         if (isOpen && !calData) loadMonth(curYear, curMonth);
     }
@@ -727,10 +735,14 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
         if (v && !loaded) { loaded = true; load(); }
     }
 
+    var panel = { isOpen: function () { return isOpen; }, close: function () { setOpen(false); } };
+    if (window.yfHeaderPanels) window.yfHeaderPanels.push(panel);
+
     btn.addEventListener('click', function (e) {
         e.stopPropagation();
         // Móvil (<1024px): el desplegable no cabe → navegar a la página (como el calendario).
         if (window.innerWidth < 1024) { window.location.href = '/mislistas/notificaciones'; return; }
+        if (!isOpen) yfClosePanels(panel);
         setOpen(!isOpen);
     });
     document.addEventListener('click', function (e) {
