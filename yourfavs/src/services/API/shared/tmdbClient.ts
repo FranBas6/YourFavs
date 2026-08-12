@@ -16,6 +16,9 @@ export const backdropUrl = (path: string | null, size: string = "w780") =>
     path ? `${IMAGE_BASE}/${size}${path}` : "";
 export const originalUrl = (path: string | null) =>
     path ? `${IMAGE_BASE}/original${path}` : "";
+/** Fotograma de un episodio (`still_path`). w300 es el tamaño que pide el handoff para 16/9. */
+export const stillUrl = (path: string | null, size: string = "w300") =>
+    path ? `${IMAGE_BASE}/${size}${path}` : "";
 
 export type MediaType = 'movie' | 'tv';
 

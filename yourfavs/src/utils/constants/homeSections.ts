@@ -17,6 +17,7 @@ export const HOME_SECTIONS: HomeSectionDef[] = [
     { key: 'rescatar', label: '¿Retomamos alguna?', desc: 'Series que dejaste a medias hace más de un mes.' },
     { key: 'para-ti', label: 'Para ti', desc: 'Recomendaciones a partir de tus gustos y favoritos.' },
     { key: 'que-veo', label: '¿Qué veo?', desc: 'La ruleta: compañía, tiempo y ánimo → un plan.' },
+    { key: 'engancha', label: 'Enganchan desde el primer episodio', desc: 'Series cuyo piloto está mejor valorado que la propia serie.' },
     { key: 'tendencias', label: 'Tendencias de la semana', desc: 'Lo que está viendo todo el mundo ahora.' },
     { key: 'lanzamientos', label: 'Últimos lanzamientos', desc: 'Estrenos recientes en cine y plataformas.' },
     { key: 'populares', label: 'Más populares', desc: 'Los títulos con más tirón de forma sostenida.' },

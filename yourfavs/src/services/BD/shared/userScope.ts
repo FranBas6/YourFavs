@@ -74,3 +74,19 @@ export function userDoc(name: string, id: string): DocumentReference {
 export function userRootDoc(): DocumentReference {
     return adminDb.collection('users').doc(requireUid());
 }
+
+/**
+ * Documento GLOBAL, fuera de `users/{uid}` y por tanto **sin `requireUid()`**.
+ *
+ * Es la excepción a la regla de que todo vive bajo el usuario, y hace falta para las filas de la
+ * portada que se precalculan una vez para todo el mundo (los pilotos, el ranking semanal): son datos
+ * públicos de TMDB, iguales para cualquiera, y **la portada también la ven invitados**, que no tienen
+ * uid. Calcularlas por usuario sería pagar cien llamadas a TMDB por cada visitante.
+ *
+ * Ojo: `firestore.rules` deniega todo lo que esté fuera de `users/{uid}` a propósito (se migró para
+ * quitar las colecciones globales antiguas). El Admin SDK se salta las reglas, así que estos
+ * documentos se leen y escriben **solo en servidor**: nada de leerlos desde el cliente.
+ */
+export function globalDoc(collection: string, id: string): DocumentReference {
+    return adminDb.collection(collection).doc(id);
+}

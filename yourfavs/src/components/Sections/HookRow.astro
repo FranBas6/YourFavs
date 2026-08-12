@@ -1,0 +1,230 @@
+---
+/**
+ * Fila «Enganchan desde el primer episodio».
+ *
+ * La tarjeta es APAISADA a propósito, y no es un capricho del mockup: el compromiso que pide esta fila
+ * es distinto al de un póster («esto se empieza hoy y en 45 minutos decides»), y la forma lo dice. Va
+ * sobre un carril horizontal con snap, calcado del de «Estás viendo» (`next-episode.css`), que ya
+ * resuelve la barra siempre visible como pista de que hay más.
+ *
+ * El chip verde con el margen es lo que separa esta fila de «una selección más»: enseña el criterio y
+ * se puede comprobar. Su texto depende de `HOOK_BASELINE`, así que nunca dice contra qué se compara si
+ * no es verdad.
+ */
+import SectionHeader from '../SectionHeader.astro';
+import { stillUrl, backdropUrl } from '../../services/API/shared/tmdbClient';
+import { formatScore } from '../../utils/constants/helpers/media-helpers';
+import { HOOK_BASELINE, HOOK_MIN_START3, hookMargin, type HookItem } from '../../services/API/shared/hookRows';
+
+interface Props {
+    items: HookItem[];
+    /** Se rellenó sin filtrar por plataforma porque quedaban menos de 4. */
+    relaxedPlatforms?: boolean;
+    /** Instante del último cálculo del documento global, para decir de cuándo son los datos. */
+    updatedAt?: number;
+}
+const { items, relaxedPlatforms = false, updatedAt = 0 } = Astro.props;
+
+// El copy sale del criterio activo, así que la fila nunca afirma lo que no mide.
+const nf = (n: number) => n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
+const CRITERIO = HOOK_BASELINE === 'start3'
+    ? `los tres primeros episodios por encima de ${nf(HOOK_MIN_START3)}`
+    : HOOK_BASELINE === 'series'
+        ? 'piloto ≥ 8, con 50+ votos y por encima de la serie'
+        : 'piloto ≥ 8, con 50+ votos y por encima de su T1';
+const PROMESA = HOOK_BASELINE === 'start3'
+    ? 'Sus tres primeros episodios están todos por encima de 8: no te dejan tirado al tercero.'
+    : 'Series cuyo piloto está mejor valorado que la propia serie. Empiezas y en 45 minutos sabes si sigues.';
+const BASELINE_LABEL = HOOK_BASELINE === 'series' ? 'sobre la media de la serie' : 'sobre su 1.ª temporada';
+
+const dateFmt = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long' });
+const subtitle = [
+    PROMESA,
+    relaxedPlatforms ? 'No todas están en tus plataformas.' : '',
+    updatedAt ? `Calculado el ${dateFmt.format(new Date(updatedAt))}.` : '',
+].filter(Boolean).join(' ');
+
+/** «1h 21min» / «48min». */
+function runtimeLabel(min: number | null): string {
+    if (!min || min <= 0) return '';
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return h ? `${h}h ${m}min` : `${m}min`;
+}
+/**
+ * El chip verde: el dato con el que la fila se puede comprobar. Con `start3` enseña el peor de los tres
+ * primeros, que es justo lo que ordena la fila; con las varas comparativas, el margen.
+ */
+function signalLabel(item: HookItem): string {
+    if (HOOK_BASELINE === 'start3') {
+        return item.first3Min === null ? '' : `E1-E3 desde ${formatScore(item.first3Min)}`;
+    }
+    const m = hookMargin(item);
+    if (m === null) return '';
+    const margin = m.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return `+${margin} ${BASELINE_LABEL}`;
+}
+---
+<article class="section-card">
+    <SectionHeader
+        title="Enganchan desde el primer episodio"
+        subtitle={subtitle}
+        why={CRITERIO}
+        color="green"
+        icon="zap"
+        count={items.length}
+    />
+
+    <div class="hook-scroll">
+        {items.map((it) => (
+            <a class="hook-card" href={`/serie/${it.id}`}>
+                <div class="hook-art">
+                    {(it.pilotStill || it.backdropPath) ? (
+                        <img
+                            src={it.pilotStill ? stillUrl(it.pilotStill) : backdropUrl(it.backdropPath, 'w300')}
+                            alt={`Fotograma del piloto de ${it.name}`}
+                            loading="lazy"
+                            decoding="async"
+                            width="290"
+                            height="163"
+                        />
+                    ) : (
+                        <span class="hook-noart">{it.name}</span>
+                    )}
+                    {runtimeLabel(it.pilotRuntime) && <span class="hook-dur">{runtimeLabel(it.pilotRuntime)}</span>}
+                    {/* El mockup pone un botón de play. Aquí no se reproduce nada, así que sería
+                        mentira: este lleva a la ficha, y el icono lo dice. */}
+                    <span class="hook-go" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                    </span>
+                </div>
+                <h4 class="hook-title">{it.name}</h4>
+                <div class="hook-ep">T1 · E1 — {it.pilotName}</div>
+                <span class="hook-sig">
+                    Piloto <b>{formatScore(it.pilotVote)}</b> · {signalLabel(it)}
+                </span>
+            </a>
+        ))}
+    </div>
+</article>
+
+<style>
+    /* Carril: mismo patrón que `.nep-scroll` (barra siempre visible = pista de que hay más). */
+    .hook-scroll {
+        display: flex;
+        gap: 14px;
+        overflow-x: auto;
+        padding: 2px 4px 10px;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border-strong) var(--bg-tint);
+    }
+    .hook-scroll::-webkit-scrollbar { height: 8px; }
+    .hook-scroll::-webkit-scrollbar-track { background: var(--bg-tint); border-radius: 4px; }
+    .hook-scroll::-webkit-scrollbar-thumb { background-color: var(--border-strong); border-radius: 4px; }
+
+    .hook-card {
+        flex: 0 0 auto;
+        width: 290px;
+        scroll-snap-align: start;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .hook-art {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        border-radius: 10px;
+        overflow: hidden;
+        background: var(--bg-tint);
+    }
+    .hook-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    /* Sin fotograma: bloque con el título, nunca un icono roto. */
+    .hook-noart {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        padding: 10px;
+        text-align: center;
+        font-size: 11px;
+        color: var(--text-3);
+    }
+
+    .hook-dur {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        height: 22px;
+        padding: 0 8px;
+        border-radius: var(--r-sm);
+        background: rgba(11, 17, 32, 0.72);
+        color: #fff;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        display: grid;
+        place-items: center;
+    }
+    .hook-go {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.94);
+        color: #0f172a;
+        display: grid;
+        place-items: center;
+        transition: transform 0.15s ease;
+    }
+    .hook-go svg { width: 16px; height: 16px; }
+    .hook-card:hover .hook-go { transform: scale(1.08); }
+
+    .hook-title {
+        margin: 10px 0 3px;
+        font-family: var(--font);
+        font-size: 14.5px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 1.25;
+    }
+    .hook-ep {
+        font-size: 12px;
+        color: var(--text-3);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    /* Verde de señal con los tokens que YA existían (`--ok-soft` / `--ok-ink`), que resultan ser
+       exactamente los valores que pide el handoff y además ya están invertidos para el modo oscuro.
+       Nada de hex nuevos ni de `color-mix`. */
+    .hook-sig {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-top: 9px;
+        min-height: 22px;
+        padding: 2px 9px;
+        border-radius: var(--r-full);
+        background: var(--ok-soft);
+        color: var(--ok-ink);
+        font-family: var(--font-mono);
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 1.35;
+    }
+    .hook-sig b { font-weight: 700; }
+
+    @media (max-width: 640px) {
+        .hook-card { width: 270px; }
+        .hook-title { font-size: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .hook-go { transition: none; }
+        .hook-card:hover .hook-go { transform: none; }
+    }
+</style>

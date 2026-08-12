@@ -12,6 +12,8 @@ import {getNextEpisodesData} from "../services/API/Series/nextEpisode";
 import {getMoviesViendoDetailed} from "../services/API/Movies/viendoMovies";
 import NextEpisode from "../components/Sections/NextEpisode.astro";
 import RescatarSeries from "../components/Sections/RescatarSeries.astro";
+import HookRow from "../components/Sections/HookRow.astro";
+import { readHooksDoc, buildHookRow } from "../services/API/shared/hookRows";
 import CatalogRow from "../components/Sections/CatalogRow.astro";
 import { getStalledSeries } from "../services/API/Series/stalledSeries";
 import { hiddenHomeKeys, HOME_SECTIONS } from "../utils/constants/homeSections";
@@ -55,6 +57,7 @@ const [
     viendoMovies,
     forYou,
     stalledSeries,
+    hooksDoc,
 ] = await Promise.all([
     safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
     safeFetch(getTrending<Serie>('tv', 'week'), 'home/trendingSeries', [] as Serie[]),
@@ -79,6 +82,9 @@ const [
     Astro.locals.user
         ? safeFetch(getStalledSeries(), 'home/stalled', [] as any[])
         : Promise.resolve([] as any[]),
+    // "Enganchan desde el primer episodio": UNA lectura del documento global precalculado. También
+    // para invitados (son datos públicos de TMDB). El filtrado personal se hace en memoria abajo.
+    safeFetch(readHooksDoc(), 'home/hooks', null),
 ]);
 
 const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
@@ -96,6 +102,15 @@ const brief: DailyBrief = Astro.locals.user
 
 // Película destacada para el hero (la más trending de la semana)
 const heroMovie = trendingMovies[0] || null;
+
+// "Enganchan desde el primer episodio": el documento global ya está leído; aquí solo se filtra en
+// memoria a las plataformas del perfil y se descarta lo que ya estás viendo (recomendarte empezar algo
+// que llevas por la mitad no tiene sentido). Coste: cero llamadas.
+const hookRow = buildHookRow(hooksDoc, {
+    platforms: Astro.locals.user?.platforms ?? [],
+    region: Astro.locals.user?.region || 'ES',
+    excludeIds: new Set<number>((continueWatching || []).map((c: any) => Number(c.id)).filter(Boolean)),
+});
 
 const randomCategory = {
     slug: randomCategorySlug,
@@ -272,6 +287,26 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
             })();
         </script>
 
+        {orderedKeys.includes('engancha') && (
+            <script is:inline>
+                // Recarga incremental de la fila de pilotos: se dispara DESPUÉS de pintar, en una
+                // petición aparte, porque son ~20 llamadas a TMDB y en el SSR retrasarían la portada.
+                // El guard de 24 h y el claim viven en el servidor; esto solo evita pedirlo dos veces
+                // en la misma sesión.
+                (function () {
+                    try {
+                        if (sessionStorage.getItem('yf_hooks_ping')) return;
+                        sessionStorage.setItem('yf_hooks_ping', '1');
+                    } catch (e) { /* sin sessionStorage: se pide igual, el servidor lo corta */ }
+                    var go = function () {
+                        fetch('/api/home/hooks-refresh', { method: 'POST' }).catch(function () {});
+                    };
+                    if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 4000 });
+                    else setTimeout(go, 2500);
+                })();
+            </script>
+        )}
+
         <!-- Bloques configurables de la Home (§4): orden y visibilidad los define el perfil
              (UserProfile.homeLayout). El hero de arriba queda fijo; aquí va todo lo demás
              en el orden elegido, cada bloque envuelto igual en .content-wrapper. -->
@@ -290,6 +325,13 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 {key === 'para-ti' && forYou.length > 0 && (
                     <div class="content-wrapper">
                         <RecommendedForYou items={forYou} />
+                    </div>
+                )}
+                {/* Si el documento global falta, está vacío o el job aún no ha corrido, la fila NO se
+                    pinta: ni esqueleto eterno ni "no hay nada". */}
+                {key === 'engancha' && hookRow && hookRow.items.length > 0 && (
+                    <div class="content-wrapper">
+                        <HookRow items={hookRow.items} relaxedPlatforms={hookRow.relaxedPlatforms} updatedAt={hookRow.updatedAt} />
                     </div>
                 )}
                 {key === 'que-veo' && (
