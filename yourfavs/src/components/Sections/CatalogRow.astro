@@ -13,7 +13,7 @@ import { getGenreName } from "../../utils/constants/genres";
 interface Props { section: any; }
 const { section } = Astro.props;
 ---
-<article class={`section-card ${section.priority === 'high' ? 'featured-section' : ''}`}>
+<article class={`yf-row ${section.priority === 'high' ? 'featured-section' : ''}`}>
     <SectionHeader
         title={section.title}
         link={section.link}
@@ -28,12 +28,10 @@ const { section } = Astro.props;
     <div class="section-content">
         {section.movies.length > 0 && (
                 <div class="content-category">
+                    {/* Sin icono: los dos carriles llevaban el MISMO monitor (el de «Películas» era
+                        literalmente un monitor de ordenador con peana, y el de «Series» el mismo más dos
+                        puntitos), así que no distinguían nada. Un rótulo de dos palabras no lo necesita. */}
                     <h3 class="category-title">
-                        <svg class="category-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                            <line x1="8" y1="21" x2="16" y2="21"/>
-                            <line x1="12" y1="17" x2="12" y2="21"/>
-                        </svg>
                         <span>Películas</span>
                         <span class="item-count">({section.movies.length})</span>
                     </h3>
@@ -61,13 +59,6 @@ const { section } = Astro.props;
         {section.series.length > 0 && (
                 <div class="content-category">
                     <h3 class="category-title">
-                        <svg class="category-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                            <line x1="8" y1="21" x2="16" y2="21"/>
-                            <line x1="12" y1="17" x2="12" y2="21"/>
-                            <circle cx="17" cy="8" r="1"/>
-                            <circle cx="17" cy="16" r="1"/>
-                        </svg>
                         <span>Series</span>
                         <span class="item-count">({section.series.length})</span>
                     </h3>

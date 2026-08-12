@@ -10,65 +10,75 @@
  * Todo con tokens, así que el modo oscuro no necesita una regla propia.
  */
 
-/* Pila de filas de una página */
+/**
+ * Pila de filas de una página.
+ *
+ * El `gap` vale para un wrapper con varios hijos, pero la portada pone UN wrapper por fila (así lo
+ * dejó «Tu Home» al hacer los bloques ordenables), y un flex con un solo hijo no tiene huecos: la
+ * separación entre filas era literalmente **0px** y las doce se leían como una masa. De ahí el
+ * `margin-bottom`, que funciona en los dos casos.
+ */
 .content-wrapper {
     display: flex;
     flex-direction: column;
     gap: var(--s-8);
+    margin-bottom: var(--s-8);   /* 48px: el valor que el `gap` muerto ya pretendía */
 }
+.content-wrapper:last-child { margin-bottom: 0; }
 
-/* La tarjeta que envuelve una fila */
-.section-card {
-    background: var(--bg-elev);
-    border-radius: var(--r-lg);
-    padding: var(--s-7);
-    box-shadow: var(--sh-md);
-    border: 1px solid var(--border);
-    transition: all 0.3s ease;
+/**
+ * Fila de catálogo: SIN tarjeta.
+ *
+ * Antes cada fila era una caja blanca con borde, sombra, radio y 32px de padding. Con cuatro secciones
+ * tenía sentido; con doce bloques ordenables el marco deja de aportar y se convierte en ruido — cada
+ * fila pidiendo un recuadro para anunciar que es una fila, cuando eso ya lo dicen su título y su tira.
+ * Los bloques personales (Estás viendo, ¿Retomamos?, Para ti) ya iban planos y así se quedan: se probó
+ * a enmarcarlos y estrangula sus carriles en móvil, que están hechos para sangrar hasta el borde.
+ */
+.yf-row {
     position: relative;
-    overflow: hidden;
 }
 
-.section-card:hover {
-    box-shadow: var(--sh-lg);
-    /* sin translateY: las section cards solo cambian la sombra (refinamiento) */
-}
-
-.featured-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--primary));
+/**
+ * El hueco entre filas lo pone el wrapper y SOLO el wrapper. Varios bloques traen su propio margen
+ * inferior (`mb-8` de Tailwind en «Estás viendo» y «Para ti», `margin-bottom` en «¿Retomamos?»), que
+ * sumado al del wrapper daría 80px ahí y 48 en el resto.
+ */
+.content-wrapper > :last-child {
+    margin-bottom: 0;
 }
 
 /* Carril de un tipo (Películas / Series) dentro de la fila */
 .content-category {
     margin-bottom: var(--s-7);
 }
+/* Sin aire muerto al final: la tarjeta ponía 32px de padding, la última rejilla otros 32 y el último
+   carril otros 32 — 65px reales medidos al pie de cada fila, y por nueve filas, 600px de scroll. */
+.content-category:last-child { margin-bottom: 0; }
+.content-category:last-child .cards-grid { margin-bottom: 0; }
 
+/**
+ * Rótulo del carril. Era un titular de 24px en `--accent`, o sea MÁS GRANDE y más saturado que el
+ * título de su propia sección (22px en `--primary`): el subtítulo pesaba más que el título, y encima
+ * en el color de acción de la app. Ahora es una etiqueta, que es lo que es.
+ */
 .category-title {
     display: flex;
-    align-items: center;
-    gap: var(--s-3);
-    margin-bottom: var(--s-6);
-    font-size: 1.5rem;
+    align-items: baseline;
+    gap: var(--s-2, 6px);
+    margin-bottom: var(--s-4);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
     font-weight: 600;
-    color: var(--accent);
-}
-
-.category-icon {
-    width: 24px;
-    height: 24px;
-    stroke-width: 2;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-4);
 }
 
 .item-count {
     color: var(--text-4);
     font-weight: 400;
-    font-size: 0.875rem;
+    font-size: 10.5px;
 }
 
 /* Rejilla de pósters */
@@ -103,9 +113,8 @@
 }
 
 @media (max-width: 768px) {
-    .section-card {
-        padding: var(--s-6);
-    }
+    /* Filas más juntas en móvil: 48px de aire en una pantalla estrecha se lee como un hueco vacío. */
+    .content-wrapper { margin-bottom: var(--s-7); }
 
     .cards-grid {
         grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -120,9 +129,8 @@
 }
 
 @media print {
-    .section-card {
+    .yf-row,
+    .content-wrapper {
         break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid #ccc;
     }
 }
