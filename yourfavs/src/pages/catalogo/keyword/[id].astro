@@ -3,13 +3,14 @@
  * Descubrimiento por keyword (Auditoría v2 · 3.1).
  * Pelis + series que comparten una keyword de TMDB (`with_keywords`). Las pills de
  * keyword en las fichas enlazan aquí: /catalogo/keyword/{id}?name={nombre}.
- * Reutiliza el patrón de las páginas de catálogo (FilterBar + AdvancedFilters + grid + paginación).
+ * Reutiliza el patrón de las páginas de catálogo (CatalogModes + AdvancedFilters + grid + paginación).
  */
 import Layout from "../../../layouts/Layout.astro";
 import CatalogHeader from "../../../components/CatalogHeader.astro";
 import CardMovie from "../../../components/Cards/CardMovie.astro";
 import CardSerie from "../../../components/Cards/CardSerie.astro";
-import FilterBar from "../../../components/FilterBar.astro";
+import CatalogModes from "../../../components/CatalogModes.astro";
+import { catalogUrls, resolveCatalogMode } from "../../../utils/catalogUrl";
 import AdvancedFilters from "../../../components/AdvancedFilters.astro";
 import Pagination from "../../../components/Pagination.astro";
 import EmptyState from "../../../components/EmptyState.astro";
@@ -27,7 +28,7 @@ const keywordId = String(Astro.params.id || '');
 const urlParams = new URL(Astro.request.url).searchParams;
 const page = Number(urlParams.get('page') || 1);
 const pageStr = page.toString();
-const type = urlParams.get('type') || 'all';
+const type = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
 const keywordName = (urlParams.get('name') || 'Tema').slice(0, 80);
 const prettyName = keywordName.charAt(0).toUpperCase() + keywordName.slice(1);
 
@@ -59,21 +60,7 @@ const countCtx = [
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { with_keywords: keywordId, 'vote_count.gte': '50' } }] : []),
 ];
 
-function buildFilterUrl(changes: Record<string, string | null>) {
-    const p = new URLSearchParams(urlParams);
-    for (const [k, v] of Object.entries(changes)) {
-        if (v === null || v === '') p.delete(k);
-        else p.set(k, v);
-    }
-    p.set('page', '1');
-    return `?${p.toString()}`;
-}
-function buildTypeUrl(t: string) {
-    const changes: Record<string, string | null> = { type: t };
-    if (t !== 'series') changes.status = null;
-    if (t !== 'movies') changes.runtime = null;
-    return buildFilterUrl(changes);
-}
+const { buildFilterUrl, buildTypeUrl } = catalogUrls(urlParams);
 ---
 <Layout title={`${prettyName} · Descubrir por tema`}>
     <div class="px-1 sm:py-8">
@@ -82,9 +69,9 @@ function buildTypeUrl(t: string) {
             subtitle="Películas y series sobre este tema"
             color="purple"
             icon="tag"
-        />
-
-        <FilterBar currentType={type} buildUrl={buildTypeUrl} />
+        >
+            <CatalogModes slot="nav" current={type} buildUrl={buildTypeUrl} />
+        </CatalogHeader>
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}

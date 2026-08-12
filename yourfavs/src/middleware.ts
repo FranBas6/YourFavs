@@ -12,6 +12,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { adminAuth } from './utils/firebaseAdmin';
 import { runWithUser, setRequestPrefs } from './services/BD/shared/userScope';
 import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
+import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalogUrl';
 
 /**
  * Rutas que para un INVITADO son contenido público y merecen caché de CDN.
@@ -91,9 +92,30 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
     }
 
+    const path = context.url.pathname;
+
+    // Modo del catálogo (Todo · Películas · Series): la URL manda, y si no lo trae, lo recuerda una
+    // cookie. Se resuelve AQUÍ para que lo tengan también los menús de navegación, que se pintan en
+    // todas las páginas y son los que tienen que arrastrarlo al saltar de subpágina. Solo escribe
+    // cuando el usuario lo elige explícitamente en el catálogo, y solo si cambió: así el caso normal
+    // (navegar con el mismo modo) no emite `Set-Cookie` y sigue siendo cacheable para invitados.
+    const explicitMode = path.startsWith('/catalogo') ? context.url.searchParams.get('type') : null;
+    if (isCatalogMode(explicitMode)) {
+        context.locals.catalogMode = explicitMode;
+        if (context.cookies.get(CATALOG_MODE_COOKIE)?.value !== explicitMode) {
+            context.cookies.set(CATALOG_MODE_COOKIE, explicitMode, {
+                path: '/',
+                maxAge: CATALOG_MODE_COOKIE_MAX_AGE,
+                sameSite: 'lax',
+            });
+        }
+    } else {
+        const remembered = context.cookies.get(CATALOG_MODE_COOKIE)?.value;
+        context.locals.catalogMode = isCatalogMode(remembered) ? remembered : 'all';
+    }
+
     // Guard de invitado: las páginas /mislistas/* requieren sesión. Sin ella,
     // de vuelta a inicio (la UX fina del gating — modal "regístrate" — es Fase D).
-    const path = context.url.pathname;
     if (!context.locals.user && (path.startsWith('/mislistas') || path.startsWith('/perfil'))) {
         return context.redirect('/');
     }

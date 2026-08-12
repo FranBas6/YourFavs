@@ -10,7 +10,8 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
 import {PROVIDERS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {platformList, fetchAllPlatforms, fetchPlatformBySlug} from "../../utils/constants/platforms";
-import FilterBar from "../../components/FilterBar.astro";
+import CatalogModes from "../../components/CatalogModes.astro";
+import { catalogUrls, resolveCatalogMode } from "../../utils/catalogUrl";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
 import EmptyState from "../../components/EmptyState.astro";
@@ -28,7 +29,7 @@ const defaultPlatform = Astro.locals.user?.platformsFilterDefault === true
     && (Astro.locals.user?.platforms?.length ?? 0) > 0
     ? 'mine' : 'all';
 const platformParam = urlParams.get('platform') || defaultPlatform;
-const type = urlParams.get('type') || 'all';
+const type = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
 // La disponibilidad depende del país: esta página la fijaba a 'ES' a mano (las otras cinco de
 // discover ya usaban la del perfil), así que a un usuario de otra región le enseñaba lo que hay
 // en España.
@@ -116,22 +117,7 @@ const countCtx = _provIds ? [
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: _provBase }] : []),
 ] : [];
 
-function buildFilterUrl(changes: Record<string, string | null>) {
-    const p = new URLSearchParams(urlParams);
-    for (const [k, v] of Object.entries(changes)) {
-        if (v === null || v === '') p.delete(k);
-        else p.set(k, v);
-    }
-    p.set('page', '1');
-    return `?${p.toString()}`;
-}
-
-function buildTypeUrl(t: string) {
-    const changes: Record<string, string | null> = { type: t };
-    if (t !== 'series') changes.status = null;
-    if (t !== 'movies') changes.runtime = null;
-    return buildFilterUrl(changes);
-}
+const { buildFilterUrl, buildTypeUrl } = catalogUrls(urlParams);
 
 function buildPlatformUrl(slug: string) {
     const p = new URLSearchParams(urlParams);
@@ -147,7 +133,9 @@ function buildPlatformUrl(slug: string) {
             title={activePlatform}
             color="slate"
             icon="layout-grid"
-        />
+        >
+            <CatalogModes slot="nav" current={type} buildUrl={buildTypeUrl} />
+        </CatalogHeader>
 
         <!-- Plataformas: desplegable en móvil, pills en desktop -->
         <details class="mb-6 sm:hidden group">
@@ -216,8 +204,6 @@ function buildPlatformUrl(slug: string) {
                 </a>
             ))}
         </div>
-
-        <FilterBar currentType={type} buildUrl={buildTypeUrl} />
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}

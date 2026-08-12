@@ -12,6 +12,8 @@ interface Props {
     icon: string;   // icono Lucide
 }
 const { title, subtitle, kicker, color = 'slate', icon } = Astro.props;
+// Slot `nav`: el conmutador de modo del catálogo. Va aquí, junto al título, como en la maqueta.
+const hasNav = Astro.slots.has('nav');
 ---
 <header class="yf-page-head">
     <Stamp color={color} icon={icon} size={56} />
@@ -20,16 +22,28 @@ const { title, subtitle, kicker, color = 'slate', icon } = Astro.props;
         <h1 class="yf-page-title">{title}</h1>
         {subtitle && <p class="yf-page-sub">{subtitle}</p>}
     </div>
+    {hasNav && (
+        <div class="yf-page-head-nav">
+            <slot name="nav" />
+        </div>
+    )}
 </header>
 
 <style>
     .yf-page-head {
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         gap: 16px;
         margin-bottom: 28px;
     }
     .yf-page-head-text { min-width: 0; }
+    /* El conmutador se va al extremo opuesto del título; con `flex-wrap` en el contenedor, si no
+       cabe baja a su propia línea en vez de estrujar la cabecera. */
+    .yf-page-head-nav {
+        margin-left: auto;
+        flex: none;
+    }
     .yf-page-kicker {
         font-family: var(--font-mono);
         font-size: 11px;
@@ -55,6 +69,9 @@ const { title, subtitle, kicker, color = 'slate', icon } = Astro.props;
     }
     @media (max-width: 640px) {
         .yf-page-head { gap: 12px; margin-bottom: 18px; }
+        /* En móvil el slot baja a su propia línea (el contenedor hace wrap): sin quitar el
+           `margin-left: auto` se quedaría pegado a la derecha, descolgado del texto. */
+        .yf-page-head-nav { margin-left: 0; width: 100%; }
         .yf-page-head :global(.yf-stamp) { --st-size: 40px; }
         .yf-page-title { font-size: 24px; }
         .yf-page-sub { font-size: 13px; }

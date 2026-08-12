@@ -232,81 +232,10 @@ body {
     color: #fff;
 }
 
-/* Content wrapper */
-.content-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-8);
-}
-
-/* Section cards */
-.section-card {
-    background: var(--bg-elev);
-    border-radius: var(--r-lg);
-    padding: var(--s-7);
-    box-shadow: var(--sh-md);
-    border: 1px solid var(--border);
-    transition: all 0.3s ease;
-    position: relative;
-    overflow: hidden;
-}
-
-.section-card:hover {
-    box-shadow: var(--sh-lg);
-    /* sin translateY: las section cards solo cambian la sombra (refinamiento) */
-}
-
-.featured-section::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, var(--accent), var(--primary));
-}
-
-/* Content categories */
-.content-category {
-    margin-bottom: var(--s-7);
-}
-
-.category-title {
-    display: flex;
-    align-items: center;
-    gap: var(--s-3);
-    margin-bottom: var(--s-6);
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--accent);
-}
-
-.category-icon {
-    width: 24px;
-    height: 24px;
-    stroke-width: 2;
-}
-
-.item-count {
-    color: var(--text-4);
-    font-weight: 400;
-    font-size: 0.875rem;
-}
-
-/* Cards grid */
-.cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--s-6);
-    margin-bottom: var(--s-7);
-}
-
-@media (max-width: 640px) {
-    .cards-grid {
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: var(--s-4);
-    }
-}
+/* La maquetación de las filas de catálogo (`.content-wrapper`, `.section-card`, `.category-title`,
+   `.cards-grid`, `.card-container`…) se movió a `styles/components/catalog-row.css`, que se importa
+   junto al componente. Vivía aquí porque la fila nació en la portada, y al reutilizar `CatalogRow` en
+   `/catalogo` las cards salían a ancho completo: el markup viajaba pero el CSS no. */
 
 /* Responsive design improvements */
 @media (max-width: 768px) {
@@ -316,15 +245,6 @@ body {
 
     .hero-section {
         padding: var(--s-7) var(--s-4);
-    }
-
-    .section-card {
-        padding: var(--s-6);
-    }
-
-    .cards-grid {
-        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-        gap: var(--s-3);
     }
 }
 
@@ -337,10 +257,6 @@ body {
     .hero-icon {
         font-size: 1.5rem;
     }
-
-    .cards-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
 }
 
 /* Print styles */
@@ -348,12 +264,6 @@ body {
     .hero-section,
     .show-more-card {
         display: none;
-    }
-
-    .section-card {
-        break-inside: avoid;
-        box-shadow: none;
-        border: 1px solid #ccc;
     }
 
     body {
@@ -388,19 +298,5 @@ html {
     border-radius: 4px;
 }
 
-/* Performance optimizations */
-.cards-grid {
-    align-items: stretch;
-}
-
-.card-container {
-    display: flex;
-    height: 100%;
-}
-
-.card-container > * {
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-}
+/* `.cards-grid { align-items: stretch }` y `.card-container` también se fueron a
+   `styles/components/catalog-row.css` — ver la nota de arriba. */

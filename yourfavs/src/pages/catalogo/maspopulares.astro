@@ -8,7 +8,7 @@ import {getMostPopularSeries} from "../../services/API/Series/tmdbSeries";
 import {discoverContent, parseAdvancedFilters, hasActiveFilters, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
 import {getGenreName} from "../../utils/constants/genres";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
-import FilterBar from "../../components/FilterBar.astro";
+import CatalogModes from "../../components/CatalogModes.astro";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
 import EmptyState from "../../components/EmptyState.astro";
@@ -18,10 +18,12 @@ import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/card-animations.css';
 import { resolveMineFilter } from "../../utils/platformFilter";
+import { catalogUrls, resolveCatalogMode } from "../../utils/catalogUrl";
 
 const urlParams = new URL(Astro.request.url).searchParams;
 const page = Number(urlParams.get('page') || 1);
-const type = urlParams.get('type') || 'all';
+// El modo sale de la URL o, si no la trae, del último recordado (cookie, vía middleware).
+const type = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
 const pageStr = page.toString();
 
 const filters = parseAdvancedFilters(urlParams);
@@ -52,28 +54,9 @@ const countCtx = [
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { 'vote_count.gte': '100' } }] : []),
 ];
 
-/**
- * Construye la URL aplicando un conjunto de cambios parciales. Preserva el resto
- * de params existentes. Valor null en `changes` elimina la key. Resetea `page` a 1
- * cuando cambian los filtros (pero no cuando cambia `page` en sí, que usa buildUrl
- * dedicado para paginación).
- */
-function buildFilterUrl(changes: Record<string, string | null>) {
-    const p = new URLSearchParams(urlParams);
-    for (const [k, v] of Object.entries(changes)) {
-        if (v === null || v === '') p.delete(k);
-        else p.set(k, v);
-    }
-    p.set('page', '1');
-    return `?${p.toString()}`;
-}
-
-function buildTypeUrl(t: string) {
-    const changes: Record<string, string | null> = { type: t };
-    if (t !== 'series') changes.status = null;
-    if (t !== 'movies') changes.runtime = null;
-    return buildFilterUrl(changes);
-}
+// Los dos constructores de URL son compartidos (`utils/catalogUrl.ts`): había seis copias de esto
+// repartidas por las páginas de catálogo, y la de cambiar de modo se olvidaba de limpiar `cert`.
+const { buildFilterUrl, buildTypeUrl } = catalogUrls(urlParams);
 ---
 <Layout title="Más Populares">
     <div class="px-1 sm:py-8">
@@ -82,9 +65,9 @@ function buildTypeUrl(t: string) {
             subtitle="Las películas y series más populares del momento"
             color="pink"
             icon="flame"
-        />
-
-        <FilterBar currentType={type} buildUrl={buildTypeUrl} />
+        >
+            <CatalogModes slot="nav" current={type} buildUrl={buildTypeUrl} />
+        </CatalogHeader>
 
         <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'} showStatus={type === 'series'}
                          showCert={type === 'movies'} order="Popularidad" countCtx={countCtx}

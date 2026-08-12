@@ -27,6 +27,7 @@ import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
 import {posterUrl, backdropUrl} from "../services/API/shared/tmdbClient";
 import {safeFetch} from "../utils/safeFetch";
+import '../styles/components/catalog-row.css';
 import '../styles/pages/index.css';
 
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
@@ -169,7 +170,9 @@ const sections = [
         title: `CATEGORÍA DESTACADA: ${randomCategory.name}`,
         movies: randomCategory.movies as Movie[],
         series: randomCategory.series as Serie[],
-        link: `/catalogo/categorias?categoria=${randomCategory.slug}&page=1&type=all`,
+        // Sin `type=all`: era un parámetro fijo que reseteaba en silencio el modo elegido en el
+        // catálogo. Sin él, la página respeta el que tuvieras.
+        link: `/catalogo/categorias?categoria=${randomCategory.slug}&page=1`,
         priority: 'low',
         color: 'purple',
         lucide: 'layers'

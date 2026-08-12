@@ -12,8 +12,16 @@ interface Props {
     featured?: boolean;   // muestra el tag "Destacado" (oculto en móvil)
     color?: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
     icon: string;         // icono Lucide del stamp
+    /** Una línea de qué promete la fila, bajo el título. */
+    subtitle?: string;
+    /**
+     * El CRITERIO de la fila, en un chip junto al título («1 temporada», «status = Ended»,
+     * «runtime ≤ 90»). No es decoración: es lo que separa una fila con criterio de "una selección
+     * más", y hace que el usuario pueda comprobar por qué está viendo esto.
+     */
+    why?: string;
 }
-const { title, link, count, featured = false, color = 'slate', icon } = Astro.props;
+const { title, link, count, featured = false, color = 'slate', icon, subtitle, why } = Astro.props;
 const countLabel = count != null && count > 0
     ? `${count} ${count === 1 ? 'título' : 'títulos'}`
     : null;
@@ -21,7 +29,11 @@ const countLabel = count != null && count > 0
 <header class="yf-section-header">
     <div class="yf-sh-left">
         <Stamp color={color} icon={icon} />
-        <h2 class="yf-sh-title">{title}{countLabel && <span class="yf-sh-count">{countLabel}</span>}</h2>
+        <div class="yf-sh-titlewrap">
+            <h2 class="yf-sh-title">{title}{countLabel && <span class="yf-sh-count">{countLabel}</span>}</h2>
+            {subtitle && <p class="yf-sh-sub">{subtitle}</p>}
+        </div>
+        {why && <span class="yf-sh-why">◇ {why}</span>}
         {featured && <span class="yf-sh-tag">Destacado</span>}
     </div>
     {link && (
@@ -68,6 +80,30 @@ const countLabel = count != null && count > 0
         color: var(--text-3);
         letter-spacing: 0;
         margin-left: 8px;
+        white-space: nowrap;
+    }
+    .yf-sh-titlewrap { min-width: 0; }
+    .yf-sh-sub {
+        margin: 3px 0 0;
+        font-family: var(--font);
+        font-size: 12.5px;
+        line-height: 1.4;
+        color: var(--text-3);
+    }
+    /* El criterio de la fila. Neutro a propósito: informa, no compite con el título. */
+    .yf-sh-why {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        height: 22px;
+        padding: 0 9px;
+        border-radius: var(--r-full);
+        background: var(--bg-tint);
+        border: 1px solid var(--border);
+        font-family: var(--font);
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--text-3);
         white-space: nowrap;
     }
     .yf-sh-tag {
@@ -136,6 +172,14 @@ const countLabel = count != null && count > 0
         }
         .yf-sh-tag {
             display: none;
+        }
+        /* En móvil la cabecera es una sola línea compacta: el chip del criterio no cabe junto al
+           título, así que se cae y el subtítulo se queda (que es el que explica la fila). */
+        .yf-sh-why { display: none; }
+        .yf-sh-sub {
+            font-size: 11.5px;
+            margin-top: 2px;
+            white-space: normal;
         }
         .yf-sh-more {
             background: transparent;

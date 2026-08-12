@@ -147,7 +147,10 @@ function buildDiscoverParams(f: AdvancedFilters, mediaType: MediaType): Record<s
     }
 
     if (mediaType === 'movie' && f.runtime) {
-        if (f.runtime === 'short') out['with_runtime.lte'] = '90';
+        // Con suelo: `lte=90` a secas mete cortometrajes y títulos sin duración conocida (TMDB los
+        // reporta como 0) en un filtro que el usuario lee como «películas cortas». Son 567 títulos de
+        // 8.165, medido. 40 min es el mínimo de largometraje; `medium` y `long` ya tenían suelo.
+        if (f.runtime === 'short') { out['with_runtime.gte'] = '40'; out['with_runtime.lte'] = '90'; }
         else if (f.runtime === 'medium') {
             out['with_runtime.gte'] = '90';
             out['with_runtime.lte'] = '150';
@@ -222,7 +225,16 @@ export function buildDiscoverFilterParams(filters: AdvancedFilters, mediaType: M
 export async function discoverContent<T>(
     mediaType: MediaType,
     filters: AdvancedFilters,
-    options: { sort_by?: string; voteCountMin?: string; page?: string; providers?: string; region?: string } = {}
+    options: {
+        sort_by?: string; voteCountMin?: string; page?: string; providers?: string; region?: string;
+        /**
+         * Params de discover que no son "filtros del usuario" y que por tanto no viven en
+         * `AdvancedFilters`: los que definen una FILA con criterio propio (`with_type=2` para
+         * miniseries, `with_genres`, `vote_average.gte`, `with_runtime.lte`…). Se aplican antes que
+         * los filtros, así que si el usuario pone uno que choque, gana el del usuario.
+         */
+        extraParams?: Record<string, string>;
+    } = {}
 ): Promise<T[]> {
     const sort_by = options.sort_by || 'popularity.desc';
     const voteCountMin = options.voteCountMin || '100';
@@ -232,6 +244,7 @@ export async function discoverContent<T>(
         page,
         sort_by,
         'vote_count.gte': voteCountMin,
+        ...(options.extraParams || {}),
         ...buildDiscoverParams(filters, mediaType),
     };
     // Filtro "Solo en mis plataformas" (3.2): with_watch_providers + región.

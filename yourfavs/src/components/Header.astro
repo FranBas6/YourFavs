@@ -3,30 +3,43 @@ import '../styles/components/header.css';
 import { Icon } from 'astro-icon/components';
 import Stamp from './Stamp.astro';
 import { SUPPORTED_COUNTRIES } from '../services/API/shared/tmdbInfoService';
+import { withMode } from '../utils/catalogUrl';
 
 const currentPath = Astro.url.pathname;
 
+// `/` y `/catalogo` son portadas de sección y se comparan EXACTO: por prefijo, «Catálogo» saldría
+// activo también en Tendencias, Cartelera y las demás subpáginas, que tienen su propia entrada.
+const EXACT_NAV = ['/', '/catalogo'];
 function isActive(href: string): boolean {
-    if (href === "/") return currentPath === "/";
+    if (EXACT_NAV.includes(href)) return currentPath === href;
     return currentPath.startsWith(href);
 }
 
-// Nav principal (desktop): Inicio · Tendencias · Cartelera · Descubrir▾ · Plataformas
+// Modo del catálogo activo: los enlaces del menú lo arrastran para que no se pierda al saltar de una
+// subpágina a otra (si estás en Series y entras en Plataformas, sigues en Series). `withMode` no
+// escribe nada cuando el modo es "Todo", así que las URLs siguen limpias por defecto.
+const catalogMode = Astro.locals.catalogMode;
+
+// Nav principal (desktop): Inicio · Catálogo · Tendencias · Cartelera · Descubrir▾
+// «Catálogo» es la portada de la sección (`/catalogo`), con el conmutador Todo · Películas · Series.
+// Para hacerle sitio sin pasar de cinco entradas, «Plataformas» se movió al desplegable Descubrir,
+// que es donde están sus hermanas.
 const navMain = [
     { href: "/", label: "Inicio", icon: "sparkles" },
+    { href: "/catalogo", label: "Catálogo", icon: "library" },
     { href: "/catalogo/tendencias", label: "Tendencias", icon: "trending-up" },
     { href: "/catalogo/cartelera", label: "Cartelera", icon: "clapperboard" },
 ];
-const navPlatforms = { href: "/catalogo/plataformas", label: "Plataformas", icon: "layout-grid" };
 
-// Dropdown "Descubrir" (6 items — Categorías y Sagas son cosas distintas)
+// Dropdown "Descubrir" (7 items — Categorías y Sagas son cosas distintas)
 const discoverItems = [
-    { href: "/catalogo/ultimoslanzamientos", color: "green",  icon: "sparkles",  title: "Últimos lanzamientos", desc: "Estrenos en streaming" },
-    { href: "/catalogo/maspopulares",        color: "pink",   icon: "flame",     title: "Más populares",        desc: "Lo que todo el mundo ve" },
-    { href: "/catalogo/topmovies",           color: "amber",  icon: "star",      title: "Top películas",        desc: "Las mejores de siempre" },
-    { href: "/catalogo/topseries",           color: "blue",   icon: "trophy",    title: "Top series",           desc: "Imprescindibles TV" },
-    { href: "/catalogo/categorias",          color: "slate",  icon: "layers",    title: "Categorías",           desc: "Por género" },
-    { href: "/catalogo/colecciones",         color: "purple", icon: "tag",       title: "Sagas",                desc: "Colecciones y franquicias" },
+    { href: "/catalogo/ultimoslanzamientos", color: "green",  icon: "sparkles",     title: "Últimos lanzamientos", desc: "Estrenos en streaming" },
+    { href: "/catalogo/maspopulares",        color: "pink",   icon: "flame",        title: "Más populares",        desc: "Lo que todo el mundo ve" },
+    { href: "/catalogo/plataformas",         color: "slate",  icon: "layout-grid",  title: "Plataformas",          desc: "Por dónde se ve" },
+    { href: "/catalogo/topmovies",           color: "amber",  icon: "star",         title: "Top películas",        desc: "Las mejores de siempre" },
+    { href: "/catalogo/topseries",           color: "blue",   icon: "trophy",       title: "Top series",           desc: "Imprescindibles TV" },
+    { href: "/catalogo/categorias",          color: "slate",  icon: "layers",       title: "Categorías",           desc: "Por género" },
+    { href: "/catalogo/colecciones",         color: "purple", icon: "tag",          title: "Sagas",                desc: "Colecciones y franquicias" },
 ];
 const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href));
 
@@ -69,7 +82,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
         <!-- Nav desktop: 5 items (Inicio · Tendencias · Cartelera · Descubrir▾ · Plataformas) -->
         <nav aria-label="Navegación principal" class="header-nav-desktop">
             {navMain.map(item => (
-                <a href={item.href}
+                <a href={withMode(item.href, catalogMode)}
                    class={`header-nav-link ${isActive(item.href) ? 'is-active' : ''}`}>
                     <Icon name={`lucide:${item.icon}`} class="w-4 h-4" />
                     {item.label}
@@ -91,7 +104,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                     <div class="header-discover-kicker">Explorar el catálogo</div>
                     <div class="header-discover-grid">
                         {discoverItems.map(it => (
-                            <a href={it.href} class="header-discover-item">
+                            <a href={withMode(it.href, catalogMode)} class="header-discover-item">
                                 <Stamp color={it.color as any} icon={it.icon} size={32} />
                                 <span class="hd-body">
                                     <span class="hd-t">{it.title}</span>
@@ -136,11 +149,6 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </div>
             )}
 
-            <a href={navPlatforms.href}
-               class={`header-nav-link ${isActive(navPlatforms.href) ? 'is-active' : ''}`}>
-                <Icon name={`lucide:${navPlatforms.icon}`} class="w-4 h-4" />
-                {navPlatforms.label}
-            </a>
         </nav>
 
         <!-- Acciones desktop: búsqueda + theme toggle -->

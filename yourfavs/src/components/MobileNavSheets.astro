@@ -11,9 +11,13 @@ import BottomSheet from './BottomSheet.astro';
 import Stamp from './Stamp.astro';
 import { Icon } from 'astro-icon/components';
 import { EXPLORE_ITEMS, MY_LISTS_ITEMS } from '../utils/constants/myLists';
+import { withMode } from '../utils/catalogUrl';
 import { appDateParts } from '../utils/appTime';
 
 const user = Astro.locals.user;
+// La hoja «Explorar» es la forma de saltar entre subpáginas del catálogo en móvil, así que sus filas
+// arrastran el modo activo. Con «Todo» no se escribe nada y las URLs quedan limpias.
+const catalogMode = Astro.locals.catalogMode;
 const displayName = user ? (user.name || user.email?.split('@')[0] || 'Tú') : '';
 const email = user?.email ?? '';
 function initials(name: string, mail: string): string {
@@ -41,7 +45,7 @@ const THEME_OPTIONS = [
 <!-- Explorar (público) -->
 <BottomSheet id="explorar" title="Explorar el catálogo">
     {EXPLORE_ITEMS.map((it) => (
-        <a class="yf-sheet-row" href={it.href}>
+        <a class="yf-sheet-row" href={withMode(it.href, catalogMode)}>
             <Stamp color={it.color} icon={it.icon} size={38} />
             <span class="yf-sheet-rowtext">
                 <span class="yf-sheet-rowtitle">{it.title}</span>

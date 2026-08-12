@@ -62,9 +62,13 @@ const CERTS = [
 const labelOf = (arr: { value: string; label: string }[], v?: string) => arr.find((x) => x.value === v)?.label || v;
 
 const yearRangeActive = !!(filters.yearFrom || filters.yearTo);
+// `runtime` y `status` van gateados por su grupo igual que `cert`: si no, un filtro que ya no aplica
+// al modo actual (p. ej. una duración puesta en Películas al pasarte a Series) seguía contando en el
+// badge y pintando su chip, con el grupo escondido y sin forma de verlo ni quitarlo.
 const activeCount = [
     yearRangeActive || filters.year || filters.decade,
-    filters.rating, filters.runtime, filters.language, filters.status, (showCert && filters.cert),
+    filters.rating, (showRuntime && filters.runtime), filters.language, (showStatus && filters.status),
+    (showCert && filters.cert),
     (showMine && mineNarrows),
 ].filter(Boolean).length;
 // Orden actual (sort seleccionado o el por defecto de la página).
@@ -79,9 +83,9 @@ if (yearRangeActive) activeChips.push({ label: `${filters.yearFrom || '…'} –
 else if (filters.year) activeChips.push({ label: filters.year, remove: { year: null } });
 else if (filters.decade) activeChips.push({ label: `${filters.decade}s`, remove: { decade: null } });
 if (filters.rating) activeChips.push({ label: `★ ${filters.rating}`, remove: { rating: null } });
-if (filters.runtime) activeChips.push({ label: String(labelOf(RUNTIMES, filters.runtime)), remove: { runtime: null } });
+if (showRuntime && filters.runtime) activeChips.push({ label: String(labelOf(RUNTIMES, filters.runtime)), remove: { runtime: null } });
 if (filters.language) activeChips.push({ label: String(labelOf(LANGUAGES, filters.language)), remove: { language: null } });
-if (filters.status) activeChips.push({ label: String(labelOf(STATUSES, filters.status)), remove: { status: null } });
+if (showStatus && filters.status) activeChips.push({ label: String(labelOf(STATUSES, filters.status)), remove: { status: null } });
 if (showCert && filters.cert) activeChips.push({ label: String(labelOf(CERTS, filters.cert)), remove: { cert: null } });
 // Al quitarlo hay que escribir `mine=0`, no borrar el parámetro: con el ajuste del perfil
 // encendido, borrarlo lo dejaría igual de activo.
@@ -94,7 +98,13 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
      data-my-platforms={showMine ? myPlatforms.join(',') : undefined} data-region={region}
      data-mine-default={mineDefault ? '1' : '0'}>
     <div class="yf-adv-backdrop" data-adv-backdrop hidden></div>
-    <details class="yf-adv" open={hasActive}>
+    {/* Sin `open={hasActive}`: renderizado en servidor, cualquier URL con un filtro llegaba con el
+        panel desplegado (y en móvil, con la hoja inferior abierta sola). No era estado del navegador,
+        era el HTML. Es el mismo fallo que ya se arregló en `PersonalFilter.astro`, y la solución es la
+        misma: cargar cerrado siempre, y reabrir SOLO si vienes de tocar un filtro (bandera efímera en
+        `sessionStorage` que se consume al cargar). El badge con el número de filtros activos ya avisa
+        de que hay filtros puestos. */}
+    <details class="yf-adv">
         <summary class="yf-adv-trigger">
             <span class="yf-adv-trigger-left">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -277,6 +287,28 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         }
 
         function inSheet() { return root.classList.contains('is-sheet'); }
+
+        // Reapertura tras interactuar: al pulsar un filtro la página recarga, y en escritorio se
+        // espera que el panel siga abierto para poder seguir ajustando. La bandera se consume al
+        // cargar, así que un enlace compartido o un refresco entran cerrados. "Borrar todo" no la
+        // pone: si acabas de limpiar, no quieres el panel en la cara.
+        var REOPEN_KEY = 'yf-adv-reopen';
+        if (details && !mqSheet.matches) {
+            try {
+                if (sessionStorage.getItem(REOPEN_KEY)) {
+                    sessionStorage.removeItem(REOPEN_KEY);
+                    details.open = true;
+                }
+            } catch (e) {}
+        }
+        if (details) {
+            details.addEventListener('click', function (e) {
+                var link = e.target && e.target.closest ? e.target.closest('a') : null;
+                if (!link || !details.contains(link)) return;
+                if (link.hasAttribute('data-adv-clear')) return;
+                try { sessionStorage.setItem(REOPEN_KEY, '1'); } catch (err) {}
+            });
+        }
 
         // Navega aplicando cambios parciales (instant-apply en desktop / al "Aplicar" en hoja).
         function apply(changes) {

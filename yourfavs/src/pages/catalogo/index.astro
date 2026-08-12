@@ -1,0 +1,134 @@
+---
+/**
+ * Portada de la sección Catálogo — la pantalla D2/D3 del handoff `design_handoff_home_catalogo`.
+ *
+ * Antes esta ruta era un **404**: solo existían las doce subpáginas, cada una con su propio título, y
+ * el conmutador Todo · Películas · Series no tenía ninguna página que presidir. Aquí es donde viven
+ * las filas con criterio propio de cada modo, que es lo que hace que «Series» sea de verdad una
+ * sección de series y no la misma página con un filtro puesto.
+ *
+ * No sustituye a nada: Categorías, Plataformas, Top y Sagas siguen donde estaban, y de hecho son el
+ * destino de los «Ver más» de estas filas.
+ */
+import Layout from "../../layouts/Layout.astro";
+import CatalogHeader from "../../components/CatalogHeader.astro";
+import CatalogModes from "../../components/CatalogModes.astro";
+import AdvancedFilters from "../../components/AdvancedFilters.astro";
+import CatalogRow from "../../components/Sections/CatalogRow.astro";
+import EmptyState from "../../components/EmptyState.astro";
+import { parseAdvancedFilters, hasActiveFilters } from "../../services/API/shared/tmdbDiscoverService";
+import { fetchCatalogRows } from "../../services/API/shared/catalogRows";
+import { catalogUrls, resolveCatalogMode, withMode } from "../../utils/catalogUrl";
+import {
+    curatedRowsFor, freshSinceISO, genreRowDef, genreSlugsForDay,
+} from "../../utils/constants/catalogRows";
+import { MOVIE_GENRE_SLUGS, SERIE_GENRE_SLUGS } from "../../utils/constants/genreSlugs";
+import { allCategories } from "../../utils/constants/categories";
+import { resolveMineFilter } from "../../utils/platformFilter";
+import { appDateParts } from "../../utils/appTime";
+import '../../styles/pages/catalogo/shared.css';
+import '../../styles/pages/catalogo/card-animations.css';
+// La maquetación de `CatalogRow` (rejilla, tarjeta de fila, carriles): vive aparte porque el
+// componente se usa aquí y en la portada, y antes su CSS solo estaba en la hoja de la portada.
+import '../../styles/components/catalog-row.css';
+
+const urlParams = new URL(Astro.request.url).searchParams;
+const type = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
+const { buildFilterUrl, buildTypeUrl } = catalogUrls(urlParams, { resetPage: false });
+
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+const { mine, mineDefault } = resolveMineFilter(urlParams, Astro.locals.user);
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
+
+const MODE_LABEL: Record<string, string> = { all: 'películas y series', movies: 'películas', series: 'series' };
+const MODE_TITLE: Record<string, string> = { all: 'Catálogo', movies: 'Películas', series: 'Series' };
+
+// Filas del modo: primero las curadas (cada una con su criterio a la vista), luego los géneros del
+// día. Rotan por DÍA, no al azar en cada carga, para que la caché sirva y recargar no baile.
+const dayNum = appDateParts(Date.now()).dayNum;
+const genreDefs = genreSlugsForDay(dayNum)
+    .map((slug, i) => {
+        const label = allCategories.find((c) => c.slug === slug)?.label || slug;
+        const mg = MOVIE_GENRE_SLUGS[slug];
+        const sg = SERIE_GENRE_SLUGS[slug];
+        return genreRowDef(
+            slug, label, type,
+            typeof mg === 'number' ? mg : undefined,
+            typeof sg === 'number' ? sg : undefined,
+            i,
+        );
+    })
+    .filter((d): d is NonNullable<typeof d> => d !== null);
+
+const rowDefs = [...curatedRowsFor(type, dayNum, freshSinceISO()), ...genreDefs];
+const rows = await fetchCatalogRows(rowDefs, {
+    filters,
+    providers: myProviders,
+    region: myRegion,
+    // Con filtros del usuario no se cachea: las combinaciones son infinitas.
+    cacheable: !filtersActive && !filters.sort,
+});
+
+/**
+ * A dónde lleva el «Ver más» de cada fila.
+ *
+ * Las curadas van a su vista ampliada con el modo **explícito, incluido `all`**: la misma clave existe
+ * con medios distintos según el modo (`joyas` es cine en Películas, TV en Series y las dos en Todo), así
+ * que sin él la vista resolvía siempre la variante de cine — desde Series acababas en películas y desde
+ * Todo se perdía el carril de series. Explícito y no vía cookie para que el enlace sea compartible.
+ * Las de género van a Categorías, que sí sabe honrarlas, con el modo por la vía normal.
+ */
+const rowLink = (link: string) =>
+    link.startsWith('/catalogo/fila/') ? `${link}?type=${type}` : withMode(link, type);
+
+// Contexto del contador en vivo del panel de filtros: el mismo suelo de votos que las filas.
+const countCtx = [
+    ...((type === 'all' || type === 'movies') ? [{ type: 'movie' as const, base: { 'vote_count.gte': '150' } }] : []),
+    ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { 'vote_count.gte': '150' } }] : []),
+];
+---
+<Layout title={`${MODE_TITLE[type]} · Catálogo`}>
+    <div class="px-1 sm:py-8">
+        <CatalogHeader
+            title="Catálogo"
+            subtitle={`Explora ${MODE_LABEL[type]} por criterio, no solo por género`}
+            color="red"
+            icon="library"
+        >
+            <CatalogModes slot="nav" current={type} buildUrl={buildTypeUrl} />
+        </CatalogHeader>
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={type === 'movies'}
+                         showStatus={type === 'series'} showCert={type === 'movies'}
+                         order="Popularidad" countCtx={countCtx}
+                         mine={mine} mineDefault={mineDefault} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion}
+                         sortOptions={[{ value: 'popular', label: 'Popularidad' }, { value: 'rating', label: 'Mejor valoradas' }, { value: 'recent', label: 'Más recientes' }]} />
+
+        {rows.length === 0 ? (
+            <EmptyState
+                variant="filter"
+                title="Nada con esos filtros"
+                description="Prueba a relajar la nota mínima, el año o el idioma."
+            >
+                <a slot="cta" href={buildTypeUrl(type)} class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E63946] text-white rounded-lg text-sm font-medium hover:bg-[#C7283A] transition-all">Limpiar filtros</a>
+            </EmptyState>
+        ) : (
+            rows.map((row) => (
+                <div class="content-wrapper">
+                    <CatalogRow section={{
+                        title: row.def.title,
+                        subtitle: row.def.subtitle,
+                        why: row.def.why || undefined,
+                        link: rowLink(row.def.link),
+                        color: row.def.color,
+                        lucide: row.def.icon,
+                        movies: row.movies,
+                        series: row.series,
+                    }} />
+                </div>
+            ))
+        )}
+    </div>
+</Layout>

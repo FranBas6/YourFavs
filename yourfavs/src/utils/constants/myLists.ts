@@ -19,8 +19,9 @@ export interface NavItem {
     countKey?: 'favoritos' | 'megusta' | 'vistos' | 'pendientes' | 'verpronto' | 'siguiendo' | 'colecciones';
 }
 
-/** Hoja "Explorar el catálogo": Tendencias + Cartelera + los 6 de "Descubrir". */
+/** Hoja "Explorar el catálogo": la portada de la sección + Tendencias + Cartelera + los de "Descubrir". */
 export const EXPLORE_ITEMS: NavItem[] = [
+    { href: "/catalogo",                     color: "red",    icon: "library",       title: "Catálogo",             desc: "Películas y series por criterio" },
     { href: "/catalogo/tendencias",          color: "red",    icon: "trending-up",   title: "Tendencias",           desc: "Lo que se mueve" },
     { href: "/catalogo/cartelera",           color: "blue",   icon: "clapperboard",  title: "Cartelera",            desc: "En cines ahora" },
     { href: "/catalogo/ultimoslanzamientos", color: "green",  icon: "sparkles",      title: "Últimos lanzamientos", desc: "Estrenos en streaming" },

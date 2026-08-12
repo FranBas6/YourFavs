@@ -32,6 +32,12 @@ declare namespace App {
     interface Locals {
         /** Usuario de la sesión verificada por el middleware; null si es invitado. */
         user: SessionUser | null;
+        /**
+         * Modo del catálogo (Todo · Películas · Series · Actores) resuelto por el middleware: la URL
+         * si lo trae, y si no el último recordado en cookie. Lo leen las páginas de catálogo y los
+         * menús de navegación, para que el modo no se pierda al cambiar de subpágina.
+         */
+        catalogMode: 'all' | 'movies' | 'series' | 'people';
     }
 }
 

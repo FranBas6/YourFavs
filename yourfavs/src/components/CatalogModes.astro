@@ -1,0 +1,108 @@
+---
+/**
+ * Conmutador de modo del catálogo: Todo · Películas · Series (· Actores en Tendencias).
+ *
+ * Sustituye a `FilterBar.astro`, que hacía lo mismo pero con Tailwind en línea (`bg-gray-100`,
+ * `bg-[#E63946]`, `text-gray-500`) y sobrevivía en modo oscuro solo por un `!important` global
+ * sobre `.bg-gray-100`. Aquí todo son tokens, así que el oscuro sale sin escribir una regla.
+ *
+ * Vive dentro de `CatalogHeader` (slot `nav`), junto al título, como en la maqueta: antes era una
+ * pastilla centrada y suelta debajo de la cabecera.
+ */
+import { DEFAULT_CATALOG_MODES, type CatalogMode } from '../utils/catalogUrl';
+
+interface Props {
+    /** Modo activo, ya resuelto (URL o cookie). */
+    current: CatalogMode;
+    buildUrl: (mode: string) => string;
+    /** Los que ofrece esta página. Tendencias añade `people`. */
+    modes?: readonly CatalogMode[];
+}
+const { current, buildUrl, modes = DEFAULT_CATALOG_MODES } = Astro.props;
+
+const LABELS: Record<CatalogMode, string> = {
+    all: 'Todo',
+    movies: 'Películas',
+    series: 'Series',
+    people: 'Actores',
+};
+---
+<nav class="yf-modes" aria-label="Tipo de contenido">
+    {modes.map((m) => (
+        <a
+            href={buildUrl(m)}
+            class:list={['yf-mode', { 'is-on': m === current }]}
+            aria-current={m === current ? 'page' : undefined}
+        >{LABELS[m]}</a>
+    ))}
+</nav>
+
+<style>
+    /* Escritorio: pastilla de 3 (o 4) posiciones. La activa se ELEVA sobre el fondo hundido, que es
+       lo que distingue un segmentado de una fila de botones. */
+    .yf-modes {
+        display: inline-flex;
+        gap: 3px;
+        padding: 4px;
+        background: var(--bg-tint);
+        border: 1px solid var(--border);
+        border-radius: var(--r-full, 9999px);
+    }
+    .yf-mode {
+        display: grid;
+        place-items: center;
+        height: 34px;
+        padding: 0 18px;
+        border-radius: var(--r-full, 9999px);
+        font-family: var(--font);
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--text-3);
+        text-decoration: none;
+        white-space: nowrap;
+        transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .yf-mode:hover { color: var(--text); }
+    .yf-mode.is-on {
+        background: var(--bg-elev);
+        color: var(--text);
+        font-weight: 600;
+        box-shadow: var(--sh-md);
+    }
+
+    /* Móvil: el segmentado no cabe con 4 opciones, así que pasa a chips a lo ancho (como la maqueta),
+       y ahí la activa sí va en accent: sin la pastilla contenedora, elevar no se lee. */
+    @media (max-width: 640px) {
+        .yf-modes {
+            display: flex;
+            width: 100%;
+            gap: 7px;
+            padding: 0;
+            background: none;
+            border: 0;
+            border-radius: 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .yf-modes::-webkit-scrollbar { display: none; }
+        .yf-mode {
+            flex: 0 0 auto;
+            height: 34px;
+            padding: 0 16px;
+            background: var(--bg-elev);
+            border: 1px solid var(--border);
+            font-size: 13px;
+            color: var(--text-2);
+        }
+        .yf-mode.is-on {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+            box-shadow: none;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .yf-mode { transition: none; }
+    }
+</style>

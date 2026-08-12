@@ -1,0 +1,242 @@
+---
+/**
+ * Vista ampliada de una fila del catálogo: `/catalogo/fila/{clave}`.
+ *
+ * Existe porque los «Ver más» **mentían**. Cada fila se apoya en params de discover que el panel de
+ * filtros no sabe expresar (`with_type` para miniseries, `vote_count.lte` para las joyas, el orden por
+ * taquilla de palomitas), así que ninguna página existente podía reproducir su criterio y enlazaban a
+ * lo más parecido: «Joyas poco vistas» llevaba a Top de siempre, que es exactamente lo contrario, y
+ * «Miniseries» a series populares sin una sola miniserie.
+ *
+ * Aquí el criterio no se traduce a nada: se reutiliza **la definición de la propia fila**, así que la
+ * promesa se cumple por construcción. Y el panel de filtros sigue disponible para estrechar aún más.
+ */
+import Layout from "../../../layouts/Layout.astro";
+import CatalogHeader from "../../../components/CatalogHeader.astro";
+import AdvancedFilters from "../../../components/AdvancedFilters.astro";
+import CardMovie from "../../../components/Cards/CardMovie.astro";
+import CardSerie from "../../../components/Cards/CardSerie.astro";
+import HoverPreview from "../../../components/HoverPreview.astro";
+import Pagination from "../../../components/Pagination.astro";
+import EmptyState from "../../../components/EmptyState.astro";
+import { parseAdvancedFilters, hasActiveFilters } from "../../../services/API/shared/tmdbDiscoverService";
+import { fetchCatalogRow } from "../../../services/API/shared/catalogRows";
+import { findCuratedRow, freshSinceISO } from "../../../utils/constants/catalogRows";
+import { catalogUrls, resolveCatalogMode } from "../../../utils/catalogUrl";
+import { resolveMineFilter } from "../../../utils/platformFilter";
+import { getGenreName } from "../../../utils/constants/genres";
+import { posterUrl } from "../../../services/API/shared/tmdbClient";
+import { appDateParts } from "../../../utils/appTime";
+import '../../../styles/pages/catalogo/shared.css';
+import '../../../styles/pages/catalogo/card-animations.css';
+
+const key = String(Astro.params.key || '');
+const urlParams = new URL(Astro.request.url).searchParams;
+const dayNum = appDateParts(Date.now()).dayNum;
+// El modo desde el que se pulsó «Ver más» decide el MEDIO de la fila: `joyas` es cine en Películas, TV
+// en Series y las dos en Todo. Sin esto salía siempre cine.
+const requestedMode = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
+const found = findCuratedRow(key, dayNum, freshSinceISO(), requestedMode);
+// Clave inventada → al catálogo, que es de donde se llega aquí.
+if (!found) return Astro.redirect('/catalogo');
+const { def, mode } = found;
+
+const page = Number(urlParams.get('page') || 1);
+const pageStr = String(page);
+const { buildFilterUrl } = catalogUrls(urlParams);
+
+const filters = parseAdvancedFilters(urlParams);
+const filtersActive = hasActiveFilters(filters);
+const { mine, mineDefault } = resolveMineFilter(urlParams, Astro.locals.user);
+const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
+const myRegion = Astro.locals.user?.region || 'ES';
+
+const row = await fetchCatalogRow(def, {
+    filters,
+    providers: myProviders,
+    region: myRegion,
+    cacheable: !filtersActive && !filters.sort,
+    page: pageStr,
+});
+const movies = row?.movies ?? [];
+const series = row?.series ?? [];
+
+// El panel ofrece los filtros del modo al que pertenece la fila: en una fila de series no pinta nada
+// «Duración», y en una de cine no pinta nada «Estado».
+const isMovies = def.media === 'movie';
+const isSeries = def.media === 'tv';
+const countCtx = [
+    ...(def.media !== 'tv' ? [{ type: 'movie' as const, base: { ...def.params, ...(def.movieParams || {}) } }] : []),
+    ...(def.media !== 'movie' ? [{ type: 'tv' as const, base: { ...def.params, ...(def.tvParams || {}) } }] : []),
+];
+// TMDB no da un total fiable por encima de las 500 páginas y estas filas son cortes estrechos:
+// 20 páginas es de sobra y evita prometer una paginación que devuelve vacío.
+const totalPages = 20;
+
+// El indicador de orden dice el orden DE VERDAD, no un «el de la fila» que no informa de nada.
+const ORDER_LABELS: Record<string, string> = {
+    'vote_average.desc': 'Nota',
+    'vote_count.desc': 'Nº de votos',
+    'popularity.desc': 'Popularidad',
+    'revenue.desc': 'Taquilla',
+};
+const orderLabel = ORDER_LABELS[def.sortBy || 'popularity.desc'] || 'Popularidad';
+
+// El título de la fila lleva su promesa detrás de un «·» («Terminadas · sin riesgo de cancelación»),
+// que funciona en una cabecera de carrusel pero como H1 de página repite lo que ya dice el subtítulo
+// justo debajo. Aquí se queda con la primera parte.
+const pageTitle = def.title.split('·')[0].trim() || def.title;
+const MODE_LABEL: Record<string, string> = { all: 'Todo', movies: 'Películas', series: 'Series' };
+const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
+---
+<Layout title={`${def.title} · Catálogo`}>
+    <div class="px-1 sm:py-8">
+        {/* La navegación va ARRIBA y sola: antes el «volver» compartía línea con el chip del
+            criterio, que es un dato, no una acción. Y el enlace dice a dónde va de verdad, con el
+            modo incluido, en vez de un genérico. Comentario en `{/* *​/}` y no en `<!-- -->` porque
+            Astro sí manda los HTML al navegador. */}
+        <a href={backHref} class="yf-fila-back">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Catálogo<span class="yf-fila-back-mode">· {MODE_LABEL[mode] ?? 'Todo'}</span>
+        </a>
+
+        <CatalogHeader
+            title={pageTitle}
+            subtitle={def.subtitle}
+            color={def.color}
+            icon={def.icon}
+        >
+            {/* El criterio, como metadato a la derecha del título: es la garantía de por qué estás
+                viendo esto, y en `--font-mono` porque es un valor, no una etiqueta. */}
+            <span slot="nav" class="yf-fila-why" title="El criterio exacto con el que se construye esta lista">
+                <span class="yf-fila-why-k">Criterio</span>
+                <span class="yf-fila-why-v">{def.why}</span>
+            </span>
+        </CatalogHeader>
+
+        <AdvancedFilters filters={filters} buildUrl={buildFilterUrl} showRuntime={isMovies}
+                         showStatus={isSeries} showCert={isMovies}
+                         order={orderLabel} countCtx={countCtx}
+                         mine={mine} mineDefault={mineDefault} myPlatforms={Astro.locals.user?.platforms ?? []} region={myRegion} />
+
+        {movies.length === 0 && series.length === 0 ? (
+            <EmptyState
+                variant="filter"
+                title="Nada con esos filtros"
+                description="Prueba a relajar la nota mínima, el año o el idioma."
+            >
+                <a slot="cta" href={`/catalogo/fila/${key}`} class="inline-flex items-center gap-2 px-5 py-2.5 bg-[#E63946] text-white rounded-lg text-sm font-medium hover:bg-[#C7283A] transition-all">Limpiar filtros</a>
+            </EmptyState>
+        ) : (
+            <>
+                {movies.length > 0 && (
+                    <div class="mb-12">
+                        {def.media === 'both' && <h2 class="text-xl font-semibold text-gray-800 mb-4">Películas</h2>}
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {movies.map((item) => (
+                                <div class="card-wrapper group">
+                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}>
+                                        <CardMovie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            title={item.title}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            release_date={item.release_date}
+                                            genres={item.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }))}
+                                        />
+                                    </HoverPreview>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {series.length > 0 && (
+                    <div class="mb-12">
+                        {def.media === 'both' && <h2 class="text-xl font-semibold text-gray-800 mb-4">Series</h2>}
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                            {series.map((item) => (
+                                <div class="card-wrapper group">
+                                    <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}>
+                                        <CardSerie
+                                            id={item.id.toString()}
+                                            img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                                            name={item.name}
+                                            vote_average={item.vote_average}
+                                            overview={item.overview}
+                                            first_air_date={item.first_air_date}
+                                            genres={item.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }))}
+                                        />
+                                    </HoverPreview>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <Pagination page={page} totalPages={totalPages} buildUrl={(p: number) => {
+                    const q = new URLSearchParams(urlParams);
+                    q.set('page', String(p));
+                    return `?${q.toString()}`;
+                }} />
+            </>
+        )}
+    </div>
+</Layout>
+
+<style>
+    /* Migas: pequeñas y por encima del título, para que no compitan con él. */
+    .yf-fila-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 14px;
+        font-family: var(--font);
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-3);
+        text-decoration: none;
+        transition: color 0.15s ease;
+    }
+    .yf-fila-back:hover { color: var(--accent); }
+    .yf-fila-back svg { width: 15px; height: 15px; }
+    .yf-fila-back-mode { color: var(--text-4); font-weight: 400; }
+
+    /* El criterio: pastilla de dos partes — etiqueta en versalitas y valor en mono, que es la
+       convención de la app para los datos. Así se lee como un dato comprobable y no como un botón. */
+    .yf-fila-why {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 11px;
+        border-radius: var(--r-full);
+        background: var(--bg-tint);
+        border: 1px solid var(--border);
+        white-space: nowrap;
+    }
+    .yf-fila-why-k {
+        font-family: var(--font-mono);
+        font-size: 9.5px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-4);
+    }
+    .yf-fila-why-v {
+        font-family: var(--font-mono);
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--text-2);
+    }
+
+    @media (max-width: 640px) {
+        .yf-fila-back { margin-bottom: 10px; font-size: 12.5px; }
+        /* En móvil la pastilla ocupa el ancho y algunos criterios son largos («aventura y acción,
+           nota ≥ 6,5, por taquilla»), así que se le permite partir en dos líneas en vez de desbordar. */
+        .yf-fila-why { white-space: normal; align-items: flex-start; }
+        .yf-fila-why-k { padding-top: 1px; }
+    }
+</style>
