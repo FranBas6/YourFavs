@@ -38,13 +38,19 @@ function rangeLabel(startTs: number, endTs: number): string {
 /** "2.ª vez", "3.ª vez"… El primer pase no lleva distintivo. */
 function passLabel(pass: number): string { return `${pass}.ª vez`; }
 /**
- * De qué capítulo a qué capítulo fue ese mes: "T1 E1–E9", o "T1 E8–E10 · T2 E1–E3" cuando
- * el mes cruzó de temporada. Un solo episodio se escribe sin rango ("T1 E4").
+ * De qué capítulo a qué capítulo fue ese mes, de punta a punta: "T1 E1–E9", y si el mes cruzó
+ * de temporada, "T1 E8 – T2 E3". Solo los extremos: el desglose temporada a temporada se
+ * probó y era demasiada letra pequeña en una tarjeta de 110px. Un episodio suelto va sin
+ * rango ("T1 E4") y la temporada 0 se escribe "Esp.".
  */
 function episodeRangeLabel(ranges: { season: number; from: number; to: number }[]): string {
-    return ranges
-        .map(r => `${r.season === 0 ? 'Esp.' : `T${r.season}`} ${r.from === r.to ? `E${r.from}` : `E${r.from}–E${r.to}`}`)
-        .join(' · ');
+    const first = ranges[0];
+    const last = ranges[ranges.length - 1];
+    const sn = (n: number) => (n === 0 ? 'Esp.' : `T${n}`);
+    if (first.season === last.season) {
+        return first.from === last.to ? `${sn(first.season)} E${first.from}` : `${sn(first.season)} E${first.from}–E${last.to}`;
+    }
+    return `${sn(first.season)} E${first.from} – ${sn(last.season)} E${last.to}`;
 }
 
 const timelineTotal = stats.timeline.reduce((sum, m) => sum + m.entries.length, 0);
@@ -323,7 +329,9 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                                                 <div class="mt-1.5 text-xs font-semibold text-gray-800 line-clamp-1">{e.title || (e.kind === 'movie' ? `Película ${e.id}` : `Serie ${e.id}`)}</div>
                                                 <div class="text-[10px] text-gray-500 leading-snug">
                                                     {rangeLabel(e.startTs, e.endTs)}
-                                                    {e.seasonRanges?.length ? <>{' · '}<span class="text-purple-600 font-semibold">{episodeRangeLabel(e.seasonRanges)}</span></> : null}
+                                                    {e.wholeSeries
+                                                        ? <>{' · '}<span class="text-purple-600 font-semibold">Serie completa</span></>
+                                                        : e.seasonRanges?.length ? <>{' · '}<span class="text-purple-600 font-semibold">{episodeRangeLabel(e.seasonRanges)}</span></> : null}
                                                 </div>
                                             </a>
                                         ))}

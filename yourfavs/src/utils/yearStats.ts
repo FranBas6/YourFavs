@@ -49,8 +49,16 @@ export interface TimelineEntry {
      * De qué capítulo a qué capítulo, por temporada y ordenado: `[{2,1,3}]` → "T2 E1–E3".
      * Son los extremos de lo visto ese mes en cada temporada (si te saltaste alguno por
      * el medio, el rango sigue siendo el primero y el último). Ausente en películas.
+     * La ficha solo pinta el primero y el último, pero el desglose se conserva por si
+     * vuelve a hacer falta.
      */
     seasonRanges?: { season: number; from: number; to: number }[];
+    /**
+     * Te ventilaste la serie ENTERA en este mes. Se deduce sin pedirle nada a TMDB (ver
+     * `buildTimeline`): la serie consta como vista en tus listas y todos los episodios que
+     * has visto de ella en tu vida caen en este mes.
+     */
+    wholeSeries?: boolean;
     /** Ordinal del visionado de por vida: 2 = «2.ª vez». Ausente en el primero. */
     pass?: number;
 }
@@ -216,6 +224,8 @@ function buildTimeline(
     /** `MoviesVistas`, para las pelis anteriores al diario (su única fecha es `added_at`). */
     moviesSeen: any[],
     titles: Map<string, TitleMeta>,
+    /** Series que constan como vistas en tus listas (Vistas ∪ Me gusta ∪ Favs). Ver `wholeSeries`. */
+    seenSeries: Set<string>,
 ): MonthTimeline[] {
     const entries: TimelineEntry[] = [];
 
@@ -231,11 +241,26 @@ function buildTimeline(
         if (episode < cur.from) cur.from = episode;
         if (episode > cur.to) cur.to = episode;
     };
+    /**
+     * Episodios DISTINTOS por serie, de toda la vida y de este mes, para saber si la serie
+     * entera cabe en un mes. Se cuentan sin repetir (`T1-E3`) a propósito: un re-visionado
+     * suelto en otro mes no debería quitarle a septiembre el haberse visto la serie entera.
+     */
+    const everSeen = new Map<string, Set<string>>();
+    const monthSeen = new Map<string, Set<string>>();
+
     const bySerieMonth = new Map<string, TimelineEntry>();
     for (const w of watches) {
         const p = appDateParts(w.ts);
+        const epKey = `${w.season}-${w.episode}`;
+        let ever = everSeen.get(w.serieId);
+        if (!ever) { ever = new Set(); everSeen.set(w.serieId, ever); }
+        ever.add(epKey);
         if (p.year !== year) continue;
         const k = `${w.serieId}:${p.month}`;
+        let month = monthSeen.get(k);
+        if (!month) { month = new Set(); monthSeen.set(k, month); }
+        month.add(epKey);
         const cur = bySerieMonth.get(k);
         if (cur) {
             cur.episodes++;
@@ -255,6 +280,25 @@ function buildTimeline(
     }
     // Temporadas en orden: la etiqueta se lee "T1 · T2", no en el orden en que las viste.
     for (const e of bySerieMonth.values()) e.seasonRanges?.sort((a, b) => a.season - b.season);
+
+    /**
+     * «Serie completa»: te la ventilaste entera dentro de este mes. Dos condiciones, y ninguna
+     * cuesta una llamada a TMDB (este archivo se quitó a propósito el `fetchSerieDetails` por
+     * serie, ver `buildTitleIndex`):
+     *
+     *   1. La serie consta como VISTA en tus listas — es tu propio criterio de "terminada",
+     *      que es más fiable que compararla con el número de episodios de TMDB, donde un
+     *      especial o una temporada 0 te dejan en el 97% para siempre.
+     *   2. Todos los episodios que has visto de ella en tu vida caen en este mes.
+     *
+     * Con un solo episodio no se dice: eso es "T1 E1", no una serie completa.
+     */
+    for (const [k, e] of bySerieMonth) {
+        const ever = everSeen.get(e.id);
+        const month = monthSeen.get(k);
+        if (!ever || !month || ever.size < 2) continue;
+        if (seenSeries.has(e.id) && month.size === ever.size) e.wholeSeries = true;
+    }
 
     // Pases de serie: cada fila de NIVEL SERIE del diario (sin season) es una pulsación de
     // "Vuelto a ver", que se registra al vaciar el progreso → marca el ARRANQUE de un pase.
@@ -523,10 +567,16 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     }
     const heatmap = Array.from(heatmapMap.entries()).map(([dayKey, count]) => ({ dayKey, count }));
 
+    // «Vista» en series es el mismo criterio por niveles que en películas: Vistas ∪ Me gusta ∪
+    // Favs (las listas son excluyentes, así que una favorita ya consta vista).
+    const seenSerieIds = new Set<string>(
+        [...tvVistos, ...tvLike, ...tvFavs].map((it: any) => String(it?.id ?? '')).filter(Boolean),
+    );
+
     // Mes a mes. Solo para un año concreto: de por vida no significa nada (¿el marzo de qué?).
     const timeline = year === 'all'
         ? []
-        : buildTimeline(year, watches, logRows, movVistos, buildTitleIndex(snapshot));
+        : buildTimeline(year, watches, logRows, movVistos, buildTitleIndex(snapshot), seenSerieIds);
 
     /**
      * «Tu mes más activo» y «tu día de la semana» salen del VISIONADO REAL, no de las altas en listas.
