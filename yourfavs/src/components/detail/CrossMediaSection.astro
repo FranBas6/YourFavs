@@ -1,0 +1,89 @@
+---
+/**
+ * «También en cine» / «También en televisión» — la saga al otro lado del medio.
+ *
+ * Va JUSTO ENCIMA de Recomendaciones y no mezclada con ellas, y es a propósito: una
+ * recomendación dice «esto se te parece», y esto otro dice «esto ES lo mismo». Son dos
+ * promesas distintas y el usuario las lee distinto — la de la saga se mira entera, la de
+ * recomendaciones se ojea.
+ *
+ * Si `items` viene vacío la sección NO se pinta: con el listón alto de `crossMediaRelated`
+ * lo normal es que una ficha cualquiera no tenga nada, y una sección vacía o con un «no hay
+ * nada relacionado» sería ruido en todas las fichas del catálogo.
+ */
+import { Icon } from 'astro-icon/components';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import type { RelatedTitle } from '../../services/API/shared/crossMediaRelated';
+
+interface Props {
+    items: RelatedTitle[];
+    /** Medio de los ítems (el CONTRARIO al de la ficha), que es lo que titula la sección. */
+    mediaType: 'movie' | 'tv';
+}
+
+const { items, mediaType } = Astro.props;
+
+const heading = mediaType === 'movie' ? 'También en cine' : 'También en televisión';
+const subtitle = mediaType === 'movie'
+    ? 'Las películas de esta misma saga'
+    : 'Lo que esta saga ha hecho en televisión';
+const linkPrefix = mediaType === 'movie' ? '/movie/' : '/serie/';
+---
+{items.length > 0 && (
+    <section>
+        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
+            <span class="w-1 h-6 bg-amber-500 rounded-full"></span>
+            {heading}
+            <span class="text-sm font-normal text-gray-400">({items.length})</span>
+        </h2>
+        <p class="text-xs text-gray-500 mb-4">{subtitle}</p>
+
+        <div class="flex gap-5 overflow-x-auto pb-4">
+            {items.map((it, index) => (
+                <a
+                    href={`${linkPrefix}${it.id}`}
+                    title={`${it.title} · ${it.reason}`}
+                    class="flex-shrink-0 w-32 sm:w-40 group animate-fade-in-up"
+                    style={`animation-delay: ${index * 0.05}s`}
+                >
+                    <div class="relative rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition-shadow duration-300 bg-gray-200">
+                        {it.poster_path ? (
+                            <img
+                                src={posterUrl(it.poster_path, 'w342')}
+                                alt={it.title}
+                                loading="lazy"
+                                class="w-full aspect-[2/3] object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                        ) : (
+                            <div class="w-full aspect-[2/3] flex items-center justify-center text-gray-400">
+                                <Icon name={mediaType === 'movie' ? 'lucide:film' : 'lucide:tv'} class="w-8 h-8" />
+                            </div>
+                        )}
+
+                        {/* Distintivo de medio: en una ficha de serie, que se vea de un vistazo
+                            que estas tarjetas llevan a películas (y al revés). */}
+                        <span
+                            class="absolute top-2 left-2 p-1 rounded bg-black/70 text-white"
+                            title={mediaType === 'movie' ? 'Película' : 'Serie'}
+                        >
+                            <Icon name={mediaType === 'movie' ? 'lucide:film' : 'lucide:tv'} class="w-3.5 h-3.5" />
+                        </span>
+
+                        {/* Un estreno futuro no tiene nota que enseñar: se marca como lo que es. */}
+                        {it.upcoming ? (
+                            <span class="absolute top-2 right-2 text-[10px] font-bold px-2 py-0.5 bg-amber-500 text-white rounded-lg">
+                                PRÓX.
+                            </span>
+                        ) : it.voteAverage > 0 && (
+                            <span class="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 bg-black/70 text-yellow-400 rounded-lg backdrop-blur-sm">
+                                {it.voteAverage.toFixed(1)}
+                            </span>
+                        )}
+                    </div>
+                    <p class="mt-2 text-sm font-medium text-gray-800 line-clamp-2">{it.title}</p>
+                    <p class="text-xs text-gray-400">{it.year ?? ''}</p>
+                </a>
+            ))}
+        </div>
+    </section>
+)}

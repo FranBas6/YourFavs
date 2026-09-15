@@ -34,6 +34,8 @@ import ReviewsSection from "../../components/detail/ReviewsSection.astro";
 import LightboxGallery from "../../components/detail/LightboxGallery.astro";
 import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
+import CrossMediaSection from "../../components/detail/CrossMediaSection.astro";
+import { getCrossMediaRelated } from "../../services/API/shared/crossMediaRelated";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import StarRating from "../../components/detail/StarRating.astro";
 import {safeFetch} from "../../utils/safeFetch";
@@ -198,6 +200,7 @@ const [
     allVideos,
     reviewsData,
     movieLogo,
+    crossMediaSeries,
 ] = await Promise.all([
     id ? fetchAllMoviePosters(id).catch(() => []) : Promise.resolve([]),
     item?.belongs_to_collection ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null) : Promise.resolve(null),
@@ -207,6 +210,12 @@ const [
     id ? getMovieVideos(id) : Promise.resolve([]),
     tmdbId ? tmdbFetch<{ results: any[] }>(`/movie/${tmdbId}/reviews`).catch(() => ({ results: [] })) : Promise.resolve({ results: [] }),
     tmdbId ? getTitleLogo('movie', tmdbId) : Promise.resolve(null),
+    // Series de la misma saga. Va aquí dentro, en paralelo con el resto, para no sumar nada al
+    // TTFB: es una búsqueda en TMDB y, al primer acierto, sale de caché las 24h siguientes.
+    tmdbId
+        ? getCrossMediaRelated({ type: 'movie', id: tmdbId, title: item?.title || '', originalTitle: item?.original_title })
+            .catch(() => [])
+        : Promise.resolve([]),
 ]);
 
 // Saga con progreso: solo si la película pertenece a colección (evita la
@@ -705,6 +714,9 @@ const jsonLd = item ? {
 
                     <!-- Dobladores en español (lazy, eldoblaje.com) -->
                     <DubbingSection type="movie" tmdbId={id} />
+
+                    <!-- La saga al otro lado: series de esta misma película -->
+                    <CrossMediaSection items={crossMediaSeries} mediaType="tv" />
 
                     <!-- Equipo -->
                     <CrewGrid crew={directors} />
