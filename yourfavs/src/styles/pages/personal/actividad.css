@@ -154,8 +154,11 @@
     .tl-day-head { flex-wrap: wrap; row-gap: 4px; }
     .act-collapse { display: block; margin-bottom: 16px; }
     .act-summary.is-desktop { display: none; }
-    /* Filtros con scroll horizontal sin barra */
-    .act-filters.is-mobile { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px 6px; padding: 0 16px 4px; }
+    /* Filtros con scroll horizontal sin barra.
+       overscroll-behavior-x: la fila sangra hasta el borde de la pantalla y sus chips se
+       salen por la derecha; sin esto, al deslizarla el gesto ENCADENA al documento (scroll
+       chaining, comportamiento por defecto) y en iOS arrastra la página entera de lado. */
+    .act-filters.is-mobile { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; margin: 0 -16px 6px; padding: 0 16px 4px; }
     .act-filters.is-mobile::-webkit-scrollbar { display: none; }
     .act-filters.is-mobile .chip { flex-shrink: 0; }
 }

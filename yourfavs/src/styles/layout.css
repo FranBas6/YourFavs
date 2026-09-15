@@ -44,7 +44,14 @@ body {
     padding: 0;
     transition: background-color 0.3s ease;
     width: 100%;
+    /* Las dos líneas son a propósito: `hidden` esconde la barra pero el viewport SIGUE siendo
+       scrollable (iOS lo arrastra igual, de ahí el paneo lateral en móvil); `clip` no es
+       scrollable en absoluto. El navegador que no entienda `clip` se queda con `hidden`.
+       Ojo: se deja en `body`, no en `html`, para que siga propagando al viewport — si el
+       overflow lo agarrase `body`, se convertiría en contenedor de scroll y rompería
+       todos los `position: sticky` de la app. */
     overflow-x: hidden;
+    overflow-x: clip;
 }
 
 img {

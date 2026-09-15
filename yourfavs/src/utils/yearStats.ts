@@ -45,6 +45,12 @@ export interface TimelineEntry {
     endTs: number;
     /** Episodios vistos ESE mes. 0 en películas. */
     episodes: number;
+    /**
+     * De qué capítulo a qué capítulo, por temporada y ordenado: `[{2,1,3}]` → "T2 E1–E3".
+     * Son los extremos de lo visto ese mes en cada temporada (si te saltaste alguno por
+     * el medio, el rango sigue siendo el primero y el último). Ausente en películas.
+     */
+    seasonRanges?: { season: number; from: number; to: number }[];
     /** Ordinal del visionado de por vida: 2 = «2.ª vez». Ausente en el primero. */
     pass?: number;
 }
@@ -214,6 +220,17 @@ function buildTimeline(
     const entries: TimelineEntry[] = [];
 
     // --- Series: un tramo por (serie, mes) ---
+    // Los extremos por temporada se llevan por NÚMERO de episodio, no por hora: el backfill
+    // sella muchos episodios con el mismo instante (mediodía), así que el orden cronológico
+    // no distingue E1 de E9 y "de qué capítulo a qué capítulo" saldría al azar.
+    const trackEpisode = (e: TimelineEntry, season: number, episode: number) => {
+        if (!Number.isFinite(season) || !Number.isFinite(episode)) return;
+        const ranges = (e.seasonRanges ??= []);
+        const cur = ranges.find(r => r.season === season);
+        if (!cur) { ranges.push({ season, from: episode, to: episode }); return; }
+        if (episode < cur.from) cur.from = episode;
+        if (episode > cur.to) cur.to = episode;
+    };
     const bySerieMonth = new Map<string, TimelineEntry>();
     for (const w of watches) {
         const p = appDateParts(w.ts);
@@ -224,15 +241,20 @@ function buildTimeline(
             cur.episodes++;
             if (w.ts < cur.startTs) cur.startTs = w.ts;
             if (w.ts > cur.endTs) cur.endTs = w.ts;
+            trackEpisode(cur, w.season, w.episode);
             continue;
         }
         const meta = titles.get(`tv:${w.serieId}`);
-        bySerieMonth.set(k, {
+        const entry: TimelineEntry = {
             id: w.serieId, kind: 'tv',
             title: meta?.title || '', poster_path: meta?.poster_path || '',
             startTs: w.ts, endTs: w.ts, episodes: 1,
-        });
+        };
+        trackEpisode(entry, w.season, w.episode);
+        bySerieMonth.set(k, entry);
     }
+    // Temporadas en orden: la etiqueta se lee "T1 · T2", no en el orden en que las viste.
+    for (const e of bySerieMonth.values()) e.seasonRanges?.sort((a, b) => a.season - b.season);
 
     // Pases de serie: cada fila de NIVEL SERIE del diario (sin season) es una pulsación de
     // "Vuelto a ver", que se registra al vaciar el progreso → marca el ARRANQUE de un pase.
