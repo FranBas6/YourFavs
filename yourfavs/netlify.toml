@@ -23,6 +23,20 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# El service worker NO se cachea. Si el CDN sirviera una copia vieja, los móviles se quedarían
+# con la versión antigua de las reglas de caché hasta que al navegador le diera por revisarlo.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# El manifest cambia poquísimo, pero cuando cambia (un icono nuevo) interesa que llegue.
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=3600"
+
 # La caché de las páginas (portada, catálogo, fichas de peli/serie/actor) YA NO SE DECIDE AQUÍ.
 #
 # Motivo: una regla por ruta no puede saber si hay sesión, y todas esas páginas son personalizadas

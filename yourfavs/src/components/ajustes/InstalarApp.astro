@@ -1,0 +1,114 @@
+---
+/**
+ * «Instalar YourFavs» — la tarjeta que convierte la web en app con su icono.
+ *
+ * Nace OCULTA y la enseña el JS, porque el servidor no puede saber nada de lo que decide aquí:
+ * ni el navegador, ni si ya está instalada. Tres estados excluyentes:
+ *
+ *   · instalada — se está viendo YA en modo app (`display-mode: standalone`). Solo se informa.
+ *   · prompt    — Chrome/Edge/Android han ofrecido `beforeinstallprompt`: botón que instala
+ *                 de verdad, con el diálogo del sistema.
+ *   · ios       — Safari de iPhone/iPad, que no tiene API de instalación y nunca la tendrá:
+ *                 toca explicar el gesto de «Compartir → Añadir a pantalla de inicio».
+ *
+ * Si no es ninguno de los tres (Firefox de escritorio, Chrome de iOS…) la tarjeta se queda
+ * oculta: mejor no estar que ofrecer un botón que no hace nada.
+ */
+---
+<div class="aj-card" id="aj-install-card" hidden>
+    <div class="aj-row">
+        <span class="aj-row-ico" style="--ico: var(--a-pronto); --ico-bg: var(--a-pronto-bg);" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2.5"/><path d="M12 18h.01"/>
+            </svg>
+        </span>
+        <span class="aj-row-text">
+            <span class="aj-row-title" id="aj-install-title">Instalar YourFavs</span>
+            <p class="aj-row-desc" id="aj-install-desc">Tenla como una app, con su icono y sin la barra del navegador.</p>
+        </span>
+        <button type="button" class="aj-btn" id="aj-install-btn" hidden>Instalar</button>
+    </div>
+
+    <div class="aj-row" id="aj-install-ios" hidden>
+        <span class="aj-row-text">
+            <p class="aj-row-desc">
+                En el iPhone lo hace Safari, no la web: toca <b>Compartir</b> (el cuadrado con la flecha hacia
+                arriba), baja y elige <b>Añadir a pantalla de inicio</b>.
+            </p>
+            <p class="aj-row-desc">
+                La primera vez que la abras te pedirá iniciar sesión otra vez: iOS le da a la app instalada su
+                propio almacén, separado del de Safari. Solo pasa una vez.
+            </p>
+        </span>
+    </div>
+</div>
+
+<style>
+    /* El bloque de los tres temas no deja aire por debajo (`.aj-card` solo tiene
+       `margin-bottom`), así que esta tarjeta se pegaba a las tarjetas de tema. 16px es el
+       ritmo de la hoja (`.aj-group + .aj-group`). */
+    #aj-install-card { margin-top: 16px; }
+
+    /* `.aj-row { display: flex }` GANA al `[hidden]` del navegador: cualquier regla de autor
+       pesa más que la hoja del user-agent. Sin esto, `el.hidden = true` no escondía nada y
+       las instrucciones del iPhone salían también en escritorio. */
+    [hidden] { display: none !important; }
+</style>
+
+<script is:inline>
+    (function () {
+        var card = document.getElementById('aj-install-card');
+        if (!card) return;
+        var btn = document.getElementById('aj-install-btn');
+        var ios = document.getElementById('aj-install-ios');
+        var title = document.getElementById('aj-install-title');
+        var desc = document.getElementById('aj-install-desc');
+
+        // `standalone` a secas es el de iOS, que nunca implementó el media query.
+        var instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+        if (instalada) {
+            title.textContent = 'YourFavs ya está instalada';
+            desc.textContent = 'La estás usando como app. Para quitarla, mantén pulsado su icono en la pantalla de inicio.';
+            card.hidden = false;
+            return;
+        }
+
+        // Safari de iPhone/iPad. El iPad moderno se declara Macintosh, de ahí lo de maxTouchPoints.
+        var ua = navigator.userAgent;
+        var esIOS = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        var esSafari = /Safari/.test(ua) && !/CriOS|FxiOS|EdgiOS|Chrome/.test(ua);
+        if (esIOS && esSafari) {
+            ios.hidden = false;
+            card.hidden = false;
+        }
+
+        // Chrome/Edge/Android: el navegador avisa de que se puede instalar y nos cede el momento.
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();               // sin esto, el navegador enseña su propia barrita
+            var diferido = e;
+            btn.hidden = false;
+            card.hidden = false;
+            btn.addEventListener('click', function () {
+                btn.disabled = true;
+                diferido.prompt();
+                diferido.userChoice.then(function (r) {
+                    if (r.outcome === 'accepted') {
+                        title.textContent = 'YourFavs instalada';
+                        desc.textContent = 'Búscala en tu pantalla de inicio o en tu lista de aplicaciones.';
+                        btn.hidden = true;
+                    } else {
+                        btn.disabled = false;
+                    }
+                });
+            }, { once: true });
+        });
+
+        // Instalada desde el diálogo del navegador (no desde nuestro botón).
+        window.addEventListener('appinstalled', function () {
+            title.textContent = 'YourFavs instalada';
+            desc.textContent = 'Búscala en tu pantalla de inicio o en tu lista de aplicaciones.';
+            btn.hidden = true;
+            ios.hidden = true;
+        });
+    })();
+</script>

@@ -10,6 +10,7 @@
  * viaje entre dispositivos.
  */
 import type { UserProfile } from "../../services/BD/profile/userProfile";
+import InstalarApp from "./InstalarApp.astro";
 
 interface Props { profile: UserProfile; }
 const { profile } = Astro.props;
@@ -48,6 +49,10 @@ const OPTIONS = [
         <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
     </div>
 </form>
+
+{/* Instalar la app. Fuera del <form> a propósito: no es un ajuste del perfil, no se guarda
+    en Firestore y no debe viajar en el POST. */}
+<InstalarApp />
 
 <script>
     // Aplicar al instante. `change` en un grupo de radios solo dispara en el que se marca.

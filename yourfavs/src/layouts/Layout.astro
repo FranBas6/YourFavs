@@ -45,12 +45,26 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <link rel="icon" type="image/svg+xml" href="/logo_yourfavs.png"/>
+    <!-- El favicon de la pestaña NO se toca: es el logo de siempre. Lo único corregido es el
+         `type`, que decía `image/svg+xml` apuntando a un PNG. Los iconos de la app instalada
+         (apple-touch-icon y manifest) son otra cosa y van aparte, aquí debajo. -->
+    <link rel="icon" type="image/png" href="/logo_yourfavs.png"/>
     <meta name="generator" content={Astro.generator}/>
     <meta name="description" content={description}/>
     <meta name="theme-color" content="#3B82F6"/>
     <link rel="canonical" href={Astro.url.href}/>
+    <!-- App instalable. El `apple-touch-icon` de aquí abajo ya se enlazaba, pero el archivo
+         NO existía: era un 404, y por eso iOS ponía una captura de la página en la pantalla
+         de inicio en vez del logo. Lo genera `scripts/build-pwa-icons.mjs`. -->
     <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
+    <link rel="manifest" href="/manifest.webmanifest"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="mobile-web-app-capable" content="yes"/>
+    <!-- `default` y no `black-translucent` a propósito: el translúcido mete el contenido bajo
+         la barra de estado, y el layout no tiene padding superior de safe-area (el tabbar sí
+         lo tiene abajo). Con `default`, la cabecera azul empieza donde debe. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+    <meta name="apple-mobile-web-app-title" content="YourFavs"/>
     <meta property="og:image" content={ogImage}/>
     <meta name="twitter:card" content="summary_large_image"/>
     <meta name="twitter:title" content={title}/>
@@ -172,5 +186,17 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 {!hideTabbar && <MobileNavSheets />}
 <script is:inline src="/js/hover-preview.js" defer></script>
 <script is:inline src="/js/scroll-restore.js"></script>
+{import.meta.env.PROD && (
+    <script is:inline>
+        // Service worker (ver public/sw.js). Solo en producción a propósito: en `astro dev`
+        // una caché de assets pelea con el HMR de Vite y acabas depurando fantasmas.
+        // Va en `load` para no competir por red con el primer render.
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/sw.js').catch(function () { /* sin SW se vive igual */ });
+            });
+        }
+    </script>
+)}
 </body>
 </html>

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+    <title>Sin conexión · YourFavs</title>
+    <meta name="theme-color" content="#0B1220"/>
+    <!--
+      Página que sirve el service worker cuando una navegación no llega a la red. Todo va
+      embebido a propósito: si dependiera de una hoja de estilos o de una fuente externa, sin
+      conexión se vería en Times New Roman sobre blanco, que es justo lo que se quiere evitar.
+    -->
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 18px; padding: 32px 24px;
+            background: #0B1220; color: #E5E7EB;
+            font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+            text-align: center;
+        }
+        img { width: 96px; height: 96px; border-radius: 22px; }
+        h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+        p { margin: 0; max-width: 34ch; font-size: 14px; line-height: 1.5; color: #9CA3AF; }
+        button {
+            margin-top: 6px; min-height: 44px; padding: 12px 22px;
+            border: 0; border-radius: 999px; cursor: pointer;
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: #fff;
+            font: inherit; font-size: 15px; font-weight: 600;
+        }
+        button:active { transform: scale(.98); }
+    </style>
+</head>
+<body>
+    <img src="/icons/icon-192.png" alt="YourFavs"/>
+    <h1>Sin conexión</h1>
+    <p>YourFavs necesita internet para saber qué has visto y qué te falta. En cuanto vuelvas a tener cobertura, sigue donde lo dejaste.</p>
+    <button type="button" onclick="location.reload()">Reintentar</button>
+</body>
+</html>
