@@ -1,6 +1,7 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
+import { getCurrentUid } from '../services/BD/shared/userScope';
 
 const TTL_MS = 60 * 60 * 1000;
 const MAX_CAST_ORDER = 10;
@@ -14,9 +15,11 @@ export interface TopActor {
     series: number;
 }
 
-let cache: { data: TopActor[]; expires: number } | null = null;
+// Por uid: el top sale de TU biblioteca. Con una única variable, la instancia caliente
+// le servía a cualquier usuario el top del último que lo calculó.
+const cache = new Map<string, { data: TopActor[]; expires: number }>();
 
-export function invalidateTopActorsCache() { cache = null; }
+export function invalidateTopActorsCache() { cache.clear(); }
 
 /**
  * Lee el top de actores de la caché SIN computar (3.4). Devuelve null si está
@@ -24,15 +27,20 @@ export function invalidateTopActorsCache() { cache = null; }
  * "visto N con esta persona" solo aparece cuando la caché ya está caliente.
  */
 export function peekTopActors(): TopActor[] | null {
-    return cache && cache.expires > Date.now() ? cache.data : null;
+    const uid = getCurrentUid();
+    const hit = uid ? cache.get(uid) : undefined;
+    return hit && hit.expires > Date.now() ? hit.data : null;
 }
 
 interface CastEntry { id: number; name: string; profile_path: string | null; order: number }
 interface CreditsResponse { cast?: CastEntry[] }
 
 export async function calculateTopActors(limit = 10): Promise<TopActor[]> {
+    const uid = getCurrentUid();
+    if (!uid) return [];
     const now = Date.now();
-    if (cache && cache.expires > now) return cache.data;
+    const hit = cache.get(uid);
+    if (hit && hit.expires > now) return hit.data;
 
     const { movFavs, movVistos, movLike, tvFavs, tvVistos, tvSig, tvLike } = await getLibrarySnapshot();
 
@@ -86,6 +94,6 @@ export async function calculateTopActors(limit = 10): Promise<TopActor[]> {
         .sort((a, b) => b.appearances - a.appearances || a.name.localeCompare(b.name))
         .slice(0, limit);
 
-    cache = { data: top, expires: now + TTL_MS };
+    cache.set(uid, { data: top, expires: now + TTL_MS });
     return top;
 }

@@ -2,6 +2,7 @@ import { tmdbFetch, tmdbFetchList } from "./tmdbClient";
 import { processBatch } from "../../../utils/processBatch";
 import { getMovieCollectionInfo, type MovieCollectionInfo } from "../Movies/InfoMovies";
 import { getLibrarySnapshot } from "../../BD/shared/librarySnapshot";
+import { getCurrentUid } from "../../BD/shared/userScope";
 import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
 import { SEED_COLLECTION_IDS } from "../../../utils/constants/featuredCollections";
 
@@ -11,7 +12,9 @@ const USER_TTL_MS = 5 * 60 * 1000;
 const MAX_USER_MOVIES = 50;
 
 let popularCache: CacheEntry<MovieCollectionInfo[]> | null = null;
-let userCache: CacheEntry<MovieCollectionInfo[]> | null = null;
+// Por uid: son las sagas de TU biblioteca. Con una única variable, la instancia caliente
+// le servía a cualquier usuario las del último que entró.
+const userCache = new Map<string, CacheEntry<MovieCollectionInfo[]>>();
 
 async function extractCollectionIds(movieIds: string[]): Promise<number[]> {
     const results = await processBatch(
@@ -92,7 +95,10 @@ export async function getPopularCollections(): Promise<MovieCollectionInfo[]> {
 }
 
 export async function getUserCollections(): Promise<MovieCollectionInfo[]> {
-    if (userCache && userCache.expires > Date.now()) return userCache.data;
+    const uid = getCurrentUid();
+    if (!uid) return [];
+    const hit = userCache.get(uid);
+    if (hit && hit.expires > Date.now()) return hit.data;
     try {
         const { movFavs: favs, movVistos: vistas, movLike: liked, movPend: pendientes, movVerPronto: verPronto } = await getLibrarySnapshot();
 
@@ -114,7 +120,7 @@ export async function getUserCollections(): Promise<MovieCollectionInfo[]> {
 
         const collectionIds = await extractCollectionIds(recentIds);
         const collections = await loadCollections(collectionIds);
-        userCache = { data: collections, expires: Date.now() + USER_TTL_MS };
+        userCache.set(uid, { data: collections, expires: Date.now() + USER_TTL_MS });
         return collections;
     } catch (error) {
         console.error("Error al cargar tus colecciones:", error);
@@ -124,9 +130,9 @@ export async function getUserCollections(): Promise<MovieCollectionInfo[]> {
 
 export function invalidateCollectionsCache(): void {
     popularCache = null;
-    userCache = null;
+    userCache.clear();
 }
 
 export function invalidateUserCollectionsCache(): void {
-    userCache = null;
+    userCache.clear();
 }
