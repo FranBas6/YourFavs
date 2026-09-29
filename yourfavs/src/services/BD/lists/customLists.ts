@@ -1,26 +1,17 @@
 /**
  * Listas personalizadas (Fase L1) — colecciones propias del usuario.
  *
- * Modelo:
- *   users/{uid}/customLists/{listId}
- *     name · description · icon (emoji) · colorStamp · cover · itemCount · position · created_at · updated_at
- *   users/{uid}/customLists/{listId}/items/{itemId}   // itemId = `${media_type}_${tmdb_id}`
- *     media_type · tmdb_id · title · poster_path · position · added_at
+ * Modelo (antes users/{uid}/customLists/{listId} + subcolección items):
+ *   custom_lists        name · description · icon (emoji) · color_stamp · cover · item_count · position · created_at · updated_at
+ *   custom_list_items   media_type · tmdb_id · title · poster_path · position · added_at
+ * Hacia fuera, la forma de siempre: `colorStamp`, `itemCount` e items con id `${media_type}_${tmdb_id}`.
  *
- * Acceso por Admin SDK vía userScope (uid de la sesión, NUNCA del cliente).
- * `itemCount` y `position` están denormalizados: el hub lista sin contar items,
- * y el orden (de listas y de items) se persiste para el drag manual.
+ * `item_count` lo mantiene un trigger (antes un FieldValue.increment a mano en cada alta/baja,
+ * que se podía desincronizar); `position` se persiste para el drag manual.
  *
- * El borrado de cuenta usa recursiveDelete(users/{uid}), que ya cubre estas
- * subcolecciones; `deleteList` hace recursiveDelete del subárbol de la lista.
+ * Borrar una lista se lleva sus items por la FK (`on delete cascade`), y borrar la cuenta, todo.
  */
-import { FieldValue } from 'firebase-admin/firestore';
-import type { DocumentData, WriteBatch } from 'firebase-admin/firestore';
-import { adminDb } from '../../../utils/firebaseAdmin';
-import { userCol, userDoc, requireUid, getCurrentUid } from '../shared/userScope';
-
-const COLLECTION = 'customLists';
-const ITEMS = 'items';
+import { db, fetchAll, getAuthId, requireAuthId } from '../shared/userScope';
 
 export type ColorStamp = 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
 export const LIST_COLORS: ColorStamp[] = ['red', 'amber', 'blue', 'green', 'purple', 'pink', 'slate'];
@@ -109,27 +100,74 @@ function itemIdFor(mediaType: 'movie' | 'tv', tmdbId: number | string): string {
 
 // ---- lecturas ----
 
+const LIST_COLUMNS = 'id, name, description, icon, color_stamp, cover, item_count, position, created_at, updated_at';
+const ITEM_COLUMNS = 'media_type, tmdb_id, title, poster_path, position, added_at';
+
+function toList(r: Record<string, any>): CustomList {
+    return {
+        id: r.id,
+        name: r.name,
+        description: r.description ?? '',
+        icon: r.icon ?? '',
+        colorStamp: (r.color_stamp ?? 'slate') as ColorStamp,
+        cover: (r.cover ?? null) as CustomListCover | null,
+        itemCount: r.item_count ?? 0,
+        position: r.position ?? 0,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+    };
+}
+
+function toItem(r: Record<string, any>): CustomListItem {
+    return {
+        id: itemIdFor(r.media_type, r.tmdb_id),
+        media_type: r.media_type,
+        tmdb_id: r.tmdb_id,
+        title: r.title ?? '',
+        poster_path: r.poster_path ?? null,
+        position: r.position ?? 0,
+        added_at: r.added_at,
+    };
+}
+
+/** `movie_550` → { media_type: 'movie', tmdb_id: 550 } (null si no tiene esa forma). */
+function parseItemId(itemId: string): { media_type: 'movie' | 'tv'; tmdb_id: number } | null {
+    const m = /^(movie|tv)_(\d+)$/.exec(itemId);
+    return m ? { media_type: m[1] as 'movie' | 'tv', tmdb_id: Number(m[2]) } : null;
+}
+
 export async function getCustomLists(): Promise<CustomList[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userCol(COLLECTION).orderBy('position').get();
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) } as CustomList));
+    const userId = getAuthId();
+    if (!userId) return [];
+    const rows = await fetchAll<Record<string, any>>((from, to) =>
+        db().from('custom_lists').select(LIST_COLUMNS).eq('user_id', userId)
+            .order('position', { nullsFirst: false }).order('created_at').range(from, to),
+    );
+    return rows.map(toList);
 }
 
 export async function getCustomList(listId: string): Promise<CustomList | null> {
-    if (!getCurrentUid()) return null;
-    const snap = await userDoc(COLLECTION, listId).get();
-    return snap.exists ? ({ id: snap.id, ...(snap.data() as DocumentData) } as CustomList) : null;
+    const userId = getAuthId();
+    if (!userId) return null;
+    const { data, error } = await db().from('custom_lists').select(LIST_COLUMNS)
+        .eq('user_id', userId).eq('id', listId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? toList(data) : null;
 }
 
 export async function getListItems(listId: string): Promise<CustomListItem[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userDoc(COLLECTION, listId).collection(ITEMS).orderBy('position').get();
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as DocumentData) } as CustomListItem));
+    const userId = getAuthId();
+    if (!userId) return [];
+    const rows = await fetchAll<Record<string, any>>((from, to) =>
+        db().from('custom_list_items').select(ITEM_COLUMNS).eq('user_id', userId).eq('list_id', listId)
+            .order('position', { nullsFirst: false }).order('added_at').range(from, to),
+    );
+    return rows.map(toItem);
 }
 
 /**
  * Para el popover "Guardar en…": todas las listas + en cuáles está ya el item.
- * Una lectura por lista (lookup directo del doc item por id) → barato.
+ * Dos consultas en total (antes: una lectura por lista).
  */
 export async function getListsMembership(
     mediaType: 'movie' | 'tv',
@@ -137,49 +175,41 @@ export async function getListsMembership(
 ): Promise<{ lists: CustomList[]; memberIds: string[] }> {
     const lists = await getCustomLists();
     if (lists.length === 0) return { lists, memberIds: [] };
-    const itemId = itemIdFor(mediaType, tmdbId);
-    const snaps = await Promise.all(
-        lists.map(l => userDoc(COLLECTION, l.id).collection(ITEMS).doc(itemId).get())
-    );
-    const memberIds = lists.filter((_, i) => snaps[i].exists).map(l => l.id);
-    return { lists, memberIds };
+    const { data, error } = await db().from('custom_list_items').select('list_id')
+        .eq('user_id', requireAuthId()).eq('media_type', mediaType).eq('tmdb_id', Number(tmdbId));
+    if (error) throw new Error(error.message);
+    const member = new Set((data ?? []).map((r) => r.list_id));
+    return { lists, memberIds: lists.filter(l => member.has(l.id)).map(l => l.id) };
 }
 
 // ---- escrituras: listas ----
 
 export async function createList(input: CustomListInput): Promise<string> {
-    requireUid();
+    const userId = requireAuthId();
     const name = cleanName(input.name);
     if (!name) throw new Error('El nombre es obligatorio');
 
-    const existing = await userCol(COLLECTION).get();
-    const maxPos = existing.empty
-        ? 0
-        : Math.max(0, ...existing.docs.map(d => Number(d.data().position) || 0));
+    const { data: last, error: lastError } = await db().from('custom_lists').select('position')
+        .eq('user_id', userId).order('position', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+    if (lastError) throw new Error(lastError.message);
+    const maxPos = Math.max(0, Number(last?.position) || 0);
 
-    const ref = userCol(COLLECTION).doc();
-    const now = new Date();
-    const doc: Omit<CustomList, 'id'> = {
+    const { data, error } = await db().from('custom_lists').insert({
+        user_id: userId,
         name,
         description: cleanDesc(input.description),
         icon: cleanIcon(input.icon),
-        colorStamp: cleanColor(input.colorStamp),
-        cover: cleanCover(input.cover),
-        itemCount: 0,
+        color_stamp: cleanColor(input.colorStamp),
+        cover: cleanCover(input.cover) as never,
         position: maxPos + 1,
-        created_at: now,
-        updated_at: now,
-    };
-    await ref.set(doc);
-    return ref.id;
+    }).select('id').single();
+    if (error) throw new Error(error.message);
+    return data.id;
 }
 
 export async function updateList(listId: string, patch: Partial<CustomListInput>): Promise<void> {
-    requireUid();
-    const ref = userDoc(COLLECTION, listId);
-    if (!(await ref.get()).exists) throw new Error('Lista no encontrada');
-
-    const update: Record<string, unknown> = { updated_at: new Date() };
+    const userId = requireAuthId();
+    const update: Record<string, unknown> = {}; // updated_at: lo pone el trigger
     if (patch.name !== undefined) {
         const n = cleanName(patch.name);
         if (!n) throw new Error('El nombre es obligatorio');
@@ -187,91 +217,85 @@ export async function updateList(listId: string, patch: Partial<CustomListInput>
     }
     if (patch.description !== undefined) update.description = cleanDesc(patch.description);
     if (patch.icon !== undefined) update.icon = cleanIcon(patch.icon);
-    if (patch.colorStamp !== undefined) update.colorStamp = cleanColor(patch.colorStamp);
+    if (patch.colorStamp !== undefined) update.color_stamp = cleanColor(patch.colorStamp);
     if (patch.cover !== undefined) update.cover = cleanCover(patch.cover);
-    await ref.update(update);
+    // `select` para saber si la lista existía (0 filas = no es tuya o no existe).
+    const { data, error } = await db().from('custom_lists').update(update as never)
+        .eq('user_id', userId).eq('id', listId).select('id');
+    if (error) throw new Error(error.message);
+    if (!data?.length) throw new Error('Lista no encontrada');
 }
 
 export async function deleteList(listId: string): Promise<void> {
-    requireUid();
-    const ref = userDoc(COLLECTION, listId);
-    // recursiveDelete borra el doc + su subcolección items en una pasada.
-    await adminDb.recursiveDelete(ref);
+    const userId = requireAuthId();
+    // Los items se van con la lista (FK on delete cascade).
+    const { error } = await db().from('custom_lists').delete().eq('user_id', userId).eq('id', listId);
+    if (error) throw new Error(error.message);
 }
 
 /** Reordena las listas del hub: `orderedIds` = nuevo orden completo → position = índice+1. */
 export async function reorderLists(orderedIds: string[]): Promise<void> {
-    requireUid();
-    const batch: WriteBatch = adminDb.batch();
-    orderedIds.forEach((id, i) => batch.update(userDoc(COLLECTION, id), { position: i + 1 }));
-    await batch.commit();
+    requireAuthId();
+    const { error } = await db().rpc('reorder_custom_lists', { p_ids: orderedIds });
+    if (error) throw new Error(error.message);
 }
 
 // ---- escrituras: items ----
 
 export async function addItemToList(listId: string, item: CustomListItemInput): Promise<{ itemCount: number }> {
-    requireUid();
-    const listRef = userDoc(COLLECTION, listId);
-    const listSnap = await listRef.get();
-    if (!listSnap.exists) throw new Error('Lista no encontrada');
-    const prevCount = Number(listSnap.data()?.itemCount) || 0;
+    const userId = requireAuthId();
+    const list = await getCustomList(listId);
+    if (!list) throw new Error('Lista no encontrada');
 
     const mediaType = item.media_type === 'tv' ? 'tv' : 'movie';
     const tmdbId = Number(item.tmdb_id);
     if (!Number.isFinite(tmdbId)) throw new Error('tmdb_id inválido');
 
-    const itemRef = listRef.collection(ITEMS).doc(itemIdFor(mediaType, tmdbId));
-    if ((await itemRef.get()).exists) return { itemCount: prevCount }; // idempotente: ya está, no recontar
+    const { data: last, error: lastError } = await db().from('custom_list_items').select('position')
+        .eq('user_id', userId).eq('list_id', listId)
+        .order('position', { ascending: false, nullsFirst: false }).limit(1).maybeSingle();
+    if (lastError) throw new Error(lastError.message);
+    const maxPos = Number(last?.position) || 0;
 
-    const itemsSnap = await listRef.collection(ITEMS).orderBy('position', 'desc').limit(1).get();
-    const maxPos = itemsSnap.empty ? 0 : (Number(itemsSnap.docs[0].data().position) || 0);
-
-    const batch = adminDb.batch();
-    batch.set(itemRef, {
+    // Idempotente: si ya está, no se inserta ni se recuenta (el trigger solo cuenta altas reales).
+    const { data: inserted, error } = await db().from('custom_list_items').upsert({
+        user_id: userId,
+        list_id: listId,
         media_type: mediaType,
         tmdb_id: tmdbId,
         title: String(item.title ?? '').slice(0, 200),
         poster_path: item.poster_path ? String(item.poster_path) : null,
         position: maxPos + 1,
-        added_at: new Date(),
-    });
-    batch.update(listRef, { itemCount: FieldValue.increment(1), updated_at: new Date() });
-    await batch.commit();
-    return { itemCount: prevCount + 1 };
+    }, { onConflict: 'user_id,list_id,media_type,tmdb_id', ignoreDuplicates: true }).select('tmdb_id');
+    if (error) throw new Error(error.message);
+    return { itemCount: list.itemCount + (inserted?.length ? 1 : 0) };
 }
 
 export async function removeItemFromList(listId: string, itemId: string): Promise<void> {
-    requireUid();
-    const listRef = userDoc(COLLECTION, listId);
-    const itemRef = listRef.collection(ITEMS).doc(itemId);
-    const itemSnap = await itemRef.get();
-    if (!itemSnap.exists) return; // ya no está → nada que decrementar
-    const item = itemSnap.data() as { media_type?: string; tmdb_id?: number };
-
-    const batch = adminDb.batch();
-    batch.delete(itemRef);
-    batch.update(listRef, { itemCount: FieldValue.increment(-1), updated_at: new Date() });
-    await batch.commit();
+    const userId = requireAuthId();
+    const key = parseItemId(itemId);
+    if (!key) return;
+    const { data: removed, error } = await db().from('custom_list_items').delete()
+        .eq('user_id', userId).eq('list_id', listId).eq('media_type', key.media_type).eq('tmdb_id', key.tmdb_id)
+        .select('tmdb_id');
+    if (error) throw new Error(error.message);
+    if (!removed?.length) return; // ya no estaba → nada que registrar
 
     // §5 · bitácora (best-effort): quitar un título de una colección es intencional.
     try {
-        if (item.tmdb_id != null) {
-            const { appendActivity } = await import('../shared/activityLog');
-            await appendActivity({
-                verb: 'remove',
-                media_type: item.media_type === 'movie' ? 'movie' : 'tv',
-                tmdb_id: item.tmdb_id,
-                meta: { custom: true, listId },
-            });
-        }
+        const { appendActivity } = await import('../shared/activityLog');
+        await appendActivity({
+            verb: 'remove',
+            media_type: key.media_type,
+            tmdb_id: key.tmdb_id,
+            meta: { custom: true, listId },
+        });
     } catch { /* bitácora opcional */ }
 }
 
 /** Reordena los items de una lista: `orderedItemIds` = nuevo orden completo. */
 export async function reorderItems(listId: string, orderedItemIds: string[]): Promise<void> {
-    requireUid();
-    const itemsCol = userDoc(COLLECTION, listId).collection(ITEMS);
-    const batch = adminDb.batch();
-    orderedItemIds.forEach((id, i) => batch.update(itemsCol.doc(id), { position: i + 1 }));
-    await batch.commit();
+    requireAuthId();
+    const { error } = await db().rpc('reorder_custom_list_items', { p_list_id: listId, p_item_ids: orderedItemIds });
+    if (error) throw new Error(error.message);
 }

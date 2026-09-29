@@ -1,7 +1,7 @@
 /**
  * Gustos del usuario (Fase F · onboarding) — almacén `taste` propio.
  *
- * Vive en la subcolección users/{uid}/taste/current, SEPARADO de las listas
+ * Vive en `user_state` con clave 'taste' (antes users/{uid}/taste/current), SEPARADO de las listas
  * (Favoritos / Me gusta / …) y también del doc raíz de perfil. Razón: "lo que
  * sigo" ≠ "lo que le digo al sistema que me gusta"; y al ser arrays grandes
  * (hasta 10 géneros + 10 títulos + 10 personas) no deben engordar la lectura
@@ -9,13 +9,11 @@
  *
  * El estado del onboarding ('done' | 'skipped') NO vive aquí: es una bandera
  * ligera en el doc raíz de perfil (userProfile.ts) para decidir gating sin
- * lecturas extra. Acceso por Admin SDK vía userScope (uid de la sesión).
+ * lecturas extra.
  *
- * El borrado de cuenta usa recursiveDelete(users/{uid}), que ya cubre esta
- * subcolección automáticamente → sin pasos extra al eliminar cuenta.
+ * Al borrar la cuenta, el `on delete cascade` de `user_state` se lo lleva → sin pasos extra.
  */
-import { userRootDoc, getCurrentUid } from '../shared/userScope';
-import type { DocumentReference } from 'firebase-admin/firestore';
+import { db, getAuthId, requireAuthId } from '../shared/userScope';
 
 export interface TasteTitle {
     id: number;
@@ -42,24 +40,32 @@ export interface UserTaste {
     updated_at?: unknown;
 }
 
-/** Doc de gustos del usuario actual: users/{uid}/taste/current. Lanza sin sesión. */
-function tasteDoc(): DocumentReference {
-    return userRootDoc().collection('taste').doc('current');
-}
+const KEY = 'taste';
 
 export async function getUserTaste(): Promise<UserTaste | null> {
-    if (!getCurrentUid()) return null;
-    const snap = await tasteDoc().get();
-    return snap.exists ? (snap.data() as UserTaste) : null;
+    const userId = getAuthId();
+    if (!userId) return null;
+    const { data, error } = await db().from('user_state').select('data').eq('user_id', userId).eq('key', KEY).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? (data.data as unknown as UserTaste) : null;
 }
 
-/** Merge parcial: solo escribe los campos presentes en `patch`. */
+/** Merge parcial: solo escribe los campos presentes en `patch` (el resto se conserva). */
 export async function setUserTaste(patch: Partial<UserTaste>): Promise<void> {
-    await tasteDoc().set({ ...patch, updated_at: new Date() }, { merge: true });
+    const userId = requireAuthId();
+    const current = await getUserTaste();
+    const next = { ...(current ?? {}), ...patch, updated_at: new Date().toISOString() };
+    const { error } = await db().from('user_state').upsert(
+        { user_id: userId, key: KEY, data: next as never },
+        { onConflict: 'user_id,key' },
+    );
+    if (error) throw new Error(error.message);
 }
 
-/** Reinicia los gustos (borra el doc). El estado de onboarding se gestiona aparte. */
+/** Reinicia los gustos (borra la fila). El estado de onboarding se gestiona aparte. */
 export async function clearUserTaste(): Promise<void> {
-    if (!getCurrentUid()) return;
-    await tasteDoc().delete();
+    const userId = getAuthId();
+    if (!userId) return;
+    const { error } = await db().from('user_state').delete().eq('user_id', userId).eq('key', KEY);
+    if (error) throw new Error(error.message);
 }

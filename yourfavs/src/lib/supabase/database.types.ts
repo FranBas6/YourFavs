@@ -249,6 +249,12 @@ isOneToOne: false
 "renumber_list_positions":
 { Args: { "p_collection": string }; Returns: undefined
                            },
+"reorder_custom_list_items":
+{ Args: { "p_item_ids": (string)[],"p_list_id": string }; Returns: undefined
+                           },
+"reorder_custom_lists":
+{ Args: { "p_ids": (string)[] }; Returns: undefined
+                           },
 "shift_list_positions":
 { Args: { "p_collection": string,"p_delta": number,"p_from": number,"p_to": number }; Returns: undefined
                            }

@@ -1,11 +1,11 @@
 /**
  * Perfil + preferencias del usuario (Fase E).
  *
- * Vive en el documento RAÍZ users/{uid} (campos), separado de las subcolecciones
- * de listas. Antes ese doc "no existía" (solo subcolecciones); aquí le damos
- * campos. Acceso por Admin SDK vía userScope (uid de la sesión).
+ * Vive en la tabla `profiles` (antes el documento RAÍZ users/{uid}), una fila por cuenta que
+ * crea el trigger `on_auth_user_created`. Hacia fuera se mantiene la forma de siempre en
+ * camelCase (`platformsFilterDefault`, `notifPrefs`…); las columnas van en snake_case.
  */
-import { userRootDoc, getCurrentUid } from '../shared/userScope';
+import { db, getAuthId, requireAuthId } from '../shared/userScope';
 
 /**
  * Modo sin spoilers, desglosado.
@@ -70,13 +70,62 @@ export interface UserProfile {
     updated_at?: unknown;
 }
 
+/** Campo del perfil (camelCase, lo que ve la app) → columna de `profiles`. */
+const COLUMN: Record<Exclude<keyof UserProfile, 'updated_at'>, string> = {
+    display_name: 'display_name',
+    avatar_url: 'avatar_url',
+    region: 'region',
+    language: 'language',
+    theme: 'theme',
+    email: 'email',
+    onboarding: 'onboarding',
+    platforms: 'platforms',
+    platformsFilterDefault: 'platforms_filter_default',
+    notifPrefs: 'notif_prefs',
+    spoilerFree: 'spoiler_free',
+    spoilers: 'spoilers',
+    homeLayout: 'home_layout',
+};
+const SELECT = [...Object.values(COLUMN), 'updated_at'].join(', ');
+
 export async function getUserProfile(): Promise<UserProfile | null> {
-    if (!getCurrentUid()) return null;
-    const snap = await userRootDoc().get();
-    return snap.exists ? (snap.data() as UserProfile) : null;
+    const userId = getAuthId();
+    if (!userId) return null;
+    const { data, error } = await db().from('profiles').select(SELECT).eq('id', userId).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+    // Sin claves a null: en Firestore un campo nunca escrito simplemente no existía, y así es
+    // como lo leen las páginas (`profile?.theme ?? 'light'`).
+    const row = data as unknown as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [field, column] of Object.entries(COLUMN)) if (row[column] !== null) out[field] = row[column];
+    if (row.updated_at) out.updated_at = row.updated_at;
+    return out as UserProfile;
 }
 
-/** Merge parcial: solo escribe los campos presentes en `patch`. */
+/**
+ * Merge parcial: solo escribe los campos presentes en `patch`.
+ *
+ * Firestore (`set(..., { merge: true })`) fusionaba también DENTRO de los mapas, y Ajustes
+ * depende de ello: manda solo el interruptor que cambió (`notifPrefs: { episodes: false }`)
+ * sin borrar los demás. Un UPDATE de Postgres sustituiría el jsonb entero, así que esos dos
+ * objetos se fusionan aquí con lo que ya hay. Los arrays (`platforms`, `homeLayout`) se
+ * sustituyen, igual que hacía Firestore.
+ */
 export async function setUserProfile(patch: Partial<UserProfile>): Promise<void> {
-    await userRootDoc().set({ ...patch, updated_at: new Date() }, { merge: true });
+    const userId = requireAuthId();
+    const merged: Partial<UserProfile> = { ...patch };
+    if (patch.notifPrefs || patch.spoilers) {
+        const current = await getUserProfile();
+        if (patch.notifPrefs) merged.notifPrefs = { ...(current?.notifPrefs ?? {}), ...patch.notifPrefs };
+        if (patch.spoilers) merged.spoilers = { ...(current?.spoilers ?? {}), ...patch.spoilers };
+    }
+    const update: Record<string, unknown> = {};
+    for (const [field, value] of Object.entries(merged)) {
+        const column = COLUMN[field as keyof typeof COLUMN];
+        if (column && value !== undefined) update[column] = value; // updated_at: lo pone el trigger
+    }
+    if (!Object.keys(update).length) return;
+    const { error } = await db().from('profiles').update(update as never).eq('id', userId);
+    if (error) throw new Error(error.message);
 }
