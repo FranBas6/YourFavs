@@ -246,6 +246,9 @@ isOneToOne: false
             "claim_app_state":
 { Args: { "p_key": string,"p_ttl_ms": number }; Returns: Json
                            },
+"renumber_actor_favs":
+{ Args: Record<PropertyKey, never>; Returns: undefined
+                           },
 "renumber_list_positions":
 { Args: { "p_collection": string }; Returns: undefined
                            },
@@ -254,6 +257,9 @@ isOneToOne: false
                            },
 "reorder_custom_lists":
 { Args: { "p_ids": (string)[] }; Returns: undefined
+                           },
+"shift_actor_fav_positions":
+{ Args: { "p_delta": number,"p_from": number,"p_to": number }; Returns: undefined
                            },
 "shift_list_positions":
 { Args: { "p_collection": string,"p_delta": number,"p_from": number,"p_to": number }; Returns: undefined

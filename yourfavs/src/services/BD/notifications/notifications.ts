@@ -1,13 +1,12 @@
 /**
  * Buzón de notificaciones (Bloque 4 · la campana).
  *
- * users/{uid}/notifications/{deterministicId} → { type, title, subtitle, href,
+ * Tabla `notifications` (antes users/{uid}/notifications/{deterministicId}) → { type, title, subtitle, href,
  * poster_path, created_at, read }. El id es DETERMINISTA (p.ej. episode:1399:T2·E5)
  * para que re-sincronizar (materializar al abrir) sea idempotente y no duplique ni
  * pise el estado `read`. Ver el generador en services/API/notifications/generator.ts.
  */
-import { userCol, userDoc, requireUid, getCurrentUid } from '../shared/userScope';
-import { adminDb } from '../../../utils/firebaseAdmin';
+import { db, getAuthId, requireAuthId } from '../shared/userScope';
 
 export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change' | 'streak';
 
@@ -32,8 +31,6 @@ export interface NotifInput {
     created_at?: number;
 }
 
-const COL = 'notifications';
-
 // Tipos que la campana muestra hoy. El viejo 'on_platform' se retiró (sin detección de
 // cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
 // desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
@@ -50,15 +47,20 @@ function toMs(v: any): number {
 }
 
 export async function listNotifications(limit = 30): Promise<NotificationDoc[]> {
-    if (!getCurrentUid()) return [];
+    const userId = getAuthId();
+    if (!userId) return [];
     try {
-        // Pedimos de más y filtramos los tipos obsoletos en memoria (evita índice compuesto).
-        const snap = await userCol(COL).orderBy('created_at', 'desc').limit(limit * 2).get();
-        return snap.docs
-            .map((d) => {
-                const x = d.data();
+        // Solo los tipos activos, filtrados en la BD (en Firestore se pedía de más y se filtraba
+        // en memoria para no necesitar un índice compuesto).
+        const { data, error } = await db().from('notifications')
+            .select('id, type, title, subtitle, href, poster_path, created_at, read')
+            .eq('user_id', userId).in('type', [...ACTIVE_TYPES])
+            .order('created_at', { ascending: false }).limit(limit);
+        if (error) throw new Error(error.message);
+        return (data ?? [])
+            .map((x) => {
                 return {
-                    id: d.id,
+                    id: x.id,
                     type: x.type,
                     title: x.title || '',
                     subtitle: x.subtitle || '',
@@ -66,10 +68,8 @@ export async function listNotifications(limit = 30): Promise<NotificationDoc[]> 
                     poster_path: x.poster_path ?? null,
                     created_at: toMs(x.created_at),
                     read: !!x.read,
-                };
-            })
-            .filter((n) => ACTIVE_TYPES.has(n.type))
-            .slice(0, limit);
+                } as NotificationDoc;
+            });
     } catch (error) {
         console.error('Error al leer notifications:', error);
         return [];
@@ -77,48 +77,57 @@ export async function listNotifications(limit = 30): Promise<NotificationDoc[]> 
 }
 
 export async function unreadCount(): Promise<number> {
-    if (!getCurrentUid()) return 0;
+    const userId = getAuthId();
+    if (!userId) return 0;
     try {
-        const snap = await userCol(COL).where('read', '==', false).get();
-        return snap.docs.filter((d) => ACTIVE_TYPES.has(d.data().type)).length;
+        // Un count en la BD (índice parcial de no leídas); antes se leían todas para contarlas.
+        const { count, error } = await db().from('notifications').select('id', { count: 'exact', head: true })
+            .eq('user_id', userId).eq('read', false).in('type', [...ACTIVE_TYPES]);
+        if (error) throw new Error(error.message);
+        return count ?? 0;
     } catch {
         return 0;
     }
 }
 
 export async function markRead(id: string): Promise<void> {
-    await userDoc(COL, id).set({ read: true }, { merge: true });
+    const { error } = await db().from('notifications').update({ read: true }).eq('user_id', requireAuthId()).eq('id', id);
+    if (error) throw new Error(error.message);
 }
 
 export async function markAllRead(): Promise<void> {
-    const snap = await userCol(COL).where('read', '==', false).get();
-    if (snap.empty) return;
-    const batch = adminDb.batch();
-    snap.docs.forEach((d) => batch.set(d.ref, { read: true }, { merge: true }));
-    await batch.commit();
+    const { error } = await db().from('notifications').update({ read: true }).eq('user_id', requireAuthId()).eq('read', false);
+    if (error) throw new Error(error.message);
 }
 
 /**
  * Upsert idempotente: crea las nuevas (read:false) y refresca el contenido de las
- * existentes SIN tocar su `read` (leemos solo los ids para saber cuáles ya están).
+ * existentes SIN tocar su `read` ni su `created_at`. Se miran solo los ids que llegan
+ * (antes se leían los de TODAS las notificaciones para saberlo).
  */
 export async function upsertMany(items: NotifInput[]): Promise<void> {
     if (!items.length) return;
-    requireUid();
-    const existing = await userCol(COL).select().get(); // solo ids → lectura mínima
-    const known = new Set(existing.docs.map((d) => d.id));
-    const batch = adminDb.batch();
-    for (const it of items) {
-        const ref = userDoc(COL, it.id);
-        const content = {
-            type: it.type, title: it.title, subtitle: it.subtitle,
-            href: it.href, poster_path: it.poster_path,
-        };
-        if (known.has(it.id)) {
-            batch.set(ref, content, { merge: true }); // preserva read + created_at
-        } else {
-            batch.set(ref, { ...content, created_at: it.created_at ?? Date.now(), read: false });
-        }
+    const userId = requireAuthId();
+    const ids = [...new Set(items.map((it) => it.id))];
+    const { data: existing, error: readError } = await db().from('notifications').select('id').eq('user_id', userId).in('id', ids);
+    if (readError) throw new Error(readError.message);
+    const known = new Set((existing ?? []).map((r) => r.id));
+    const content = (it: NotifInput) => ({
+        user_id: userId, id: it.id, type: it.type, title: it.title, subtitle: it.subtitle,
+        href: it.href, poster_path: it.poster_path,
+    });
+    // Últimas por id (por si el lote trae un id dos veces).
+    const byId = new Map(items.map((it) => [it.id, it]));
+    const fresh = [...byId.values()].filter((it) => !known.has(it.id))
+        .map((it) => ({ ...content(it), created_at: new Date(it.created_at ?? Date.now()).toISOString(), read: false }));
+    const refreshed = [...byId.values()].filter((it) => known.has(it.id)).map(content);
+    if (fresh.length) {
+        const { error } = await db().from('notifications').insert(fresh);
+        if (error) throw new Error(error.message);
     }
-    await batch.commit();
+    if (refreshed.length) {
+        // Solo columnas de contenido → read y created_at se quedan como estaban.
+        const { error } = await db().from('notifications').upsert(refreshed, { onConflict: 'user_id,id' });
+        if (error) throw new Error(error.message);
+    }
 }

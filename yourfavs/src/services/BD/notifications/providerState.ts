@@ -2,16 +2,16 @@
  * Snapshot de disponibilidad en plataformas (para "cambió de plataforma").
  *
  * Guarda, por usuario, qué pendientes estaban en flatrate de TUS plataformas la
- * última vez que se sincronizó la campana (un único doc users/{uid}/notifMeta/
- * providerState → lectura + escritura mínima). El generador compara el estado de HOY
+ * última vez que se sincronizó la campana (una fila de `user_state`, clave
+ * 'notif_provider_state' → lectura + escritura mínima). El generador compara el estado de HOY
  * contra este snapshot para detectar qué ENTRÓ y qué SALIÓ, y luego lo reescribe.
  *
  * NO necesita cron: se materializa al abrir, igual que el resto de la campana. La
  * semántica es la correcta para un buzón pull: "qué cambió desde la última vez que
  * miraste". El diff solo tiene sentido con memoria del estado anterior; esa memoria
- * es este doc.
+ * es esta fila.
  */
-import { userDoc, getCurrentUid } from '../shared/userScope';
+import { readUserState, writeUserState } from '../shared/userState';
 
 export interface ProviderSnapEntry {
     name: string;                   // nombre del proveedor (p.ej. "Netflix")
@@ -27,15 +27,10 @@ export interface ProviderState {
     map: Record<string, ProviderSnapEntry>;         // key "movie:123" → entrada
 }
 
-const COL = 'notifMeta';
-const DOC = 'providerState';
-
 export async function readProviderState(): Promise<ProviderState | null> {
-    if (!getCurrentUid()) return null;
     try {
-        const snap = await userDoc(COL, DOC).get();
-        if (!snap.exists) return null;
-        const d = snap.data() as any;
+        const d = await readUserState<any>('notif_provider_state');
+        if (!d) return null;
         return { version: d?.version, day: d?.day || '', map: d?.map || {} };
     } catch {
         return null;
@@ -43,5 +38,5 @@ export async function readProviderState(): Promise<ProviderState | null> {
 }
 
 export async function writeProviderState(state: ProviderState): Promise<void> {
-    await userDoc(COL, DOC).set(state);
+    await writeUserState('notif_provider_state', state);
 }

@@ -16,7 +16,7 @@
  * de propina se sabe **en qué plataforma** está cada título, que es lo que necesitan el aviso de
  * «no todas están en tus plataformas» y los tratamientos de ranking con etiqueta de plataforma.
  */
-import { globalDoc } from '../../BD/shared/userScope';
+import { claimAppState, readAppState, releaseAppState, writeAppState } from './appState';
 import { tmdbFetch } from './tmdbClient';
 import { isoWeekKey } from '../../../utils/appTime';
 import {
@@ -36,9 +36,8 @@ export interface RankingDoc {
     week: string;
     items: RankingItem[];
     /**
-     * `null`, no `undefined`, en la primera semana: Firestore **rechaza `undefined`** salvo que se active
-     * `ignoreUndefinedProperties`, que este proyecto no tiene. Es el mismo tropiezo que dio un 500 al
-     * vaciar el nombre visible del perfil.
+     * `null`, no `undefined`, en la primera semana: el JSON que se guarda en `app_state` no conserva
+     * `undefined` (en Firestore, además, lo rechazaba y dio un 500 al vaciar el nombre del perfil).
      */
     prevWeek?: string | null;
     prevItems?: RankingItem[];
@@ -125,13 +124,12 @@ export async function computeRanking(region: string, platforms: number[]): Promi
  * Devuelve `null` si no hay nada que pintar: la fila no se dibuja, ni vacía ni con esqueleto.
  */
 export async function getWeeklyRanking(region: string, platforms: number[]): Promise<{ entries: RankedEntry[]; week: string } | null> {
-    const ref = globalDoc('homeRows', rankingDocId(region, platforms));
+    const key = rankingDocId(region, platforms); // app_state (antes homeRows/{id})
     const week = isoWeekKey(Date.now());
 
     let doc: RankingDoc | null = null;
     try {
-        const snap = await ref.get();
-        doc = (snap.exists ? snap.data() : null) as RankingDoc | null;
+        doc = await readAppState<RankingDoc>(key);
     } catch (err) {
         console.warn('[weeklyRanking] lectura falló:', (err as Error).message);
         return null;
@@ -142,17 +140,17 @@ export async function getWeeklyRanking(region: string, platforms: number[]): Pro
     }
 
     // Toca semana nueva. El claim evita que dos instancias gasten las mismas llamadas a TMDB.
-    const now = Date.now();
     let claimed = false;
     try {
-        claimed = await ref.firestore.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            const cur = (snap.exists ? snap.data() : null) as RankingDoc | null;
-            if (cur?.week === week && cur.items?.length) return false;
-            if (cur?.claimedAt && now - cur.claimedAt < CLAIM_TTL_MS) return false;
-            tx.set(ref, { claimedAt: now }, { merge: true });
-            return true;
-        });
+        const cur = await claimAppState<RankingDoc>(key, CLAIM_TTL_MS);
+        if (cur !== false) {
+            // Entre la lectura y el claim otra instancia pudo terminar la semana: se suelta y se sirve.
+            if (cur?.week === week && cur.items?.length) {
+                await releaseAppState(key);
+                return { entries: withMovement(cur.items, cur.prevItems), week };
+            }
+            claimed = true;
+        }
     } catch (err) {
         console.warn('[weeklyRanking] claim falló:', (err as Error).message);
     }
@@ -165,7 +163,7 @@ export async function getWeeklyRanking(region: string, platforms: number[]): Pro
     try {
         const items = await computeRanking(region, platforms);
         if (!items.length) {
-            await ref.set({ claimedAt: 0 }, { merge: true }).catch(() => {});
+            await releaseAppState(key).catch(() => {});
             return doc?.items?.length ? { entries: withMovement(doc.items, doc.prevItems), week: doc.week } : null;
         }
         // La semana que había pasa a ser "la anterior": es la referencia del movimiento.
@@ -175,14 +173,13 @@ export async function getWeeklyRanking(region: string, platforms: number[]): Pro
             prevWeek: doc?.week ?? null,
             prevItems: doc?.items || [],
             updatedAt: Date.now(),
-            claimedAt: 0,
         };
-        await ref.set(next, { merge: true });
+        await writeAppState(key, next);
         console.log(`[weeklyRanking] ${rankingDocId(region, platforms)} → ${week}, ${items.length} títulos`);
         return { entries: withMovement(items, next.prevItems), week };
     } catch (err) {
         console.warn('[weeklyRanking] cálculo falló:', (err as Error).message);
-        await ref.set({ claimedAt: 0 }, { merge: true }).catch(() => {});
+        await releaseAppState(key).catch(() => {});
         return doc?.items?.length ? { entries: withMovement(doc.items, doc.prevItems), week: doc.week } : null;
     }
 }

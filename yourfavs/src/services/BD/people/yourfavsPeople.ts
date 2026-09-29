@@ -1,13 +1,11 @@
-import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
-
-const COLLECTION = 'FollowedPeople';
+import { db, fetchAll, getAuthId, requireAuthId } from "../shared/userScope";
 
 /**
  * Personas seguidas (handoff v2 §③ "Avísame de estrenos"): actores/directores
  * cuyos estrenos futuros se anuncian en el calendario. Se guarda nombre y foto
  * para pintar sin re-fetch de /person/{id} (la ficha ya los tiene al seguir).
  *
- * Fase C: datos por usuario (users/{uid}/FollowedPeople) vía Admin SDK + userScope.
+ * Tabla `followed_people` (antes users/{uid}/FollowedPeople).
  */
 export interface FollowedPerson {
     id: string;            // id TMDB de la persona
@@ -16,28 +14,31 @@ export interface FollowedPerson {
     added_at: Date;
 }
 
+interface PersonRow { person_id: number; name: string | null; profile_path: string | null; added_at: string }
+
+const toPerson = (r: PersonRow): FollowedPerson => ({
+    id: String(r.person_id),
+    name: r.name ?? '',
+    profile_path: r.profile_path ?? null,
+    added_at: new Date(r.added_at),
+});
+
 export async function addFollowedPerson(id: string, name: string, profilePath: string | null): Promise<void> {
-    await userDoc(COLLECTION, id).set({
-        id,
-        name,
-        profile_path: profilePath ?? null,
-        added_at: new Date(),
-    });
+    const { error } = await db().from('followed_people').upsert(
+        { user_id: requireAuthId(), person_id: Number(id), name, profile_path: profilePath ?? null, added_at: new Date().toISOString() },
+        { onConflict: 'user_id,person_id' },
+    );
+    if (error) throw new Error(error.message);
 }
 
 export async function removeFollowedPerson(id: string): Promise<void> {
-    const ref = userDoc(COLLECTION, id);
-    // Capturamos nombre/foto ANTES de borrar, para que la bitácora (§5) pueda pintar
-    // el avatar sin re-fetch a TMDB (igual que el evento de "empezaste a seguir").
-    let meta: Record<string, unknown> = {};
-    try {
-        const snap = await ref.get();
-        if (snap.exists) {
-            const d = snap.data() as FollowedPerson;
-            meta = { name: d.name, profile_path: d.profile_path ?? null };
-        }
-    } catch { /* metadatos opcionales */ }
-    await ref.delete();
+    // Borrado que devuelve la fila: nombre/foto quedan para la bitácora (§5), que así puede
+    // pintar el avatar sin re-fetch a TMDB (igual que el evento de "empezaste a seguir").
+    const { data, error } = await db().from('followed_people').delete()
+        .eq('user_id', requireAuthId()).eq('person_id', Number(id)).select('name, profile_path');
+    if (error) throw new Error(error.message);
+    const d = data?.[0];
+    const meta: Record<string, unknown> = d ? { name: d.name, profile_path: d.profile_path ?? null } : {};
     // §5 · bitácora (best-effort): dejar de seguir es intencional y borra el added_at.
     try {
         const { appendActivity } = await import('../shared/activityLog');
@@ -46,15 +47,22 @@ export async function removeFollowedPerson(id: string): Promise<void> {
 }
 
 export async function getFollowedPerson(id: string): Promise<FollowedPerson | null> {
-    if (!getCurrentUid()) return null;
-    const snap = await userDoc(COLLECTION, id).get();
-    return snap.exists ? (snap.data() as FollowedPerson) : null;
+    const userId = getAuthId();
+    if (!userId) return null;
+    const { data, error } = await db().from('followed_people').select('person_id, name, profile_path, added_at')
+        .eq('user_id', userId).eq('person_id', Number(id)).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? toPerson(data as PersonRow) : null;
 }
 
 export async function getAllFollowedPeople(): Promise<FollowedPerson[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userCol(COLLECTION).get();
-    return snap.docs.map(d => d.data() as FollowedPerson);
+    const userId = getAuthId();
+    if (!userId) return [];
+    const rows = await fetchAll<PersonRow>((from, to) =>
+        db().from('followed_people').select('person_id, name, profile_path, added_at').eq('user_id', userId)
+            .order('added_at').order('person_id').range(from, to),
+    );
+    return rows.map(toPerson);
 }
 
 /** Form POST de la ficha (actionType=follow_person, action=add|remove). */

@@ -16,7 +16,7 @@
  * la nota de la serie, los géneros, el póster, el fotograma y la duración del piloto, TODA la primera
  * temporada y los proveedores por región. Verificado.
  */
-import { globalDoc } from '../../BD/shared/userScope';
+import { claimAppState, readAppState, releaseAppState, writeAppState } from './appState';
 import { tmdbFetch } from './tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 
@@ -97,7 +97,7 @@ export interface HooksDoc {
     items: HookItem[];
 }
 
-const DOC = () => globalDoc('homeRows', 'hooks');
+const KEY = 'hooks'; // app_state (antes homeRows/hooks)
 
 /** L1: en un proceso caliente evita releer el documento en cada render de la portada. */
 let l1: { data: HooksDoc; expires: number } | null = null;
@@ -133,13 +133,12 @@ export async function readHooksDoc(): Promise<HooksDoc | null> {
     const now = Date.now();
     if (l1 && l1.expires > now) return l1.data;
     try {
-        const snap = await DOC().get();
-        if (!snap.exists) return null;
-        const data = snap.data() as HooksDoc;
+        const data = await readAppState<HooksDoc>(KEY);
+        if (!data) return null;
         l1 = { data, expires: now + L1_TTL_MS };
         return data;
     } catch (err) {
-        console.warn('[hookRows] no se pudo leer homeRows/hooks:', (err as Error).message);
+        console.warn('[hookRows] no se pudo leer app_state/hooks:', (err as Error).message);
         return null;
     }
 }
@@ -318,29 +317,27 @@ export function mergeHookItems(existing: HookItem[], fresh: HookItem[]): HookIte
  * Recarga incremental *on-open*: si el documento está viejo y nadie lo ha reclamado, procesa una
  * página de candidatas y la fusiona.
  *
- * El claim va en una **transacción** porque el guard del patrón original (un `Map` en memoria más un
- * campo persistido) no protege de dos Lambdas arrancando a la vez: las dos leerían "viejo" y las dos
- * recalcularían. Aquí solo una se lleva el claim.
+ * El claim es atómico (`claim_app_state`, un UPDATE condicional) porque el guard del patrón original
+ * (un `Map` en memoria más un campo persistido) no protege de dos Lambdas arrancando a la vez: las
+ * dos leerían "viejo" y las dos recalcularían. Aquí solo una se lleva el claim.
  *
  * Devuelve `true` si ha hecho trabajo.
  */
 export async function ensureHooksFresh(regions: string[] = ['ES']): Promise<boolean> {
-    const ref = DOC();
     const now = Date.now();
+    const isFresh = (d: HooksDoc | null) => Boolean(d?.updatedAt && now - d.updatedAt < HOOKS_TTL_MS);
 
     let cursorPage = 1;
+    let existing: HookItem[] = [];
     try {
-        const claimed = await ref.firestore.runTransaction(async (tx) => {
-            const snap = await tx.get(ref);
-            const data = (snap.exists ? snap.data() : null) as HooksDoc | null;
-            const fresh = data?.updatedAt && now - data.updatedAt < HOOKS_TTL_MS;
-            const busy = data?.claimedAt && now - data.claimedAt < CLAIM_TTL_MS;
-            if (fresh || busy) return false;
-            cursorPage = data?.cursorPage && data.cursorPage <= LAST_PAGE ? data.cursorPage : 1;
-            tx.set(ref, { claimedAt: now }, { merge: true });
-            return true;
-        });
-        if (!claimed) return false;
+        // Lectura previa: el caso normal (fresco) sale aquí sin tocar el cerrojo.
+        if (isFresh(await readAppState<HooksDoc>(KEY))) return false;
+        const claimed = await claimAppState<HooksDoc>(KEY, CLAIM_TTL_MS);
+        if (claimed === false) return false; // otra instancia lo está recalculando
+        // Entre la lectura y el claim otra instancia pudo terminar: si ya está fresco, se suelta.
+        if (isFresh(claimed)) { await releaseAppState(KEY); return false; }
+        cursorPage = claimed?.cursorPage && claimed.cursorPage <= LAST_PAGE ? claimed.cursorPage : 1;
+        existing = claimed?.items || [];
     } catch (err) {
         console.warn('[hookRows] claim falló:', (err as Error).message);
         return false;
@@ -350,22 +347,19 @@ export async function ensureHooksFresh(regions: string[] = ['ES']): Promise<bool
         const pages = Array.from({ length: CANDIDATES_PER_RUN }, (_, i) => cursorPage + i)
             .filter((p) => p <= LAST_PAGE);
         const fresh = await collectHookItems(pages, regions);
-        const snap = await ref.get();
-        const existing = ((snap.exists ? snap.data() : null) as HooksDoc | null)?.items || [];
         const nextPage = cursorPage + pages.length > LAST_PAGE ? 1 : cursorPage + pages.length;
-        await ref.set({
+        await writeAppState(KEY, {
             updatedAt: Date.now(),
             cursorPage: nextPage,
-            claimedAt: 0,
             items: mergeHookItems(existing, fresh),
-        }, { merge: true });
+        } satisfies HooksDoc);
         l1 = null; // el documento cambió: la caché de proceso ya no vale
         console.log(`[hookRows] recarga: página ${cursorPage}, ${fresh.length} nuevas`);
         return true;
     } catch (err) {
         // Liberar el claim para que el siguiente lo pueda intentar, y dejar el documento como estaba.
         console.warn('[hookRows] recarga falló:', (err as Error).message);
-        await ref.set({ claimedAt: 0 }, { merge: true }).catch(() => {});
+        await releaseAppState(KEY).catch(() => {});
         return false;
     }
 }
