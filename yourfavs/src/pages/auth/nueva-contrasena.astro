@@ -1,0 +1,119 @@
+---
+/**
+ * /auth/nueva-contrasena — destino del enlace de «¿Olvidaste la contraseña?».
+ *
+ * Con Firebase, el enlace del email abría una página alojada por Firebase. Con Supabase el
+ * enlace pasa por /auth/callback, que abre la sesión, y aquí se elige la contraseña nueva.
+ * Mismo aspecto que la tarjeta del modal de login (AuthModal).
+ */
+import Layout from "../../layouts/Layout.astro";
+
+export const prerender = false;
+
+const hasSession = Boolean(Astro.locals.user);
+---
+<Layout title="Nueva contraseña | YourFavs">
+    <div class="np-wrap">
+        <div class="np-card">
+            {hasSession ? (
+                <>
+                    <h1 class="np-title">Elige tu nueva contraseña</h1>
+                    <p class="np-sub">Para {Astro.locals.user?.email}. Al guardarla seguirás con la sesión abierta.</p>
+                    <form class="np-form" id="np-form" novalidate>
+                        <label class="np-field">
+                            <span>Nueva contraseña</span>
+                            <input type="password" id="np-password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres"/>
+                        </label>
+                        <p class="np-msg" id="np-msg" role="alert" hidden></p>
+                        <button type="submit" class="np-submit" id="np-submit">Guardar contraseña</button>
+                    </form>
+                </>
+            ) : (
+                <>
+                    <h1 class="np-title">El enlace ha caducado</h1>
+                    <p class="np-sub">
+                        Pide otro desde «¿Olvidaste la contraseña?» en el login, y ábrelo en este mismo
+                        navegador.
+                    </p>
+                    <a class="np-submit" href="/">Volver al inicio</a>
+                </>
+            )}
+        </div>
+    </div>
+</Layout>
+
+<style>
+    .np-wrap { display: flex; justify-content: center; padding: 6vh 0 10vh; }
+    .np-card {
+        width: 420px;
+        max-width: 100%;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: var(--r-xl, 16px);
+        padding: 28px 28px 22px;
+    }
+    .np-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: var(--text); }
+    .np-sub { margin: 0 0 22px; font-size: 13.5px; color: var(--text-3); }
+    .np-form { display: flex; flex-direction: column; gap: 12px; }
+    .np-field { display: flex; flex-direction: column; gap: 5px; }
+    .np-field span { font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .np-field input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 9px;
+        border: 1px solid var(--border);
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+    }
+    .np-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .np-msg { margin: 0; font-size: 12.5px; padding: 9px 11px; border-radius: 8px; background: rgba(239, 68, 68, .12); color: #ef4444; }
+    .np-msg.is-ok { background: rgba(16, 185, 129, .14); color: #10b981; }
+    .np-submit {
+        display: block;
+        width: 100%;
+        padding: 11px 16px;
+        border-radius: var(--r-full, 999px);
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        font-weight: 600;
+        font-size: 14px;
+        text-align: center;
+        cursor: pointer;
+    }
+    .np-submit:disabled { opacity: .6; cursor: default; }
+    @media (max-width: 480px) { .np-card { padding: 24px 20px 18px; } }
+</style>
+
+<script>
+    const form = document.getElementById('np-form') as HTMLFormElement | null;
+    if (form) {
+        const input = document.getElementById('np-password') as HTMLInputElement;
+        const msg = document.getElementById('np-msg') as HTMLElement;
+        const btn = document.getElementById('np-submit') as HTMLButtonElement;
+        const show = (text: string, ok = false) => { msg.textContent = text; msg.classList.toggle('is-ok', ok); msg.hidden = false; };
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (input.value.length < 6) { show('La contraseña debe tener al menos 6 caracteres.'); return; }
+            btn.disabled = true;
+            btn.textContent = 'Un momento…';
+            try {
+                const res = await fetch('/api/auth/new-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: input.value }),
+                });
+                const data = await res.json().catch(() => null);
+                if (!data?.ok) throw new Error(data?.error || 'Algo salió mal. Inténtalo de nuevo.');
+                show('Contraseña guardada. Te llevamos al inicio…', true);
+                setTimeout(() => { location.href = '/'; }, 1200);
+            } catch (err) {
+                show((err as Error).message);
+                btn.disabled = false;
+                btn.textContent = 'Guardar contraseña';
+            }
+        });
+    }
+</script>

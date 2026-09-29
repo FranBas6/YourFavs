@@ -2,6 +2,11 @@
   command = "npm run build"
   publish = "dist"
 
+# Node 22: @supabase/supabase-js ya no arranca en Node 20 (sin WebSocket nativo), y 20 está fuera
+# de soporte desde abril de 2026. Las funciones de Netlify usan la versión del build.
+[build.environment]
+  NODE_VERSION = "22"
+
 [functions]
   node_bundler = "esbuild"
   directory = "netlify/functions"

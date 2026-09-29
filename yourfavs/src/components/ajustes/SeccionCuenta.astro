@@ -89,11 +89,7 @@ const { user } = Astro.props;
         try {
             const res = await fetch('/api/auth/delete-account', { method: 'POST' });
             if (!res.ok) throw new Error();
-            try {
-                const { clientAuth } = await import('../../utils/firebaseAuthClient');
-                const { signOut } = await import('firebase/auth');
-                await signOut(clientAuth);
-            } catch { /* la cuenta ya no existe; da igual */ }
+            // El servidor ya ha borrado las cookies de sesión junto con la cuenta.
             location.href = '/';
         } catch {
             delBtn.disabled = false;

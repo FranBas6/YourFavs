@@ -6,9 +6,10 @@
  * y se cierra con Esc / backdrop / ✕. Login y registro comparten tarjeta y
  * alternan con un toggle. Google + email/contraseña + "¿olvidaste?".
  *
- * `firebase/auth` se carga en DIFERIDO (import dinámico de ../utils/authActions):
- * un invitado solo lo descarga al abrir el modal; un usuario logueado al cargar
- * (gracias a la cookie legible has_session) para renovar la sesión (rolling).
+ * Las acciones (../utils/authActions) son `fetch` a /api/auth/*: el login lo hace el
+ * servidor con Supabase y deja la sesión en cookies httpOnly. Google va por redirección
+ * (no popup): al volver, /auth/callback trae `?auth=ok|new|error` y aquí se completa lo
+ * mismo que antes tras el popup (acción pendiente del invitado u onboarding).
  */
 ---
 <div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
@@ -474,9 +475,24 @@
             else showMsg(res.error);
         });
 
-        // ---- "sesión continua": si ya hay sesión, renueva la cookie al cargar ----
-        if (document.cookie.split('; ').some((c) => c.startsWith('has_session='))) {
-            getActions().then((a) => a.rollingSync());
+        // ---- vuelta de Google: /auth/callback redirige aquí con ?auth=ok|new|error ----
+        // (La "sesión continua" ya no necesita nada en cliente: el middleware refresca la
+        // sesión de Supabase en cada request.)
+        const authReturn = new URLSearchParams(location.search).get('auth');
+        if (authReturn) {
+            const clean = new URL(location.href);
+            clean.searchParams.delete('auth');
+            history.replaceState(history.state, '', clean.pathname + clean.search + clean.hash);
+            if (authReturn === 'error') {
+                open();
+                showMsg('No se pudo entrar con Google. Inténtalo de nuevo.');
+            } else {
+                // La página ya llega con sesión: solo falta lo que el popup hacía después.
+                let pending: string | null = null;
+                try { pending = sessionStorage.getItem('yf_pending_action'); } catch { /* noop */ }
+                if (pending) completeOrReload();
+                else if (authReturn === 'new') location.href = '/gustos?welcome=1';
+            }
         }
     }
 </script>

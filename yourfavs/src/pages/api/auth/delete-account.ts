@@ -1,34 +1,35 @@
 /**
- * POST /api/auth/delete-account — elimina la cuenta del usuario en sesión.
+ * POST /api/auth/delete-account — elimina la cuenta del usuario en sesión. Irreversible.
  *
- * Borra users/{uid} + TODAS sus subcolecciones (recursiveDelete) y el usuario de
- * Firebase Auth, luego limpia las cookies. El uid SIEMPRE sale de la sesión
- * verificada (locals.user), nunca del cliente. Irreversible.
+ * Borrar el usuario de Supabase Auth se lleva por delante todas sus filas (`on delete cascade`
+ * desde `auth.users` en todas las tablas). Hace falta la clave secreta: un usuario no puede
+ * borrarse a sí mismo de Auth.
+ *
+ * TRANSICIÓN (Fase 3 → 4): mientras los datos sigan en Firestore, se borra también su árbol
+ * `users/{uid}`. En la Fase 4 esa parte desaparece.
  */
 import type { APIRoute } from 'astro';
-import { adminAuth, adminDb } from '../../../utils/firebaseAdmin';
+import { adminDb } from '../../../utils/firebaseAdmin';
+import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { clearSessionFlag, json } from '../../../lib/supabase/authHttp';
 
 export const prerender = false;
-
-function json(data: unknown, status = 200): Response {
-    return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
-}
 
 export const POST: APIRoute = async ({ locals, cookies }) => {
     const user = locals.user;
     if (!user) return json({ ok: false, error: 'No autorizado' }, 401);
 
     try {
-        // users/{uid} + todas sus subcolecciones (listas, tags, subs, episodios…)
         await adminDb.recursiveDelete(adminDb.collection('users').doc(user.uid));
-        // Usuario de Firebase Auth
-        await adminAuth.deleteUser(user.uid);
+        const { error } = await supabaseAdmin().auth.admin.deleteUser(user.authId);
+        if (error) throw error;
     } catch (err) {
         console.error('[api/auth/delete-account] error:', (err as Error).message);
         return json({ ok: false, error: 'No se pudo eliminar la cuenta' }, 500);
     }
 
-    cookies.delete('session', { path: '/' });
-    cookies.delete('has_session', { path: '/' });
-    return json({ ok: true }, 200);
+    // La sesión ya no vale (el usuario no existe): se limpian las cookies de este navegador.
+    try { await locals.supabase.auth.signOut({ scope: 'local' }); } catch { /* da igual */ }
+    clearSessionFlag(cookies);
+    return json({ ok: true });
 };

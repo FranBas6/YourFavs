@@ -1,15 +1,17 @@
 /**
  * Middleware SSR — corre en CADA request antes de la página/handler.
  *
- * Lee la cookie de sesión, la verifica con el Admin SDK y rellena
- * `Astro.locals.user` (o null si no hay sesión / es inválida). A partir de aquí,
- * cualquier .astro o API route lee `Astro.locals.user` para saber quién es.
+ * Crea el cliente de Supabase de la petición (`locals.supabase`), valida la sesión de sus
+ * cookies y rellena `Astro.locals.user` (o null si no hay sesión / es inválida). A partir de
+ * aquí, cualquier .astro o API route lee `Astro.locals.user` para saber quién es.
  *
- * Verificación LOCAL (checkRevoked = false): no llama a Firebase en cada request
- * (sería lento y caro en Netlify Functions). La revocación se fuerza en logout.
+ * `getClaims()` valida el JWT y, si está a punto de caducar, lo REFRESCA y reescribe las cookies
+ * aquí, antes de renderizar. Eso sustituye a la "sesión continua" que antes hacía el cliente con
+ * un POST a /api/auth/session en cada página.
  */
 import { defineMiddleware } from 'astro:middleware';
-import { adminAuth } from './utils/firebaseAdmin';
+import { createSupabaseServerClient } from './lib/supabase/server';
+import { SESSION_FLAG, clearSessionFlag, setSessionFlag } from './lib/supabase/authHttp';
 import { runWithUser, setRequestPrefs } from './services/BD/shared/userScope';
 import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
 import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalogUrl';
@@ -52,45 +54,48 @@ function applyCacheHeaders(res: Response, path: string, hasSession: boolean): vo
 
 export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = null;
+    const supabase = createSupabaseServerClient(context);
+    context.locals.supabase = supabase;
 
-    const session = context.cookies.get('session')?.value;
-    if (session) {
+    // Sesión de las cookies. Y, sin ella, el fallback móvil (Fase C): la app nativa NO usa
+    // cookies y manda `Authorization: Bearer <access token>`. Es ADITIVO: la web no manda esa
+    // cabecera, así que su flujo de cookies no se ve afectado.
+    let claims: { sub: string; email?: string; user_metadata?: Record<string, unknown> } | null = null;
+    try {
+        claims = (await supabase.auth.getClaims()).data?.claims ?? null;
+        if (!claims) {
+            const bearer = context.request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
+            if (bearer) claims = (await supabase.auth.getClaims(bearer)).data?.claims ?? null;
+        }
+    } catch {
+        claims = null; // sesión inválida/caducada → invitado
+    }
+
+    if (claims) {
+        const meta = claims.user_metadata ?? {};
+        const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
+        // TRANSICIÓN (Fase 3 → 4): los datos siguen en Firestore bajo el uid de FIREBASE. Las
+        // cuentas migradas guardan ese uid en `profiles.firebase_uid`, así que el `uid` que ve
+        // la app (y con el que lee Firestore) es ese; `authId` es el de Supabase. En la Fase 4
+        // los dos pasan a ser el de Supabase y esta consulta desaparece.
+        let dataUid = claims.sub;
         try {
-            const decoded = await adminAuth.verifySessionCookie(session, false);
-            context.locals.user = {
-                uid: decoded.uid,
-                email: decoded.email ?? null,
-                name: (decoded.name as string | undefined) ?? null,
-                picture: (decoded.picture as string | undefined) ?? null,
-            };
-        } catch {
-            // Cookie inválida/caducada → seguimos como invitado (user = null).
-            context.locals.user = null;
-        }
+            const { data } = await supabase.from('profiles').select('firebase_uid').eq('id', claims.sub).maybeSingle();
+            if (data?.firebase_uid) dataUid = data.firebase_uid;
+        } catch { /* sin perfil: se queda el uid de Supabase */ }
+        context.locals.user = {
+            uid: dataUid,
+            authId: claims.sub,
+            email: claims.email ?? null,
+            name: str(meta.full_name) ?? str(meta.name) ?? str(meta.display_name),
+            picture: str(meta.avatar_url) ?? str(meta.picture),
+        };
     }
 
-    // Fallback móvil (Fase C): sin cookie válida, aceptar
-    // `Authorization: Bearer <idToken>` (la app nativa NO usa cookies). Verificamos
-    // el ID token con el Admin SDK. Es ADITIVO: la web no manda esta cabecera, así
-    // que su flujo de cookie de sesión no se ve afectado.
-    if (!context.locals.user) {
-        const authz = context.request.headers.get('authorization');
-        const m = authz?.match(/^Bearer\s+(.+)$/i);
-        if (m) {
-            try {
-                const decoded = await adminAuth.verifyIdToken(m[1]); // ID token, no session cookie
-                context.locals.user = {
-                    uid: decoded.uid,
-                    email: decoded.email ?? null,
-                    name: (decoded.name as string | undefined) ?? null,
-                    picture: (decoded.picture as string | undefined) ?? null,
-                };
-            } catch {
-                // ID token inválido/caducado → seguimos como invitado (user = null).
-                context.locals.user = null;
-            }
-        }
-    }
+    // Bandera legible para el gating del cliente: que diga la verdad (ver authHttp.ts).
+    const flag = context.cookies.get(SESSION_FLAG)?.value;
+    if (context.locals.user && !flag) setSessionFlag(context.cookies);
+    else if (!context.locals.user && flag) clearSessionFlag(context.cookies);
 
     const path = context.url.pathname;
 

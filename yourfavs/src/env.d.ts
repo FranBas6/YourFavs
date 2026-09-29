@@ -1,7 +1,11 @@
 /// <reference path="../.astro/types.d.ts" />
 
 interface SessionUser {
+    /** Dueño de los DATOS. En la transición (Fase 3 → 4) es el uid de Firebase de las cuentas
+     *  migradas; al terminar la Fase 4, el de Supabase (igual que `authId`). */
     uid: string;
+    /** Id del usuario en Supabase Auth (`auth.users.id`). */
+    authId: string;
     email: string | null;
     name: string | null;
     picture: string | null;
@@ -30,6 +34,8 @@ interface SessionUser {
 
 declare namespace App {
     interface Locals {
+        /** Cliente de Supabase de ESTA petición (con sus cookies): la RLS ve a su usuario. */
+        supabase: import('./lib/supabase/server').SupabaseServer;
         /** Usuario de la sesión verificada por el middleware; null si es invitado. */
         user: SessionUser | null;
         /**
@@ -62,6 +68,10 @@ interface ImportMetaEnv {
     // Servidor (privadas)
     readonly TMDB_API_KEY: string;
     readonly FIREBASE_ADMIN_KEY_B64: string;
+    // Supabase (todas de servidor: el navegador no habla con Supabase)
+    readonly SUPABASE_URL: string;
+    readonly SUPABASE_PUBLISHABLE_KEY: string;
+    readonly SUPABASE_SECRET_KEY: string;
 }
 
 interface ImportMeta {
