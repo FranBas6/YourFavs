@@ -16,9 +16,14 @@ import { supabaseEnv } from './env';
 
 export type SupabaseServer = ReturnType<typeof createSupabaseServerClient>;
 
-export function createSupabaseServerClient(ctx: { request: Request; cookies: AstroCookies }) {
+/**
+ * `accessToken`: solo para la app nativa, que no usa cookies y manda `Authorization: Bearer`.
+ * Con él, cada consulta lleva ese token y la RLS ve a su usuario.
+ */
+export function createSupabaseServerClient(ctx: { request: Request; cookies: AstroCookies }, accessToken?: string) {
     const { url, publishableKey } = supabaseEnv();
     return createServerClient<Database>(url, publishableKey, {
+        ...(accessToken ? { global: { headers: { Authorization: `Bearer ${accessToken}` } } } : {}),
         cookies: {
             getAll() {
                 return parseCookieHeader(ctx.request.headers.get('Cookie') ?? '').map(({ name, value }) => ({ name, value: value ?? '' }));

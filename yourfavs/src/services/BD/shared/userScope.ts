@@ -1,16 +1,15 @@
 /**
  * Scope de usuario para la capa BD (Fase C) — AsyncLocalStorage.
  *
- * El middleware mete el `uid` de la sesión verificada en un store por petición
- * (`runWithUser`). Las funciones de `services/BD/**` leen ese `uid` de aquí (sin
- * cambiar sus firmas) y construyen refs del Admin SDK bajo `users/{uid}/…`.
+ * El middleware mete en un store por petición (`runWithUser`) el usuario de la sesión
+ * verificada y el cliente de Supabase con sus cookies. Las funciones de `services/BD/**`
+ * leen ambos de aquí sin cambiar sus firmas.
  *
- * Regla de oro: el `uid` SIEMPRE viene de la sesión (cookie verificada), NUNCA
- * del cliente. Por eso vive en el store que rellena el middleware, no en params.
+ * Regla de oro: el usuario SIEMPRE viene de la sesión (cookie verificada), NUNCA del
+ * cliente. Por eso vive en el store que rellena el middleware, no en params. Y la RLS de
+ * Postgres lo vuelve a comprobar en cada consulta.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { adminDb } from '../../../utils/firebaseAdmin';
-import type { CollectionReference, DocumentReference } from 'firebase-admin/firestore';
 import type { SupabaseServer } from '../../../lib/supabase/server';
 
 interface RequestContext {
@@ -113,35 +112,4 @@ export function requireUid(): string {
     const uid = getCurrentUid();
     if (!uid) throw new Error('[userScope] Operación de datos sin usuario en sesión');
     return uid;
-}
-
-/** Colección del usuario actual: users/{uid}/{name}. Lanza si no hay sesión. */
-export function userCol(name: string): CollectionReference {
-    return adminDb.collection('users').doc(requireUid()).collection(name);
-}
-
-/** Documento del usuario actual: users/{uid}/{name}/{id}. */
-export function userDoc(name: string, id: string): DocumentReference {
-    return userCol(name).doc(id);
-}
-
-/** Documento RAÍZ del usuario: users/{uid} (perfil/preferencias). Lanza sin sesión. */
-export function userRootDoc(): DocumentReference {
-    return adminDb.collection('users').doc(requireUid());
-}
-
-/**
- * Documento GLOBAL, fuera de `users/{uid}` y por tanto **sin `requireUid()`**.
- *
- * Es la excepción a la regla de que todo vive bajo el usuario, y hace falta para las filas de la
- * portada que se precalculan una vez para todo el mundo (los pilotos, el ranking semanal): son datos
- * públicos de TMDB, iguales para cualquiera, y **la portada también la ven invitados**, que no tienen
- * uid. Calcularlas por usuario sería pagar cien llamadas a TMDB por cada visitante.
- *
- * Ojo: `firestore.rules` deniega todo lo que esté fuera de `users/{uid}` a propósito (se migró para
- * quitar las colecciones globales antiguas). El Admin SDK se salta las reglas, así que estos
- * documentos se leen y escriben **solo en servidor**: nada de leerlos desde el cliente.
- */
-export function globalDoc(collection: string, id: string): DocumentReference {
-    return adminDb.collection(collection).doc(id);
 }

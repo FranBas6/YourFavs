@@ -1,10 +1,9 @@
 /// <reference path="../.astro/types.d.ts" />
 
 interface SessionUser {
-    /** Dueño de los DATOS. En la transición (Fase 3 → 4) es el uid de Firebase de las cuentas
-     *  migradas; al terminar la Fase 4, el de Supabase (igual que `authId`). */
+    /** Id del usuario en Supabase Auth (`auth.users.id`), dueño de sus filas. */
     uid: string;
-    /** Id del usuario en Supabase Auth (`auth.users.id`). */
+    /** Lo mismo que `uid`. Se mantiene el nombre porque lo usan las rutas de auth y avatar. */
     authId: string;
     email: string | null;
     name: string | null;
@@ -57,17 +56,8 @@ interface Window {
 }
 
 interface ImportMetaEnv {
-    // Cliente (públicas)
-    readonly PUBLIC_FIREBASE_API_KEY: string;
-    readonly PUBLIC_FIREBASE_AUTH_DOMAIN: string;
-    readonly PUBLIC_FIREBASE_PROJECT_ID: string;
-    readonly PUBLIC_FIREBASE_STORAGE_BUCKET: string;
-    readonly PUBLIC_FIREBASE_MESSAGING_SENDER_ID: string;
-    readonly PUBLIC_FIREBASE_APP_ID: string;
-    readonly PUBLIC_FIREBASE_MEASUREMENT_ID: string;
     // Servidor (privadas)
     readonly TMDB_API_KEY: string;
-    readonly FIREBASE_ADMIN_KEY_B64: string;
     // Supabase (todas de servidor: el navegador no habla con Supabase)
     readonly SUPABASE_URL: string;
     readonly SUPABASE_PUBLISHABLE_KEY: string;

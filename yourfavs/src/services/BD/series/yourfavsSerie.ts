@@ -632,6 +632,3 @@ export async function getMaxWatchStreak(): Promise<{ max: number; current: numbe
 // dos meses solo aparecía en el segundo. Ahora lo calcula `buildTimeline` en `yearStats.ts`,
 // sobre la unión de progreso y diario, con un tramo por serie y mes.
 
-// Re-export del client SDK db por compatibilidad con módulos que aún lo importan de aquí.
-// (El acceso a datos por usuario va por Admin SDK + userScope; esto solo es compat.)
-export { db } from "../../../utils/firebaseConfig";

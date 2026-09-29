@@ -3,13 +3,10 @@
  *
  * Borrar el usuario de Supabase Auth se lleva por delante todas sus filas (`on delete cascade`
  * desde `auth.users` en todas las tablas). Hace falta la clave secreta: un usuario no puede
- * borrarse a sí mismo de Auth.
- *
- * TRANSICIÓN (Fase 3 → 4): mientras los datos sigan en Firestore, se borra también su árbol
- * `users/{uid}`. En la Fase 4 esa parte desaparece.
+ * borrarse a sí mismo de Auth. Los ficheros de Storage (avatar) se borran aparte: Storage no
+ * cuelga de la FK.
  */
 import type { APIRoute } from 'astro';
-import { adminDb } from '../../../utils/firebaseAdmin';
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { clearSessionFlag, json } from '../../../lib/supabase/authHttp';
 
@@ -20,8 +17,10 @@ export const POST: APIRoute = async ({ locals, cookies }) => {
     if (!user) return json({ ok: false, error: 'No autorizado' }, 401);
 
     try {
-        await adminDb.recursiveDelete(adminDb.collection('users').doc(user.uid));
-        const { error } = await supabaseAdmin().auth.admin.deleteUser(user.authId);
+        const admin = supabaseAdmin();
+        const { data: files } = await admin.storage.from('avatars').list(user.authId);
+        if (files?.length) await admin.storage.from('avatars').remove(files.map((f) => `${user.authId}/${f.name}`));
+        const { error } = await admin.auth.admin.deleteUser(user.authId);
         if (error) throw error;
     } catch (err) {
         console.error('[api/auth/delete-account] error:', (err as Error).message);

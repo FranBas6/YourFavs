@@ -1,7 +1,7 @@
 /**
  * Variables de Supabase, todas de SERVIDOR (sin `PUBLIC_`): el navegador no habla con Supabase.
  *
- * Mismo patrón que `firebaseAdmin.ts`: `import.meta.env` en local (Vite lee `.env`) y
+ * `import.meta.env` en local (Vite lee `.env`) y
  * `process.env` en Netlify, donde las variables del panel llegan en tiempo de ejecución.
  * Falla con un mensaje claro en vez de con un `undefined` en mitad de una consulta.
  */

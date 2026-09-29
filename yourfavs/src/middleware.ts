@@ -54,8 +54,7 @@ function applyCacheHeaders(res: Response, path: string, hasSession: boolean): vo
 
 export const onRequest = defineMiddleware(async (context, next) => {
     context.locals.user = null;
-    const supabase = createSupabaseServerClient(context);
-    context.locals.supabase = supabase;
+    let supabase = createSupabaseServerClient(context);
 
     // Sesión de las cookies. Y, sin ella, el fallback móvil (Fase C): la app nativa NO usa
     // cookies y manda `Authorization: Bearer <access token>`. Es ADITIVO: la web no manda esa
@@ -65,26 +64,22 @@ export const onRequest = defineMiddleware(async (context, next) => {
         claims = (await supabase.auth.getClaims()).data?.claims ?? null;
         if (!claims) {
             const bearer = context.request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
-            if (bearer) claims = (await supabase.auth.getClaims(bearer)).data?.claims ?? null;
+            if (bearer) {
+                claims = (await supabase.auth.getClaims(bearer)).data?.claims ?? null;
+                // Sin cookies, las consultas tienen que llevar el token para que la RLS vea al usuario.
+                if (claims) supabase = createSupabaseServerClient(context, bearer);
+            }
         }
     } catch {
         claims = null; // sesión inválida/caducada → invitado
     }
+    context.locals.supabase = supabase;
 
     if (claims) {
         const meta = claims.user_metadata ?? {};
         const str = (v: unknown) => (typeof v === 'string' && v ? v : null);
-        // TRANSICIÓN (Fase 3 → 4): los datos siguen en Firestore bajo el uid de FIREBASE. Las
-        // cuentas migradas guardan ese uid en `profiles.firebase_uid`, así que el `uid` que ve
-        // la app (y con el que lee Firestore) es ese; `authId` es el de Supabase. En la Fase 4
-        // los dos pasan a ser el de Supabase y esta consulta desaparece.
-        let dataUid = claims.sub;
-        try {
-            const { data } = await supabase.from('profiles').select('firebase_uid').eq('id', claims.sub).maybeSingle();
-            if (data?.firebase_uid) dataUid = data.firebase_uid;
-        } catch { /* sin perfil: se queda el uid de Supabase */ }
         context.locals.user = {
-            uid: dataUid,
+            uid: claims.sub,
             authId: claims.sub,
             email: claims.email ?? null,
             name: str(meta.full_name) ?? str(meta.name) ?? str(meta.display_name),
