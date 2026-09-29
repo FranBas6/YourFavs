@@ -1,4 +1,5 @@
-import { userCol, getCurrentUid } from "./userScope";
+import { getCurrentUid } from "./userScope";
+import type { LiveProgress, WatchLogRow } from "./episodeWatches";
 import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
 import { getFirebaseTimestamp, formatScore } from "../../../utils/constants/helpers/media-helpers";
 
@@ -69,8 +70,8 @@ function lowerBound(arr: CutPoint[], v: number): number {
 // cuando entre dos episodios ocurrió otra cosa (guardar en una lista, valorar, ver un
 // episodio de otra serie…). La segunda regla usa una señal real en vez de adivinar.
 async function fetchWatchedEpisodeEvents(
-    logDocs: FirebaseFirestore.QueryDocumentSnapshot[],
-    liveDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    logRows: WatchLogRow[],
+    live: LiveProgress[],
     cutPoints: CutPoint[] = [],
 ): Promise<ActivityEvent[]> {
     try {
@@ -88,9 +89,8 @@ async function fetchWatchedEpisodeEvents(
         // 1) WatchedEpisodes (fuente PRIMARIA de la HORA). watched_at es el instante REAL
         //    de cada visionado (ISO absoluto) → el reloj cliente lo pinta bien en Madrid,
         //    sin el desfase de mediodía. Cubre lo que sigue marcado (el caso normal).
-        for (const docSnap of liveDocs) {
-            const data = docSnap.data() as { watched_episodes?: { season: number; episode: number; watched_at?: string }[] };
-            const serie = bucketFor(docSnap.id);
+        for (const data of live) {
+            const serie = bucketFor(data.id);
             for (const ep of data.watched_episodes || []) {
                 const ts = ep.watched_at ? new Date(ep.watched_at).getTime() : 0;
                 if (!ts || isNaN(ts)) continue;
@@ -103,8 +103,7 @@ async function fetchWatchedEpisodeEvents(
         //    WatchedEpisodes (desmarcados para volver a ver) → así no se pierde el
         //    historial (bug §5). Su HORA: logged_at real si no es del backfill; los del
         //    backfill (o sin hora) caen a mediodía UTC del watched_on (día real, estable).
-        for (const docSnap of logDocs) {
-            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; episode?: number; watched_on?: string; logged_at?: unknown; source?: string };
+        for (const x of logRows) {
             if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
             const serie = bucketFor(String(x.tmdb_id));
             if (serie.covered.has(`${x.season}:${x.episode}`)) continue; // ya cubierto por watched_at
@@ -194,12 +193,11 @@ async function fetchWatchedEpisodeEvents(
 // rewatch=true y "pases" de serie (entradas a nivel serie, sin season). NO los
 // episodios sueltos (esos ya salen vía WatchedEpisodes; no duplicamos).
 async function fetchRewatchEvents(
-    logDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    logRows: WatchLogRow[],
 ): Promise<ActivityEvent[]> {
     try {
         const events: ActivityEvent[] = [];
-        for (const docSnap of logDocs) {
-            const x = docSnap.data() as { media_type?: string; tmdb_id?: number; season?: number; rewatch?: boolean; logged_at?: unknown; watched_on?: string; note?: string };
+        for (const x of logRows as (WatchLogRow & { note?: string })[]) {
             const isMovieRewatch = x.media_type === 'movie' && x.rewatch === true;
             const isSeriesPass = x.media_type === 'tv' && x.season == null;
             if (!isMovieRewatch && !isSeriesPass) continue;
@@ -222,14 +220,13 @@ async function fetchRewatchEvents(
     }
 }
 
-// Valoraciones (4.2): cada nota en Ratings → un evento. updated_at marca el
+// Valoraciones (4.2): cada nota en `ratings` → un evento. updated_at marca el
 // instante; si updated_at supera a created_at es una edición → "Nota actualizada".
 async function fetchRatingEvents(): Promise<ActivityEvent[]> {
     try {
-        const snap = await userCol('Ratings').get();
+        const { listRatings } = await import('../lists/ratings');
         const events: ActivityEvent[] = [];
-        for (const docSnap of snap.docs) {
-            const x = docSnap.data() as { media_type?: string; tmdb_id?: string; score?: number; created_at?: unknown; updated_at?: unknown };
+        for (const x of await listRatings()) {
             if (!x.score) continue;
             const updated = getFirebaseTimestamp(x.updated_at);
             const created = getFirebaseTimestamp(x.created_at);
@@ -238,9 +235,9 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
             const edited = created > 0 && updated > 0 && updated - created > 60_000; // >1min = edición real
             events.push({
                 type: x.media_type === 'movie' ? 'movie' : 'serie',
-                id: String(x.tmdb_id || docSnap.id.replace(/^(movie|tv)_/, '')),
+                id: String(x.tmdb_id),
                 collection: 'Ratings',
-                action: `${edited ? 'Nota actualizada' : 'Has valorado'} · ★ ${formatScore(x.score)}`,
+                action: `${edited ? 'Nota actualizada' : 'Has valorado'} · ★ ${formatScore(Number(x.score))}`,
                 timestamp: ts,
             });
         }
@@ -376,17 +373,18 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (cachedFeed && cachedFeed.expires > Date.now()) return cachedFeed.data;
     // WatchLog se lee UNA sola vez y se comparte entre episodios vistos y re-visionados
     // (antes se escaneaba dos veces → doble de lecturas en la colección más grande).
-    const { getWatchedProgressDocs } = await import('../series/yourfavsSerie');
-    const [snapshot, logSnap, liveDocs] = await Promise.all([
-        getLibrarySnapshot(),          // las 11 listas (1 lectura cacheada)
-        userCol('WatchLog').get(),
-        getWatchedProgressDocs(),
+    const { getAllWatchedProgress } = await import('../series/yourfavsSerie');
+    const { getAllWatchLog } = await import('../lists/watchLog');
+    const [snapshot, logRows, live] = await Promise.all([
+        getLibrarySnapshot(),          // las listas (cacheado)
+        getAllWatchLog(),
+        getAllWatchedProgress(),
     ]);
     // Los episodios se agrupan AL FINAL: necesitan conocer el resto de eventos para poder
     // cortar la sesión cuando entre dos episodios ocurrió otra cosa. El builder de episodios
     // no lee Firestore (recibe los docs), así que sacarlo del Promise.all no cuesta nada.
     const [rewatchEvents, ratingEvents, personEvents, favPersonEvents, mutationEvents] = await Promise.all([
-        fetchRewatchEvents(logSnap.docs),
+        fetchRewatchEvents(logRows),
         fetchRatingEvents(),
         fetchFollowPersonEvents(),
         fetchActorFavEvents(),
@@ -429,7 +427,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     const cutPoints: CutPoint[] = [...dedupedCollectionEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents]
         .filter(e => e.timestamp > 0)
         .map(e => ({ ts: e.timestamp, serie: null }));
-    const episodeEvents = await fetchWatchedEpisodeEvents(logSnap.docs, liveDocs, cutPoints);
+    const episodeEvents = await fetchWatchedEpisodeEvents(logRows, live, cutPoints);
     const events = [...dedupedCollectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
     feedCache.set(uid, { data: events, expires: Date.now() + FEED_TTL_MS });
     return events;

@@ -480,15 +480,6 @@ export async function getAllWatchedProgress(): Promise<WatchedProgress[]> {
     return Array.from(bySerie, ([id, rows]) => rowsToProgress(String(id), rows)!);
 }
 
-/**
- * TRANSICIÓN (Fase 4, bloque 1 → 2): el progreso con forma de documentos de Firestore, para los
- * dos lectores que aún lo cruzan con el WatchLog de Firestore (yearStats y activityFeed). Se
- * va en el bloque 2, cuando el diario pase a Postgres.
- */
-export async function getWatchedProgressDocs(): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
-    return (await getAllWatchedProgress()).map(p => ({ id: p.id, data: () => p })) as unknown as FirebaseFirestore.QueryDocumentSnapshot[];
-}
-
 export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
     const inserted = await insertEpisodes(serieId, [{ season, episode }], new Date().toISOString());
     if (inserted.length) {

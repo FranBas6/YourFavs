@@ -1,22 +1,21 @@
 /**
  * Override por serie del "modo sin spoilers" (§2 · parada 2).
  *
- * Doc `users/{uid}/SpoilerPrefs/tv_{id}` → { spoilerFree: boolean }. La SERIE manda
+ * Tabla `spoiler_prefs` (antes users/{uid}/SpoilerPrefs/tv_{id}) → spoiler_free. La SERIE manda
  * sobre el ajuste global del perfil: si hay override, se usa; si no, se sigue el global.
- * Mismo patrón de doc-id por título que `NotificationSubs`/`MediaTags`.
+ * Una fila por serie, igual que `notification_subs`/`media_tags`.
  */
-import { userDoc, getCurrentUid } from './userScope';
-
-const COLLECTION = 'SpoilerPrefs';
+import { db, getAuthId, requireAuthId } from './userScope';
 
 /** Override de la serie: `true`/`false` explícito, o `null` = seguir el global del perfil. */
 export async function getSpoilerPref(serieId: string | number): Promise<boolean | null> {
-    if (!getCurrentUid()) return null;
+    const userId = getAuthId();
+    if (!userId) return null;
     try {
-        const snap = await userDoc(COLLECTION, `tv_${serieId}`).get();
-        if (!snap.exists) return null;
-        const v = (snap.data() as any)?.spoilerFree;
-        return typeof v === 'boolean' ? v : null;
+        const { data, error } = await db().from('spoiler_prefs').select('spoiler_free')
+            .eq('user_id', userId).eq('tmdb_id', Number(serieId)).maybeSingle();
+        if (error || !data) return null;
+        return typeof data.spoiler_free === 'boolean' ? data.spoiler_free : null;
     } catch {
         return null;
     }
@@ -29,17 +28,17 @@ export async function getSpoilerPref(serieId: string | number): Promise<boolean 
  * override": la serie se quedaba ignorando el global para siempre y sin forma de deshacerlo.
  */
 export async function clearSpoilerPref(serieId: string | number): Promise<void> {
-    if (!getCurrentUid()) return;
+    const userId = getAuthId();
+    if (!userId) return;
     try {
-        await userDoc(COLLECTION, `tv_${serieId}`).delete();
+        await db().from('spoiler_prefs').delete().eq('user_id', userId).eq('tmdb_id', Number(serieId));
     } catch { /* si no existe, ya está en el estado que queremos */ }
 }
 
 export async function setSpoilerPref(serieId: string | number, value: boolean): Promise<void> {
-    await userDoc(COLLECTION, `tv_${serieId}`).set({
-        id: `tv_${serieId}`,
-        tmdb_id: String(serieId),
-        spoilerFree: value,
-        updated_at: new Date(),
-    });
+    const { error } = await db().from('spoiler_prefs').upsert(
+        { user_id: requireAuthId(), tmdb_id: Number(serieId), spoiler_free: value },
+        { onConflict: 'user_id,tmdb_id' },
+    );
+    if (error) throw new Error(error.message);
 }

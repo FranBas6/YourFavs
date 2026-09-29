@@ -1,7 +1,7 @@
 /**
  * Bitácora de acciones intencionales (§5) — `Activity` append-only.
  *
- *   users/{uid}/Activity/{entryId}   // id autogenerado
+ *   activity (antes users/{uid}/Activity/{entryId})   // id autogenerado
  *     verb        "unwatch"|"remove"|"unfollow"|"reorder"|"abandon"|"resume"…
  *     media_type  "movie"|"tv"|"person"
  *     tmdb_id     number
@@ -18,9 +18,7 @@
  * El título/póster NO se congelan aquí: la página de Actividad los resuelve por TMDB,
  * igual que el resto de fuentes del feed; así los handlers registran sin datos extra.
  */
-import { userCol, getCurrentUid } from './userScope';
-
-const COLLECTION = 'Activity';
+import { db, fetchAll, getAuthId } from './userScope';
 
 export type ActivityVerb =
     | 'unwatch'    // desmarcar / vaciar episodios
@@ -49,19 +47,20 @@ export interface ActivityRecord extends ActivityInput {
  * origina (los handlers la llaman dentro de un try/catch, como el diario).
  */
 export async function appendActivity(e: ActivityInput): Promise<void> {
-    if (!getCurrentUid()) return;
+    const userId = getAuthId();
+    if (!userId) return;
     const tmdbId = Number(e.tmdb_id);
     if (!Number.isFinite(tmdbId)) return;
 
-    const doc: Record<string, unknown> = {
+    const { error } = await db().from('activity').insert({
+        user_id: userId,
         verb: e.verb,
         media_type: e.media_type,
         tmdb_id: tmdbId,
-        logged_at: new Date(),
-    };
-    if (e.meta && Object.keys(e.meta).length) doc.meta = e.meta;
-
-    await userCol(COLLECTION).add(doc);
+        logged_at: new Date().toISOString(),
+        meta: e.meta && Object.keys(e.meta).length ? (e.meta as never) : null,
+    });
+    if (error) throw new Error(error.message);
     // Toda acción intencional (quitar/dejar de seguir/abandonar/retomar/reordenar) pasa
     // por aquí → invalidamos la caché del feed de Actividad en un solo sitio (import
     // dinámico para evitar ciclo; activityFeed importa activityLog dinámicamente también).
@@ -70,10 +69,12 @@ export async function appendActivity(e: ActivityInput): Promise<void> {
 
 /** Todas las entradas de la bitácora (el feed las ordena/mezcla con el resto de fuentes). */
 export async function listActivity(): Promise<ActivityRecord[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userCol(COLLECTION).get();
-    return snap.docs.map((d) => {
-        const x = d.data() as Omit<ActivityRecord, 'id'>;
-        return { id: d.id, ...x };
-    });
+    const userId = getAuthId();
+    if (!userId) return [];
+    const rows = await fetchAll<Record<string, any>>((from, to) =>
+        db().from('activity').select('id, verb, media_type, tmdb_id, logged_at, meta')
+            .eq('user_id', userId).order('logged_at').order('id').range(from, to),
+    );
+    // Sin `meta` a null: la forma de siempre, donde el campo simplemente no existía.
+    return rows.map(({ meta, ...r }) => ({ ...r, ...(meta ? { meta } : {}) }) as ActivityRecord);
 }

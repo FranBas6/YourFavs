@@ -1,6 +1,17 @@
-import { userCol, userDoc, getCurrentUid } from './userScope';
+import { db, fetchAll, getAuthId, requireAuthId } from './userScope';
 
-const COLLECTION = 'MediaTags';
+// Tabla `media_tags` (antes users/{uid}/MediaTags/{type}_{id}). Hacia fuera se devuelve la
+// forma de documento de siempre: `id` = "movie_550" y `tmdb_id` en texto.
+interface MediaTagsRow { media_type: 'movie' | 'tv'; tmdb_id: number; tags: string[]; notes: string; updated_at: string }
+const COLUMNS = 'media_type, tmdb_id, tags, notes, updated_at';
+const toDoc = (r: MediaTagsRow): MediaTagsDoc => ({
+    id: docIdFor(r.media_type, r.tmdb_id),
+    media_type: r.media_type,
+    tmdb_id: String(r.tmdb_id),
+    tags: r.tags ?? [],
+    notes: r.notes ?? '',
+    updated_at: r.updated_at,
+});
 
 export interface MediaTagsDoc {
     id: string;                 // "movie_550" | "tv_1399"
@@ -31,24 +42,29 @@ export async function getMediaTags(
     mediaType: 'movie' | 'tv',
     tmdbId: string | number
 ): Promise<MediaTagsDoc | null> {
-    if (!getCurrentUid()) return null;
-    const snap = await userDoc(COLLECTION, docIdFor(mediaType, tmdbId)).get();
-    return snap.exists ? (snap.data() as MediaTagsDoc) : null;
+    const userId = getAuthId();
+    if (!userId) return null;
+    const { data, error } = await db().from('media_tags').select(COLUMNS)
+        .eq('user_id', userId).eq('media_type', mediaType).eq('tmdb_id', Number(tmdbId)).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? toDoc(data as MediaTagsRow) : null;
 }
 
 /** Lee todos los docs de tags para una lista de items. Devuelve mapa `${type}_${id}` → doc. */
 export async function getMediaTagsBatch(
     items: { mediaType: 'movie' | 'tv'; tmdbId: string | number }[]
 ): Promise<Record<string, MediaTagsDoc>> {
-    if (items.length === 0 || !getCurrentUid()) return {};
-    const snaps = await Promise.all(
-        items.map(it => userDoc(COLLECTION, docIdFor(it.mediaType, it.tmdbId)).get())
-    );
+    const userId = getAuthId();
+    if (items.length === 0 || !userId) return {};
+    // Una consulta por tipo (antes: una lectura por título de la lista).
     const map: Record<string, MediaTagsDoc> = {};
-    for (let i = 0; i < snaps.length; i++) {
-        if (snaps[i].exists) {
-            const data = snaps[i].data() as MediaTagsDoc;
-            map[data.id] = data;
+    for (const mediaType of ['movie', 'tv'] as const) {
+        const ids = Array.from(new Set(items.filter(it => it.mediaType === mediaType).map(it => Number(it.tmdbId)).filter(Number.isInteger)));
+        for (let i = 0; i < ids.length; i += 200) {
+            const { data, error } = await db().from('media_tags').select(COLUMNS)
+                .eq('user_id', userId).eq('media_type', mediaType).in('tmdb_id', ids.slice(i, i + 200));
+            if (error) throw new Error(error.message);
+            for (const r of (data ?? []) as MediaTagsRow[]) { const d = toDoc(r); map[d.id] = d; }
         }
     }
     return map;
@@ -56,9 +72,13 @@ export async function getMediaTagsBatch(
 
 /** Lee TODOS los docs de tags (para construir lista de tags únicos en filtro). */
 export async function getAllMediaTags(): Promise<MediaTagsDoc[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userCol(COLLECTION).get();
-    return snap.docs.map(d => d.data() as MediaTagsDoc);
+    const userId = getAuthId();
+    if (!userId) return [];
+    const rows = await fetchAll<MediaTagsRow>((from, to) =>
+        db().from('media_tags').select(COLUMNS).eq('user_id', userId)
+            .order('media_type').order('tmdb_id').range(from, to),
+    );
+    return rows.map(toDoc);
 }
 
 export async function setMediaTags(
@@ -66,37 +86,30 @@ export async function setMediaTags(
     tmdbId: string | number,
     payload: { tags?: string[]; notes?: string }
 ): Promise<void> {
-    const id = docIdFor(mediaType, tmdbId);
+    const userId = requireAuthId();
+    const key = { user_id: userId, media_type: mediaType, tmdb_id: Number(tmdbId) };
     const tags = payload.tags ? payload.tags.map(normalizeTag).filter(Boolean) : undefined;
     const notes = payload.notes !== undefined ? payload.notes.trim().slice(0, 2000) : undefined;
 
-    // Si todo queda vacío, borra el doc para no dejar basura
-    if ((tags === undefined || tags.length === 0) && (notes === undefined || notes === '')) {
-        const existing = await userDoc(COLLECTION, id).get();
-        if (existing.exists) {
-            const data = existing.data() as MediaTagsDoc;
-            const newTags = tags ?? data.tags ?? [];
-            const newNotes = notes ?? data.notes ?? '';
-            if (newTags.length === 0 && newNotes === '') {
-                await userDoc(COLLECTION, id).delete();
-                return;
-            }
+    const existingData = await getMediaTags(mediaType, tmdbId);
+    const finalTags = tags !== undefined ? Array.from(new Set(tags)) : existingData?.tags || [];
+    const finalNotes = notes !== undefined ? notes : existingData?.notes || '';
+
+    // Si todo queda vacío, borra la fila para no dejar basura
+    if (finalTags.length === 0 && finalNotes === '') {
+        if (existingData) {
+            const { error } = await db().from('media_tags').delete()
+                .eq('user_id', key.user_id).eq('media_type', key.media_type).eq('tmdb_id', key.tmdb_id);
+            if (error) throw new Error(error.message);
         }
+        return;
     }
 
-    const existing = await userDoc(COLLECTION, id).get();
-    const existingData = existing.exists ? (existing.data() as MediaTagsDoc) : null;
-
-    const finalDoc: MediaTagsDoc = {
-        id,
-        media_type: mediaType,
-        tmdb_id: String(tmdbId),
-        tags: tags !== undefined ? Array.from(new Set(tags)) : existingData?.tags || [],
-        notes: notes !== undefined ? notes : existingData?.notes || '',
-        updated_at: new Date().toISOString(),
-    };
-
-    await userDoc(COLLECTION, id).set(finalDoc);
+    const { error } = await db().from('media_tags').upsert(
+        { ...key, tags: finalTags, notes: finalNotes, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,media_type,tmdb_id' },
+    );
+    if (error) throw new Error(error.message);
 }
 
 export async function handleMediaTagsAction(formData: FormData): Promise<string> {

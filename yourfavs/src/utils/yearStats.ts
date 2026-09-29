@@ -2,7 +2,7 @@ import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
 import { appDateParts } from './appTime';
-import { userCol, getCurrentUid } from '../services/BD/shared/userScope';
+import { getCurrentUid } from '../services/BD/shared/userScope';
 import { getLibrarySnapshot, type LibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import {
     unionEpisodeWatches, watchLogInstant,
@@ -542,13 +542,11 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     let logRows: WatchLogRow[] = [];
     try {
         if (getCurrentUid()) {
-            const { getWatchedProgressDocs } = await import('../services/BD/series/yourfavsSerie');
-            const [watchedDocs, logSnap] = await Promise.all([
-                getWatchedProgressDocs(),
-                userCol('WatchLog').get(),
-            ]);
-            watches = unionEpisodeWatches(watchedDocs, logSnap.docs);
-            logRows = logSnap.docs.map((d) => d.data() as WatchLogRow);
+            const { getAllWatchedProgress } = await import('../services/BD/series/yourfavsSerie');
+            const { getAllWatchLog } = await import('../services/BD/lists/watchLog');
+            const [live, log] = await Promise.all([getAllWatchedProgress(), getAllWatchLog()]);
+            watches = unionEpisodeWatches(live, log);
+            logRows = log;
         }
     } catch (error) {
         console.error('Error leyendo visionados (WatchedEpisodes + WatchLog):', error);

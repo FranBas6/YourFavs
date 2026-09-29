@@ -54,17 +54,23 @@ export function watchLogInstant(x: WatchLogRow): { ts: number; synthetic: boolea
     return { ts, synthetic: true };
 }
 
+/** Progreso de una serie tal y como lo devuelve `getAllWatchedProgress`. */
+export interface LiveProgress {
+    id: string;
+    watched_episodes?: { season: number; episode: number; watched_at?: string }[];
+}
+
 /**
- * Un array plano de visionados a partir de los documentos de las dos colecciones (que el
- * llamante ya tiene leídos: aquí no se toca Firestore).
+ * Un array plano de visionados a partir de las dos fuentes (que el llamante ya tiene
+ * leídas: aquí no se toca la BD).
  *
  * El orden importa: `WatchedEpisodes` va primero para que, cuando las dos fuentes
  * describan el mismo episodio el mismo día, gane la hora real del progreso sobre la
  * posible hora sintética del diario.
  */
 export function unionEpisodeWatches(
-    liveDocs: FirebaseFirestore.QueryDocumentSnapshot[],
-    logDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    live: LiveProgress[],
+    logRows: WatchLogRow[],
 ): EpisodeWatch[] {
     const out: EpisodeWatch[] = [];
     const seen = new Set<string>();
@@ -77,20 +83,15 @@ export function unionEpisodeWatches(
         out.push({ serieId, season, episode, ts, synthetic });
     };
 
-    for (const docSnap of liveDocs) {
-        const data = docSnap.data() as {
-            id?: string;
-            watched_episodes?: { season: number; episode: number; watched_at?: string }[];
-        };
-        const serieId = data.id || docSnap.id;
+    for (const data of live) {
+        const serieId = data.id;
         for (const ep of data.watched_episodes || []) {
             if (!ep.watched_at) continue;
             push(serieId, ep.season, ep.episode, new Date(ep.watched_at).getTime(), false);
         }
     }
 
-    for (const docSnap of logDocs) {
-        const x = docSnap.data() as WatchLogRow;
+    for (const x of logRows) {
         if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
         const { ts, synthetic } = watchLogInstant(x);
         push(String(x.tmdb_id), x.season, x.episode, ts, synthetic);

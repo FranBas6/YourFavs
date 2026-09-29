@@ -1,7 +1,7 @@
 /**
  * Diario de visionado (Fase L5) — `WatchLog` append-only.
  *
- *   users/{uid}/WatchLog/{entryId}   // id autogenerado
+ *   watch_log (antes users/{uid}/WatchLog/{entryId})   // id autogenerado
  *     media_type "movie"|"tv" · tmdb_id
  *     season? · episode?        // solo tv
  *     watched_on "YYYY-MM-DD"   // fecha elegida (no timestamp de marcado)
@@ -13,22 +13,28 @@
  * congelan aquí: la página del diario (L6) los resuelve por TMDB (como el resto de
  * páginas personales), así los handlers pueden registrar sin datos extra.
  */
-import { adminDb } from '../../../utils/firebaseAdmin';
-import { userCol, getCurrentUid } from '../shared/userScope';
+import { db, fetchAll, getAuthId, requireAuthId } from '../shared/userScope';
+import type { WatchLogRow } from '../shared/episodeWatches';
 
-const COLLECTION = 'WatchLog';
+const COLUMNS = 'id, media_type, tmdb_id, season, episode, watched_on, rewatch, note, logged_at, source';
 
-// Dieta de lecturas: los contadores de ficha (countWatches/Passes) consultan TODAS
-// las entradas de un título en cada carga de ficha — para una serie enorme (Naruto,
-// ~220 episodios) eso son ~220 lecturas por apertura, solo para contar 0-3 "pases".
-// Cacheamos las filas por (uid, tmdb_id) con TTL corto; cualquier append/borrado del
-// mismo título invalida su entrada. Así abrir una ficha varias veces no re-escanea.
+/** Fila de `watch_log` → la forma de documento de siempre (sin claves a null). */
+function toEntry(r: Record<string, any>): Record<string, any> {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(r)) if (v !== null) out[k] = v;
+    return out;
+}
+
+// Los contadores de ficha (countWatches/Passes) miran TODAS las entradas de un título en cada
+// carga de ficha. En Firestore eso eran ~220 lecturas para una serie como Naruto; en Postgres
+// es una consulta con índice, pero se mantiene una caché corta por (usuario, título) porque la
+// ficha pregunta varias veces en el mismo render. Cualquier alta/borrado del título la invalida.
 const ROWS_TTL_MS = 5 * 60 * 1000;
 const rowsCache = new Map<string, { rows: Record<string, any>[]; expires: number }>();
-function rowsKey(uid: string, tmdbId: number): string { return `${uid}:${tmdbId}`; }
+function rowsKey(userId: string, tmdbId: number): string { return `${userId}:${tmdbId}`; }
 function invalidateTitleRows(tmdb_id: number | string): void {
-    const uid = getCurrentUid();
-    if (uid) rowsCache.delete(rowsKey(uid, Number(tmdb_id)));
+    const userId = getAuthId();
+    if (userId) rowsCache.delete(rowsKey(userId, Number(tmdb_id)));
 }
 // Cualquier escritura del diario cambia el feed de Actividad → invalidamos su caché.
 // Import dinámico para NO crear ciclo (activityFeed → librarySnapshot → yourfavsSerie →
@@ -37,19 +43,35 @@ async function bustActivityFeed(): Promise<void> {
     try { const m = await import('../shared/activityFeed'); m.invalidateActivityFeed(); } catch { /* ignore */ }
 }
 async function getTitleRows(tmdb_id: number | string): Promise<Record<string, any>[]> {
-    const uid = getCurrentUid();
-    if (!uid) return [];
+    const userId = getAuthId();
+    if (!userId) return [];
     const id = Number(tmdb_id);
     if (!Number.isFinite(id)) return [];
-    const key = rowsKey(uid, id);
+    const key = rowsKey(userId, id);
     const cached = rowsCache.get(key);
     if (cached && cached.expires > Date.now()) return cached.rows;
-    const snap = await userCol(COLLECTION).where('tmdb_id', '==', id).get();
-    // Incluimos el id del doc en cada fila → permite borrar sin re-consultar (ver
-    // removeEpisodeFromLog). Los contadores solo leen campos, así que el id extra es inocuo.
-    const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const data = await fetchAll<Record<string, any>>((from, to) =>
+        db().from('watch_log').select(COLUMNS).eq('user_id', userId).eq('tmdb_id', id)
+            .order('logged_at').order('id').range(from, to),
+    );
+    // El id de cada fila permite borrar sin re-consultar (ver removeEpisodeFromLog).
+    const rows = data.map(toEntry);
     rowsCache.set(key, { rows, expires: Date.now() + ROWS_TTL_MS });
     return rows;
+}
+
+/**
+ * El diario ENTERO del usuario (Tu año, Actividad). En Firestore era la lectura más cara de
+ * la app (una por entrada: ~2.200 para ti); aquí son 3 peticiones de 1000 filas.
+ */
+export async function getAllWatchLog(): Promise<WatchLogRow[]> {
+    const userId = getAuthId();
+    if (!userId) return [];
+    const data = await fetchAll<Record<string, any>>((from, to) =>
+        db().from('watch_log').select(COLUMNS).eq('user_id', userId)
+            .order('logged_at').order('id').range(from, to),
+    );
+    return data.map(toEntry) as WatchLogRow[];
 }
 
 export interface WatchLogEntry {
@@ -82,32 +104,35 @@ interface AppendInput {
 
 /** Añade UNA entrada al diario. Calcula `rewatch` mirando entradas previas del mismo item. */
 export async function appendWatchLog(e: AppendInput): Promise<{ rewatch: boolean; added: boolean }> {
-    if (!getCurrentUid()) return { rewatch: false, added: false };
+    const userId = getAuthId();
+    if (!userId) return { rewatch: false, added: false };
     const tmdbId = Number(e.tmdb_id);
     if (!Number.isFinite(tmdbId)) return { rewatch: false, added: false };
 
-    const prior = await userCol(COLLECTION).where('tmdb_id', '==', tmdbId).get();
+    // ¿Ya había una entrada del mismo item? Antes se leían TODAS las del título (cientos en
+    // una serie larga) para mirarlas en JS; ahora se cuenta en la BD.
     const isEp = e.media_type === 'tv' && e.season != null && e.episode != null;
-    const rewatch = prior.docs.some((d) => {
-        const x = d.data();
-        if (x.media_type !== e.media_type) return false;
-        if (isEp) return x.season === e.season && x.episode === e.episode;
-        return true;
-    });
+    let prior = db().from('watch_log').select('id', { count: 'exact', head: true })
+        .eq('user_id', userId).eq('tmdb_id', tmdbId).eq('media_type', e.media_type);
+    if (isEp) prior = prior.eq('season', e.season!).eq('episode', e.episode!);
+    const { count, error: priorError } = await prior;
+    if (priorError) throw new Error(priorError.message);
+    const rewatch = (count ?? 0) > 0;
     // dedupe: ya consta como visto → no creamos otra entrada.
     if (e.dedupe && rewatch) return { rewatch: true, added: false };
 
-    const doc: Record<string, unknown> = {
+    const { error } = await db().from('watch_log').insert({
+        user_id: userId,
         media_type: e.media_type,
         tmdb_id: tmdbId,
         watched_on: e.watched_on || todayISO(),
         rewatch,
-        logged_at: new Date(),
-    };
-    if (isEp) { doc.season = e.season; doc.episode = e.episode; }
-    if (e.note) doc.note = String(e.note).slice(0, 500);
-
-    await userCol(COLLECTION).add(doc);
+        logged_at: new Date().toISOString(),
+        season: isEp ? e.season! : null,
+        episode: isEp ? e.episode! : null,
+        note: e.note ? String(e.note).slice(0, 500) : null,
+    });
+    if (error) throw new Error(error.message);
     invalidateTitleRows(tmdbId);
     await bustActivityFeed();
     return { rewatch, added: true };
@@ -115,43 +140,48 @@ export async function appendWatchLog(e: AppendInput): Promise<{ rewatch: boolean
 
 /**
  * Añade VARIOS episodios de una serie en lote (marcar temporada / todo). Una sola
- * lectura previa para calcular `rewatch` por episodio; escritura en batch.
+ * consulta previa para calcular `rewatch` por episodio; una inserción para todos.
  */
 export async function appendEpisodes(
     serieId: number | string,
     episodes: { season: number; episode: number }[],
     watched_on?: string
 ): Promise<void> {
-    if (!getCurrentUid() || episodes.length === 0) return;
+    const userId = getAuthId();
+    if (!userId || episodes.length === 0) return;
     const tmdbId = Number(serieId);
     if (!Number.isFinite(tmdbId)) return;
 
-    const prior = await userCol(COLLECTION).where('tmdb_id', '==', tmdbId).get();
-    const seen = new Set(
-        prior.docs
-            .map((d) => d.data())
-            .filter((x) => x.media_type === 'tv' && x.season != null && x.episode != null)
-            .map((x) => `${x.season}:${x.episode}`)
+    // Solo las columnas que hacen falta para saber qué episodios ya constaban.
+    const prior = await fetchAll<{ season: number; episode: number }>((from, to) =>
+        db().from('watch_log').select('season, episode')
+            .eq('user_id', userId).eq('tmdb_id', tmdbId).eq('media_type', 'tv')
+            .not('season', 'is', null).not('episode', 'is', null)
+            .order('logged_at').order('id').range(from, to),
     );
+    const seen = new Set(prior.map((x) => `${x.season}:${x.episode}`));
 
     const date = watched_on || todayISO();
-    const now = new Date();
-    const batch = adminDb.batch();
-    for (const ep of episodes) {
+    const now = new Date().toISOString();
+    const rows = episodes.map((ep) => {
         const key = `${ep.season}:${ep.episode}`;
-        const ref = userCol(COLLECTION).doc();
-        batch.set(ref, {
-            media_type: 'tv',
+        const row = {
+            user_id: userId,
+            media_type: 'tv' as const,
             tmdb_id: tmdbId,
             season: ep.season,
             episode: ep.episode,
             watched_on: date,
             rewatch: seen.has(key),
             logged_at: now,
-        });
+        };
         seen.add(key); // por si el lote trae duplicados
+        return row;
+    });
+    for (let i = 0; i < rows.length; i += 500) {
+        const { error } = await db().from('watch_log').insert(rows.slice(i, i + 500));
+        if (error) throw new Error(error.message);
     }
-    await batch.commit();
     invalidateTitleRows(tmdbId);
     await bustActivityFeed();
 }
@@ -168,7 +198,8 @@ export async function removeEpisodeFromLog(
     season: number,
     episode: number
 ): Promise<void> {
-    if (!getCurrentUid()) return;
+    const userId = getAuthId();
+    if (!userId) return;
     const tmdbId = Number(serieId);
     if (!Number.isFinite(tmdbId)) return;
 
@@ -179,12 +210,13 @@ export async function removeEpisodeFromLog(
     if (!matches.length) return;
 
     const tsOf = (x: Record<string, any>): number => {
-        if (x.logged_at && typeof x.logged_at.toMillis === 'function') return x.logged_at.toMillis();
+        if (x.logged_at) return new Date(x.logged_at).getTime() || 0;
         if (x.watched_on) return new Date(x.watched_on).getTime() || 0;
         return 0;
     };
     matches.sort((a, b) => tsOf(b) - tsOf(a)); // más reciente primero
-    await userCol(COLLECTION).doc(matches[0].id).delete();
+    const { error } = await db().from('watch_log').delete().eq('user_id', requireAuthId()).eq('id', matches[0].id);
+    if (error) throw new Error(error.message);
     invalidateTitleRows(tmdbId);
     await bustActivityFeed();
 }
@@ -194,7 +226,7 @@ export async function countWatches(
     media_type: 'movie' | 'tv',
     tmdb_id: number | string
 ): Promise<{ count: number; last: string | null }> {
-    if (!getCurrentUid()) return { count: 0, last: null };
+    if (!getAuthId()) return { count: 0, last: null };
     const rows = (await getTitleRows(tmdb_id)).filter((x) => x.media_type === media_type);
     if (!rows.length) return { count: 0, last: null };
     const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
@@ -203,12 +235,14 @@ export async function countWatches(
 
 /**
  * Entradas del diario en una fecha concreta ("YYYY-MM-DD"). Equality query sobre
- * `watched_on` (indexada → barata). Para la efeméride "Hace un año…" del Brief diario.
+ * `watched_on` (índice watch_log_by_day → barata). Para la efeméride "Hace un año…" del Brief diario.
  */
 export async function getWatchLogOnDate(dateISO: string): Promise<WatchLogEntry[]> {
-    if (!getCurrentUid()) return [];
-    const snap = await userCol(COLLECTION).where('watched_on', '==', dateISO).get();
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as WatchLogEntry));
+    const userId = getAuthId();
+    if (!userId) return [];
+    const { data, error } = await db().from('watch_log').select(COLUMNS).eq('user_id', userId).eq('watched_on', dateISO);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => toEntry(r) as WatchLogEntry);
 }
 
 /**
@@ -220,7 +254,7 @@ export async function getWatchLogOnDate(dateISO: string): Promise<WatchLogEntry[
 export async function countSeriesPasses(
     serieId: number | string
 ): Promise<{ passes: number; last: string | null }> {
-    if (!getCurrentUid()) return { passes: 0, last: null };
+    if (!getAuthId()) return { passes: 0, last: null };
     const rows = (await getTitleRows(serieId)).filter((x) => x.media_type === 'tv' && x.season == null);
     if (!rows.length) return { passes: 0, last: null };
     const last = rows.map((x) => x.watched_on as string).sort().pop() || null;
@@ -238,7 +272,7 @@ export async function countSeriesPasses(
 export async function countMoviePasses(
     tmdb_id: number | string
 ): Promise<{ passes: number; last: string | null; first: string | null }> {
-    if (!getCurrentUid()) return { passes: 0, last: null, first: null };
+    if (!getAuthId()) return { passes: 0, last: null, first: null };
     const all = (await getTitleRows(tmdb_id)).filter((x) => x.media_type === 'movie');
     // `first` = primer visionado registrado (incluye la entrada base, no solo re-visionados),
     // para la efeméride "La viste por primera vez en…" (§6). Sin lecturas extra.
