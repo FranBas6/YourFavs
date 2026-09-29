@@ -245,6 +245,12 @@ isOneToOne: false
           Functions: {
             "claim_app_state":
 { Args: { "p_key": string,"p_ttl_ms": number }; Returns: Json
+                           },
+"renumber_list_positions":
+{ Args: { "p_collection": string }; Returns: undefined
+                           },
+"shift_list_positions":
+{ Args: { "p_collection": string,"p_delta": number,"p_from": number,"p_to": number }; Returns: undefined
                            }
           }
           Enums: {

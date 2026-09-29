@@ -1,6 +1,8 @@
-import { FieldValue } from "firebase-admin/firestore";
-import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
-import { adminDb } from "../../../utils/firebaseAdmin";
+import { db, fetchAll, getAuthId, requireAuthId } from "../shared/userScope";
+import {
+    titleMembership, listCollection, addToCollections, removeFromCollections, clearCollection,
+    patchTitle, setPosition, shiftPositions, renumberPositions,
+} from "../shared/library";
 import { getTransition } from "../shared/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../lists/watchLog";
 import { normalizeScore } from "../../../utils/constants/helpers/media-helpers";
@@ -52,13 +54,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     // Guardar opinión en todas las colecciones
     if (action === 'save_opinion' || actionType === 'opinion') {
         const opinionText = String(formData.get('opinion') || '').trim();
-        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
-        const snaps = await Promise.all(refs.map(ref => ref.get()));
-        await Promise.all(
-            snaps
-                .filter(snap => snap.exists)
-                .map(snap => snap.ref.update({ opinion: opinionText }))
-        );
+        await patchTitle('tv', serieId, { opinion: opinionText });
         return `/serie/${serieId}`;
     }
 
@@ -66,13 +62,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     if (action === 'save_rating' || actionType === 'rating') {
         const ratingNum = normalizeScore(formData.get('rating'));
         if (!ratingNum) return `/serie/${serieId}`;
-        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
-        const snaps = await Promise.all(refs.map(ref => ref.get()));
-        await Promise.all(
-            snaps
-                .filter(snap => snap.exists)
-                .map(snap => snap.ref.update({ rating: ratingNum }))
-        );
+        await patchTitle('tv', serieId, { rating: ratingNum });
         // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
         try {
             const { setRating } = await import('../lists/ratings');
@@ -83,13 +73,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
     // Eliminar rating
     if (action === 'delete_rating') {
-        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
-        const snaps = await Promise.all(refs.map(ref => ref.get()));
-        await Promise.all(
-            snaps
-                .filter(snap => snap.exists)
-                .map(snap => snap.ref.update({ rating: FieldValue.delete() }))
-        );
+        await patchTitle('tv', serieId, { rating: null });
         try {
             const { deleteRating } = await import('../lists/ratings');
             await deleteRating('tv', serieId);
@@ -99,13 +83,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
     // Eliminar opinión
     if (action === 'delete_opinion') {
-        const refs = SERIE_COLLECTIONS.map(col => userDoc(col, serieId));
-        const snaps = await Promise.all(refs.map(ref => ref.get()));
-        await Promise.all(
-            snaps
-                .filter(snap => snap.exists)
-                .map(snap => snap.ref.update({ opinion: FieldValue.delete() }))
-        );
+        await patchTitle('tv', serieId, { opinion: null });
         return `/serie/${serieId}`;
     }
 
@@ -113,51 +91,36 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     const coleccion = ACTION_TYPE_MAP[actionType];
     if (!coleccion) throw new Error(`Tipo de acción no válido: ${actionType}`);
 
-    const docRef = userDoc(coleccion, serieId);
-    const docSnap = await docRef.get();
-    const serieExiste = docSnap.exists;
+    // En qué listas está ya la serie: UNA consulta, reutilizada abajo.
+    const membership = await titleMembership('tv', serieId);
+    const serieExiste = membership.has(coleccion);
     const customPosition = formData.get('custom_position') ? Number(formData.get('custom_position')) : null;
 
     if (action === 'add' && !serieExiste) {
-        const baseEntry: Record<string, any> = {
-            id: serieId,
-            added_at: new Date(),
-        };
-
-        // Buscar opinión + nota existentes (lectura paralela; se copian al mover/añadir)
-        const opinionSnaps = await Promise.all(
-            SERIE_COLLECTIONS.map(col => userDoc(col, serieId).get())
-        );
+        // Buscar opinión + nota existentes (se copian al mover/añadir)
         let existingOpinion = '';
         let existingRating: number | undefined;
-        for (const s of opinionSnaps) {
-            if (!s.exists) continue;
-            const d = s.data();
-            if (!existingOpinion && d?.opinion) existingOpinion = d.opinion;
-            if (existingRating === undefined && typeof d?.rating === 'number') existingRating = d.rating;
+        for (const col of SERIE_COLLECTIONS) {
+            const row = membership.get(col);
+            if (!row) continue;
+            if (!existingOpinion && row.opinion) existingOpinion = row.opinion;
+            if (existingRating === undefined && row.rating !== null) existingRating = Number(row.rating);
         }
 
         const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
         // Entrada "limpia" (sin position) para la cascada a SeriesVistas.
-        const castedEntry: Record<string, any> = { ...baseEntry };
+        const castedEntry: { opinion?: string; rating?: number } = {};
         if (opinionForSeries) castedEntry.opinion = opinionForSeries;
         if (existingRating !== undefined) castedEntry.rating = existingRating;
-        const newEntry: Record<string, any> = { ...castedEntry };
+        const newEntry: { opinion?: string; rating?: number; position?: number } = { ...castedEntry };
 
         // Manejo de posición para favoritos
         if (coleccion === 'SeriesFavs') {
-            const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
-            const currentFavorites: SeriesFavs[] = [];
-            favsSnapshot.forEach((d) => {
-                currentFavorites.push({id: d.id, ...d.data()} as SeriesFavs);
-            });
-
+            const currentFavorites = await listCollection('SeriesFavs', 'position', 'asc');
             let newPosition: number;
             if (customPosition !== null) {
-                const seriesToUpdate = currentFavorites.filter(fav => fav.position >= customPosition);
-                for (const fav of seriesToUpdate.sort((a, b) => b.position - a.position)) {
-                    await userDoc('SeriesFavs', fav.id).update({ position: fav.position + 1 });
-                }
+                // Hueco en la posición pedida: todas las de detrás bajan una (un UPDATE).
+                await shiftPositions('SeriesFavs', customPosition, null, 1);
                 newPosition = customPosition;
             } else {
                 newPosition = currentFavorites.length > 0
@@ -167,29 +130,22 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             newEntry.position = newPosition;
         }
 
-        // Modelo de 2 capas: mover + limpiar en un batch atómico. Vista/Fav/Me gusta
-        // añaden "Vistas" y limpian el progreso (Pendiente/Ver pronto/Siguiendo);
-        // Fav/Me gusta se excluyen. La cascada a Vistas usa la entrada sin position.
+        // Modelo de 2 capas: mover + limpiar. Vista/Fav/Me gusta añaden "Vistas" y limpian el
+        // progreso (Pendiente/Ver pronto/Siguiendo); Fav/Me gusta se excluyen. La cascada a
+        // Vistas usa la entrada sin position. Altas antes que bajas: si algo fallara a medias,
+        // la serie queda en una lista de más, nunca en ninguna.
         const tr = getTransition('serie', coleccion);
-        const snapByCol = new Map<string, typeof opinionSnaps[number]>();
-        SERIE_COLLECTIONS.forEach((col, i) => snapByCol.set(col, opinionSnaps[i]));
-        const batch = adminDb.batch();
-        batch.set(docRef, newEntry);
-        for (const col of tr.alsoAdd) {
-            const s = snapByCol.get(col);
-            if (!s || !s.exists) batch.set(userDoc(col, serieId), castedEntry);
-        }
-        for (const col of tr.remove) {
-            const s = snapByCol.get(col);
-            if (s && s.exists) batch.delete(userDoc(col, serieId));
-        }
-        await batch.commit();
+        await addToCollections(serieId, [
+            { collection: coleccion, ...newEntry },
+            ...tr.alsoAdd.filter(c => !membership.has(c)).map(collection => ({ collection, ...castedEntry })),
+        ]);
+        await removeFromCollections(serieId, tr.remove.filter(c => membership.has(c)));
 
         // §5 · bitácora de acciones de estado intencionales (best-effort, no derivables):
         // abandonar una serie a medias, o retomar una que estaba abandonada. El alta
         // "normal" (empezar a seguir, marcar vista…) ya se deriva de added_at → no va aquí.
         try {
-            const wasAbandoned = snapByCol.get('SeriesAbandonadas')?.exists ?? false;
+            const wasAbandoned = membership.has('SeriesAbandonadas');
             if (coleccion === 'SeriesAbandonadas') {
                 const { appendActivity } = await import('../shared/activityLog');
                 await appendActivity({ verb: 'abandon', media_type: 'tv', tmdb_id: serieId });
@@ -200,7 +156,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         } catch { /* bitácora opcional */ }
 
     } else if (action === 'remove' && serieExiste) {
-        await docRef.delete();
+        await removeFromCollections(serieId, [coleccion]);
 
         // §5 · bitácora (best-effort): quitar de una lista es intencional y NO derivable
         // (se pierde el added_at). Dejar de seguir tiene verbo propio; el resto, 'remove'.
@@ -214,25 +170,14 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         } catch { /* bitácora opcional */ }
 
         if (coleccion === 'SeriesFavs') {
-            const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
-            const remainingFavorites: SeriesFavs[] = [];
-            favsSnapshot.forEach((d) => {
-                remainingFavorites.push({id: d.id, ...d.data()} as SeriesFavs);
-            });
-            for (let i = 0; i < remainingFavorites.length; i++) {
-                await userDoc('SeriesFavs', remainingFavorites[i].id).update({ position: i + 1 });
-            }
+            await renumberPositions('SeriesFavs'); // cierra el hueco: 1..n en un UPDATE
         }
 
     } else if (action === 'update' && serieExiste && coleccion === 'SeriesFavs') {
         const requestedPosition = customPosition !== null ? customPosition : Number(formData.get('custom_position'));
         if (!requestedPosition || Number.isNaN(requestedPosition)) throw new Error('Nueva posición inválida');
 
-        const favsSnapshot = await userCol('SeriesFavs').orderBy('position').get();
-        const favorites: SeriesFavs[] = [];
-        favsSnapshot.forEach((d) => {
-            favorites.push({id: d.id, ...d.data()} as SeriesFavs);
-        });
+        const favorites = await listCollection('SeriesFavs', 'position', 'asc');
 
         if (favorites.length === 0) return `/serie/${serieId}`;
 
@@ -244,16 +189,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         const newPos = Math.min(Math.max(1, requestedPosition), maxPos);
 
         if (newPos !== oldPos) {
-            if (newPos > oldPos) {
-                for (const fav of favorites.filter(f => (f.position || 0) > oldPos && (f.position || 0) <= newPos)) {
-                    await userDoc('SeriesFavs', fav.id).update({ position: (fav.position || 0) - 1 });
-                }
-            } else {
-                for (const fav of favorites.filter(f => (f.position || 0) >= newPos && (f.position || 0) < oldPos)) {
-                    await userDoc('SeriesFavs', fav.id).update({ position: (fav.position || 0) + 1 });
-                }
-            }
-            await docRef.update({ position: newPos });
+            if (newPos > oldPos) await shiftPositions('SeriesFavs', oldPos + 1, newPos, -1);
+            else await shiftPositions('SeriesFavs', newPos, oldPos - 1, 1);
+            await setPosition('SeriesFavs', serieId, newPos);
             // §5 · bitácora (best-effort): mover un favorito de sitio es intencional.
             try {
                 const { appendActivity } = await import('../shared/activityLog');
@@ -297,14 +235,9 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 }
 
 // Helper para obtener documentos de una colección ordenados por fecha
-async function getSeriesCollection<T>(collectionName: string, orderField: string = "added_at", orderDirection: "asc" | "desc" = "desc"): Promise<T[]> {
-    if (!getCurrentUid()) return [];
+async function getSeriesCollection<T>(collectionName: string, orderField: 'added_at' | 'position' = "added_at", orderDirection: "asc" | "desc" = "desc"): Promise<T[]> {
     try {
-        const querySnapshot = await userCol(collectionName).orderBy(orderField, orderDirection).get();
-
-        if (querySnapshot.empty) return [];
-
-        return querySnapshot.docs.map(d => ({ id: d.id, ...d.data() } as T));
+        return (await listCollection(collectionName, orderField, orderDirection)) as unknown as T[];
     } catch (error) {
         console.error(`Error al obtener ${collectionName}:`, error);
         return [];
@@ -323,11 +256,7 @@ export const getSerieFav = async (): Promise<SeriesFavs[]> => {
         }));
 
         if (seriesWithOrder.every(series => series.position === null || series.position === undefined)) {
-            await Promise.all(
-                seriesWithOrder.map((series, index) =>
-                    userDoc("SeriesFavs", series.id).update({ position: index })
-                )
-            );
+            await renumberPositions('SeriesFavs');
         }
 
         return seriesWithOrder;
@@ -355,18 +284,11 @@ export const getSeriesVistasSolo = async (): Promise<SeriesInterface[]> => {
 };
 
 export async function clearAllSeriesVerPronto(): Promise<void> {
-    const querySnapshot = await userCol('SeriesVerPronto').get();
-
-    const deletePromises: Promise<unknown>[] = [];
-    querySnapshot.forEach((docSnapshot) => {
-        deletePromises.push(userDoc('SeriesVerPronto', docSnapshot.id).delete());
-    });
-
-    await Promise.all(deletePromises);
+    await clearCollection('SeriesVerPronto');
 }
 
 export async function deleteSerieVerProntoById(serieId: string): Promise<void> {
-    await userDoc('SeriesVerPronto', serieId).delete();
+    await removeFromCollections(serieId, ['SeriesVerPronto']);
 }
 
 import { processBatch } from '../../../utils/processBatch';
@@ -484,58 +406,99 @@ const removeDuplicatesAndCalculateScores = (recommendations: RecommendedSeries[]
 };
 
 // === Watched Episodes ===
+//
+// En Firestore era UN documento por serie con un array `watched_episodes` que crecía sin fin, y
+// cada marcado leía y reescribía el array entero. Aquí es una fila por episodio en
+// `watched_episodes` (clave: usuario, serie, temporada, episodio). Hacia fuera se devuelve la
+// misma forma de siempre (`WatchedProgress`), con el array ordenado como se fue llenando
+// (por `watched_at`), porque `last_watched` = el último del array.
+
+interface EpisodeRow { serie_id: number; season: number; episode: number; watched_at: string | null }
+
+function rowsToProgress(serieId: string, rows: EpisodeRow[]): WatchedProgress | null {
+    if (!rows.length) return null;
+    const watched_episodes: WatchedEpisode[] = rows.map(r => ({
+        season: r.season,
+        episode: r.episode,
+        ...(r.watched_at ? { watched_at: r.watched_at } : {}),
+    })) as WatchedEpisode[];
+    return { id: serieId, watched_episodes, last_watched: watched_episodes[watched_episodes.length - 1] } as WatchedProgress;
+}
+
+/** Episodios de una o varias series, en el orden en que se marcaron. */
+async function episodeRows(serieIds?: (string | number)[]): Promise<EpisodeRow[]> {
+    const userId = getAuthId();
+    if (!userId) return [];
+    const ids = serieIds?.map(Number).filter(Number.isInteger);
+    if (ids && ids.length === 0) return [];
+    return fetchAll<EpisodeRow>((from, to) => {
+        let q = db().from('watched_episodes').select('serie_id, season, episode, watched_at').eq('user_id', userId);
+        if (ids) q = q.in('serie_id', ids);
+        return q.order('watched_at', { ascending: true, nullsFirst: true })
+            .order('serie_id').order('season').order('episode')
+            .range(from, to);
+    });
+}
+
+async function insertEpisodes(serieId: string, eps: { season: number; episode: number }[], watchedAt: string): Promise<EpisodeRow[]> {
+    if (!eps.length) return [];
+    const userId = requireAuthId();
+    const rows = eps.map(e => ({ user_id: userId, serie_id: Number(serieId), season: e.season, episode: e.episode, watched_at: watchedAt }));
+    // ignoreDuplicates: un episodio ya marcado se queda como estaba; devuelve solo los nuevos.
+    const { data, error } = await db().from('watched_episodes')
+        .upsert(rows, { onConflict: 'user_id,serie_id,season,episode', ignoreDuplicates: true })
+        .select('serie_id, season, episode, watched_at');
+    if (error) throw new Error(error.message);
+    return (data ?? []) as EpisodeRow[];
+}
+
+async function deleteEpisodes(serieId: string, filter: { season?: number; episode?: number } = {}): Promise<void> {
+    const userId = requireAuthId();
+    let q = db().from('watched_episodes').delete().eq('user_id', userId).eq('serie_id', Number(serieId));
+    if (filter.season !== undefined) q = q.eq('season', filter.season);
+    if (filter.episode !== undefined) q = q.eq('episode', filter.episode);
+    const { error } = await q;
+    if (error) throw new Error(error.message);
+}
 
 export async function getWatchedProgress(serieId: string): Promise<WatchedProgress | null> {
-    if (!getCurrentUid()) return null;
     try {
-        const snap = await userDoc('WatchedEpisodes', serieId).get();
-        if (!snap.exists) return null;
-        return snap.data() as WatchedProgress;
+        return rowsToProgress(serieId, await episodeRows([serieId]));
     } catch (error) {
         console.error('Error al obtener progreso:', error);
         return null;
     }
 }
 
-export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
-    const ref = userDoc('WatchedEpisodes', serieId);
-    const snap = await ref.get();
-
-    if (!snap.exists) {
-        // Primer episodio marcado — crear documento
-        const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
-        await ref.set({
-            id: serieId,
-            watched_episodes: [ep],
-            last_watched: ep,
-        });
-        await logEpisode(serieId, season, episode);
-        await bustYearStats();
-        return;
+/** Progreso de TODAS las series del usuario (lo que antes era leer la colección WatchedEpisodes entera). */
+export async function getAllWatchedProgress(): Promise<WatchedProgress[]> {
+    const bySerie = new Map<number, EpisodeRow[]>();
+    for (const r of await episodeRows()) {
+        const list = bySerie.get(r.serie_id);
+        if (list) list.push(r); else bySerie.set(r.serie_id, [r]);
     }
+    return Array.from(bySerie, ([id, rows]) => rowsToProgress(String(id), rows)!);
+}
 
-    const data = snap.data() as WatchedProgress;
-    const episodes = data.watched_episodes || [];
-    const idx = episodes.findIndex(e => e.season === season && e.episode === episode);
+/**
+ * TRANSICIÓN (Fase 4, bloque 1 → 2): el progreso con forma de documentos de Firestore, para los
+ * dos lectores que aún lo cruzan con el WatchLog de Firestore (yearStats y activityFeed). Se
+ * va en el bloque 2, cuando el diario pase a Postgres.
+ */
+export async function getWatchedProgressDocs(): Promise<FirebaseFirestore.QueryDocumentSnapshot[]> {
+    return (await getAllWatchedProgress()).map(p => ({ id: p.id, data: () => p })) as unknown as FirebaseFirestore.QueryDocumentSnapshot[];
+}
 
-    if (idx >= 0) {
+export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
+    const inserted = await insertEpisodes(serieId, [{ season, episode }], new Date().toISOString());
+    if (inserted.length) {
+        // No estaba visto — añadido
+        await logEpisode(serieId, season, episode);
+    } else {
         // Ya visto — quitar. Corrección de un error: también quitamos su última
         // entrada del diario, para que deje de aparecer en Actividad.
-        episodes.splice(idx, 1);
-        await ref.update({
-            watched_episodes: episodes,
-            last_watched: episodes.length > 0 ? episodes[episodes.length - 1] : null,
-        });
+        await deleteEpisodes(serieId, { season, episode });
         await unlogEpisode(serieId, season, episode);
-    } else {
-        // No visto — añadir
-        const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
-        episodes.push(ep);
-        await ref.update({
-            watched_episodes: episodes,
-            last_watched: ep,
-        });
-        await logEpisode(serieId, season, episode);
     }
     await bustYearStats();
 }
@@ -546,109 +509,65 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
  * toggleWatchedEpisode lo desmarcaría.
  */
 export async function markWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
-    const ref = userDoc('WatchedEpisodes', serieId);
-    const snap = await ref.get();
-    const ep: WatchedEpisode = { season, episode, watched_at: new Date().toISOString() };
-
-    if (!snap.exists) {
-        await ref.set({ id: serieId, watched_episodes: [ep], last_watched: ep });
-        await logEpisode(serieId, season, episode);
-        await bustYearStats();
-        return;
-    }
-
-    const data = snap.data() as WatchedProgress;
-    const episodes = data.watched_episodes || [];
-    if (episodes.some(e => e.season === season && e.episode === episode)) return; // ya visto
-
-    episodes.push(ep);
-    await ref.update({ watched_episodes: episodes, last_watched: ep });
+    const inserted = await insertEpisodes(serieId, [{ season, episode }], new Date().toISOString());
+    if (!inserted.length) return; // ya visto
     await logEpisode(serieId, season, episode);
     await bustYearStats();
 }
 
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
-    const ref = userDoc('WatchedEpisodes', serieId);
-    const snap = await ref.get();
-    const now = new Date().toISOString();
-
-    const newEpisodes: WatchedEpisode[] = episodeNumbers.map(ep => ({ season, episode: ep, watched_at: now }));
-
-    if (!snap.exists) {
-        const last = newEpisodes[newEpisodes.length - 1];
-        await ref.set({ id: serieId, watched_episodes: newEpisodes, last_watched: last });
-        await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
-        await bustYearStats();
-        return;
-    }
-
-    const data = snap.data() as WatchedProgress;
-    // Quitar episodios de esta temporada que ya estén y reemplazar con todos
-    const otherEpisodes = (data.watched_episodes || []).filter(e => e.season !== season);
-    const allEpisodes = [...otherEpisodes, ...newEpisodes];
-    await ref.update({
-        watched_episodes: allEpisodes,
-        last_watched: allEpisodes[allEpisodes.length - 1],
-    });
+    // Quitar los episodios de esta temporada que ya estén y reemplazar con todos (misma hora).
+    await deleteEpisodes(serieId, { season });
+    await insertEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })), new Date().toISOString());
     await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
     await bustYearStats();
 }
 
 export async function unmarkSeasonWatched(serieId: string, season: number): Promise<void> {
-    const ref = userDoc('WatchedEpisodes', serieId);
-    const snap = await ref.get();
-    if (!snap.exists) return;
-
-    const data = snap.data() as WatchedProgress;
-    const remaining = (data.watched_episodes || []).filter(e => e.season !== season);
-    await ref.update({
-        watched_episodes: remaining,
-        last_watched: remaining.length > 0 ? remaining[remaining.length - 1] : null,
-    });
+    await deleteEpisodes(serieId, { season });
     await bustYearStats();
 }
 
 export async function markAllWatched(serieId: string, allEpisodes: { season: number; episode: number }[]): Promise<void> {
-    const ref = userDoc('WatchedEpisodes', serieId);
-    const now = new Date().toISOString();
-    const episodes: WatchedEpisode[] = allEpisodes.map(e => ({ season: e.season, episode: e.episode, watched_at: now }));
-    const last = episodes[episodes.length - 1];
-    await ref.set({ id: serieId, watched_episodes: episodes, last_watched: last });
+    // Sustituye el progreso entero (como el `set` del documento en Firestore).
+    await deleteEpisodes(serieId);
+    await insertEpisodes(serieId, allEpisodes.map(e => ({ season: e.season, episode: e.episode })), new Date().toISOString());
     await logSeasonEpisodes(serieId, allEpisodes.map(e => ({ season: e.season, episode: e.episode })));
     await bustYearStats();
 }
 
 export async function unmarkAllWatched(serieId: string): Promise<void> {
-    await userDoc('WatchedEpisodes', serieId).delete();
+    await deleteEpisodes(serieId);
     await bustYearStats();
 }
 
 export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }>> {
     if (serieIds.length === 0) return {};
-    const results = await Promise.all(
-        serieIds.map(id => getWatchedProgress(id))
-    );
+    // Una consulta para todas (antes: una lectura por serie).
+    const rows = await episodeRows(serieIds);
     const map: Record<string, { watched: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }> = {};
-    for (let i = 0; i < serieIds.length; i++) {
-        const data = results[i];
-        if (data && data.watched_episodes.length > 0) {
-            const bySeasons: Record<number, number> = {};
-            let lastWatchedAt = 0;
-            for (const ep of data.watched_episodes) {
-                if (ep.season > 0) bySeasons[ep.season] = (bySeasons[ep.season] || 0) + 1;
-                if (ep.watched_at) {
-                    const t = new Date(ep.watched_at).getTime();
-                    if (!isNaN(t) && t > lastWatchedAt) lastWatchedAt = t;
-                }
-            }
-            map[serieIds[i]] = {
-                watched: data.watched_episodes.length,
-                bySeasons,
-                ...(lastWatchedAt > 0 ? { lastWatchedAt } : {}),
-            };
+    for (const r of rows) {
+        const key = String(r.serie_id);
+        const entry = map[key] ??= { watched: 0, bySeasons: {} };
+        entry.watched++;
+        if (r.season > 0) entry.bySeasons![r.season] = (entry.bySeasons![r.season] || 0) + 1;
+        if (r.watched_at) {
+            const t = new Date(r.watched_at).getTime();
+            if (!isNaN(t) && t > (entry.lastWatchedAt ?? 0)) entry.lastWatchedAt = t;
         }
     }
     return map;
+}
+
+/** Días (nº absoluto, hora de Madrid) en los que marcaste algún episodio. */
+async function watchedDayNums(): Promise<Set<number>> {
+    const dayNums = new Set<number>();
+    for (const r of await episodeRows()) {
+        if (!r.watched_at) continue;
+        const t = new Date(r.watched_at).getTime();
+        if (!isNaN(t)) dayNums.add(appDateParts(t).dayNum);
+    }
+    return dayNums;
 }
 
 /**
@@ -657,21 +576,11 @@ export async function getWatchedProgressBatch(serieIds: string[]): Promise<Recor
  * antes de la medianoche). Si el día más reciente es anterior a ayer, la racha es 0.
  */
 export async function getWatchStreak(): Promise<{ current: number; lastDay: string | null }> {
-    if (!getCurrentUid()) return { current: 0, lastDay: null };
+    if (!getAuthId()) return { current: 0, lastDay: null };
     try {
-        const snap = await userCol('WatchedEpisodes').get();
         // Día absoluto en hora de Madrid (no UTC del servidor): así una marca de
         // las 00:30 cuenta en su día real y la racha no se rompe de madrugada.
-        const dayNums = new Set<number>();
-        for (const docSnap of snap.docs) {
-            const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
-            for (const ep of data.watched_episodes || []) {
-                if (!ep.watched_at) continue;
-                const t = new Date(ep.watched_at).getTime();
-                if (isNaN(t)) continue;
-                dayNums.add(appDateParts(t).dayNum);
-            }
-        }
+        const dayNums = await watchedDayNums();
         if (dayNums.size === 0) return { current: 0, lastDay: null };
 
         const todayNum = appDateParts(Date.now()).dayNum;
@@ -693,25 +602,15 @@ export async function getWatchStreak(): Promise<{ current: number; lastDay: stri
 }
 
 /**
- * Racha máxima histórica + actual, en una sola lectura de WatchedEpisodes.
+ * Racha máxima histórica + actual, en una sola lectura del progreso.
  * Cada día se reduce a un nº de día absoluto en hora de Madrid (appDateParts,
  * DST-safe) y se busca la secuencia consecutiva más larga. La actual replica el
  * criterio de getWatchStreak (hoy o ayer cuentan).
  */
 export async function getMaxWatchStreak(): Promise<{ max: number; current: number }> {
-    if (!getCurrentUid()) return { max: 0, current: 0 };
+    if (!getAuthId()) return { max: 0, current: 0 };
     try {
-        const snap = await userCol("WatchedEpisodes").get();
-        const dayNums = new Set<number>();
-        for (const docSnap of snap.docs) {
-            const data = docSnap.data() as { watched_episodes?: { watched_at?: string }[] };
-            for (const ep of data.watched_episodes || []) {
-                if (!ep.watched_at) continue;
-                const d = new Date(ep.watched_at);
-                if (isNaN(d.getTime())) continue;
-                dayNums.add(appDateParts(d.getTime()).dayNum);
-            }
-        }
+        const dayNums = await watchedDayNums();
         if (dayNums.size === 0) return { max: 0, current: 0 };
 
         const sorted = Array.from(dayNums).sort((a, b) => a - b);

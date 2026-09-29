@@ -376,10 +376,11 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (cachedFeed && cachedFeed.expires > Date.now()) return cachedFeed.data;
     // WatchLog se lee UNA sola vez y se comparte entre episodios vistos y re-visionados
     // (antes se escaneaba dos veces → doble de lecturas en la colección más grande).
-    const [snapshot, logSnap, liveSnap] = await Promise.all([
+    const { getWatchedProgressDocs } = await import('../series/yourfavsSerie');
+    const [snapshot, logSnap, liveDocs] = await Promise.all([
         getLibrarySnapshot(),          // las 11 listas (1 lectura cacheada)
         userCol('WatchLog').get(),
-        userCol('WatchedEpisodes').get(),
+        getWatchedProgressDocs(),
     ]);
     // Los episodios se agrupan AL FINAL: necesitan conocer el resto de eventos para poder
     // cortar la sesión cuando entre dos episodios ocurrió otra cosa. El builder de episodios
@@ -428,7 +429,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     const cutPoints: CutPoint[] = [...dedupedCollectionEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents]
         .filter(e => e.timestamp > 0)
         .map(e => ({ ts: e.timestamp, serie: null }));
-    const episodeEvents = await fetchWatchedEpisodeEvents(logSnap.docs, liveSnap.docs, cutPoints);
+    const episodeEvents = await fetchWatchedEpisodeEvents(logSnap.docs, liveDocs, cutPoints);
     const events = [...dedupedCollectionEvents, ...episodeEvents, ...rewatchEvents, ...ratingEvents, ...personEvents, ...favPersonEvents, ...mutationEvents];
     feedCache.set(uid, { data: events, expires: Date.now() + FEED_TTL_MS });
     return events;

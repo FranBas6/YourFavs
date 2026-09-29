@@ -1,6 +1,7 @@
-import { FieldValue } from "firebase-admin/firestore";
-import { userCol, userDoc, getCurrentUid } from "../shared/userScope";
-import { adminDb } from "../../../utils/firebaseAdmin";
+import {
+    titleMembership, listCollection, inCollection, addToCollections, removeFromCollections,
+    clearCollection, patchTitle,
+} from "../shared/library";
 import { getTransition } from "../shared/stateTransitions";
 import { normalizeScore } from "../../../utils/constants/helpers/media-helpers";
 
@@ -27,38 +28,28 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         return `/movie/${movieId}`;
     }
 
-    const movieDataBase = {
-        id: movieId,
-        added_at: new Date(),
-    };
-
-    // Refs y lectura paralela de todas las colecciones (reutilizada por los bloques de abajo)
-    const refs = MOVIE_COLLECTIONS.map(col => userDoc(col, movieId));
-    const snaps = await Promise.all(refs.map(ref => ref.get()));
+    // En qué listas está ya la peli: UNA consulta (reutilizada por los bloques de abajo).
+    const membership = await titleMembership('movie', movieId);
 
     // Buscar opinión + nota existentes en cualquier colección (se copian al mover/añadir
     // en cascada para no perderlas al reubicar el título entre listas).
     let existingOpinion = '';
     let existingRating: number | undefined;
-    for (const snap of snaps) {
-        if (!snap.exists) continue;
-        const d = snap.data();
-        if (!existingOpinion && d?.opinion) existingOpinion = d.opinion;
-        if (existingRating === undefined && typeof d?.rating === 'number') existingRating = d.rating;
+    for (const col of MOVIE_COLLECTIONS) {
+        const row = membership.get(col);
+        if (!row) continue;
+        if (!existingOpinion && row.opinion) existingOpinion = row.opinion;
+        if (existingRating === undefined && row.rating !== null) existingRating = Number(row.rating);
     }
 
     const opinionTextForCreate = String(formData.get('opinion') || '').trim() || existingOpinion;
-    const movieData: Record<string, any> = { ...movieDataBase };
+    const movieData: { opinion?: string; rating?: number } = {};
     if (opinionTextForCreate) movieData.opinion = opinionTextForCreate;
     if (existingRating !== undefined) movieData.rating = existingRating;
 
-    // Helper: aplica un patch en paralelo a todas las colecciones donde la peli existe
-    const updateExisting = (patch: Record<string, any>) =>
-        Promise.all(
-            snaps
-                .map((snap, i) => snap.exists ? refs[i].update(patch) : null)
-                .filter(Boolean) as Promise<unknown>[]
-        );
+    // Aplica un patch a todas las colecciones donde la peli existe (un UPDATE).
+    const updateExisting = (patch: { opinion?: string | null; rating?: number | null }) =>
+        patchTitle('movie', movieId, patch);
 
     if (action === 'save_opinion') {
         const opinionText = String(formData.get('opinion') || '').trim();
@@ -79,7 +70,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     }
 
     if (action === 'delete_rating') {
-        await updateExisting({ rating: FieldValue.delete() });
+        await updateExisting({ rating: null });
         try {
             const { deleteRating } = await import('../lists/ratings');
             await deleteRating('movie', movieId);
@@ -88,7 +79,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     }
 
     if (action === 'delete_opinion') {
-        await updateExisting({ opinion: FieldValue.delete() });
+        await updateExisting({ opinion: null });
         return `/movie/${movieId}`;
     }
 
@@ -96,29 +87,19 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
     const collectionName = LIST_TYPE_MAP[listType];
     if (!collectionName) return `/movie/${movieId}`;
 
-    // snaps ya cargados arriba, indexados por colección (para el batch de transición)
-    const snapByCol = new Map<string, typeof snaps[number]>();
-    MOVIE_COLLECTIONS.forEach((col, i) => snapByCol.set(col, snaps[i]));
-    const exists = snapByCol.get(collectionName)?.exists ?? false;
+    const exists = membership.has(collectionName);
 
     let mutated = false;
     let logPase = false;
     if (action === 'add' && !exists) {
-        // Modelo de 2 capas: aplica la transición (mover + limpiar) en un solo batch
-        // atómico. Marcar Visto/Fav/Me gusta añade "Vistas" y limpia el progreso;
-        // Fav/Me gusta se excluyen entre sí. Ver stateTransitions.ts.
+        // Modelo de 2 capas: aplica la transición (mover + limpiar). Marcar Visto/Fav/Me gusta
+        // añade "Vistas" y limpia el progreso; Fav/Me gusta se excluyen entre sí. Ver
+        // stateTransitions.ts. Primero las altas y luego las bajas: si algo fallara a medias,
+        // el título queda en una lista de más, nunca en ninguna.
         const tr = getTransition('movie', collectionName);
-        const batch = adminDb.batch();
-        batch.set(userDoc(collectionName, movieId), movieData);
-        for (const col of tr.alsoAdd) {
-            const s = snapByCol.get(col);
-            if (!s || !s.exists) batch.set(userDoc(col, movieId), movieData);
-        }
-        for (const col of tr.remove) {
-            const s = snapByCol.get(col);
-            if (s && s.exists) batch.delete(userDoc(col, movieId));
-        }
-        await batch.commit();
+        await addToCollections(movieId, [collectionName, ...tr.alsoAdd.filter(c => !membership.has(c))]
+            .map(collection => ({ collection, ...movieData })));
+        await removeFromCollections(movieId, tr.remove.filter(c => membership.has(c)));
         mutated = true;
         logPase = tr.logPase;
         // Diario (L5): cada entrada a "visto" registra el visionado (fecha = hoy). dedupe:
@@ -131,7 +112,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         }
     } else if (action === 'remove' && exists) {
         // Quitar es un borrado simple: no auto-restaura estados previos.
-        await userDoc(collectionName, movieId).delete();
+        await removeFromCollections(movieId, [collectionName]);
         mutated = true;
         // §5 · bitácora (best-effort): quitar de una lista es intencional y NO derivable
         // (se pierde el added_at). Los borrados en cascada del branch 'add' NO llegan aquí.
@@ -208,13 +189,8 @@ interface RecommendedMovie {
 
 // Helper para obtener documentos de una colección ordenados por fecha
 async function getMovieCollection(collectionName: string): Promise<MovieInterface[]> {
-    if (!getCurrentUid()) return [];
     try {
-        const querySnapshot = await userCol(collectionName).orderBy("added_at", "desc").get();
-
-        if (querySnapshot.empty) return [];
-
-        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MovieInterface));
+        return (await listCollection(collectionName, 'added_at', 'desc')) as unknown as MovieInterface[];
     } catch (error) {
         console.error(`Error al obtener ${collectionName}:`, error);
         return [];
@@ -238,7 +214,7 @@ export const getMoviesViendo = () => getMovieCollection("MoviesViendo");
  *    (sin dedupe → cuenta como "vuelta a ver"), preservando Vistas y la opinión.
  */
 export async function finishViewingMovie(movieId: string): Promise<void> {
-    const wasVista = (await userDoc('MoviesVistas', movieId).get()).exists;
+    const wasVista = await inCollection('MoviesVistas', movieId);
 
     if (!wasVista) {
         const fd = new FormData();
@@ -250,7 +226,7 @@ export async function finishViewingMovie(movieId: string): Promise<void> {
     }
 
     // Re-visionado terminado: fuera de Viendo + pase en el diario.
-    await userDoc('MoviesViendo', movieId).delete();
+    await removeFromCollections(movieId, ['MoviesViendo']);
     try {
         const { appendWatchLog } = await import('../lists/watchLog');
         await appendWatchLog({ media_type: 'movie', tmdb_id: movieId }); // sin dedupe → pase
@@ -299,18 +275,11 @@ export const getMoviesVistasSolo = async (): Promise<MovieInterface[]> => {
 };
 
 export async function clearAllMoviesVerPronto(): Promise<void> {
-    const querySnapshot = await userCol('MoviesVerPronto').get();
-
-    const deletePromises: Promise<unknown>[] = [];
-    querySnapshot.forEach((docSnapshot) => {
-        deletePromises.push(userDoc('MoviesVerPronto', docSnapshot.id).delete());
-    });
-
-    await Promise.all(deletePromises);
+    await clearCollection('MoviesVerPronto');
 }
 
 export async function deleteMovieVerProntoById(movieId: string): Promise<void> {
-    await userDoc('MoviesVerPronto', movieId).delete();
+    await removeFromCollections(movieId, ['MoviesVerPronto']);
 }
 
 import { processBatch } from '../../../utils/processBatch';

@@ -11,18 +11,73 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { adminDb } from '../../../utils/firebaseAdmin';
 import type { CollectionReference, DocumentReference } from 'firebase-admin/firestore';
+import type { SupabaseServer } from '../../../lib/supabase/server';
 
 interface RequestContext {
     uid: string | null;
     language: string;   // idioma de contenido TMDB (perfil) — default es-ES
     region: string;     // región de streaming (perfil) — default ES
+    /** Cliente de Supabase de la petición (con la sesión de sus cookies; anónimo si invitado). */
+    db: SupabaseServer | null;
+    /** Id de Supabase Auth del usuario (dueño de las filas en Postgres). */
+    authId: string | null;
 }
 
 const als = new AsyncLocalStorage<RequestContext>();
 
 /** Lo invoca el middleware una vez por request, envolviendo a `next()`. */
-export function runWithUser<T>(uid: string | null, fn: () => T): T {
-    return als.run({ uid, language: 'es-ES', region: 'ES' }, fn);
+export function runWithUser<T>(
+    uid: string | null,
+    fn: () => T,
+    auth: { db: SupabaseServer; authId: string | null } | null = null,
+): T {
+    return als.run({ uid, language: 'es-ES', region: 'ES', db: auth?.db ?? null, authId: auth?.authId ?? null }, fn);
+}
+
+// ---------------------------------------------------------------------------------------
+// Supabase (Fase 4). Las funciones de services/BD/** ya migradas usan esto en vez de
+// userCol/userDoc. La RLS de Postgres ya limita cada consulta a las filas del usuario de la
+// sesión; aun así se filtra por `user_id` explícitamente, para que la consulta diga lo que hace.
+// ---------------------------------------------------------------------------------------
+
+/** Cliente de Supabase de la petición actual. Lanza fuera de una petición. */
+export function db(): SupabaseServer {
+    const client = als.getStore()?.db;
+    if (!client) throw new Error('[userScope] Consulta a Supabase fuera de una petición');
+    return client;
+}
+
+/** Id de Supabase del usuario en sesión, o null (invitado). */
+export function getAuthId(): string | null {
+    return als.getStore()?.authId ?? null;
+}
+
+/** Id de Supabase obligatorio (escrituras). Lanza si no hay sesión. */
+export function requireAuthId(): string {
+    const id = getAuthId();
+    if (!id) throw new Error('[userScope] Operación de datos sin usuario en sesión');
+    return id;
+}
+
+/**
+ * Lee TODAS las filas de una consulta, de 1000 en 1000.
+ *
+ * La API de Supabase corta cada respuesta en `max_rows` (1000 por defecto, en local y en la
+ * nube) SIN avisar: un `select` sobre tus 2.000 episodios devolvería 1.000 y nadie se daría
+ * cuenta. Cualquier lectura de "todo lo del usuario" pasa por aquí. La consulta tiene que
+ * llevar un `order` estable, o las páginas podrían solaparse.
+ */
+export async function fetchAll<T>(
+    page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+    pageSize = 1000,
+): Promise<T[]> {
+    const out: T[] = [];
+    for (let from = 0; ; from += pageSize) {
+        const { data, error } = await page(from, from + pageSize - 1);
+        if (error) throw new Error(error.message);
+        out.push(...(data ?? []));
+        if (!data || data.length < pageSize) return out;
+    }
 }
 
 /** El middleware fija idioma/región del perfil tras leerlo (mutando el store). */

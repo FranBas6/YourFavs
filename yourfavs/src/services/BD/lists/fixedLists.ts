@@ -2,21 +2,21 @@
  * Listas fijas (del sistema) accesibles desde el popover "Guardar en…" (Fase L4).
  *
  * Reutiliza los handlers existentes (handleMovieFavAction / handleSerieFavAction),
- * que ya guardan en users/{uid}/… vía userScope e invalidan cachés. Aquí solo
+ * que ya guardan en `library_items` vía userScope e invalidan cachés. Aquí solo
  * exponemos un acceso por (media_type, tmdb_id, list, action) para poder guardar
  * en Favoritos/Pendientes/Vistas desde cualquier card, no solo desde la ficha.
  *
  * Solo las 3 listas del mockup (favorites/pendientes/vistas); el resto (Me gusta,
  * Ver pronto, Siguiendo) siguen gestionándose en la ficha.
  */
-import { userDoc, userCol, getCurrentUid } from '../shared/userScope';
+import { titleMembership, countCollection } from '../shared/library';
 import { handleMovieFavAction } from '../movies/yourfavsMovie';
 import { handleSerieFavAction } from '../series/yourfavsSerie';
 
 export type FixedList = 'favorites' | 'pendientes' | 'vistas';
 export const FIXED_LISTS: FixedList[] = ['favorites', 'pendientes', 'vistas'];
 
-// Colección Firestore por (media_type, lista). Las de series tienen otros nombres.
+// Colección (el nombre de siempre) por (media_type, lista). Las de series tienen otros nombres.
 const COLLECTION_BY_MEDIA: Record<'movie' | 'tv', Record<FixedList, string>> = {
     movie: { favorites: 'MovieFavs', pendientes: 'MoviesPendientes', vistas: 'MoviesVistas' },
     tv: { favorites: 'SeriesFavs', pendientes: 'SeriesPendiente', vistas: 'SeriesVistas' },
@@ -37,10 +37,9 @@ export async function getFixedMembership(
     tmdbId: number | string
 ): Promise<Record<FixedList, boolean>> {
     const result: Record<FixedList, boolean> = { favorites: false, pendientes: false, vistas: false };
-    if (!getCurrentUid()) return result;
     const cols = COLLECTION_BY_MEDIA[mediaType];
-    const snaps = await Promise.all(FIXED_LISTS.map(l => userDoc(cols[l], String(tmdbId)).get()));
-    FIXED_LISTS.forEach((l, i) => { result[l] = snaps[i].exists; });
+    const rows = await titleMembership(mediaType, tmdbId); // invitado → vacío
+    FIXED_LISTS.forEach((l) => { result[l] = rows.has(cols[l]); });
     return result;
 }
 
@@ -67,8 +66,7 @@ export async function saveFixed(
     // Contador agregado (no lee los docs). Es decorativo: si falla, devolvemos 0.
     let count = 0;
     try {
-        const agg = await userCol(COLLECTION_BY_MEDIA[mediaType][list]).count().get();
-        count = agg.data().count;
+        count = await countCollection(COLLECTION_BY_MEDIA[mediaType][list]);
     } catch { /* el toast simplemente no mostrará el #N */ }
     return { count };
 }

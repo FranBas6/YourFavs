@@ -1,5 +1,4 @@
-import type { DocumentSnapshot } from "firebase-admin/firestore";
-import { userDoc, getCurrentUid } from "./userScope";
+import { titleMembership } from "./library";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'] as const;
 const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto', 'SeriesAbandonadas'] as const;
@@ -9,7 +8,6 @@ export type SerieCollection = typeof SERIE_COLLECTIONS[number];
 
 export interface MediaExistenceResult<K extends string> {
     exists: Record<K, boolean>;
-    snaps: Record<K, DocumentSnapshot>;
     /** Primera opinión encontrada en cualquier colección (para sidebar "Tu opinión"). */
     opinion: string;
     /** Primer rating 1-10 encontrado en cualquier colección (para sidebar "Tu nota"). */
@@ -30,27 +28,19 @@ export async function checkMediaExistence(
 ): Promise<MediaExistenceResult<string>> {
     const collections: readonly string[] = mediaType === 'movie' ? MOVIE_COLLECTIONS : SERIE_COLLECTIONS;
 
+    // Una sola consulta por todas las listas (en Firestore era una lectura por colección).
+    // Invitado: titleMembership devuelve vacío → nada existe (botones en estado "no guardado").
+    const rows = await titleMembership(mediaType === 'movie' ? 'movie' : 'tv', id);
+
     const exists: Record<string, boolean> = {};
-    const snapsMap: Record<string, DocumentSnapshot> = {};
     let opinion = '';
     let rating: number | null = null;
-
-    // Invitado: nada existe (la ficha mostrará los botones en estado "no guardado").
-    if (!getCurrentUid()) {
-        for (const col of collections) exists[col] = false;
-        return { exists, snaps: snapsMap, opinion, rating };
+    for (const col of collections) {
+        const row = rows.get(col);
+        exists[col] = Boolean(row);
+        if (!row) continue;
+        if (!opinion && row.opinion) opinion = row.opinion;
+        if (rating === null && row.rating !== null) rating = Number(row.rating);
     }
-
-    const snaps = await Promise.all(collections.map((col) => userDoc(col, id).get()));
-    for (let i = 0; i < collections.length; i++) {
-        const col = collections[i];
-        exists[col] = snaps[i].exists;
-        snapsMap[col] = snaps[i];
-        if (snaps[i].exists) {
-            const data = snaps[i].data();
-            if (!opinion && data?.opinion) opinion = data.opinion;
-            if (rating === null && typeof data?.rating === 'number') rating = data.rating;
-        }
-    }
-    return { exists, snaps: snapsMap, opinion, rating };
+    return { exists, opinion, rating };
 }

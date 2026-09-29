@@ -542,11 +542,12 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     let logRows: WatchLogRow[] = [];
     try {
         if (getCurrentUid()) {
-            const [watchedSnap, logSnap] = await Promise.all([
-                userCol('WatchedEpisodes').get(),
+            const { getWatchedProgressDocs } = await import('../services/BD/series/yourfavsSerie');
+            const [watchedDocs, logSnap] = await Promise.all([
+                getWatchedProgressDocs(),
                 userCol('WatchLog').get(),
             ]);
-            watches = unionEpisodeWatches(watchedSnap.docs, logSnap.docs);
+            watches = unionEpisodeWatches(watchedDocs, logSnap.docs);
             logRows = logSnap.docs.map((d) => d.data() as WatchLogRow);
         }
     } catch (error) {

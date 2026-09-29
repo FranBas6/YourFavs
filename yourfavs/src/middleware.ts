@@ -159,5 +159,5 @@ export const onRequest = defineMiddleware(async (context, next) => {
         const response = await next();
         applyCacheHeaders(response, path, Boolean(context.locals.user));
         return response;
-    });
+    }, { db: supabase, authId: context.locals.user?.authId ?? null });
 });
