@@ -1,8 +1,12 @@
 ---
 /**
- * Botón "Seguir" de una persona (handoff v2 §③): form POST SSR como el resto
+ * Avisos de estrenos de una persona de TMDB (handoff v2 §③): form POST SSR como el resto
  * de acciones del proyecto. La página dueña enruta actionType=follow_person
  * a handlePersonFollowAction antes de su handler habitual.
+ *
+ * Por dentro sigue siendo «seguir a la persona» (FollowedPeople, actionType follow_person), pero
+ * de cara al usuario se llama «avisos»: «Seguir / Siguiendo» queda para seguir a OTROS USUARIOS
+ * (perfil público, docs/PLAN_SOCIAL.md) y tener las dos cosas con el mismo nombre confundía.
  */
 interface Props {
     personId: string;
@@ -24,10 +28,10 @@ const { personId, name, profilePath = null, isFollowing } = Astro.props;
             ${isFollowing
                 ? 'bg-[#E63946] text-white hover:bg-[#C7283A]'
                 : 'bg-white text-gray-700 border border-gray-300 hover:border-[#E63946] hover:text-[#E63946]'}`}
-        title={isFollowing ? 'Dejar de seguir: sus estrenos saldrán del calendario' : 'Seguir: te avisaremos de sus estrenos'}>
+        title={isFollowing ? 'Desactivar avisos: sus estrenos saldrán del calendario' : 'Activar avisos: sus estrenos aparecerán en tu calendario'}>
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 3h16z"/><path d="M10 21a2 2 0 0 0 4 0"/>
         </svg>
-        {isFollowing ? 'Siguiendo' : 'Seguir'}
+        {isFollowing ? 'Avisos activados' : 'Avisarme de sus estrenos'}
     </button>
 </form>

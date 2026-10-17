@@ -40,7 +40,7 @@ export const MY_LISTS_ITEMS: NavItem[] = [
     { href: "/mislistas/pendientes",  color: "blue",   icon: "bookmark", title: "Pendientes",      desc: "Para ver pronto",       countKey: "pendientes" },
     { href: "/mislistas/verpronto",   color: "purple", icon: "clock",    title: "Ver pronto",      desc: "En tu radar",           countKey: "verpronto" },
     { href: "/mislistas/siguiendo",   color: "pink",   icon: "tv",       title: "Siguiendo",       desc: "Series al día",         countKey: "siguiendo" },
-    { href: "/mislistas/actores",     color: "slate",  icon: "user",     title: "Actores",         desc: "Quienes sigues" },
+    { href: "/mislistas/actores",     color: "slate",  icon: "user",     title: "Actores",         desc: "Favoritos y avisos" },
     { href: "/mislistas/colecciones", color: "purple", icon: "library",  title: "Mis colecciones", desc: "Listas personalizadas", countKey: "colecciones" },
     { href: "/mislistas/actividad",   color: "green",  icon: "activity", title: "Actividad",       desc: "Tu historial" },
 ];
