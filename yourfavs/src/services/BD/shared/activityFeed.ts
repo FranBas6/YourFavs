@@ -248,7 +248,8 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
     }
 }
 
-// Personas seguidas (Bloque 3): "Empezaste a seguir a X". Avatar circular (no póster).
+// Personas con avisos (Bloque 3): "X · Avisos activados". Avatar circular (no póster).
+// Por dentro es FollowedPeople, pero «seguir» se reserva para seguir a otros usuarios.
 // FollowedPeople guarda name/profile_path/added_at → sin fetch extra a TMDB.
 async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
     try {
@@ -259,7 +260,7 @@ async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
                 type: 'person',
                 id: String(p.id),
                 collection: 'FollowPerson',
-                action: 'Empezaste a seguir',
+                action: 'Avisos activados',
                 timestamp: getFirebaseTimestamp(p.added_at),
                 name: p.name,
                 profile_path: p.profile_path ?? null,
@@ -334,7 +335,7 @@ async function fetchMutationEvents(): Promise<ActivityEvent[]> {
                         action: meta.custom ? 'Quitada de una colección' : (REMOVE_LABEL[meta.collection] || 'Quitada de una lista') });
                     break;
                 case 'unfollow':
-                    out.push({ type, id, collection: 'ActUnfollow', action: 'Dejaste de seguir', timestamp,
+                    out.push({ type, id, collection: 'ActUnfollow', action: type === 'person' ? 'Avisos desactivados' : 'Dejaste de seguir', timestamp,
                         ...(type === 'person' ? { name: meta.name || 'Persona', profile_path: meta.profile_path ?? null } : {}) });
                     break;
                 case 'abandon':

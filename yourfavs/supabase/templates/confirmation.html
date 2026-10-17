@@ -1,0 +1,36 @@
+<!--
+  Email «Confirma tu cuenta» de YourFavs (Supabase Auth → Confirm signup).
+  En local lo carga supabase/config.toml; en prod se pega este mismo HTML en el panel
+  (Authentication → Email Templates → Confirm signup). Ver docs/supabase_auth_runbook.md.
+
+  El enlace lleva `token_hash` y NO `{{ .ConfirmationURL }}`: el de Supabase canjea un `code` que
+  necesita la cookie PKCE del navegador donde se hizo el registro, así que fallaba si se abría el
+  email en el móvil. `/auth/callback` lo verifica con `verifyOtp` en el servidor.
+-->
+<!DOCTYPE html>
+<html lang="es">
+  <body style="margin:0;padding:24px;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #E5E7EB;border-radius:16px;">
+      <tr>
+        <td style="padding:32px 28px;">
+          <p style="margin:0 0 20px;font-size:20px;font-weight:800;letter-spacing:.02em;">YOURFAVS</p>
+          <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;">Confirma tu cuenta</h1>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#374151;">
+            Pulsa el botón para activar tu cuenta de YourFavs con <strong>{{ .Email }}</strong>.
+            Puedes abrirlo desde el móvil o desde cualquier navegador.
+          </p>
+          <p style="margin:0 0 28px;">
+            <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=email"
+               style="display:inline-block;padding:12px 22px;border-radius:999px;background:#E63946;color:#ffffff;font-weight:600;font-size:15px;text-decoration:none;">
+              Confirmar mi cuenta
+            </a>
+          </p>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:#6B7280;">
+            El enlace caduca en una hora y solo vale una vez. Si no has creado tú esta cuenta,
+            ignora este correo: sin confirmar no se activa.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

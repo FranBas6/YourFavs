@@ -12,7 +12,11 @@
 
 // `isNewUser`: cuenta recién creada (registro). La usa el modal para llevar al
 // onboarding de gustos solo en el primer acceso (Fase F · Acceso A).
-export type AuthResult = { ok: true; isNewUser?: boolean } | { ok: false; error: string };
+// `pendingConfirmation`: registro hecho pero falta confirmar el email (no hay sesión todavía).
+// `code`: solo viaja `email_not_confirmed`, para que el modal ofrezca reenviar el enlace.
+export type AuthResult =
+    | { ok: true; isNewUser?: boolean; pendingConfirmation?: boolean }
+    | { ok: false; error: string; code?: string };
 
 async function post(path: string, body?: unknown): Promise<AuthResult & { url?: string }> {
     try {
@@ -22,8 +26,10 @@ async function post(path: string, body?: unknown): Promise<AuthResult & { url?: 
             body: body === undefined ? undefined : JSON.stringify(body),
         });
         const data = await res.json().catch(() => null);
-        if (data?.ok) return { ok: true, isNewUser: data.isNewUser === true, url: data.url };
-        return { ok: false, error: data?.error || 'Algo salió mal. Inténtalo de nuevo.' };
+        if (data?.ok) {
+            return { ok: true, isNewUser: data.isNewUser === true, pendingConfirmation: data.pendingConfirmation === true, url: data.url };
+        }
+        return { ok: false, error: data?.error || 'Algo salió mal. Inténtalo de nuevo.', code: typeof data?.code === 'string' ? data.code : undefined };
     } catch {
         return { ok: false, error: 'Sin conexión. Revisa tu red e inténtalo de nuevo.' };
     }
@@ -47,7 +53,12 @@ export function loginEmail(email: string, password: string): Promise<AuthResult>
 }
 
 export function registerEmail(email: string, password: string): Promise<AuthResult> {
-    return post('/api/auth/register', { email, password });
+    return post('/api/auth/register', { email, password, next: location.pathname + location.search });
+}
+
+/** Reenvía el email de confirmación (pantalla «Revisa tu correo»). */
+export function resendConfirmation(email: string): Promise<AuthResult> {
+    return post('/api/auth/resend', { email });
 }
 
 export function resetPassword(email: string): Promise<AuthResult> {

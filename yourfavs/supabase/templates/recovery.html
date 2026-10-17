@@ -1,0 +1,35 @@
+<!--
+  Email «Restablecer contraseña» de YourFavs (Supabase Auth → Reset password).
+  En local lo carga supabase/config.toml; en prod se pega este mismo HTML en el panel
+  (Authentication → Email Templates → Reset password). Ver docs/supabase_auth_runbook.md.
+
+  Mismo motivo que confirmation.html: `token_hash` en vez de `{{ .ConfirmationURL }}` para que el
+  enlace funcione en un navegador distinto del que pidió el cambio.
+-->
+<!DOCTYPE html>
+<html lang="es">
+  <body style="margin:0;padding:24px;background:#F3F4F6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111827;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;margin:0 auto;background:#ffffff;border:1px solid #E5E7EB;border-radius:16px;">
+      <tr>
+        <td style="padding:32px 28px;">
+          <p style="margin:0 0 20px;font-size:20px;font-weight:800;letter-spacing:.02em;">YOURFAVS</p>
+          <h1 style="margin:0 0 12px;font-size:20px;font-weight:700;">Restablece tu contraseña</h1>
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#374151;">
+            Alguien ha pedido cambiar la contraseña de la cuenta <strong>{{ .Email }}</strong>.
+            Si has sido tú, pulsa el botón y elige una nueva.
+          </p>
+          <p style="margin:0 0 28px;">
+            <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=recovery&next=/auth/nueva-contrasena"
+               style="display:inline-block;padding:12px 22px;border-radius:999px;background:#E63946;color:#ffffff;font-weight:600;font-size:15px;text-decoration:none;">
+              Elegir nueva contraseña
+            </a>
+          </p>
+          <p style="margin:0;font-size:13px;line-height:1.5;color:#6B7280;">
+            El enlace caduca en una hora y solo vale una vez. Si no lo has pedido tú, ignora este
+            correo: tu contraseña no cambia.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

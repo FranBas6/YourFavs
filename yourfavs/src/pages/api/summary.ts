@@ -16,8 +16,8 @@
  *   language = es-ES (opc.)  se pasa a TMDB tal cual si viene
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch, posterUrl, backdropUrl } from '../../services/API/shared/tmdbClient';
-import { getGenreName } from '../../utils/constants/genres';
+import { tmdbFetch } from '../../services/API/shared/tmdbClient';
+import { toItem } from '../../services/API/shared/summaryItem';
 
 export const prerender = false;
 
@@ -30,65 +30,9 @@ function json(data: unknown, status = 200): Response {
     });
 }
 
-export interface SummaryItem {
-    id: number;
-    media_type: 'movie' | 'tv';
-    /** title (movie) o name (tv), en el idioma pedido. */
-    title: string;
-    /** poster_path crudo (para reusar a otros tamaños), o null. */
-    poster_path: string | null;
-    /** URL w500 del póster, o null (el cliente pinta placeholder). */
-    image: string | null;
-    /** backdrop_path crudo, o null. */
-    backdrop_path: string | null;
-    /** URL w780 del backdrop (para el hero de la Home), o null. */
-    backdrop: string | null;
-    /** Sinopsis corta (para la card), o null. */
-    overview: string | null;
-    /** vote_average a 1 decimal, o null si no hay votos. */
-    rating: number | null;
-    /** Fecha de estreno completa (movie: release_date · tv: first_air_date), o null. */
-    release_date: string | null;
-    /** Año de estreno, o null. */
-    year: string | null;
-    /** Nombres de género ya localizados. */
-    genres: string[];
-}
-
-/**
- * Normaliza un objeto TMDB (detalle o item de lista) al resumen de card.
- * Acepta tanto `genres:[{id,name}]` (detalle) como `genre_ids:[number]` (listas).
- * Exportado para reusarlo desde `/api/catalog`.
- */
-export function toItem(raw: any, type: 'movie' | 'tv'): SummaryItem | null {
-    if (!raw || !raw.id) return null;
-    const title = type === 'movie' ? raw.title : raw.name;
-    if (!title) return null;
-    const date = type === 'movie' ? raw.release_date : raw.first_air_date;
-    const year = typeof date === 'string' && date.length >= 4 ? date.slice(0, 4) : null;
-    const vote = typeof raw.vote_average === 'number' && raw.vote_average > 0
-        ? Math.round(raw.vote_average * 10) / 10
-        : null;
-    const genres: string[] = Array.isArray(raw.genres)
-        ? raw.genres.map((g: any) => g?.name).filter(Boolean)
-        : Array.isArray(raw.genre_ids)
-            ? raw.genre_ids.map((id: number) => getGenreName(id)).filter(Boolean)
-            : [];
-    return {
-        id: raw.id,
-        media_type: type,
-        title,
-        poster_path: raw.poster_path ?? null,
-        image: raw.poster_path ? posterUrl(raw.poster_path, 'w500') : null,
-        backdrop_path: raw.backdrop_path ?? null,
-        backdrop: raw.backdrop_path ? backdropUrl(raw.backdrop_path, 'w780') : null,
-        overview: raw.overview || null,
-        rating: vote,
-        release_date: typeof date === 'string' && date ? date : null,
-        year,
-        genres,
-    };
-}
+// `SummaryItem` y `toItem` viven en `services/API/shared/summaryItem.ts` (también los usa el perfil
+// público). Se re-exportan aquí para que las rutas que ya los importaban de './summary' no cambien.
+export { toItem, type SummaryItem } from '../../services/API/shared/summaryItem';
 
 export const GET: APIRoute = async ({ url }) => {
     const type = url.searchParams.get('type');

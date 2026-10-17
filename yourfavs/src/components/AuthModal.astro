@@ -10,6 +10,10 @@
  * servidor con Supabase y deja la sesión en cookies httpOnly. Google va por redirección
  * (no popup): al volver, /auth/callback trae `?auth=ok|new|error` y aquí se completa lo
  * mismo que antes tras el popup (acción pendiente del invitado u onboarding).
+ *
+ * Confirmación de email (F0 de docs/PLAN_SOCIAL.md): si el registro queda pendiente de confirmar,
+ * o alguien intenta entrar sin haber confirmado, la tarjeta pasa a la vista «Revisa tu correo»
+ * (`#auth-pending`) con botón de reenviar. Al volver de un enlace caducado, `?auth=link`.
  */
 ---
 <div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
@@ -60,6 +64,24 @@
             <span data-mode="login">¿No tienes cuenta? <button type="button" class="auth-link" data-auth-switch="register">Regístrate</button></span>
             <span data-mode="register" hidden>¿Ya tienes cuenta? <button type="button" class="auth-link" data-auth-switch="login">Entra</button></span>
         </p>
+
+        <!-- «Revisa tu correo»: sustituye a Google + formulario mientras falta confirmar el email. -->
+        <div class="auth-pending" id="auth-pending" hidden>
+            <span class="auth-pending-ico" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
+            </span>
+            <p class="auth-pending-text">
+                Te hemos enviado un enlace a <strong id="auth-pending-email"></strong>. Ábrelo para
+                activar tu cuenta: vale desde el móvil o desde cualquier navegador.
+            </p>
+            <p class="auth-pending-hint">
+                Si en un par de minutos no ha llegado, mira en spam. Si ese email ya tenía cuenta, no
+                te llegará nada: entra con tu contraseña o recupérala.
+            </p>
+            <p class="auth-msg" id="auth-pending-msg" role="status" hidden></p>
+            <button type="button" class="auth-submit" id="auth-resend">Reenviar el enlace</button>
+            <button type="button" class="auth-forgot" data-auth-pending-back>Volver a entrar</button>
+        </div>
     </div>
 </div>
 
@@ -248,6 +270,24 @@
     }
     .auth-link:hover { text-decoration: underline; }
 
+    /* Vista «Revisa tu correo» (confirmación de email pendiente). */
+    .auth-pending { display: flex; flex-direction: column; gap: 12px; }
+    .auth-pending[hidden] { display: none; }
+    .auth-pending-ico {
+        width: 44px;
+        height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: var(--r-full, 999px);
+        background: var(--accent-soft);
+        color: var(--accent);
+    }
+    .auth-pending-ico svg { width: 22px; height: 22px; }
+    .auth-pending-text { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-2); }
+    .auth-pending-text strong { color: var(--text); word-break: break-all; }
+    .auth-pending-hint { margin: 0; font-size: 12.5px; color: var(--text-3); }
+
     @media (max-width: 480px) {
         .auth-overlay { padding: 5vh 12px 12px; }
         .auth-card { padding: 24px 20px 18px; }
@@ -268,6 +308,20 @@
         const msgEl = document.getElementById('auth-msg') as HTMLElement;
         const titleEl = document.getElementById('auth-title') as HTMLElement;
         const subEl = document.getElementById('auth-sub') as HTMLElement;
+        const pendingEl = document.getElementById('auth-pending') as HTMLElement;
+        const pendingEmailEl = document.getElementById('auth-pending-email') as HTMLElement;
+        const pendingMsgEl = document.getElementById('auth-pending-msg') as HTMLElement;
+        const resendBtn = document.getElementById('auth-resend') as HTMLButtonElement;
+        // Lo que se esconde mientras se espera la confirmación (y vuelve con setMode).
+        const standardEls = [
+            googleBtn,
+            overlay.querySelector('.auth-divider') as HTMLElement,
+            form,
+            overlay.querySelector('[data-auth-forgot]') as HTMLElement,
+            overlay.querySelector('.auth-toggle') as HTMLElement,
+        ];
+        let pendingEmail = '';
+        let resendTimer: number | undefined;
 
         let mode: 'login' | 'register' = 'login';
         let lastFocus: HTMLElement | null = null;
@@ -295,6 +349,8 @@
         function setMode(next: 'login' | 'register') {
             mode = next;
             clearMsg();
+            pendingEl.hidden = true;
+            standardEls.forEach((el) => { if (el) el.hidden = false; });
             const isLogin = next === 'login';
             titleEl.textContent = isLogin ? 'Entra en YourFavs' : 'Crea tu cuenta';
             subEl.textContent = isLogin
@@ -305,6 +361,37 @@
             (overlay!.querySelector('[data-mode="login"]') as HTMLElement).hidden = !isLogin;
             (overlay!.querySelector('[data-mode="register"]') as HTMLElement).hidden = isLogin;
             (overlay!.querySelector('[data-auth-forgot]') as HTMLElement).hidden = !isLogin;
+        }
+
+        // «Revisa tu correo». `note` sustituye al subtítulo (p. ej. al intentar entrar sin confirmar).
+        function showPending(email: string, note?: string) {
+            pendingEmail = email;
+            standardEls.forEach((el) => { if (el) el.hidden = true; });
+            pendingEl.hidden = false;
+            pendingEmailEl.textContent = email;
+            pendingMsgEl.hidden = true;
+            titleEl.textContent = 'Revisa tu correo';
+            subEl.textContent = note || 'Un paso más y tu cuenta está lista.';
+            setLoading(false);
+            resendBtn.focus();
+        }
+
+        // Cuenta atrás tras reenviar: evita pulsar diez veces y chocar con el límite de envíos.
+        function cooldownResend(seconds: number) {
+            window.clearInterval(resendTimer);
+            let left = seconds;
+            resendBtn.disabled = true;
+            resendBtn.textContent = `Reenviar el enlace (${left})`;
+            resendTimer = window.setInterval(() => {
+                left -= 1;
+                if (left <= 0) {
+                    window.clearInterval(resendTimer);
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = 'Reenviar el enlace';
+                } else {
+                    resendBtn.textContent = `Reenviar el enlace (${left})`;
+                }
+            }, 1000);
         }
 
         function open(gating = false) {
@@ -461,8 +548,31 @@
             setLoading(true);
             const a = await getActions();
             const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
-            if (res.ok) afterAuth(res);
-            else { showMsg(res.error); setLoading(false); }
+            if (res.ok && res.pendingConfirmation) { showPending(email); return; }
+            if (res.ok) { afterAuth(res); return; }
+            if (res.code === 'email_not_confirmed') {
+                showPending(email, 'Aún no has confirmado tu email. Usa el enlace que te enviamos o pide otro.');
+                return;
+            }
+            showMsg(res.error);
+            setLoading(false);
+        });
+
+        // ---- confirmación pendiente: reenviar / volver ----
+        resendBtn.addEventListener('click', async () => {
+            if (!pendingEmail) return;
+            resendBtn.disabled = true;
+            const a = await getActions();
+            const res = await a.resendConfirmation(pendingEmail);
+            pendingMsgEl.textContent = res.ok ? 'Enlace reenviado. Mira tu bandeja de entrada.' : res.error;
+            pendingMsgEl.classList.toggle('is-ok', res.ok);
+            pendingMsgEl.hidden = false;
+            cooldownResend(res.ok ? 30 : 60);
+        });
+        overlay.querySelector('[data-auth-pending-back]')!.addEventListener('click', () => {
+            setMode('login');
+            emailInput.value = pendingEmail;
+            passInput.focus();
         });
 
         // ---- reset de contraseña ----
@@ -486,6 +596,11 @@
             if (authReturn === 'error') {
                 open();
                 showMsg('No se pudo entrar con Google. Inténtalo de nuevo.');
+            } else if (authReturn === 'link') {
+                // Enlace del email caducado o ya usado. Si era de confirmar, al intentar entrar
+                // el login responde «sin confirmar» y el modal ofrece reenviarlo.
+                open();
+                showMsg('Ese enlace ha caducado o ya se usó. Entra con tu email y contraseña; si aún no habías confirmado, te ofreceremos otro.');
             } else {
                 // La página ya llega con sesión: solo falta lo que el popup hacía después.
                 let pending: string | null = null;

@@ -176,8 +176,8 @@ export async function getCalendarData(
 
         const names = u.person_names?.length ? u.person_names : [u.person_name];
         const label = names.length > 1
-            ? `Estreno · sigues a ${names[0]} y ${names.length - 1} más`
-            : `Estreno · porque sigues a ${names[0]}`;
+            ? `Estreno · avisos de ${names[0]} y ${names.length - 1} más`
+            : `Estreno · tienes avisos de ${names[0]}`;
         addEvent(u.release_date, {
             tmdb_id: u.tmdb_id,
             media_type: u.media_type,
