@@ -133,6 +133,9 @@ export function invalidateCollectionsCache(): void {
     userCache.clear();
 }
 
+/** Solo las sagas del usuario de la petición; sin uid (fuera de una petición) se vacía todo. */
 export function invalidateUserCollectionsCache(): void {
-    userCache.clear();
+    const uid = getCurrentUid();
+    if (uid) userCache.delete(uid);
+    else userCache.clear();
 }

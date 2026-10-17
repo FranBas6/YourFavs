@@ -19,7 +19,16 @@ export interface TopActor {
 // le servía a cualquier usuario el top del último que lo calculó.
 const cache = new Map<string, { data: TopActor[]; expires: number }>();
 
-export function invalidateTopActorsCache() { cache.clear(); }
+/**
+ * Invalida SOLO el top del usuario de la petición: con varias cuentas, que uno marque una película
+ * no tiene por qué tirar el top ya calculado de los demás. Fuera de una petición (sin uid) no hay a
+ * quién apuntar, así que se vacía todo como antes.
+ */
+export function invalidateTopActorsCache() {
+    const uid = getCurrentUid();
+    if (uid) cache.delete(uid);
+    else cache.clear();
+}
 
 /**
  * Lee el top de actores de la caché SIN computar (3.4). Devuelve null si está
