@@ -224,7 +224,11 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+# YourFavs: encendido desde la F0 de la capa social (docs/PLAN_SOCIAL.md): con perfiles públicos,
+# registrarse con el email de otra persona no puede salir gratis. En local los correos los recoge
+# Mailpit (MAILPIT_URL en `npm run db:status`); en prod hace falta SMTP propio (Resend) ANTES de
+# encenderlo en el panel, ver docs/supabase_auth_runbook.md.
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
@@ -243,6 +247,16 @@ otp_expiry = 3600
 # pass = "env(SENDGRID_API_KEY)"
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
+
+# Plantillas propias: enlace con `token_hash` en vez de `{{ .ConfirmationURL }}`, para que funcione
+# aunque se abra en otro navegador (ver la cabecera de cada archivo). Las mismas se pegan en el panel.
+[auth.email.template.confirmation]
+subject = "Confirma tu cuenta de YourFavs"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Restablece tu contraseña de YourFavs"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

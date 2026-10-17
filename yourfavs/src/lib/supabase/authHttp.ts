@@ -61,6 +61,10 @@ export function mapAuthError(code: string | undefined): string {
         case 'session_not_found':
         case 'session_expired':
             return 'El enlace ha caducado. Pide otro desde «¿Olvidaste la contraseña?».';
+        case 'email_not_confirmed':
+            return 'Antes de entrar, confirma tu email con el enlace que te enviamos.';
+        case 'otp_expired':
+            return 'El enlace ha caducado o ya se usó. Pide otro.';
         default:
             return 'Algo salió mal. Inténtalo de nuevo.';
     }

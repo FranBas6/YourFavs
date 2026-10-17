@@ -1,9 +1,11 @@
 /**
  * POST /api/auth/reset   { email }
  *
- * Manda el email de «restablecer contraseña». El enlace vuelve a `/auth/callback`, que abre la
- * sesión y lleva a `/auth/nueva-contrasena`. Ojo: con PKCE el enlace hay que abrirlo en el MISMO
- * navegador donde se pidió, porque el verificador vive en una cookie de este.
+ * Manda el email de «restablecer contraseña». El enlace de nuestra plantilla
+ * (`supabase/templates/recovery.html`) lleva `token_hash` y vuelve a `/auth/callback`, que abre la
+ * sesión con `verifyOtp` y lleva a `/auth/nueva-contrasena`: funciona en cualquier navegador.
+ * `redirectTo` solo lo usa la plantilla por defecto de Supabase (enlace con `?code=`, que sí exige
+ * el mismo navegador), por si un día faltara la nuestra en el panel.
  *
  * Responde ok aunque el email no exista (Supabase hace lo mismo): así no sirve para averiguar
  * quién tiene cuenta.
