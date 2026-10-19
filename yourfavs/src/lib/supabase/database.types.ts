@@ -83,13 +83,13 @@ isOneToOne: false
                   ]
                 },"custom_lists": {
                   Row: {
-                    "color_stamp": string | null,"cover": Json | null,"created_at": string,"description": string,"icon": string | null,"id": string,"item_count": number,"name": string,"position": number | null,"updated_at": string,"user_id": string
+                    "color_stamp": string | null,"cover": Json | null,"created_at": string,"description": string,"icon": string | null,"id": string,"is_public": boolean,"item_count": number,"name": string,"position": number | null,"updated_at": string,"user_id": string
                   }
                   Insert: {
-                    "color_stamp"?: string | null,"cover"?: Json | null,"created_at"?: string,"description"?: string,"icon"?: string | null,"id"?: string,"item_count"?: number,"name": string,"position"?: number | null,"updated_at"?: string,"user_id"?: string
+                    "color_stamp"?: string | null,"cover"?: Json | null,"created_at"?: string,"description"?: string,"icon"?: string | null,"id"?: string,"is_public"?: boolean,"item_count"?: number,"name": string,"position"?: number | null,"updated_at"?: string,"user_id"?: string
                   }
                   Update: {
-                    "color_stamp"?: string | null,"cover"?: Json | null,"created_at"?: string,"description"?: string,"icon"?: string | null,"id"?: string,"item_count"?: number,"name"?: string,"position"?: number | null,"updated_at"?: string,"user_id"?: string
+                    "color_stamp"?: string | null,"cover"?: Json | null,"created_at"?: string,"description"?: string,"icon"?: string | null,"id"?: string,"is_public"?: boolean,"item_count"?: number,"name"?: string,"position"?: number | null,"updated_at"?: string,"user_id"?: string
                   }
                   Relationships: [
                     
@@ -159,15 +159,28 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
-                },"profiles": {
+                },"profile_hidden_titles": {
                   Row: {
-                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"region": string | null,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
+                    "hidden_at": string,"media_type": Database["public"]['Enums']["media_type"],"poster_path": string | null,"title": string | null,"tmdb_id": number,"user_id": string
                   }
                   Insert: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "hidden_at"?: string,"media_type": Database["public"]['Enums']["media_type"],"poster_path"?: string | null,"title"?: string | null,"tmdb_id": number,"user_id"?: string
                   }
                   Update: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "hidden_at"?: string,"media_type"?: Database["public"]['Enums']["media_type"],"poster_path"?: string | null,"title"?: string | null,"tmdb_id"?: number,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"profiles": {
+                  Row: {
+                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"region": string | null,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
+                  }
+                  Insert: {
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                  }
+                  Update: {
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     

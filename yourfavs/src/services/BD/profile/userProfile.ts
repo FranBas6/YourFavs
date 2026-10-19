@@ -67,6 +67,14 @@ export interface UserProfile {
     /** Modo sin spoilers desglosado (Ajustes · A3b). Ver `resolveSpoilerSettings`. */
     spoilers?: Partial<SpoilerSettings>;
     homeLayout?: { key: string; hidden?: boolean }[];   // §4 home a tu medida (mostrar/ocultar bloques)
+    /**
+     * Perfil público (F1 social): SOLO LECTURA desde aquí. Se leen porque el middleware los pone
+     * en `locals.user` para el menú de cuenta y la hoja Perfil («Ver mi perfil público»). Se
+     * escriben con `services/BD/social/publicSettings.ts`, que valida el handle (formato,
+     * reservados, unicidad, 30 días) y el resto de campos públicos.
+     */
+    publicHandle?: string;
+    publicVisibility?: 'off' | 'public' | 'friends';
     updated_at?: unknown;
 }
 
@@ -85,7 +93,11 @@ const COLUMN: Record<Exclude<keyof UserProfile, 'updated_at'>, string> = {
     spoilerFree: 'spoiler_free',
     spoilers: 'spoilers',
     homeLayout: 'home_layout',
+    publicHandle: 'public_handle',
+    publicVisibility: 'public_visibility',
 };
+/** Campos que `setUserProfile` NUNCA escribe: tienen su propio módulo con validación. */
+const READ_ONLY = new Set<string>(['publicHandle', 'publicVisibility']);
 const SELECT = [...Object.values(COLUMN), 'updated_at'].join(', ');
 
 export async function getUserProfile(): Promise<UserProfile | null> {
@@ -123,6 +135,7 @@ export async function setUserProfile(patch: Partial<UserProfile>): Promise<void>
     const update: Record<string, unknown> = {};
     for (const [field, value] of Object.entries(merged)) {
         const column = COLUMN[field as keyof typeof COLUMN];
+        if (READ_ONLY.has(field)) continue;
         if (column && value !== undefined) update[column] = value; // updated_at: lo pone el trigger
     }
     if (!Object.keys(update).length) return;
