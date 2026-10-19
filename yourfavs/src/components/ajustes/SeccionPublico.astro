@@ -1,0 +1,328 @@
+---
+/**
+ * Ajustes → «Perfil público» (handoff docs/design_handoff_perfil_publico §8).
+ *
+ * Siete tarjetas: dirección y visibilidad · sobre ti · Mis 4 · secciones · colecciones públicas ·
+ * títulos ocultos · buscadores. Guarda sola, campo a campo, con «Guardado» y Deshacer: no hay botón
+ * de guardar.
+ *
+ * Quién guarda qué:
+ *   · `autosave.ts` (el de todo Ajustes), con `data-save-url="/api/profile/public"`: visibilidad,
+ *     bio, interruptores de secciones y buscadores.
+ *   · `scripts/ajustes/publico.ts`: lo que no es un campo simple — la dirección (comprobación en
+ *     vivo + confirmación al cambiarla), Mis 4 (diálogo buscador y flechas), las colecciones
+ *     (una petición por colección) y los títulos ocultos. Usa el mismo indicador y la misma barra
+ *     de Deshacer a través de los eventos `yf:save-state` y `yf:undo`.
+ *
+ * Con el perfil desactivado todo se puede preparar; solo se esconden «Ver mi perfil» y «Compartir».
+ */
+import Stamp from '../Stamp.astro';
+import { Icon } from 'astro-icon/components';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import {
+    getOwnPublicSettings, listOwnCollectionsForPublic, listOwnHiddenTitles, BIO_MAX,
+} from '../../services/BD/social/publicSettings';
+import { handleCooldownUntil, HANDLE_MAX } from '../../services/BD/social/handles';
+import { PUBLIC_SECTIONS } from '../../utils/constants/publicSections';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+
+const [settings, collections, hidden] = await Promise.all([
+    getOwnPublicSettings(),
+    listOwnCollectionsForPublic(),
+    listOwnHiddenTitles(),
+]);
+
+const fmtDate = (iso: string | Date) =>
+    new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' }).format(new Date(iso));
+const cooldown = settings.handle ? handleCooldownUntil(settings.handleChangedAt) : null;
+const isPublic = settings.visibility === 'public';
+const publicUrl = settings.handle ? `https://yourfavs.app/u/${settings.handle}` : '';
+const sectionDefs = settings.sections.map((s) => ({ ...s, def: PUBLIC_SECTIONS.find((d) => d.id === s.id)! }));
+const bioLen = [...settings.bio].length;
+const slots = [0, 1, 2, 3];
+const typeLabel = (t: 'movie' | 'tv', year: string | null) => `${t === 'movie' ? 'Película' : 'Serie'}${year ? ` · ${year}` : ''}`;
+
+// Estado inicial para el script (sin datos de nadie más que del usuario en sesión).
+const boot = {
+    handle: settings.handle,
+    cooldownUntil: cooldown ? cooldown.toISOString() : null,
+    nextChangeLabel: fmtDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)),
+    four: settings.four,
+    visibility: settings.visibility,
+};
+---
+<div class="aj-public" id="aj-public">
+    <script type="application/json" id="aj-public-boot" set:html={JSON.stringify(boot)} />
+
+    <!-- 1 · Dirección y visibilidad -->
+    <section class="aj-card" aria-labelledby="pp-addr-title">
+        <div class="aj-card-head">
+            <div>
+                <h2 id="pp-addr-title">Dirección y visibilidad</h2>
+                <p>Dónde vive tu perfil y quién puede verlo.</p>
+            </div>
+        </div>
+        <div class="aj-card-body">
+            <div class="aj-field">
+                <span class="aj-field-label">
+                    <label for="pp-handle">Tu dirección</label>
+                    <span class="aj-field-count" id="pp-handle-count">{(settings.handle ?? '').length}/{HANDLE_MAX}</span>
+                </span>
+                <div class="aj-handle" id="pp-handle-box">
+                    <span class="aj-handle-pre" aria-hidden="true">yourfavs.app/u/</span>
+                    <input id="pp-handle" type="text" inputmode="text" autocomplete="off" autocapitalize="none" spellcheck="false"
+                           value={settings.handle ?? ''} maxlength={HANDLE_MAX} readonly={Boolean(cooldown)}
+                           aria-describedby="pp-handle-rules pp-handle-help" placeholder="tu_nombre" />
+                    <span class="aj-handle-state" id="pp-handle-state" aria-live="polite"></span>
+                </div>
+                <ul class="aj-rules" id="pp-handle-rules">
+                    <li data-rule="len">
+                        <svg class="aj-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="aj-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        <svg class="aj-no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        Entre 3 y 20 caracteres
+                    </li>
+                    <li data-rule="chars">
+                        <svg class="aj-dot" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/></svg>
+                        <svg class="aj-yes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                        <svg class="aj-no" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                        Solo minúsculas, números y _
+                    </li>
+                </ul>
+                <p class="aj-field-error" id="pp-handle-error" role="alert" hidden></p>
+                <span class="aj-field-help" id="pp-handle-help" style="max-width: none;">
+                    {cooldown
+                        ? `Podrás cambiarla a partir del ${fmtDate(cooldown)}.`
+                        : settings.handle ? 'Se guarda al salir del campo.' : 'Elige tu dirección para poder hacer público tu perfil.'}
+                </span>
+                <div class="aj-warn">
+                    <Icon name="lucide:triangle-alert" />
+                    <span>Si la cambias, los enlaces que ya hayas compartido dejarán de funcionar. Solo puedes cambiarla una vez cada 30 días.</span>
+                </div>
+            </div>
+        </div>
+        <div class="aj-card-body">
+            <div class="aj-field">
+                <span class="aj-field-label" id="pp-vis-label">Quién puede verlo</span>
+                <div class="aj-seg" role="radiogroup" aria-labelledby="pp-vis-label">
+                    <label><input type="radio" name="visibility" value="off" data-save="visibility" data-save-url="/api/profile/public" checked={settings.visibility === 'off'} />Desactivado</label>
+                    <label><input type="radio" name="visibility" value="public" data-save="visibility" data-save-url="/api/profile/public" checked={settings.visibility === 'public'} />Público</label>
+                    <label class:list={[{ 'is-off': !SOCIAL_PHASE.friends }]}>
+                        <input type="radio" name="visibility" value="friends" data-save="visibility" data-save-url="/api/profile/public"
+                               checked={settings.visibility === 'friends'} disabled={!SOCIAL_PHASE.friends} aria-disabled={!SOCIAL_PHASE.friends ? 'true' : undefined} />
+                        Solo amigos{!SOCIAL_PHASE.friends && <span class="aj-soon">Pronto</span>}
+                    </label>
+                </div>
+                <p class="aj-seg-help" id="pp-vis-help" data-help-off="Nadie puede verlo. Tu dirección se conserva." data-help-public="Público: cualquiera con el enlace, también sin cuenta.">
+                    {isPublic ? 'Público: cualquiera con el enlace, también sin cuenta.' : 'Nadie puede verlo. Tu dirección se conserva.'}
+                </p>
+            </div>
+
+            <div id="pp-public-links" hidden={!isPublic} style="margin-top: 18px;">
+                <div class="aj-linkrow">
+                    <span class="aj-row-text">
+                        <span class="aj-row-title">Ver mi perfil</span>
+                        <p class="aj-row-desc">Tal y como lo ven los demás.</p>
+                    </span>
+                    <a class="aj-btn" id="pp-open" href={settings.handle ? `/u/${settings.handle}` : '#'} target="_blank" rel="noopener">
+                        <Icon name="lucide:external-link" />Abrir
+                    </a>
+                </div>
+                <div class="aj-copy-row" style="margin-top: 14px;">
+                    <input type="text" id="pp-url" value={publicUrl} readonly aria-label="Dirección de tu perfil" />
+                    <button type="button" class="aj-btn" id="pp-share" style="height: 42px;">
+                        <Icon name="lucide:link" /><span id="pp-share-label">Copiar enlace</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 2 · Sobre ti -->
+    <section class="aj-card" id="bio" aria-labelledby="pp-bio-title">
+        <div class="aj-card-head">
+            <div>
+                <h2 id="pp-bio-title">Sobre ti</h2>
+                <p>Unas líneas bajo tu nombre. Texto plano, sin enlaces.</p>
+            </div>
+        </div>
+        <div class="aj-card-body">
+            <label class="aj-field">
+                <span class="aj-field-label">
+                    Bio
+                    <span class:list={['aj-field-count', { 'is-near': bioLen >= 260 }]} id="pp-bio-count">{bioLen}/{BIO_MAX}</span>
+                </span>
+                <textarea id="pp-bio" maxlength={BIO_MAX} data-save="bio" data-save-url="/api/profile/public" data-save-debounce="800"
+                          placeholder="Qué te gusta ver, qué no, qué recomiendas siempre…">{settings.bio}</textarea>
+            </label>
+        </div>
+    </section>
+
+    <!-- 3 · Mis 4 -->
+    <section class="aj-card" id="mis4" aria-labelledby="pp-four-title">
+        <div class="aj-card-head">
+            <div>
+                <h2 id="pp-four-title">Mis 4</h2>
+                <p>Cuatro títulos elegidos a mano, en la cabecera de tu perfil.</p>
+            </div>
+        </div>
+        <div class="aj-card-body">
+            <div class="aj-four" id="pp-four">
+                {slots.map((i) => {
+                    const pick = settings.four[i];
+                    return (
+                        <div class="aj-four-cell" data-slot={i}>
+                            <span class="aj-four-pos">{i + 1}</span>
+                            <div class:list={['aj-four-po', { 'is-empty': !pick }]}>
+                                {pick?.poster_path ? <img src={posterUrl(pick.poster_path, 'w185')} alt="" loading="lazy" /> : !pick && <Icon name="lucide:plus" />}
+                            </div>
+                            <div class="aj-four-t" title={pick?.title ?? ''}>{pick ? pick.title : `Hueco ${i + 1}`}</div>
+                            <div class="aj-four-ctl">
+                                {pick && <button type="button" class="aj-btn is-ico" data-four-move="-1" aria-label="Mover a la izquierda" disabled={i === 0}><Icon name="lucide:chevron-left" /></button>}
+                                <button type="button" class="aj-btn" data-four-pick>{pick ? 'Cambiar' : 'Elegir'}</button>
+                                {pick && <button type="button" class="aj-btn is-ico" data-four-move="1" aria-label="Mover a la derecha" disabled={i === settings.four.length - 1}><Icon name="lucide:chevron-right" /></button>}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+            <p class="aj-field-help" style="margin-top: 12px; max-width: none;">Ordénalas con las flechas. Arrastrar llegará más adelante.</p>
+        </div>
+    </section>
+
+    <!-- 4 · Secciones -->
+    <section class="aj-card" aria-labelledby="pp-sec-title">
+        <div class="aj-card-head">
+            <div>
+                <h2 id="pp-sec-title">Secciones</h2>
+                <p>Lo que sale en tu perfil, en este orden.</p>
+            </div>
+            <span class="aj-soon">Reordenar · Pronto</span>
+        </div>
+        <div data-save-group="sections" data-save-url="/api/profile/public">
+            {sectionDefs.map((s) => (
+                <div class:list={['aj-row', { 'is-soon': s.def.soon }]} data-section-row={s.id}>
+                    <span class="aj-grip" aria-hidden="true"><Icon name="lucide:grip-vertical" /></span>
+                    <Stamp color={s.def.color} icon={s.def.icon} size={34} />
+                    <span class="aj-row-text">
+                        <span class="aj-row-title">{s.def.label}{s.def.soon && <span class="aj-soon">Pronto</span>}</span>
+                        <p class="aj-row-desc">{s.def.desc}</p>
+                    </span>
+                    <label class="aj-switch">
+                        <input type="checkbox" role="switch" checked={s.on} disabled={s.def.soon}
+                               data-key={s.def.soon ? undefined : s.id} aria-label={s.def.label} />
+                        <span class="aj-switch-track"></span>
+                    </label>
+                </div>
+            ))}
+        </div>
+    </section>
+
+    <!-- 5 · Colecciones públicas -->
+    <section class="aj-card" id="colecciones" aria-labelledby="pp-coll-title">
+        <div class="aj-card-head">
+            <div>
+                <h2 id="pp-coll-title">Colecciones públicas</h2>
+                <p>Las que actives saldrán en la sección «Colecciones» de tu perfil.</p>
+            </div>
+        </div>
+        {collections.length === 0 ? (
+            <div class="aj-row is-info">
+                <span>Todavía no tienes colecciones. <a class="aj-link" href="/mislistas/colecciones">Crear una</a></span>
+            </div>
+        ) : collections.map((c) => (
+            <div class="aj-row" data-coll-row={c.id}>
+                <span class="aj-coll-th" style={`--th-bg: var(--stamp-${c.colorStamp || 'slate'})`} aria-hidden="true">{c.icon || '🎬'}</span>
+                <span class="aj-row-text">
+                    <span class="aj-row-title">{c.name}</span>
+                    <p class="aj-row-desc" data-coll-desc data-count={`${c.itemCount} ${c.itemCount === 1 ? 'título' : 'títulos'}`}>
+                        {c.itemCount} {c.itemCount === 1 ? 'título' : 'títulos'}{c.isPublic ? '' : ' · privada'}
+                    </p>
+                </span>
+                <label class="aj-switch">
+                    <input type="checkbox" role="switch" checked={c.isPublic} data-coll-id={c.id} data-coll-name={c.name}
+                           aria-label={`Mostrar «${c.name}» en mi perfil`} />
+                    <span class="aj-switch-track"></span>
+                </label>
+            </div>
+        ))}
+    </section>
+
+    <!-- 6 · Títulos ocultos -->
+    <section class="aj-card" aria-labelledby="pp-hid-title">
+        <div class="aj-card-head">
+            <div>
+                <h2 id="pp-hid-title">Títulos ocultos</h2>
+                <p>No salen en «Lo último visto» ni en «Mejor valoradas».</p>
+            </div>
+        </div>
+        <div id="pp-hidden-list">
+            {hidden.map((h) => (
+                <div class="aj-row" data-hidden-row={`${h.mediaType}:${h.tmdbId}`}>
+                    <span class="aj-hid-po">{h.posterPath && <img src={posterUrl(h.posterPath, 'w92')} alt="" loading="lazy" />}</span>
+                    <span class="aj-row-text">
+                        <span class="aj-row-title">{h.title || 'Sin título'}</span>
+                        <p class="aj-row-desc">Oculto desde el {fmtDate(h.hiddenAt)}</p>
+                    </span>
+                    <button type="button" class="aj-btn" data-unhide data-mt={h.mediaType} data-id={String(h.tmdbId)}
+                            data-title={h.title ?? ''} data-poster={h.posterPath ?? ''}>
+                        <Icon name="lucide:eye" />Volver a mostrar
+                    </button>
+                </div>
+            ))}
+        </div>
+        <div class="aj-row is-info">
+            <Icon name="lucide:info" />
+            <span><span id="pp-hidden-none" hidden={hidden.length > 0}>No has ocultado ningún título. </span>Para ocultar otro título, abre su ficha y usa «No mostrar en mi perfil».</span>
+        </div>
+    </section>
+
+    <!-- 7 · Buscadores -->
+    <section class="aj-card" aria-label="Buscadores">
+        <div class="aj-row">
+            <Stamp color="slate" icon="search" size={34} />
+            <span class="aj-row-text">
+                <span class="aj-row-title">Que aparezca en buscadores</span>
+                <p class="aj-row-desc">Google y otros podrán enseñar tu perfil en sus resultados. Si lo apagas después, puede tardar unos días en desaparecer.</p>
+            </span>
+            <label class="aj-switch">
+                <input type="checkbox" role="switch" checked={settings.indexable} data-save="indexable" data-save-url="/api/profile/public"
+                       aria-label="Que aparezca en buscadores" />
+                <span class="aj-switch-track"></span>
+            </label>
+        </div>
+    </section>
+</div>
+
+<!-- Diálogo de Mis 4: mismo armazón que el selector de plataformas (.aj-picker). -->
+<div class="aj-picker" id="pp-picker" role="dialog" aria-modal="true" aria-labelledby="pp-picker-title" hidden>
+    <div class="aj-picker-card">
+        <div class="aj-picker-head">
+            <div>
+                <h3 id="pp-picker-title">Hueco 1 · elegir</h3>
+                <p>Busca cualquier película o serie.</p>
+            </div>
+            <button type="button" class="aj-picker-close" id="pp-picker-close" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="aj-picker-search">
+            <input type="search" id="pp-picker-q" placeholder="Busca una película o serie…" autocomplete="off"
+                   role="combobox" aria-expanded="true" aria-controls="pp-picker-list" aria-autocomplete="list" />
+            <div class="aj-picker-tabs" role="tablist" aria-label="Qué buscar">
+                <button type="button" role="tab" aria-selected="true" data-tab="all">Todo</button>
+                <button type="button" role="tab" aria-selected="false" data-tab="movie">Películas</button>
+                <button type="button" role="tab" aria-selected="false" data-tab="tv">Series</button>
+                <button type="button" role="tab" aria-selected="false" data-tab="mine">De mis listas</button>
+            </div>
+        </div>
+        <div class="aj-picker-list" id="pp-picker-list" role="listbox" aria-label="Resultados">
+            <p class="aj-picker-state">Escribe para buscar.</p>
+        </div>
+        <div class="aj-picker-foot" id="pp-picker-foot" hidden>
+            <button type="button" class="aj-btn aj-btn-ghost" id="pp-picker-remove">Quitar de este hueco</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    import '../../scripts/ajustes/publico';
+</script>

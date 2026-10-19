@@ -37,6 +37,11 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
         description: 'Tu avatar y el nombre con el que te ve la app.',
     },
     {
+        key: 'publico', label: 'Perfil público', group: 'perfil', icon: 'at-sign',
+        title: 'Perfil público',
+        description: 'Una página en yourfavs.app con tu nombre, para enseñar lo que ves. Nace apagada: decides tú qué sale y quién lo ve.',
+    },
+    {
         key: 'gustos', label: 'Tus gustos', group: 'perfil', icon: 'heart',
         title: 'Tus gustos',
         description: 'Lo que usamos para personalizar tus recomendaciones «Para ti».',

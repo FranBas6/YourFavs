@@ -63,6 +63,9 @@ const themeLabel = { light: 'Claro', dark: 'Oscuro', system: 'Según el sistema'
 function valueFor(key: string): string {
     switch (key) {
         case 'perfil': return isNav ? '' : displayName;
+        // Perfil público (F1 social): encendido o apagado. «Solo amigos» llegará en la F3.
+        case 'publico': return profile.publicVisibility === 'public' ? 'Público'
+            : profile.publicVisibility === 'friends' ? 'Solo amigos' : 'Desactivado';
         case 'gustos': return profile.onboarding === 'done' ? 'Configurados' : 'Sin configurar';
         case 'home': return isNav ? `${homeVisible}/${homeTotal}` : `${homeVisible} de ${homeTotal}`;
         case 'plataformas':
@@ -81,6 +84,7 @@ function valueFor(key: string): string {
 // dos trazos llevan el segundo en `d2`.
 const ICONS: Record<string, { d: string; d2?: string }> = {
     user:     { d: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2', d2: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0' },
+    'at-sign': { d: 'M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0', d2: 'M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94' },
     heart:    { d: 'M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z' },
     layout:   { d: 'M3 5h18v5H3zM3 14h8v5H3zM14 14h7v5h-7z' },
     tv:       { d: 'M2 7h20v12H2z', d2: 'm7 3 5 4 5-4' },

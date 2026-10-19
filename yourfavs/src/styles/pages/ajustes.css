@@ -908,3 +908,144 @@
 
 .aj-link { color: var(--accent); font-weight: 600; text-decoration: none; }
 .aj-link:hover { text-decoration: underline; }
+
+/* =====================================================================================
+   Perfil público (/perfil/publico) — handoff docs/design_handoff_perfil_publico §8.
+   Solo lo nuevo: el resto (tarjetas, filas, interruptores, copia, selector) es lo de arriba.
+   ===================================================================================== */
+
+/* Campo de dirección: prefijo + valor + estado DENTRO del campo. */
+.aj-handle {
+    display: flex; align-items: stretch; height: 42px; overflow: hidden;
+    border: 1px solid var(--border-strong); border-radius: 9px; background: var(--bg-elev);
+}
+.aj-handle:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.aj-handle.is-bad { border-color: var(--accent); }
+.aj-handle-pre {
+    display: flex; align-items: center; padding: 0 4px 0 12px; flex-shrink: 0;
+    font: 500 13px var(--font-mono); color: var(--text-3);
+    background: var(--bg-tint); border-right: 1px solid var(--border);
+}
+@media (max-width: 560px) { .aj-handle-pre { font-size: 11.5px; padding-left: 10px; } }
+.aj-handle input {
+    flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text);
+    padding: 0 10px; font: 500 13.5px var(--font-mono); height: auto;
+}
+.aj-handle input:focus { box-shadow: none; }
+.aj-handle input[readonly] { color: var(--text-2); }
+.aj-handle-state {
+    display: flex; align-items: center; gap: 5px; padding: 0 12px; flex-shrink: 0;
+    font: 600 12px var(--font); color: var(--text-2); white-space: nowrap;
+}
+.aj-handle-state svg { width: 14px; height: 14px; }
+.aj-handle-state.is-ok { color: var(--ok-ink); }
+.aj-handle-state.is-bad { color: var(--accent-dark); }
+[data-theme="dark"] .aj-handle-state.is-bad { color: var(--stamp-red-ink); }
+.aj-handle-state .aj-spin { animation: aj-spin .8s linear infinite; }
+@keyframes aj-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .aj-handle-state .aj-spin { animation: none; } }
+
+/* Reglas del handle: cambian de icono, no solo de color. */
+.aj-rules { display: flex; flex-direction: column; gap: 5px; margin: 9px 0 0; padding: 0; list-style: none; }
+.aj-rules li { display: flex; align-items: center; gap: 7px; font-size: 11.8px; color: var(--text-2); }
+.aj-rules svg { width: 14px; height: 14px; flex-shrink: 0; }
+.aj-rules li .aj-yes { display: none; }
+.aj-rules li.is-ok { color: var(--ok-ink); }
+.aj-rules li.is-ok .aj-yes { display: block; }
+.aj-rules li.is-ok .aj-no, .aj-rules li.is-ok .aj-dot { display: none; }
+.aj-rules li .aj-no { display: none; }
+.aj-rules li.is-bad { color: var(--accent-dark); }
+[data-theme="dark"] .aj-rules li.is-bad { color: var(--stamp-red-ink); }
+.aj-rules li.is-bad .aj-no { display: block; }
+.aj-rules li.is-bad .aj-dot { display: none; }
+
+.aj-warn {
+    display: flex; gap: 10px; margin-top: 14px; padding: 11px 13px; border-radius: var(--r-md);
+    background: var(--stamp-amber); color: var(--stamp-amber-ink); font-size: 12px; line-height: 1.5;
+}
+.aj-warn svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+.aj-field-error { font-size: 12px; font-weight: 600; color: var(--accent-dark); margin: 6px 0 0; }
+[data-theme="dark"] .aj-field-error { color: var(--stamp-red-ink); }
+
+/* Segmentado de visibilidad (radiogroup). */
+.aj-seg {
+    display: inline-flex; gap: 3px; padding: 3px; border-radius: var(--r-full);
+    background: var(--bg-tint); border: 1px solid var(--border);
+}
+.aj-seg label {
+    position: relative; height: 34px; padding: 0 16px; border-radius: var(--r-full);
+    display: flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer;
+    font: 500 13px var(--font); color: var(--text-2); white-space: nowrap;
+}
+.aj-seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.aj-seg label:has(input:checked) { background: var(--bg-elev); color: var(--text); font-weight: 600; box-shadow: var(--sh-md); }
+.aj-seg label:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.aj-seg label.is-off { color: var(--text-3); cursor: default; }
+.aj-seg label.is-off input { cursor: default; }
+.aj-seg label .aj-soon { margin-left: 0; }
+@media (max-width: 1023px) {
+    .aj-seg { display: flex; }
+    .aj-seg label { flex: 1; padding: 0 6px; font-size: 12px; gap: 4px; }
+    .aj-seg label .aj-soon { display: none; }
+}
+.aj-seg-help { font-size: 12px; color: var(--text-2); margin: 8px 0 0; }
+
+/* Filas de enlace del perfil (Ver mi perfil / Compartir) */
+.aj-linkrow { display: flex; align-items: center; gap: 13px; }
+.aj-linkrow + .aj-linkrow, .aj-linkrow + .aj-copy-row { margin-top: 14px; }
+
+/* Bio */
+.aj-field textarea {
+    width: 100%; min-height: 96px; resize: vertical; padding: 11px 12px; border-radius: 9px;
+    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    font: 400 14px/1.55 var(--font);
+}
+.aj-field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.aj-field-count.is-near { color: var(--stamp-amber-ink); }
+
+/* Mis 4 */
+.aj-four { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 1024px) { .aj-four { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; } }
+.aj-four-cell { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.aj-four-pos { font: 600 10.5px var(--font-mono); color: var(--text-3); }
+.aj-four-po { aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; background: var(--bg-tint); }
+.aj-four-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.aj-four-po.is-empty {
+    border: 1.5px dashed var(--border-strong); display: flex; align-items: center; justify-content: center;
+    color: var(--text-3);
+}
+.aj-four-po.is-empty svg { width: 20px; height: 20px; }
+.aj-four-t { font: 500 12px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 15px; }
+.aj-four-ctl { display: flex; gap: 4px; align-items: center; }
+.aj-four-ctl .aj-btn:not(.is-ico) { flex: 1; justify-content: center; }
+.aj-btn.is-ico { width: 32px; padding: 0; justify-content: center; }
+.aj-btn[disabled] { opacity: .45; cursor: default; }
+.aj-btn svg { width: 14px; height: 14px; }
+
+/* Secciones: asa en gris (reordenar llega más adelante). */
+.aj-grip { width: 26px; height: 34px; display: grid; place-items: center; color: var(--text-4); opacity: .6; flex-shrink: 0; }
+.aj-grip svg { width: 16px; height: 16px; }
+
+/* Colecciones públicas y títulos ocultos */
+.aj-coll-th {
+    width: 40px; height: 40px; border-radius: 9px; flex-shrink: 0;
+    display: grid; place-items: center; font-size: 18px; background: var(--th-bg, var(--stamp-slate));
+}
+.aj-hid-po { width: 32px; aspect-ratio: 2 / 3; border-radius: 4px; overflow: hidden; flex-shrink: 0; background: var(--bg-tint); }
+.aj-hid-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.aj-row.is-info { color: var(--text-2); font-size: 12.5px; }
+.aj-row.is-info svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-3); }
+
+/* Diálogo de Mis 4: pestañas en píldora + resultados con póster. */
+.aj-picker-tabs { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+.aj-picker-tabs button {
+    height: 30px; padding: 0 13px; border-radius: var(--r-full); border: 1px solid var(--border);
+    background: none; color: var(--text-2); font: 600 12px var(--font); cursor: pointer;
+}
+.aj-picker-tabs button[aria-selected="true"] { background: var(--accent-soft); border-color: transparent; color: var(--accent-dark); }
+[data-theme="dark"] .aj-picker-tabs button[aria-selected="true"] { color: var(--stamp-red-ink); }
+.aj-picker-po { width: 34px; aspect-ratio: 2 / 3; border-radius: 4px; overflow: hidden; flex-shrink: 0; background: var(--bg-tint); }
+.aj-picker-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.aj-picker-meta { display: block; font-size: 11.5px; color: var(--text-2); }
+.aj-picker-item.is-active { background: var(--bg-tint); }
+.aj-picker-foot { padding: 10px 20px 14px; border-top: 1px solid var(--border); }
