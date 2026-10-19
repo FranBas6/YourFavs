@@ -132,13 +132,14 @@ export async function findPublicProfileRow(rawHandle: string): Promise<ProfileRo
 }
 
 /**
- * ¿Puede este visitante ver el contenido? En F1 solo existen «off» (ya filtrado) y «public».
- * «friends» deja ver la identidad a cualquiera (para poder pedir la amistad) y el contenido solo al
- * dueño; en F3 se sumarán los amigos.
+ * ¿Puede este visitante ver el contenido? «off» ya está filtrado. «friends» deja ver la identidad
+ * a cualquiera (para poder pedir la amistad) y el contenido solo al dueño y a sus amigos.
  */
-function canSeeContent(row: ProfileRow, role: ViewerRole): boolean {
+function canSeeContent(row: ProfileRow, role: ViewerRole, rel: Relation | null): boolean {
     if (role === 'owner') return true;
-    return row.public_visibility === 'public';
+    if (row.public_visibility === 'public') return true;
+    // «Solo amigos» (F3): el contenido, solo para sus amigos.
+    return row.public_visibility === 'friends' && Boolean(rel?.friends);
 }
 
 /**
@@ -408,7 +409,7 @@ export async function getPublicProfile(rawHandle: string, viewerId: string | nul
         rel = await getRelation(viewerId, row.id);
     }
 
-    if (!canSeeContent(row, viewerRole) || rel?.blockedByMe) {
+    if (!canSeeContent(row, viewerRole, rel) || rel?.blockedByMe) {
         const identity = await resolveIdentity(row);
         return {
             ownerId: row.id, handle: row.public_handle, name: identity.name,
@@ -439,11 +440,14 @@ export async function getPublicCollection(rawHandle: string, listId: string, vie
     const row = await findPublicProfileRow(rawHandle);
     if (!row) return null;
     const viewerRole: ViewerRole = viewerId === row.id ? 'owner' : viewerId ? 'member' : 'guest';
-    if (!canSeeContent(row, viewerRole)) return null;
     // Con un bloqueo en cualquier sentido, la colección tampoco existe para quien mira.
+    let rel: Relation | null = null;
     if (viewerRole === 'member' && viewerId) {
-        if (await isBlockedBy(viewerId, row.id) || (await getRelation(viewerId, row.id)).blockedByMe) return null;
+        if (await isBlockedBy(viewerId, row.id)) return null;
+        rel = await getRelation(viewerId, row.id);
+        if (rel.blockedByMe) return null;
     }
+    if (!canSeeContent(row, viewerRole, rel)) return null;
 
     const { data: list, error } = await supabaseAdmin()
         .from('custom_lists')

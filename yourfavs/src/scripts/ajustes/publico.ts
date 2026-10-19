@@ -193,14 +193,14 @@ function init(root: HTMLElement) {
     function updateLinks() {
         const vis = currentVisibility();
         if (links) links.hidden = vis === 'off' || !savedHandle;
-        if (visHelp) visHelp.textContent = (vis === 'off' ? visHelp.dataset.helpOff : visHelp.dataset.helpPublic) || '';
+        if (visHelp) visHelp.textContent = (vis === 'off' ? visHelp.dataset.helpOff : vis === 'friends' ? visHelp.dataset.helpFriends : visHelp.dataset.helpPublic) || '';
         if (savedHandle) {
             if (urlInput) urlInput.value = `https://yourfavs.app/u/${savedHandle}`;
             if (openLink) openLink.href = `/u/${savedHandle}`;
         }
         // El valor de la navegación de Ajustes («Público» / «Desactivado»), sin recargar.
         document.querySelectorAll<HTMLElement>('a[href="/perfil/publico"] .aj-nav-value, a[href="/perfil/publico"] .aj-index-row-value')
-            .forEach((el) => { el.textContent = vis === 'public' ? 'Público' : 'Desactivado'; });
+            .forEach((el) => { el.textContent = vis === 'public' ? 'Público' : vis === 'friends' ? 'Solo amigos' : 'Desactivado'; });
     }
 
     // Antes que autosave (captura): sin dirección guardada no se puede publicar.

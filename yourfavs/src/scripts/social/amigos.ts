@@ -39,7 +39,7 @@ function init(root: HTMLElement) {
     let seq = 0;
 
     // ---- Pestañas -----------------------------------------------------------------------
-    async function fetchTab(tab: FriendsTab, offset = 0): Promise<{ items: PersonEntry[]; hasMore: boolean } | null> {
+    async function fetchTab(tab: FriendsTab, offset = 0): Promise<{ items: PersonEntry[]; hasMore: boolean; sent?: PersonEntry[] } | null> {
         try {
             const res = await fetch(`/api/social/lists?tab=${tab}&offset=${offset}`, { headers: { Accept: 'application/json' } });
             const d = await res.json();
@@ -66,7 +66,7 @@ function init(root: HTMLElement) {
         if (mine !== seq) return;
         panel.removeAttribute('aria-busy');
         panel.innerHTML = d
-            ? panelHtml(tab, d.items, { ...ctx, hasMore: d.hasMore })
+            ? panelHtml(tab, d.items, { ...ctx, hasMore: d.hasMore, sent: d.sent })
             : '<p class="am-note">No se ha podido cargar. Inténtalo otra vez.</p>';
     }
 
@@ -161,15 +161,49 @@ function init(root: HTMLElement) {
     });
 
     // ---- Tras una acción (relations.ts) -----------------------------------------------
-    // Desbloquear en «Bloqueados» saca la fila de la lista y baja el contador.
-    document.addEventListener('yf:relation', (e) => {
-        const { uid, rel } = (e as CustomEvent<{ uid: string; rel: Relation }>).detail;
-        if (current !== 'bloqueados' || searching || rel.blockedByMe || !panel) return;
-        const row = panel.querySelector<HTMLElement>(`.so-row[data-person="${CSS.escape(uid)}"]`);
+    function bumpCount(tab: FriendsTab, delta: number) {
+        const c = root.querySelector<HTMLElement>(`[data-count="${tab}"]`);
+        if (!c) return;
+        const n = Math.max(0, (Number(c.textContent) || 0) + delta);
+        c.textContent = String(n);
+        const hot = tab === 'pendientes' && n > 0;
+        c.classList.toggle('hot', hot);
+        c.setAttribute('aria-label', hot ? `${n} sin responder` : String(n));
+    }
+    /** Quita una fila de la pestaña abierta (y de su grupo, en Pendientes). */
+    function dropRow(uid: string, list?: 'received' | 'sent') {
+        if (!panel) return;
+        const scope = list ? panel.querySelector(`[data-list="${list}"]`) : panel;
+        const row = scope?.querySelector<HTMLElement>(`.so-row[data-person="${CSS.escape(uid)}"]`);
         if (!row) return;
         row.remove();
-        const c = root.querySelector<HTMLElement>('[data-count="bloqueados"]');
-        if (c) { const n = Math.max(0, (Number(c.textContent) || 1) - 1); c.textContent = String(n); c.setAttribute('aria-label', String(n)); }
-        if (!panel.querySelector('.so-row')) panel.innerHTML = panelHtml('bloqueados', [], { ...ctx, hasMore: false });
+        if (list) {
+            const g = panel.querySelector<HTMLElement>(`[data-grp="${list}"] [data-grp-n]`);
+            if (g) g.textContent = String(Math.max(0, (Number(g.textContent) || 1) - 1));
+            if (!scope!.querySelector('.so-row')) {
+                // Grupo vacío: fuera su rótulo, su lista y su nota; sin nada más, el vacío de la pestaña.
+                panel.querySelector(`[data-grp="${list}"]`)?.remove();
+                const next = scope!.nextElementSibling;
+                scope!.remove();
+                if (list === 'received' && next?.classList.contains('am-note')) next.remove();
+                if (!panel.querySelector('.so-row')) panel.innerHTML = panelHtml('pendientes', [], { ...ctx, hasMore: false });
+            }
+        } else if (!panel.querySelector('.so-row')) {
+            panel.innerHTML = panelHtml(current, [], { ...ctx, hasMore: false });
+        }
+    }
+    document.addEventListener('yf:relation', (e) => {
+        const { uid, rel, action } = (e as CustomEvent<{ uid: string; rel: Relation; action: string }>).detail;
+        if (action === 'friend-accept') { bumpCount('pendientes', -1); bumpCount('amigos', 1); }
+        if (action === 'friend-reject') bumpCount('pendientes', -1);
+        if (action === 'friend-remove') bumpCount('amigos', -1);
+        if (action === 'friend-restore') bumpCount('amigos', 1);
+        if (action === 'unblock') bumpCount('bloqueados', -1);
+        if (searching || !rel) return;
+        if (current === 'bloqueados' && !rel.blockedByMe) dropRow(uid);
+        if (current === 'pendientes' && (action === 'friend-accept' || action === 'friend-reject')) dropRow(uid, 'received');
+        if (current === 'pendientes' && action === 'friend-cancel' && !rel.requestOut) dropRow(uid, 'sent');
+        if (current === 'amigos' && action === 'friend-remove') dropRow(uid);
+        if (current === 'amigos' && action === 'friend-restore') showTab('amigos');
     });
 }

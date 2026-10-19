@@ -5,7 +5,6 @@
  *   · Compartir: hoja nativa (`navigator.share`) en móvil; copiar el enlace en escritorio.
  *   · «Ocultar» (solo dueño): quita el título de «Lo último visto» / «Mejor valoradas» con
  *     `POST /api/profile/hidden`, y ofrece Deshacer (`DELETE`) devolviéndolo a su sitio.
- *   · Menús de los botones de relación (fases F2+; en F1 no se pintan).
  *   · Arquetipo (solo dueño): si el guardado tiene más de 7 días, se recalcula en segundo plano.
  *   · Invitado: recuerda por qué perfil llegó (cookie `yf_ref`, 30 días) para que, si crea la
  *     cuenta, siga a esa persona y el modal diga quién le invita (F2). Va en el navegador porque
@@ -64,20 +63,15 @@ function init(root: HTMLElement) {
     }
 
     // ---- Menús -----------------------------------------------------------------------
-    function closeMenus(except?: Element | null) {
+    // Abrirlos y cerrarlos lo hace scripts/social/relations.ts en toda la app; aquí solo se cierra
+    // el de «···» tras «Copiar enlace», que no es una acción de relación.
+    function closeMenus() {
         root.querySelectorAll<HTMLElement>('[data-menu-toggle][aria-expanded="true"]').forEach((btn) => {
-            if (btn === except) return;
             btn.setAttribute('aria-expanded', 'false');
             const menu = btn.parentElement?.querySelector<HTMLElement>('.pf-menu');
             if (menu) menu.hidden = true;
         });
     }
-    document.addEventListener('click', (e) => {
-        if (!(e.target as Element).closest('.pf-menu-wrap')) closeMenus();
-    });
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeMenus();
-    });
 
     // ---- Deshacer --------------------------------------------------------------------
     const undoBar = document.getElementById('pf-undo');
@@ -141,18 +135,6 @@ function init(root: HTMLElement) {
     // ---- Delegación ---------------------------------------------------------------------
     root.addEventListener('click', (e) => {
         const t = e.target as Element;
-        const toggle = t.closest<HTMLElement>('[data-menu-toggle]');
-        if (toggle) {
-            const open = toggle.getAttribute('aria-expanded') !== 'true';
-            closeMenus(toggle);
-            toggle.setAttribute('aria-expanded', String(open));
-            const menu = toggle.parentElement?.querySelector<HTMLElement>('.pf-menu');
-            if (menu) {
-                menu.hidden = !open;
-                if (open) menu.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-            }
-            return;
-        }
         const hideBtn = t.closest<HTMLElement>('.js-pf-hide');
         if (hideBtn) { e.preventDefault(); hide(hideBtn); return; }
         const action = t.closest<HTMLElement>('[data-action]')?.dataset.action;

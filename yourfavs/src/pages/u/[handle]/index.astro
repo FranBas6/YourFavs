@@ -21,7 +21,11 @@ import LogCard from '../../../components/social/LogCard.astro';
 import CollectionCard from '../../../components/social/CollectionCard.astro';
 import OwnerEmptyRow from '../../../components/social/OwnerEmptyRow.astro';
 import { Icon } from 'astro-icon/components';
+import ProfileActions from '../../../components/social/ProfileActions.astro';
 import { getPublicProfile } from '../../../services/BD/social/publicProfile';
+import { shouldSuggestFriend } from '../../../services/BD/social/referral';
+import { avatarHtml, initialsOf, stampFor } from '../../../lib/social/ui';
+import { SOCIAL_PHASE } from '../../../utils/constants/social';
 import { safeFetch } from '../../../utils/safeFetch';
 import '../../../styles/pages/social/perfil-publico.css';
 
@@ -51,6 +55,17 @@ const description = view.bio
     : `Las películas y series de ${view.name} en YourFavs.`;
 const ogImage = avatarSrc ? new URL(avatarSrc, Astro.url.origin).toString() : '/logo_yourfavs.png';
 const robots = view.indexable ? undefined : 'noindex, nofollow';
+
+// «Solo amigos» visto por quien no es su amigo (F3, D4): solo identidad y el candado.
+const friendsLocked = view.locked && !view.rel?.blockedByMe;
+
+// Sugerencia «¿Pedirle amistad a X?» para quien llegó a YourFavs por su enlace (F3, D13).
+const suggest = SOCIAL_PHASE.friends && view.viewerRole === 'member' && viewerId && view.rel
+    ? await safeFetch(shouldSuggestFriend(viewerId, view.ownerId, view.rel), `u/${handle}/sugg`, false)
+    : false;
+const suggAvatar = suggest
+    ? avatarHtml({ id: view.ownerId, handle: view.handle, name: view.name, avatar: avatarSrc, archetype: null, color: stampFor(view.ownerId), initials: initialsOf(view.name) }, 44, ['slate', 'check'])
+    : '';
 
 // Banda del dueño: «acaba de hacerse público» durante las primeras 24 h.
 const fresh = view.since ? Date.now() - new Date(view.since).getTime() < 24 * 60 * 60 * 1000 : false;
@@ -96,7 +111,9 @@ const ownCollections = view.ownCollectionsTotal ?? 0;
                 <span class="pf-band-ic"><Icon name="lucide:eye" /></span>
                 <span class="pf-band-text">
                     <strong>Así te ven los demás.</strong>{' '}
-                    {fresh ? 'Tu perfil acaba de hacerse público.' : 'Público: cualquiera con el enlace puede verlo.'}
+                    {view.visibility === 'friends'
+                        ? 'Solo amigos: tus amigos lo ven entero; los demás, solo tu nombre.'
+                        : fresh ? 'Tu perfil acaba de hacerse público.' : 'Público: cualquiera con el enlace puede verlo.'}
                 </span>
                 <div class="pf-band-acts">
                     <a class="pf-btn" href="/perfil/publico"><Icon name="lucide:pencil" />Editar</a>
@@ -108,7 +125,30 @@ const ownCollections = view.ownCollectionsTotal ?? 0;
             </div>
         )}
 
+        {suggest && (
+            <section class="pf-sugg" aria-label="Sugerencia" data-person={view.ownerId} data-handle={view.handle} data-name={view.name}>
+                <Fragment set:html={suggAvatar} />
+                <div class="pf-sugg-b">
+                    <h2>¿Pedirle amistad a {firstName}?</h2>
+                    <p>Llegaste a YourFavs por su enlace y ya sigues a {firstName}. La amistad necesita que acepte.</p>
+                </div>
+                <div class="pf-acts-row" data-rel-host="sugg">
+                    <button type="button" class="pf-btn ghost" data-sugg-dismiss>Ahora no</button>
+                    <button type="button" class="pf-btn pri" data-sa="friend-request"><Icon name="lucide:user-plus" />Enviar solicitud</button>
+                </div>
+            </section>
+        )}
+
         <ProfileHeader view={view} avatarSrc={avatarSrc} />
+
+        {friendsLocked && (
+            <section class="pf-locked" aria-labelledby="pf-locked-t">
+                <Stamp color="slate" icon="lock" />
+                <h2 id="pf-locked-t">{firstName} comparte su perfil solo con sus amigos</h2>
+                <p>Envíale una solicitud. Cuando la acepte verás sus series favoritas, lo último que ha visto y sus colecciones.</p>
+                <ProfileActions viewer={isGuest ? 'guest' : 'member'} rel={view.rel ?? undefined} person={{ id: view.ownerId, handle: view.handle, name: view.name }} locked />
+            </section>
+        )}
 
         {view.rel?.blockedByMe && (
             <section class="pf-locked" aria-labelledby="pf-blocked-t">

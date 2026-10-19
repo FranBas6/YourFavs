@@ -13,7 +13,7 @@
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { findPublicProfileRow } from './publicProfile';
 import { follow, getPeople } from './graph';
-import type { PersonCard } from '../../../lib/social/types';
+import type { PersonCard, Relation } from '../../../lib/social/types';
 
 export const REF_COOKIE = 'yf_ref';
 
@@ -48,4 +48,22 @@ export async function applyReferral(newUserId: string, rawHandle: string | null 
     } catch (err) {
         console.error('[referral] no se pudo aplicar:', (err as Error).message);
     }
+}
+
+/**
+ * ¿Se enseña «¿Pedirle amistad a X?» encima de su perfil? (handoff social D13). Solo a quien llegó
+ * por el enlace de X, si no sois amigos, no hay solicitud entre vosotros en ningún sentido y no la
+ * descartó con «Ahora no».
+ */
+export async function shouldSuggestFriend(viewerId: string, ownerId: string, rel: Relation): Promise<boolean> {
+    if (rel.friends || rel.requestOut || rel.requestIn || rel.blockedByMe) return false;
+    const { data, error } = await supabaseAdmin().from('profiles')
+        .select('referred_by, referral_suggestion_dismissed').eq('id', viewerId).maybeSingle();
+    if (error) throw new Error(error.message);
+    return data?.referred_by === ownerId && !data.referral_suggestion_dismissed;
+}
+
+export async function dismissReferralSuggestion(me: string): Promise<void> {
+    const { error } = await supabaseAdmin().from('profiles').update({ referral_suggestion_dismissed: true }).eq('id', me);
+    if (error) throw new Error(error.message);
 }

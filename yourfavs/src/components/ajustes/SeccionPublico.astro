@@ -35,8 +35,18 @@ const [settings, collections, hidden] = await Promise.all([
 const fmtDate = (iso: string | Date) =>
     new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', timeZone: 'Europe/Madrid' }).format(new Date(iso));
 const cooldown = settings.handle ? handleCooldownUntil(settings.handleChangedAt) : null;
-const isPublic = settings.visibility === 'public';
+// «Público» y «Solo amigos» son los dos un perfil ACTIVO (con enlace que compartir).
+const isPublic = settings.visibility !== 'off';
+const VIS_HELP = {
+    off: 'Nadie puede verlo. Tu dirección se conserva.',
+    public: 'Público: cualquiera con el enlace, también sin cuenta.',
+    friends: 'Solo amigos: tus amigos lo ven entero; los demás, solo tu nombre y el botón para pedirte amistad.',
+} as const;
 const publicUrl = settings.handle ? `https://yourfavs.app/u/${settings.handle}` : '';
+// Llegó desde «Para pedir amistad, activa tu perfil» (F3): al volver a esa página con el perfil ya
+// activo, la solicitud sale sola (scripts/social/relations.ts). Solo rutas propias.
+const nextRaw = Astro.url.searchParams.get('next') ?? '';
+const backTo = nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : null;
 const sectionDefs = settings.sections.map((s) => ({ ...s, def: PUBLIC_SECTIONS.find((d) => d.id === s.id)! }));
 const bioLen = [...settings.bio].length;
 const slots = [0, 1, 2, 3];
@@ -54,8 +64,15 @@ const boot = {
 <div class="aj-public" id="aj-public">
     <script type="application/json" id="aj-public-boot" set:html={JSON.stringify(boot)} />
 
+    {backTo && (
+        <p class="aj-back-note" role="note">
+            <Icon name="lucide:handshake" />
+            <span>Elige tu dirección y ponlo en Público o Solo amigos. Después, <a href={backTo}>vuelve a donde estabas</a> y tu solicitud de amistad saldrá sola.</span>
+        </p>
+    )}
+
     <!-- 1 · Dirección y visibilidad -->
-    <section class="aj-card" aria-labelledby="pp-addr-title">
+    <section class="aj-card" id="direccion" aria-labelledby="pp-addr-title">
         <div class="aj-card-head">
             <div>
                 <h2 id="pp-addr-title">Dirección y visibilidad</h2>
@@ -113,8 +130,8 @@ const boot = {
                         Solo amigos{!SOCIAL_PHASE.friends && <span class="aj-soon">Pronto</span>}
                     </label>
                 </div>
-                <p class="aj-seg-help" id="pp-vis-help" data-help-off="Nadie puede verlo. Tu dirección se conserva." data-help-public="Público: cualquiera con el enlace, también sin cuenta.">
-                    {isPublic ? 'Público: cualquiera con el enlace, también sin cuenta.' : 'Nadie puede verlo. Tu dirección se conserva.'}
+                <p class="aj-seg-help" id="pp-vis-help" data-help-off={VIS_HELP.off} data-help-public={VIS_HELP.public} data-help-friends={VIS_HELP.friends}>
+                    {VIS_HELP[settings.visibility]}
                 </p>
             </div>
 

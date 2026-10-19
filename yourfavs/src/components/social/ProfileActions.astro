@@ -4,18 +4,18 @@
  * público §7 y social F2/F3 §6.1).
  *
  * Seguir y amistad son DOS botones independientes: seguir es libre y en un sentido; la amistad va
- * por solicitud. Cada botón solo se pinta si su fase está encendida en `SOCIAL_PHASE` (F2 seguir y
- * bloquear, F3 amistad, F4 recomendar).
+ * por solicitud. Cada botón solo se pinta si su fase está encendida en `SOCIAL_PHASE`.
  *
- * El botón de seguir sale de `lib/social/ui.ts` (el mismo marcado que en filas y avisos) y lo
- * repinta `scripts/social/relations.ts` tras pulsarlo, con la relación que devuelve el servidor.
- * El invitado ve los mismos botones, pero le abren el acceso (`data-auth-open`).
+ * Con sesión, el marcado sale de `lib/social/ui.ts` (`profileActionsHtml`), el mismo que repinta
+ * `scripts/social/relations.ts` tras cada acción con la relación que devuelve el servidor. El
+ * invitado ve los botones aquí, pero le abren «Crear cuenta» (`data-auth-open`).
  *
+ * `locked`: perfil «Solo amigos» visto por quien no es su amigo (D4): «Añadir amigo» pasa delante.
  * `force` enciende todas las fases: solo para la página de prueba (`/dev/perfil-acciones`).
  */
 import { Icon } from 'astro-icon/components';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
-import { followButtonHtml } from '../../lib/social/ui';
+import { profileActionsHtml } from '../../lib/social/ui';
 import { NO_RELATION, type Relation } from '../../lib/social/types';
 
 interface Props {
@@ -24,101 +24,33 @@ interface Props {
     rel?: Relation;
     /** Dueño del perfil: id para las acciones, handle y nombre para los textos. */
     person: { id: string; handle: string; name: string };
+    locked?: boolean;
     force?: boolean;
 }
-const { viewer, rel = NO_RELATION, person, force = false } = Astro.props;
+const { viewer, rel = NO_RELATION, person, locked = false, force = false } = Astro.props;
 const phase = force ? { follow: true, friends: true, recommend: true, block: true } : SOCIAL_PHASE;
-const firstName = person.name.split(/\s+/)[0] || person.name;
-
-const member = viewer === 'member';
-const blocked = member && rel.blockedByMe;
-const followHtml = member && !blocked ? followButtonHtml(person, rel, { phase, size: 'md' }) : '';
-
-// La amistad pide solicitud: el estado decide qué botón (y si abre menú).
-const friendBtn = (() => {
-    if (!phase.friends || blocked) return null;
-    if (member && rel.requestOut) return { label: 'Solicitud enviada', icon: 'clock', kind: 'wait', menu: 'sent' };
-    if (member && rel.friends) return { label: 'Amigos', icon: 'user-check', kind: 'friend', menu: 'friends' };
-    if (member && rel.requestIn) return null;   // va arriba como «Aceptar / Rechazar»
-    return { label: 'Añadir amigo', icon: 'user-plus', kind: '', menu: null };
-})();
-
-const showReceived = member && !blocked && phase.friends && rel.requestIn;
-const showRecommend = member && !blocked && phase.recommend && rel.friends;
-// «···»: Copiar enlace + Bloquear. Sin bloqueo el menú se quedaría con una sola opción, así que se
-// sustituye por el botón «Compartir» de siempre.
-const showMore = member && !blocked && phase.block;
-const showShare = !showMore && !blocked;
+const memberHtml = viewer === 'member' ? profileActionsHtml(person, rel, { phase, locked }) : '';
 ---
-{viewer !== 'owner' && (
-    <div class="pf-acts" data-person={person.id} data-handle={person.handle} data-name={person.name}>
-        {showReceived && (
-            <div class="pf-req">
-                <Icon name="lucide:user-plus" />
-                {firstName} te ha enviado una solicitud de amistad.
-            </div>
-        )}
-        <div class="pf-acts-row" data-rel-host="profile" style={showReceived ? 'margin-top: 12px' : undefined}>
-            {blocked && (
-                <button type="button" class="pf-btn" data-sa="unblock"><Icon name="lucide:shield-off" />Desbloquear</button>
+{viewer === 'member' && (
+    <div class="pf-acts" data-person={person.id} data-handle={person.handle} data-name={person.name} data-locked={locked ? '1' : undefined}>
+        <div data-rel-host="profile" set:html={memberHtml} />
+    </div>
+)}
+{viewer === 'guest' && (
+    <div class="pf-acts">
+        <div class="pf-acts-row">
+            {locked && phase.friends && (
+                <button type="button" class="pf-btn pri" data-auth-open="register"><Icon name="lucide:user-plus" />Añadir amigo</button>
             )}
-            {showReceived && (
-                <>
-                    <button type="button" class="pf-btn pri" data-sa="friend-accept"><Icon name="lucide:user-check" />Aceptar solicitud</button>
-                    <button type="button" class="pf-btn ghost" data-sa="friend-reject">Rechazar</button>
-                </>
-            )}
-            {viewer === 'guest' && phase.follow && (
-                <button type="button" class="pf-btn pri" aria-pressed="false" data-auth-open="register">
+            {phase.follow && (
+                <button type="button" class:list={['pf-btn', { pri: !locked }]} aria-pressed="false" data-auth-open="register">
                     <Icon name="lucide:plus" />Seguir
                 </button>
             )}
-            {followHtml && <Fragment set:html={followHtml} />}
-            {friendBtn && (
-                viewer === 'guest' ? (
-                    <button type="button" class="pf-btn" data-auth-open="register"><Icon name="lucide:user-plus" />Añadir amigo</button>
-                ) : friendBtn.menu ? (
-                    <span class="pf-menu-wrap">
-                        <button type="button" class:list={['pf-btn', friendBtn.kind]} aria-haspopup="menu" aria-expanded="false" data-menu-toggle>
-                            <Icon name={`lucide:${friendBtn.icon}`} />{friendBtn.label}<Icon name="lucide:chevron-down" class="pf-car" />
-                        </button>
-                        <div class="pf-menu" role="menu" hidden>
-                            {friendBtn.menu === 'sent' && (
-                                <button type="button" role="menuitem" data-sa="friend-cancel"><Icon name="lucide:x" />Cancelar solicitud</button>
-                            )}
-                            {friendBtn.menu === 'friends' && (
-                                <>
-                                    {phase.recommend && <button type="button" role="menuitem" data-action="recommend"><Icon name="lucide:send" />Recomendar algo</button>}
-                                    {phase.recommend && <hr />}
-                                    <button type="button" role="menuitem" class="pf-danger" data-sa="friend-remove"><Icon name="lucide:user-x" />Eliminar amigo</button>
-                                </>
-                            )}
-                        </div>
-                    </span>
-                ) : (
-                    <button type="button" class:list={['pf-btn', friendBtn.kind]} data-sa="friend-request">
-                        <Icon name={`lucide:${friendBtn.icon}`} />{friendBtn.label}
-                    </button>
-                )
+            {!locked && phase.friends && (
+                <button type="button" class="pf-btn" data-auth-open="register"><Icon name="lucide:user-plus" />Añadir amigo</button>
             )}
-            {showRecommend && (
-                <button type="button" class="pf-btn pf-ico-mobile" data-action="recommend" aria-label="Recomendar">
-                    <Icon name="lucide:send" /><span class="pf-lbl-wide">Recomendar</span>
-                </button>
-            )}
-            {showMore && (
-                <span class="pf-menu-wrap">
-                    <button type="button" class="pf-btn ico" aria-label="Más opciones" aria-haspopup="menu" aria-expanded="false" data-menu-toggle>
-                        <Icon name="lucide:ellipsis" />
-                    </button>
-                    <div class="pf-menu" role="menu" hidden>
-                        <button type="button" role="menuitem" data-action="copy-link"><Icon name="lucide:link" />Copiar enlace</button>
-                        <hr />
-                        <button type="button" role="menuitem" class="pf-danger" data-sa="block"><Icon name="lucide:ban" />Bloquear a {firstName}</button>
-                    </div>
-                </span>
-            )}
-            {showShare && (
+            {!locked && (
                 <button type="button" class="pf-btn ico" aria-label="Compartir perfil" data-action="share">
                     <Icon name="lucide:share-2" />
                 </button>

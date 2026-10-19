@@ -11,7 +11,7 @@ import { db, getAuthId, requireAuthId } from '../shared/userScope';
 export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change' | 'streak'
     // Entre personas (capa social). No los crea el generador: los escribe el servidor en el buzón de
     // quien los recibe al pasar (`social_follow`, migración 20261020090000).
-    | 'follow';
+    | 'follow' | 'friend_request' | 'friend_accepted';
 
 export interface NotificationDoc {
     id: string;
@@ -40,7 +40,7 @@ export interface NotifInput {
 // cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
 // desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
 // pendiente ENTRA o SALE de tus plataformas (diff contra snapshot, ver el generador).
-const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow']);
+const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow', 'friend_request', 'friend_accepted']);
 
 function toMs(v: any): number {
     if (!v) return 0;

@@ -1,14 +1,18 @@
 ---
 /**
- * Lo social que necesita cualquier página con sesión (F2+): el diálogo «¿Bloquear a…?» y el
- * script que atiende los botones de relación allá donde salgan (`scripts/social/relations.ts`).
- * Se monta una vez en el Layout, solo con sesión.
+ * Lo social que necesita cualquier página con sesión (F2+): el diálogo «¿Bloquear a…?», el de
+ * «Para pedir amistad, activa tu perfil» (F3, solo si aún no lo tienes activo) y el script que
+ * atiende los botones de relación allá donde salgan (`scripts/social/relations.ts`). Se monta una
+ * vez en el Layout, solo con sesión.
  *
  * Diálogo (handoff social F2/F3 §6.5): `<dialog>` nativo, que ya atrapa el foco y se cierra con
  * Esc. Foco inicial en «Cancelar». En móvil se pega abajo. El nombre lo rellena el script.
  */
 import { Icon } from 'astro-icon/components';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
+
+const user = Astro.locals.user;
+const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.publicVisibility !== 'off');
 ---
 {SOCIAL_PHASE.block && (
     <dialog id="so-block-dlg" class="so-dlg" role="alertdialog" aria-labelledby="so-block-t" aria-describedby="so-block-d">
@@ -26,6 +30,18 @@ import { SOCIAL_PHASE } from '../../utils/constants/social';
         <div class="so-dlg-f">
             <button type="button" class="pf-btn" data-bl-cancel>Cancelar</button>
             <button type="button" class="pf-btn dgr" data-bl-confirm><Icon name="lucide:ban" />Bloquear</button>
+        </div>
+    </dialog>
+)}
+
+{SOCIAL_PHASE.friends && !hasProfile && (
+    <dialog id="so-noprof-dlg" class="so-dlg" aria-labelledby="so-noprof-t" aria-describedby="so-noprof-d">
+        <span class="so-dlg-st" style="--sb: var(--stamp-amber); --si: var(--stamp-amber-ink)"><Icon name="lucide:at-sign" /></span>
+        <h3 id="so-noprof-t">Para pedir amistad, activa tu perfil</h3>
+        <p id="so-noprof-d"><span data-bl-first></span> tiene que saber quién se lo pide. Solo necesitas elegir tu dirección; lo demás puedes dejarlo para luego.</p>
+        <div class="so-dlg-f">
+            <button type="button" class="pf-btn ghost" data-np-cancel>Ahora no</button>
+            <a class="pf-btn pri" href="/perfil/publico#direccion" data-np-go>Activar mi perfil</a>
         </div>
     </dialog>
 )}

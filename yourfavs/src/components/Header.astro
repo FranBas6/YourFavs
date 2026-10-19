@@ -260,8 +260,8 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                 <span class="ami-sub">Nombre, avatar, región</span>
                             </span>
                         </a>
-                        {/* Perfil público (F1 social): con él activo, a tu página; si no, a activarlo. */}
-                        {user.publicHandle && user.publicVisibility === 'public' ? (
+                        {/* Perfil público (F1 social): con él activo (Público o Solo amigos), a tu página; si no, a activarlo. */}
+                        {user.publicHandle && user.publicVisibility && user.publicVisibility !== 'off' ? (
                             <a href={`/u/${user.publicHandle}`} class="account-menu-item account-menu-item-2l" role="menuitem">
                                 <Icon name="lucide:at-sign" />
                                 <span class="ami-body">

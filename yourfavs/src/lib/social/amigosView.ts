@@ -51,19 +51,51 @@ function emptyHtml(tab: FriendsTab, ctx: ViewCtx): string {
     return `<div class="so-emp">${stamp(c, i)}<span class="pf-tag">${TAB_LABEL[tab]}</span><h2>${esc(title)}</h2><p>${esc(text)}</p>${action}</div>`;
 }
 
-function rowMeta(tab: FriendsTab, e: PersonEntry, now: number): string[] {
+/** «Amigos desde mayo» (este año) o «Amigos desde diciembre de 2025». */
+function friendsSince(at: number, now: number): string {
+    const d = new Date(at);
+    const month = d.toLocaleDateString('es-ES', { month: 'long' });
+    return d.getFullYear() === new Date(now).getFullYear() ? `Amigos desde ${month}` : `Amigos desde ${month} de ${d.getFullYear()}`;
+}
+
+function rowMeta(tab: FriendsTab, e: PersonEntry, now: number, group?: 'received' | 'sent'): string[] {
     if (tab === 'bloqueados' && e.at) return [`bloqueado ${relTime(e.at, now)}`];
+    if (tab === 'amigos' && e.at) return [friendsSince(e.at, now)];
+    if (group === 'received' && e.at) return [relTime(e.at, now)];
+    if (group === 'sent' && e.at) return [`enviada ${relTime(e.at, now)}`];
+    if (tab === 'seguidores' && e.rel.requestIn) return ['te ha pedido amistad'];
     return [];
 }
 
 /** Solo las filas (para «Cargar más», que las añade a la lista que ya hay). */
-export function rowsHtml(tab: FriendsTab, items: PersonEntry[], ctx: ViewCtx): string {
+export function rowsHtml(tab: FriendsTab, items: PersonEntry[], ctx: ViewCtx, group?: 'received' | 'sent'): string {
     const now = ctx.now ?? Date.now();
     return items.map((e) => personRowHtml(e.person, e.rel, {
         phase: ctx.phase,
-        meta: rowMeta(tab, e, now),
+        meta: rowMeta(tab, e, now, group),
         hideArchetype: tab === 'bloqueados',
+        actions: group === 'sent' ? 'sent' : tab === 'amigos' ? 'friendRow' : 'row',
     })).join('');
+}
+
+const grp = (label: string, n: number, key: string, extra = '') =>
+    `<div class="am-grp" data-grp="${key}">${esc(label)} · <b data-grp-n>${n}</b>${extra ? `<span>${esc(extra)}</span>` : ''}<hr></div>`;
+
+/** «Pendientes» (F3): recibidas, enviadas y el hueco de las recomendaciones (F4). */
+function pendingHtml(received: PersonEntry[], sent: PersonEntry[], o: ViewCtx): string {
+    const recs = o.phase.recommend ? '' : `<div class="am-grp">Recomendaciones<hr></div><div class="am-soon">${stamp('slate', 'inbox', 36)}<div><b>Pronto.</b> Cuando un amigo te recomiende algo, lo verás aquí para añadirlo a Pendientes o descartarlo.</div></div>`;
+    if (!received.length && !sent.length) return emptyHtml('pendientes', o) + recs;
+    let html = '';
+    if (received.length) {
+        html += grp('Recibidas', received.length, 'received')
+            + `<div class="so-list" data-list="received">${rowsHtml('pendientes', received, o, 'received')}</div>`
+            + `<p class="am-note">${icon('eye-off')}Si rechazas, no se lo decimos: seguirá viendo «Solicitud enviada».</p>`;
+    }
+    if (sent.length) {
+        html += grp('Enviadas', sent.length, 'sent', 'de 20 como máximo')
+            + `<div class="so-list" data-list="sent">${rowsHtml('pendientes', sent, o, 'sent')}</div>`;
+    }
+    return html + recs;
 }
 
 export function moreButtonHtml(offset: number): string {
@@ -71,7 +103,8 @@ export function moreButtonHtml(offset: number): string {
 }
 
 /** El panel entero de una pestaña. */
-export function panelHtml(tab: FriendsTab, items: PersonEntry[], o: ViewCtx & { hasMore: boolean }): string {
+export function panelHtml(tab: FriendsTab, items: PersonEntry[], o: ViewCtx & { hasMore: boolean; sent?: PersonEntry[] }): string {
+    if (tab === 'pendientes') return pendingHtml(items, o.sent ?? [], o);
     if (!items.length) return emptyHtml(tab, o);
     let html = `<div class="so-list">${rowsHtml(tab, items, o)}</div>`;
     if (o.hasMore) html += moreButtonHtml(items.length);

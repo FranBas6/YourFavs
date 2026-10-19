@@ -27,15 +27,17 @@ export const prerender = false;
 const user = Astro.locals.user;
 const tabs = tabsFor(SOCIAL_PHASE);
 const asked = Astro.url.searchParams.get('tab') as FriendsTab | null;
-const tab: FriendsTab = asked && tabs.includes(asked) ? asked : tabs[0];
 const myHandle = user?.publicHandle && user.publicVisibility && user.publicVisibility !== 'off' ? user.publicHandle : null;
 
 let counts: Partial<Record<FriendsTab, number>> = {};
+let tab: FriendsTab = asked && tabs.includes(asked) ? asked : tabs[0];
 let initial = '';
 if (user) {
-    const [c, page] = await Promise.all([tabCounts(user.uid), listTab(user.uid, tab)]);
-    counts = c;
-    initial = panelHtml(tab, page.items, { phase: SOCIAL_PHASE, myHandle, hasMore: page.hasMore });
+    counts = await tabCounts(user.uid);
+    // Sin pestaña pedida: Pendientes si hay algo que responder; si no, tus amigos (F3).
+    if (!(asked && tabs.includes(asked)) && SOCIAL_PHASE.friends && !counts.pendientes) tab = 'amigos';
+    const page = await listTab(user.uid, tab);
+    initial = panelHtml(tab, page.items, { phase: SOCIAL_PHASE, myHandle, hasMore: page.hasMore, sent: page.sent });
 }
 const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
 ---
