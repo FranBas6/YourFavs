@@ -1,0 +1,72 @@
+---
+/**
+ * «No mostrar en mi perfil» — en la ficha de una película o serie, dentro del bloque «Tus tags y
+ * notas». Quita el título de las secciones AUTOMÁTICAS del perfil público («Lo último visto» y
+ * «Mejor valoradas»); lo que el dueño elige a mano (Mis 4, colecciones) no se toca.
+ *
+ * Es el camino que indica Ajustes → «Perfil público» → «Títulos ocultos», y el único en móvil, donde
+ * el «Ocultar» del propio perfil no aparece (no hay hover). Guarda al momento con
+ * `POST/DELETE /api/profile/hidden` y se deshace con el propio interruptor.
+ *
+ * Carga su estado él solo (una consulta) para que las fichas solo tengan que montarlo.
+ */
+import { isOwnTitleHidden } from '../../services/BD/social/publicSettings';
+
+interface Props {
+    mediaType: 'movie' | 'tv';
+    tmdbId: number | string;
+    title: string;
+    posterPath: string | null;
+}
+const { mediaType, tmdbId, title, posterPath } = Astro.props;
+const user = Astro.locals.user;
+let hidden = false;
+if (user) {
+    try { hidden = await isOwnTitleHidden(mediaType, Number(tmdbId)); } catch { /* se pinta apagado */ }
+}
+const id = `hide-${mediaType}-${tmdbId}`;
+---
+{user && (
+    <div class="mt-3 pt-3 border-t border-gray-100">
+        <label for={id} class="flex items-start gap-2.5 cursor-pointer">
+            <input id={id} type="checkbox" role="switch" class="mt-0.5 w-4 h-4 accent-fuchsia-600 flex-shrink-0" checked={hidden}
+                   data-hide-profile data-mt={mediaType} data-id={String(tmdbId)} data-title={title} data-poster={posterPath ?? ''} />
+            <span>
+                <span class="block text-sm font-medium text-gray-700">No mostrar en mi perfil</span>
+                <span class="block text-[11px] text-gray-500">No saldrá en «Lo último visto» ni en «Mejor valoradas» de tu perfil público.</span>
+            </span>
+        </label>
+    </div>
+)}
+
+<script>
+    document.addEventListener('change', async (e) => {
+        const input = e.target as HTMLInputElement;
+        if (!input?.matches?.('[data-hide-profile]')) return;
+        const hide = input.checked;
+        input.disabled = true;
+        let ok = false;
+        try {
+            const res = await fetch('/api/profile/hidden', {
+                method: hide ? 'POST' : 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    mediaType: input.dataset.mt, tmdbId: Number(input.dataset.id),
+                    title: input.dataset.title, posterPath: input.dataset.poster || null,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            ok = res.ok && data.ok;
+        } catch { /* red */ }
+        input.disabled = false;
+        if (!ok) input.checked = !hide;
+        const box = document.getElementById('toast-container');
+        if (box) {
+            const t = document.createElement('div');
+            t.className = `toast toast-${ok ? 'success' : 'error'}`;
+            t.textContent = ok ? (hide ? 'Oculto de tu perfil' : 'Vuelve a salir en tu perfil') : 'No se pudo guardar';
+            box.appendChild(t);
+            setTimeout(() => t.remove(), 2800);
+        }
+    });
+</script>

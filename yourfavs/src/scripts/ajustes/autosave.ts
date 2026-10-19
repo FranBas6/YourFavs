@@ -11,6 +11,13 @@
  *   data-save-group="platforms"          → contenedor de checkboxes → array de números
  *   data-save-group="notifPrefs" + data-notif="episodes" en cada checkbox → objeto
  *   id="home-layout"                     → lista de la Home (orden + visibilidad)
+ *   data-save-url="/api/profile/public"  → en el campo o en su grupo: a qué endpoint va (por
+ *                                          defecto, /api/profile/preferences)
+ *
+ * Eventos para otros scripts de la página (Ajustes → «Perfil público»):
+ *   `yf:save-state` { state, msg }  → usa este mismo indicador «Guardando… / Guardado»
+ *   `yf:undo` { label, revert }      → usa esta misma barra de Deshacer
+ *   `yf:saved` { field, value }      → avisa de cada guardado confirmado por el servidor
  *
  * Cola: UNA petición en vuelo por campo. Un cambio nuevo sobre el mismo campo aborta la
  * anterior (si no, dos toques rápidos podían aplicarse en orden inverso y dejar guardado el
@@ -66,6 +73,11 @@ function init(root: HTMLElement) {
     }
     function scalarEl(field: string) {
         return root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-save="${field}"]`);
+    }
+    /** Endpoint del campo: el que declare su elemento o su grupo, o el de preferencias. */
+    function urlFor(field: string): string {
+        const el = groupBox(field) ?? scalarEl(field);
+        return el?.dataset.saveUrl || PREFS_URL;
     }
 
     /** Lee el valor actual del DOM para ese campo. */
@@ -169,6 +181,12 @@ function init(root: HTMLElement) {
      * Puerta de entrada para el resto de la página (el diálogo de avatar). Así el Deshacer
      * tiene UN solo dueño en vez de dos barras compitiendo por el mismo hueco.
      */
+    /** Otros scripts de la página guardan por su cuenta pero comparten el indicador. */
+    document.addEventListener('yf:save-state', (e) => {
+        const d = (e as CustomEvent).detail as { state?: State; msg?: string };
+        if (d?.state && d.msg) setState(d.state, d.msg);
+    });
+
     document.addEventListener('yf:undo', (e) => {
         const d = (e as CustomEvent).detail as { label?: string; revert?: () => void; onExpire?: () => void };
         if (d?.label && typeof d.revert === 'function') offerUndo(d.label, d.revert, d.onExpire);
@@ -202,6 +220,23 @@ function init(root: HTMLElement) {
             const input = root.querySelector<HTMLInputElement>(`input[name="platforms"][value="${gone[0]}"]`);
             const name = input?.closest('.aj-tile')?.querySelector('.aj-tile-name')?.textContent?.trim();
             return { label: `Quitaste ${name || 'la plataforma'}`, revert: () => recheck(input) };
+        }
+
+        // Perfil público: apagar una sección y desactivar el perfil (handoff §8.1 y §8.4).
+        if (field === 'sections') {
+            if (!prev || !next || typeof prev !== 'object' || typeof next !== 'object') return null;
+            const p = prev as Record<string, boolean>;
+            const n = next as Record<string, boolean>;
+            const off = Object.keys(n).filter((k) => p[k] === true && n[k] === false);
+            if (off.length !== 1) return null;
+            const input = root.querySelector<HTMLInputElement>(`[data-save-group="sections"] input[data-key="${off[0]}"]`);
+            const title = input?.closest('.aj-row')?.querySelector('.aj-row-title')?.firstChild?.textContent?.trim();
+            return { label: `Quitaste «${title || 'la sección'}» de tu perfil`, revert: () => recheck(input) };
+        }
+        if (field === 'visibility') {
+            if (prev === 'off' || next !== 'off') return null;
+            const radio = root.querySelector<HTMLInputElement>(`[data-save="visibility"][value="${String(prev)}"]`);
+            return { label: 'Desactivaste tu perfil público', revert: () => recheck(radio) };
         }
 
         if (field === HOME_FIELD) {
@@ -246,7 +281,7 @@ function init(root: HTMLElement) {
 
         setState('saving', 'Guardando…');
         try {
-            const res = await fetch(isHome ? HOME_URL : PREFS_URL, {
+            const res = await fetch(isHome ? HOME_URL : urlFor(field), {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(isHome ? { layout: value } : { [field]: value }),
@@ -263,6 +298,7 @@ function init(root: HTMLElement) {
             lastFailed = null;
             setState('saved', 'Guardado');
             if (undo) offerUndo(undo.label, undo.revert);
+            document.dispatchEvent(new CustomEvent('yf:saved', { detail: { field, value } }));
         } catch (err) {
             if ((err as Error).name === 'AbortError') return;   // lo reemplazó otro cambio
             // La Home no se revierte: el orden es un array entero y devolver las filas a su

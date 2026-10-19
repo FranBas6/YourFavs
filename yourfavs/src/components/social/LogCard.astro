@@ -1,0 +1,62 @@
+---
+/**
+ * Tarjeta de «Lo último visto» (handoff §6.4). SIN SPOILERS: solo póster, título, tipo y, en
+ * series, temporada y CUÁNTOS episodios. Nunca número ni nombre de episodio, ni fotogramas.
+ * Toda la tarjeta enlaza a la ficha; la nota del dueño solo en películas.
+ */
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import { relativeDayLabel } from '../../utils/appTime';
+import OwnerRating from './OwnerRating.astro';
+import SaveToButton from './SaveToButton.astro';
+import type { PublicLogCard } from '../../services/BD/social/publicProfile';
+
+interface Props {
+    card: PublicLogCard;
+    ownerName: string;
+    avatarSrc: string | null;
+    isOwner: boolean;
+    canSave: boolean;
+}
+const { card, ownerName, avatarSrc, isOwner, canSave } = Astro.props;
+const isTv = card.media_type === 'tv';
+const href = `/${isTv ? 'serie' : 'movie'}/${card.tmdb_id}`;
+const when = relativeDayLabel(card.watched_on);
+const epLabel = card.episodes === 1 ? '1 episodio' : `${card.episodes} episodios`;
+const detail = isTv
+    ? [card.season != null ? `T${card.season}` : null, card.episodes > 0 ? epLabel : null].filter(Boolean).join(' · ')
+    : card.year ?? '';
+// Para lectores de pantalla: «Severance, serie, temporada 2, 3 episodios, hace 2 días».
+const spoken = [
+    card.title,
+    isTv ? 'serie' : 'película',
+    isTv && card.season != null ? `temporada ${card.season}` : null,
+    isTv && card.episodes > 0 ? epLabel : null,
+    !isTv && card.year ? card.year : null,
+    when,
+].filter(Boolean).join(', ');
+---
+<div class:list={['pf-lc', 'group', { 'is-owner': isOwner }]} data-title-key={`${card.media_type}:${card.tmdb_id}`}>
+    <div class="pf-lc-po">
+        {card.poster_path && <img src={posterUrl(card.poster_path, 'w92')} alt="" loading="lazy" decoding="async" />}
+    </div>
+    <div class="pf-lc-bd">
+        <div class="pf-lc-t"><a href={href} aria-label={spoken}>{card.title}</a></div>
+        <div class="pf-lc-k" aria-hidden="true">
+            <span class="pf-lc-ty">{isTv ? 'SERIE' : 'PELÍCULA'}</span>
+            {detail}
+        </div>
+        <div class="pf-lc-w">
+            <span aria-hidden="true">{when}</span>
+            {!isTv && card.rating != null && (
+                <span class="pf-lc-rtw"><OwnerRating score={card.rating} ownerName={ownerName} avatarSrc={avatarSrc} size="sm" /></span>
+            )}
+            {isOwner && (
+                <button type="button" class="pf-hide js-pf-hide" data-mt={card.media_type} data-id={String(card.tmdb_id)} data-title={card.title} data-poster={card.poster_path ?? ''}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/></svg>
+                    Ocultar
+                </button>
+            )}
+        </div>
+    </div>
+    {canSave && <SaveToButton mediaType={card.media_type} tmdbId={card.tmdb_id} title={card.title} posterPath={card.poster_path} />}
+</div>

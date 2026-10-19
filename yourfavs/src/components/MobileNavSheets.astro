@@ -83,7 +83,8 @@ const THEME_OPTIONS = [
                 <span class="yf-sheet-headname">{displayName}</span>
                 {email && <span class="yf-sheet-headmail">{email}</span>}
             </span>
-            <a class="yf-sheet-headlink" href="/perfil/perfil">
+            {/* Con el perfil público activo, «Ver perfil» lleva a tu página; si no, a tus ajustes de perfil. */}
+            <a class="yf-sheet-headlink" href={user.publicHandle && user.publicVisibility === 'public' ? `/u/${user.publicHandle}` : '/perfil/perfil'}>
                 Ver perfil
                 <Icon name="lucide:chevron-right" />
             </a>

@@ -460,7 +460,13 @@
         // ---- disparadores globales ----
         document.addEventListener('click', (e) => {
             const t = e.target as HTMLElement;
-            if (t.closest('[data-auth-open]')) { e.preventDefault(); open(); }
+            const opener = t.closest('[data-auth-open]');
+            if (opener) {
+                e.preventDefault();
+                open();
+                // `data-auth-open="register"` abre directamente en «Crear cuenta» (perfil público).
+                if (opener.getAttribute('data-auth-open') === 'register') setMode('register');
+            }
             else if (t.closest('[data-auth-logout]')) {
                 e.preventDefault();
                 getActions().then((a) => a.logout()).then(() => location.reload());

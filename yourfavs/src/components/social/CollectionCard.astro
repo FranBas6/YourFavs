@@ -1,0 +1,32 @@
+---
+/**
+ * Tarjeta de colección pública (handoff §6.6). Portada con los TRES primeros pósters y el emoji; si
+ * la colección tiene portada propia o menos de 3 pósters, el comportamiento de `colecciones.astro`
+ * (portada propia, o el emoji sobre el color). El color de reserva es el token del stamp, no los hex
+ * fijos de `.cover-*`.
+ */
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import type { PublicCollection } from '../../services/BD/social/publicProfile';
+
+interface Props { list: PublicCollection; href: string }
+const { list, href } = Astro.props;
+const color = ['red', 'amber', 'blue', 'green', 'purple', 'pink', 'slate'].includes(list.colorStamp ?? '') ? list.colorStamp : 'slate';
+const ownCover = list.cover?.type === 'poster' && list.cover.poster_path
+    ? posterUrl(list.cover.poster_path, 'w342')
+    : list.cover?.type === 'upload' && list.cover.url ? list.cover.url : null;
+const triple = !ownCover && list.posters.length >= 3;
+const count = `${list.itemCount} ${list.itemCount === 1 ? 'título' : 'títulos'}`;
+---
+<a class="pf-cc" href={href}>
+    <div class:list={['pf-cc-cv', { solo: !triple, cover: !!ownCover }]} style={`--cc-bg: var(--stamp-${color})`}>
+        {ownCover && <img src={ownCover} alt="" loading="lazy" decoding="async" />}
+        {triple && list.posters.slice(0, 3).map((p) => <img src={posterUrl(p, 'w185')} alt="" loading="lazy" decoding="async" />)}
+        {(triple || ownCover) && <span class="pf-cc-veil"></span>}
+        {list.icon && <span class="pf-cc-em" aria-hidden="true">{list.icon}</span>}
+    </div>
+    <div class="pf-cc-bd">
+        <div class="pf-cc-t">{list.name}</div>
+        <div class="pf-cc-d">{list.description}</div>
+        <div class="pf-cc-n">{count}</div>
+    </div>
+</a>

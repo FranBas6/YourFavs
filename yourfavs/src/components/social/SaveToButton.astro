@@ -1,0 +1,24 @@
+---
+/**
+ * El ⊕ «Guardar en tus listas» de las cards, para los pósters del perfil público. Mismo contrato
+ * que `CardMovie`/`CardSerie` (`.js-saveto` + data-mt/id/title/poster), así que lo gobierna el
+ * `SaveToPopover` global: con sesión abre el popover, sin sesión pide entrar (`yf:require-auth`).
+ * Las clases son las mismas que en las cards para que se vea idéntico; la posición la pone el CSS
+ * del perfil.
+ */
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+
+interface Props {
+    mediaType: 'movie' | 'tv';
+    tmdbId: number;
+    title: string;
+    posterPath: string | null;
+}
+const { mediaType, tmdbId, title, posterPath } = Astro.props;
+---
+<span role="button" tabindex="0"
+      class="card-saveto js-saveto rounded-full bg-black/60 hover:bg-[#E63946] backdrop-blur text-white inline-flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+      data-mt={mediaType} data-id={String(tmdbId)} data-title={title} data-poster={posterPath ? posterUrl(posterPath, 'w342') : ''}
+      aria-label={`Guardar «${title}» en tus listas`}>
+    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</span>

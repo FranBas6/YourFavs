@@ -20,6 +20,7 @@ import { peekTopActors } from "../../utils/topActorsLibrary";
 import { posterUrl, backdropUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
+import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
 import { countMoviePasses } from "../../services/BD/lists/watchLog";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import NotificationBell from "../../components/personal/NotificationBell.astro";
@@ -649,6 +650,7 @@ const jsonLd = item ? {
                                     <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-fuchsia-600 text-white text-xs rounded-lg hover:bg-fuchsia-700">Guardar</button>
                                 </form>
                             </details>
+                            <HideFromProfileToggle mediaType="movie" tmdbId={item?.id} title={item?.title || ''} posterPath={item?.poster_path ?? null} />
                         </div>
                     )}
 

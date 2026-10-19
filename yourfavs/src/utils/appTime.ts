@@ -60,3 +60,24 @@ export function appDateParts(ts: number): AppDateParts {
         dayNum: Math.round(utc / 86400000),
     };
 }
+
+const _MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/**
+ * Fecha de un día del calendario (`"YYYY-MM-DD"`, como `watch_log.watched_on`) en relativo y en
+ * hora de Madrid: «hoy», «ayer», «hace 3 días», «hace 1 semana», «hace 2 semanas»… y, pasadas 8
+ * semanas, «el 3 de marzo» (con el año si no es el actual). Perfil público · «Lo último visto».
+ */
+export function relativeDayLabel(dateISO: string, now = Date.now()): string {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateISO || '');
+    if (!m) return '';
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    const today = appDateParts(now);
+    const diff = Math.round((Date.UTC(today.year, today.month, today.day) - Date.UTC(y, mo - 1, d)) / 86_400_000);
+    if (diff <= 0) return 'hoy';
+    if (diff === 1) return 'ayer';
+    if (diff < 7) return `hace ${diff} días`;
+    const weeks = Math.floor(diff / 7);
+    if (weeks <= 8) return weeks === 1 ? 'hace 1 semana' : `hace ${weeks} semanas`;
+    return `el ${d} de ${_MONTHS[mo - 1]}${y !== today.year ? ` de ${y}` : ''}`;
+}

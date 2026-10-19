@@ -1,0 +1,58 @@
+---
+/**
+ * Colección pública · /u/{handle}/coleccion/{id} (handoff perfil público §6.6).
+ *
+ * La colección de otra persona en SOLO LECTURA: sin editar, reordenar ni borrar, con el ⊕ en cada
+ * título para guardarlo en tus listas y una línea que vuelve al perfil. Misma visibilidad que el
+ * perfil más `is_public`: si cualquiera de las dos falla, 404 (sin distinguir por qué).
+ */
+import Layout from '../../../../layouts/Layout.astro';
+import PosterTile from '../../../../components/social/PosterTile.astro';
+import { Icon } from 'astro-icon/components';
+import { getPublicCollection } from '../../../../services/BD/social/publicProfile';
+import { safeFetch } from '../../../../utils/safeFetch';
+import '../../../../styles/pages/social/perfil-publico.css';
+
+export const prerender = false;
+
+const handle = String(Astro.params.handle ?? '');
+const listId = String(Astro.params.id ?? '');
+const viewerId = Astro.locals.user?.uid ?? null;
+const data = await safeFetch(getPublicCollection(handle, listId, viewerId), `u/${handle}/coleccion`, null);
+if (!data) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+if (handle !== data.handle) return Astro.redirect(`/u/${data.handle}/coleccion/${encodeURIComponent(listId)}`, 301);
+
+const { list, items, ownerName } = data;
+const isOwner = data.viewerRole === 'owner';
+const color = ['red', 'amber', 'blue', 'green', 'purple', 'pink', 'slate'].includes(list.colorStamp ?? '') ? list.colorStamp : 'slate';
+const count = `${items.length} ${items.length === 1 ? 'título' : 'títulos'}`;
+const description = list.description || `Una colección de ${ownerName} en YourFavs.`;
+---
+<Layout
+    title={`${list.name} · colección de ${ownerName} · YourFavs`}
+    description={description.length > 155 ? `${description.slice(0, 154)}…` : description}
+    ogUrl={`https://yourfavs.app/u/${data.handle}/coleccion/${encodeURIComponent(list.id)}`}
+    robots={data.indexable ? undefined : 'noindex, nofollow'}
+>
+    <div class="pf-page">
+        <a class="pf-coll-back" href={`/u/${data.handle}`}>
+            <Icon name="lucide:arrow-left" />Colección de {ownerName} · @{data.handle}
+        </a>
+        <header class="pf-coll-head">
+            <span class="pf-coll-em" style={`--cc-bg: var(--stamp-${color})`} aria-hidden="true">{list.icon || '🎬'}</span>
+            <div>
+                <h1>{list.name}</h1>
+                <p>{list.description ? `${list.description} · ` : ''}{count}</p>
+            </div>
+        </header>
+        <div class="pf-coll-grid">
+            {items.map((it) => (
+                <PosterTile mediaType={it.media_type} tmdbId={it.tmdb_id} title={it.title || 'Sin título'} posterPath={it.poster_path}
+                    canSave={!isOwner} size="w342" />
+            ))}
+        </div>
+    </div>
+</Layout>
