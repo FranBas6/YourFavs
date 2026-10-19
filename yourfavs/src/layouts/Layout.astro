@@ -6,6 +6,7 @@ import SaveToPopover from "../components/SaveToPopover.astro";
 import Coach from "../components/Coach.astro";
 import MobileTabBar from "../components/MobileTabBar.astro";
 import MobileNavSheets from "../components/MobileNavSheets.astro";
+import SocialLayer from "../components/social/SocialLayer.astro";
 import "../styles/tokens.css";
 import "../styles/layout.css";
 import "@fontsource/poppins/400.css";
@@ -15,6 +16,7 @@ import "@fontsource/poppins/700.css";
 import "@fontsource/jetbrains-mono/400.css";
 import "@fontsource/jetbrains-mono/500.css";
 import "@fontsource/jetbrains-mono/700.css";
+import "../styles/components/social-ui.css";   // botones, filas y avisos sociales (F2+)
 import "../styles/dark-mode.css";   // <- el ÚLTIMO: las reglas [data-theme="dark"] ganan en cascada
 
 interface Props {
@@ -112,6 +114,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 <AuthModal/>
 <SaveToPopover/>
 <Coach/>
+{Astro.locals.user && <SocialLayer/>}
 
 <main id="content" class="max-w-7xl w-full px-3 sm:px-6 lg:px-8 mx-auto pt-4 sm:pt-6 md:pt-8 lg:pt-10">
     <slot/>

@@ -55,63 +55,8 @@
     .pf-band-acts .pf-btn { flex: 0 0 auto; }
 }
 
-/* ---- Botones (ProfileActions y resto de la página) -------------------------------- */
-.pf-btn {
-    height: 44px; padding: 0 15px; border-radius: 9px;
-    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
-    font: 600 13px var(--font);
-    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    cursor: pointer; white-space: nowrap; text-decoration: none;
-    transition: border-color .15s ease, background-color .15s ease;
-}
-@media (min-width: 1024px) { .pf-btn { height: 38px; } }
-.pf-btn:hover { border-color: var(--text-3); color: var(--text); }
-.pf-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-.pf-btn .pf-car { width: 13px; height: 13px; margin-left: -2px; opacity: .8; }
-/* Principal: --accent-dark en reposo. Blanco sobre --accent da 4,2:1 y no pasa AA a 13 px. */
-.pf-btn.pri { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
-.pf-btn.pri:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
-.pf-btn[aria-pressed="true"] { background: var(--bg-tint); border-color: var(--border-strong); color: var(--text); }
-.pf-btn.friend { background: var(--ok-soft); border-color: transparent; color: var(--ok-ink); }
-.pf-btn.wait { background: var(--bg-tint); border-style: dashed; color: var(--text-2); }
-.pf-btn.ghost { background: none; border-color: transparent; color: var(--text-2); }
-.pf-btn.ico { width: 44px; padding: 0; }
-@media (min-width: 1024px) { .pf-btn.ico { width: 38px; } }
-.pf-acts-row { display: flex; gap: 8px; flex-wrap: nowrap; }
-.pf-acts-row .pf-btn:not(.ico) { flex: 1; padding: 0 10px; }
-@media (min-width: 1024px) {
-    .pf-acts-row { flex-wrap: wrap; }
-    .pf-acts-row .pf-btn:not(.ico) { flex: 0 0 auto; padding: 0 15px; }
-}
-/* «Recomendar» es icono en móvil y texto en escritorio. */
-.pf-btn .pf-lbl-wide { display: none; }
-@media (min-width: 1024px) { .pf-btn .pf-lbl-wide { display: inline; } }
-.pf-btn.pf-ico-mobile { width: 44px; padding: 0; flex: 0 0 auto !important; }
-@media (min-width: 1024px) { .pf-btn.pf-ico-mobile { width: auto; padding: 0 15px; } }
-
-/* Etiqueta distinta por tamaño: «Copiar enlace» en escritorio, «Compartir» en móvil. */
-.pf-desk, .pf-mob { display: inline-flex; align-items: center; gap: 7px; }
-.pf-desk { display: none; }
-@media (min-width: 1024px) { .pf-desk { display: inline-flex; } .pf-mob { display: none; } }
-
-/* Menús de los botones (F2+) */
-.pf-menu-wrap { position: relative; display: inline-flex; }
-.pf-menu {
-    position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; min-width: 210px;
-    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md);
-    box-shadow: var(--sh-lg); padding: 6px;
-}
-.pf-menu[hidden] { display: none; }
-.pf-menu button {
-    width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px;
-    border: 0; border-radius: 8px; background: none; color: var(--text); font: 500 13px var(--font);
-    cursor: pointer; text-align: left;
-}
-.pf-menu button:hover, .pf-menu button:focus-visible { background: var(--bg-tint); }
-.pf-menu button svg { width: 16px; height: 16px; }
-.pf-menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 4px; }
-.pf-danger { color: var(--accent-dark) !important; }
-[data-theme="dark"] .pf-danger { color: var(--stamp-red-ink) !important; }
+/* Botones (.pf-btn), menús (.pf-menu) y etiquetas (.pf-tag): en styles/components/social-ui.css,
+   global desde la F2 porque los usan también la campana, el ⌘K y el centro «Amigos». */
 
 /* ---- Cabecera -------------------------------------------------------------------- */
 .pf-head {
@@ -156,11 +101,6 @@
 .pf-handle {
     font: 500 13px var(--font-mono); color: var(--text-2); margin-top: 5px;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-}
-.pf-tag {
-    font: 600 10.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
-    padding: 3px 8px; border-radius: var(--r-full);
-    background: var(--bg-tint); border: 1px solid var(--border-strong); color: var(--text-2);
 }
 .pf-more { grid-area: more; min-width: 0; margin-top: 16px; }
 @media (min-width: 1024px) { .pf-more { margin-top: 0; } }
