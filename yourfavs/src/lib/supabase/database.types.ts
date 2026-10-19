@@ -133,6 +133,32 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"friend_requests": {
+                  Row: {
+                    "created_at": string,"from_id": string,"id": number,"rejected_at": string | null,"resolved_at": string | null,"status": string,"to_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"from_id": string,"id"?: never,"rejected_at"?: string | null,"resolved_at"?: string | null,"status"?: string,"to_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"from_id"?: string,"id"?: never,"rejected_at"?: string | null,"resolved_at"?: string | null,"status"?: string,"to_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
+                },"friendships": {
+                  Row: {
+                    "a_id": string,"b_id": string,"ended_at": string | null,"ended_by": string | null,"since": string
+                  }
+                  Insert: {
+                    "a_id": string,"b_id": string,"ended_at"?: string | null,"ended_by"?: string | null,"since"?: string
+                  }
+                  Update: {
+                    "a_id"?: string,"b_id"?: string,"ended_at"?: string | null,"ended_by"?: string | null,"since"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"library_items": {
                   Row: {
                     "added_at": string,"collection": string,"media_type": Database["public"]['Enums']["media_type"],"opinion": string | null,"position": number | null,"rating": number | null,"tmdb_id": number,"user_id": string
@@ -303,23 +329,47 @@ isOneToOne: false
 "shift_list_positions":
 { Args: { "p_collection": string,"p_delta": number,"p_from": number,"p_to": number }; Returns: undefined
                            },
+"social_are_friends":
+{ Args: { "p_x": string,"p_y": string }; Returns: boolean
+                           },
 "social_block":
+{ Args: { "p_me": string,"p_them": string }; Returns: undefined
+                           },
+"social_cancel_request":
 { Args: { "p_me": string,"p_them": string }; Returns: undefined
                            },
 "social_follow":
 { Args: { "p_me": string,"p_them": string }; Returns: string
+                           },
+"social_make_friends":
+{ Args: { "p_x": string,"p_y": string }; Returns: undefined
+                           },
+"social_notify":
+{ Args: { "p_actor": string,"p_id": string,"p_to": string,"p_type": string }; Returns: undefined
                            },
 "social_people":
 { Args: { "p_ids": (string)[] }; Returns: {
               "archetype": Json,"handle": string,"has_avatar": boolean,"id": string,"name": string,"updated_at": string
             }[]
                            },
+"social_respond_request":
+{ Args: { "p_accept": boolean,"p_from": string,"p_me": string }; Returns: string
+                           },
+"social_restore_friend":
+{ Args: { "p_me": string,"p_them": string }; Returns: boolean
+                           },
 "social_search":
 { Args: { "p_limit": number,"p_me": string,"p_q": string }; Returns: {
               "id": string
             }[]
                            },
+"social_send_request":
+{ Args: { "p_me": string,"p_them": string }; Returns: string
+                           },
 "social_unfollow":
+{ Args: { "p_me": string,"p_them": string }; Returns: undefined
+                           },
+"social_unfriend":
 { Args: { "p_me": string,"p_them": string }; Returns: undefined
                            }
           }

@@ -69,4 +69,6 @@ export interface NotifView {
     read: boolean;
     actor?: PersonCard;
     rel?: Relation;
+    /** Solo `friend_request`: cómo está ahora esa solicitud. */
+    req?: 'pending' | 'accepted' | 'rejected' | 'gone';
 }

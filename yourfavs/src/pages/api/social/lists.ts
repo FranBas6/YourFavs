@@ -1,6 +1,8 @@
 /**
- * GET /api/social/lists?tab=siguiendo|seguidores|bloqueados&offset=0
- *   → { ok, items: PersonEntry[], total, hasMore }
+ * GET /api/social/lists?tab=pendientes|amigos|siguiendo|seguidores|bloqueados&offset=0
+ *   → { ok, items: PersonEntry[], total, hasMore, sent? }
+ *
+ * «Pendientes» trae las recibidas en `items` y las que enviaste en `sent` (F3).
  *
  * Datos de cada pestaña del centro «Amigos», de 30 en 30. Son tuyas y de nadie más: el perfil
  * público no enseña a quién sigues ni quién te sigue (handoff §14, duda 3).
@@ -13,7 +15,7 @@ import type { FriendsTab } from '../../../lib/social/types';
 
 export const prerender = false;
 
-const TABS: FriendsTab[] = ['siguiendo', 'seguidores', 'bloqueados'];
+const TABS: FriendsTab[] = ['pendientes', 'amigos', 'siguiendo', 'seguidores', 'bloqueados'];
 
 export const GET: APIRoute = async ({ url, locals }) => {
     const me = locals.user?.uid;

@@ -31,7 +31,10 @@ const TYPE_TO_PREF: Record<NotifType, string> = {
     anniversary: 'anniversary',
     platform_change: 'platform',
     streak: 'streak',
-    follow: 'social', // no lo genera este archivo: lo respeta `social_follow` en la BD
+    // Entre personas: no los genera este archivo; la preferencia la respeta la BD al crearlos.
+    follow: 'social',
+    friend_request: 'social',
+    friend_accepted: 'social',
 };
 
 // Firestore no admite '/' en el id de documento.
