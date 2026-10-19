@@ -1,0 +1,239 @@
+---
+/**
+ * Perfil público · /u/{handle} — F1 de la capa social (docs/PLAN_SOCIAL.md, handoff
+ * docs/design_handoff_perfil_publico).
+ *
+ * Solo lectura. Todo llega resuelto del servidor (`getPublicProfile`): el HTML no pide datos desde
+ * el navegador. Lo único con JS es lo del dueño («Ocultar», compartir, recalcular el arquetipo) y
+ * los menús de los botones de fases futuras (`scripts/social/perfil.ts`).
+ *
+ * 404 si el handle no existe, si el perfil está apagado o si es un handle VIEJO (no redirige).
+ *
+ * Caché: para un invitado es cacheable 5 min en el CDN (middleware, prefijo `/u/`); con sesión,
+ * `private, no-store`.
+ */
+import Layout from '../../../layouts/Layout.astro';
+import SectionHeader from '../../../components/SectionHeader.astro';
+import Stamp from '../../../components/Stamp.astro';
+import ProfileHeader from '../../../components/social/ProfileHeader.astro';
+import PosterTile from '../../../components/social/PosterTile.astro';
+import LogCard from '../../../components/social/LogCard.astro';
+import CollectionCard from '../../../components/social/CollectionCard.astro';
+import OwnerEmptyRow from '../../../components/social/OwnerEmptyRow.astro';
+import type { ProfileRelation } from '../../../components/social/ProfileActions.astro';
+import { Icon } from 'astro-icon/components';
+import { getPublicProfile } from '../../../services/BD/social/publicProfile';
+import { safeFetch } from '../../../utils/safeFetch';
+import '../../../styles/pages/social/perfil-publico.css';
+
+export const prerender = false;
+
+const handle = String(Astro.params.handle ?? '');
+const viewerId = Astro.locals.user?.uid ?? null;
+const view = await safeFetch(getPublicProfile(handle, viewerId), `u/${handle}`, null);
+if (!view) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+// Una sola dirección por perfil: `/u/Lucia` lleva a `/u/lucia`.
+if (handle !== view.handle) return Astro.redirect(`/u/${view.handle}`, 301);
+
+const isOwner = view.viewerRole === 'owner';
+const isGuest = view.viewerRole === 'guest';
+const relation: ProfileRelation = isOwner ? 'owner' : isGuest ? 'guest' : 'stranger';
+const firstName = view.name.split(/\s+/)[0] || view.name;
+const avatarSrc = view.hasAvatar ? `/api/u/${view.handle}/avatar?v=${view.avatarVersion}` : null;
+const canSave = !isOwner;
+const ownerRatingProps = { ownerName: firstName, avatarSrc };
+
+// La dirección pública siempre es la de producción (handoff §6.12), también en local.
+const publicUrl = `https://yourfavs.app/u/${view.handle}`;
+const description = view.bio
+    ? (view.bio.length > 155 ? `${view.bio.slice(0, 154).trimEnd()}…` : view.bio)
+    : `Las películas y series de ${view.name} en YourFavs.`;
+const ogImage = avatarSrc ? new URL(avatarSrc, Astro.url.origin).toString() : '/logo_yourfavs.png';
+const robots = view.indexable ? undefined : 'noindex, nofollow';
+
+// Banda del dueño: «acaba de hacerse público» durante las primeras 24 h.
+const fresh = view.since ? Date.now() - new Date(view.since).getTime() < 24 * 60 * 60 * 1000 : false;
+
+// Qué secciones se pintan y en qué orden (el del dueño). A un visitante, una sección vacía no se le
+// pinta; al dueño, las que admiten vacío le salen con «Solo lo ves tú».
+type Block = { id: string; kind: 'content' | 'empty' };
+const blocks: Block[] = [];
+for (const s of view.sections) {
+    if (!s.on) continue;
+    if (s.id === 'favs') {
+        if (view.favs.length) blocks.push({ id: 'favs', kind: 'content' });
+        else if (isOwner) blocks.push({ id: 'favs', kind: 'empty' });
+    } else if (s.id === 'log' && view.log.length) {
+        blocks.push({ id: 'log', kind: 'content' });
+    } else if (s.id === 'best' && view.best.length) {
+        blocks.push({ id: 'best', kind: 'content' });
+    } else if (s.id === 'collections') {
+        if (view.collections.length) blocks.push({ id: 'collections', kind: 'content' });
+        else if (isOwner) blocks.push({ id: 'collections', kind: 'empty' });
+    }
+    // 'common' (En común contigo) llega en la F5.
+}
+// Tarjeta de invitación: solo invitados, después de la SEGUNDA sección que se pinte (o al final).
+const inviteAfter = isGuest ? Math.min(2, blocks.length) : -1;
+
+const seasonsLabel = (n: number | null) => (n == null ? '' : n === 1 ? '1 temporada' : `${n} temporadas`);
+const ownCollections = view.ownCollectionsTotal ?? 0;
+---
+<Layout
+    title={`${view.name} (@${view.handle}) · YourFavs`}
+    description={description}
+    ogImage={ogImage}
+    ogType="profile"
+    ogUrl={publicUrl}
+    robots={robots}
+>
+    <div class="pf-page" data-pf-page data-handle={view.handle} data-owner={isOwner ? '1' : ''} data-url={publicUrl}
+         data-name={view.name} data-archetype-stale={isOwner && (!view.archetype || Date.now() - new Date(view.archetype.computed_at).getTime() > 7 * 24 * 60 * 60 * 1000) ? '1' : ''}>
+
+        {isOwner && (
+            <div class="pf-band" role="status">
+                <span class="pf-band-ic"><Icon name="lucide:eye" /></span>
+                <span class="pf-band-text">
+                    <strong>Así te ven los demás.</strong>{' '}
+                    {fresh ? 'Tu perfil acaba de hacerse público.' : 'Público: cualquiera con el enlace puede verlo.'}
+                </span>
+                <div class="pf-band-acts">
+                    <a class="pf-btn" href="/perfil/publico"><Icon name="lucide:pencil" />Editar</a>
+                    <button type="button" class="pf-btn" data-action="share">
+                        <span class="pf-desk"><Icon name="lucide:link" />Copiar enlace</span>
+                        <span class="pf-mob"><Icon name="lucide:share-2" />Compartir</span>
+                    </button>
+                </div>
+            </div>
+        )}
+
+        <ProfileHeader view={view} relation={relation} avatarSrc={avatarSrc} />
+
+        {blocks.map((b, i) => (
+            <Fragment>
+                {b.id === 'favs' && b.kind === 'content' && (
+                    <section class="pf-row" aria-labelledby="pf-sec-favs">
+                        <SectionHeader
+                            headingId="pf-sec-favs" title="Series favoritas" color="amber" icon="award"
+                            cap={`Top ${view.favs.length}`}
+                            subtitle={`Su ranking, en el orden que ${firstName} ha elegido.`}
+                            why="orden del dueño"
+                        />
+                        <div class="pf-lane">
+                            {view.favs.map((f) => (
+                                <PosterTile mediaType="tv" tmdbId={f.tmdb_id} title={f.title} posterPath={f.poster_path}
+                                    rank={f.rank} meta={seasonsLabel(f.seasons)} canSave={canSave} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {b.id === 'favs' && b.kind === 'empty' && (
+                    <OwnerEmptyRow
+                        id="favs" title="Series favoritas" cap="Top 10" color="amber" icon="award"
+                        heading="Todavía no tienes series favoritas"
+                        text="Tus series favoritas, en el orden que tú elijas, salen aquí. Se ordenan en tu lista de Favoritos."
+                        ctaLabel="Elegir tus series favoritas" ctaHref="/mislistas/favoritos"
+                    />
+                )}
+                {b.id === 'log' && (
+                    <section class="pf-row" aria-labelledby="pf-sec-log">
+                        <SectionHeader
+                            headingId="pf-sec-log" title="Lo último visto" color="blue" icon="history"
+                            cap={`Últimos ${view.log.length}`}
+                            subtitle="Agrupado por serie. Sin títulos de episodio ni fotogramas, para no destripar nada."
+                            why="del diario de visionados"
+                        />
+                        <div class="pf-log">
+                            {view.log.map((card) => (
+                                <LogCard card={card} ownerName={firstName} avatarSrc={avatarSrc} isOwner={isOwner} canSave={canSave} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {b.id === 'best' && (
+                    <section class="pf-row" aria-labelledby="pf-sec-best">
+                        <SectionHeader
+                            headingId="pf-sec-best" title={`Mejor valoradas por ${firstName}`} color="pink" icon="star"
+                            cap={`Sus ${view.best.length} mejores`}
+                            subtitle={`La nota es la de ${firstName}, de 0,5 a 10. No la de TMDB ni la tuya.`}
+                            why={`notas de ${firstName}`}
+                        />
+                        <div class="pf-lane">
+                            {view.best.map((t) => (
+                                <PosterTile mediaType={t.media_type} tmdbId={t.tmdb_id} title={t.title} posterPath={t.poster_path}
+                                    rating={{ score: t.rating, ...ownerRatingProps }} canSave={canSave} canHide={isOwner} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {b.id === 'collections' && b.kind === 'content' && (
+                    <section class="pf-row" aria-labelledby="pf-sec-collections">
+                        <SectionHeader
+                            headingId="pf-sec-collections" title="Colecciones" color="green" icon="library"
+                            cap={view.collections.length === 1 ? '1 pública' : `${view.collections.length} públicas`}
+                            subtitle="Las listas propias que ha decidido enseñar."
+                        />
+                        <div class="pf-cols">
+                            {view.collections.map((c) => <CollectionCard list={c} href={`/u/${view.handle}/coleccion/${encodeURIComponent(c.id)}`} />)}
+                        </div>
+                    </section>
+                )}
+                {b.id === 'collections' && b.kind === 'empty' && (
+                    ownCollections > 0 ? (
+                        <OwnerEmptyRow
+                            id="collections" title="Colecciones" color="green" icon="library"
+                            heading="Ninguna colección es pública todavía"
+                            text={`Tienes ${ownCollections} ${ownCollections === 1 ? 'colección propia' : 'colecciones propias'}. Marca las que quieras enseñar y aparecerán aquí.`}
+                            ctaLabel="Elegir colecciones" ctaHref="/perfil/publico#colecciones"
+                        />
+                    ) : (
+                        <OwnerEmptyRow
+                            id="collections" title="Colecciones" color="green" icon="library"
+                            heading="Ninguna colección es pública todavía"
+                            text="Crea una colección y podrás enseñarla aquí."
+                            ctaLabel="Crear una colección" ctaHref="/mislistas/colecciones"
+                        />
+                    )
+                )}
+                {i + 1 === inviteAfter && (
+                    <aside class="pf-invite">
+                        <Stamp color="red" icon="bookmark" />
+                        <div>
+                            <h3>¿Te apetece algo de lo que ve {firstName}?</h3>
+                            <p>Con una cuenta guardas cualquiera de estos títulos en tus listas con el ⊕, y tienes tu propio perfil.</p>
+                        </div>
+                        <div class="pf-acts-row">
+                            <button type="button" class="pf-btn ghost" data-auth-open>Entrar</button>
+                            <button type="button" class="pf-btn pri" data-auth-open="register">Crear cuenta</button>
+                        </div>
+                    </aside>
+                )}
+            </Fragment>
+        ))}
+        {isGuest && inviteAfter === 0 && (
+            <aside class="pf-invite">
+                <Stamp color="red" icon="bookmark" />
+                <div>
+                    <h3>¿Quieres tu propio perfil?</h3>
+                    <p>Con una cuenta llevas tus películas y series, y puedes enseñarlas como {firstName}.</p>
+                </div>
+                <div class="pf-acts-row">
+                    <button type="button" class="pf-btn ghost" data-auth-open>Entrar</button>
+                    <button type="button" class="pf-btn pri" data-auth-open="register">Crear cuenta</button>
+                </div>
+            </aside>
+        )}
+
+        <div class="pf-undo" id="pf-undo" role="status" aria-live="polite" hidden>
+            <span id="pf-undo-msg"></span>
+            <button type="button" id="pf-undo-do"><Icon name="lucide:undo-2" />Deshacer</button>
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import '../../../scripts/social/perfil';
+</script>

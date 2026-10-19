@@ -20,22 +20,39 @@ interface Props {
      * más", y hace que el usuario pueda comprobar por qué está viendo esto.
      */
     why?: string;
+    /**
+     * Tope de la fila en texto («Top 10», «Últimos 12»). Sustituye a `count`: en el perfil público
+     * cada sección anuncia hasta dónde llega, porque no tiene «Ver todo».
+     */
+    cap?: string;
+    /** Marca «Solo lo ves tú» a la derecha (vacíos del perfil público que solo ve su dueño). */
+    onlyOwner?: boolean;
+    /** `id` del `<h2>`, para que su `<section aria-labelledby>` lo nombre por el título. */
+    headingId?: string;
 }
-const { title, link, count, featured = false, color = 'slate', icon, subtitle, why } = Astro.props;
-const countLabel = count != null && count > 0
-    ? `${count} ${count === 1 ? 'título' : 'títulos'}`
-    : null;
+const { title, link, count, featured = false, color = 'slate', icon, subtitle, why, cap, onlyOwner = false, headingId } = Astro.props;
+const countLabel = cap
+    ? cap
+    : count != null && count > 0
+        ? `${count} ${count === 1 ? 'título' : 'títulos'}`
+        : null;
 ---
 <header class="yf-section-header">
     <div class="yf-sh-left">
         <Stamp color={color} icon={icon} />
         <div class="yf-sh-titlewrap">
-            <h2 class="yf-sh-title">{title}{countLabel && <span class="yf-sh-count">{countLabel}</span>}</h2>
+            <h2 class="yf-sh-title" id={headingId}>{title}{countLabel && <span class="yf-sh-count">{countLabel}</span>}</h2>
             {subtitle && <p class="yf-sh-sub">{subtitle}</p>}
         </div>
         {why && <span class="yf-sh-why">◇ {why}</span>}
         {featured && <span class="yf-sh-tag">Destacado</span>}
     </div>
+    {onlyOwner && (
+        <span class="pf-only">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.53 13.53 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><path d="m2 2 20 20"/></svg>
+            Solo lo ves tú
+        </span>
+    )}
     {link && (
         <a href={link} class="yf-sh-more">
             <span>Ver más</span>

@@ -22,6 +22,13 @@ interface Props {
     description?: string;
     ogImage?: string;
     ogType?: string;
+    /**
+     * `<meta name="robots">`. Ausente = no se pinta (lo de siempre). El perfil público manda
+     * `noindex, nofollow` salvo que su dueño active «Que aparezca en buscadores».
+     */
+    robots?: string;
+    /** URL canónica absoluta para `og:url` (el perfil público usa la de producción). */
+    ogUrl?: string;
 }
 
 const {
@@ -29,6 +36,8 @@ const {
     description = "Tu plataforma favorita para descubrir películas y series",
     ogImage = "/og-image.png",
     ogType = "website",
+    robots,
+    ogUrl,
 } = Astro.props;
 
 // Pista post-guardado (Fase F · Acceso C): elegible si hay sesión y el usuario
@@ -92,6 +101,8 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <meta property="og:title" content={title}/>
     <meta property="og:description" content={description}/>
     <meta property="og:type" content={ogType}/>
+    {ogUrl && <meta property="og:url" content={ogUrl}/>}
+    {robots && <meta name="robots" content={robots}/>}
     <title>{title}</title>
 </head>
 <body id="top" class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins" data-taste-hint={tasteHintEligible ? 'eligible' : ''}>

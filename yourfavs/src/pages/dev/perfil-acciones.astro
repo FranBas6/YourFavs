@@ -1,0 +1,52 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO: los 8 estados de `ProfileActions` con todas las fases
+ * encendidas (`force`), para revisarlos en claro y en oscuro antes de activarlos de verdad en
+ * F2/F3/F4 (handoff perfil público §7.3). En producción no existe: 404.
+ */
+import Layout from '../../layouts/Layout.astro';
+import ProfileActions, { type ProfileRelation } from '../../components/social/ProfileActions.astro';
+import '../../styles/pages/social/perfil-publico.css';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+const STATES: { relation: ProfileRelation; label: string; note: string }[] = [
+    { relation: 'guest', label: 'Invitado', note: 'Sin sesión. Cualquier botón pide entrar.' },
+    { relation: 'stranger', label: 'Desconocido', note: 'Con sesión, sin relación.' },
+    { relation: 'following', label: 'Le sigues', note: 'Seguir y amistad son independientes.' },
+    { relation: 'followsyou', label: 'Te sigue', note: 'Además, etiqueta «Te sigue» junto al @handle.' },
+    { relation: 'sent', label: 'Solicitud enviada', note: 'Menú ▾ con «Cancelar solicitud».' },
+    { relation: 'received', label: 'Solicitud recibida', note: 'Aviso verde arriba + Aceptar / Rechazar.' },
+    { relation: 'friends', label: 'Amigos', note: '«Recomendar» pasa a icono en móvil.' },
+    { relation: 'owner', label: 'Dueño', note: 'Sin botones: Editar y Compartir van en la banda.' },
+];
+---
+<Layout title="Prueba · botones del perfil público" robots="noindex, nofollow">
+    <div class="pf-page" data-pf-page data-name="Lucía">
+        <h1 style="font: 700 22px var(--font); margin: 0 16px 6px;">ProfileActions · 8 estados</h1>
+        <p style="font-size: 13px; color: var(--text-2); margin: 0 16px 24px;">
+            Todas las fases forzadas a encendidas. En la app, `SOCIAL_PHASE` decide cuáles se pintan.
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 12px; padding: 0 16px;">
+            {STATES.map((s) => (
+                <div style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px 18px;">
+                    <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+                        <b style="font: 600 13.5px var(--font);">{s.label}</b>
+                        <span style="font-size: 12px; color: var(--text-2);">{s.note}</span>
+                    </div>
+                    <ProfileActions relation={s.relation} firstName="Lucía" force />
+                    {s.relation === 'owner' && <p style="font-size: 12px; color: var(--text-3); margin: 8px 0 0;">(vacío a propósito)</p>}
+                </div>
+            ))}
+        </div>
+    </div>
+</Layout>
+
+<script>
+    import '../../scripts/social/perfil';
+</script>

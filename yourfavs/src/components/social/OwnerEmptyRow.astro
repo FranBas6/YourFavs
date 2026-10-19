@@ -1,0 +1,35 @@
+---
+/**
+ * Vacío que SOLO ve el dueño de un perfil público (handoff §6.9). A un visitante, una sección sin
+ * contenido no se le pinta: no hay estado vacío público. Mantiene la cabecera de la fila con «Solo
+ * lo ves tú» y debajo invita a rellenarla. Va en línea, dentro de la fila: no sustituye a EmptyState.
+ */
+import SectionHeader from '../SectionHeader.astro';
+
+interface Props {
+    id: string;
+    title: string;
+    cap?: string;
+    color: 'amber' | 'blue' | 'pink' | 'green';
+    icon: string;
+    heading: string;
+    text: string;
+    ctaLabel: string;
+    ctaHref: string;
+}
+const { id, title, cap, color, icon, heading, text, ctaLabel, ctaHref } = Astro.props;
+---
+<section class="pf-row" aria-labelledby={`pf-sec-${id}`}>
+    <SectionHeader title={title} cap={cap} color={color} icon={icon} onlyOwner headingId={`pf-sec-${id}`} />
+    <div class="pf-ghost">
+        <div class="pf-ghost-po" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div>
+            <h3>{heading}</h3>
+            <p>{text}</p>
+            <a class="pf-btn pri" href={ctaHref}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg>
+                {ctaLabel}
+            </a>
+        </div>
+    </div>
+</section>

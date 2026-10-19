@@ -1,0 +1,97 @@
+---
+/**
+ * Cabecera del perfil público (handoff §6.1 y §6.2).
+ *
+ * Escritorio: dos columnas, identidad a la izquierda y «Mis 4» a la derecha. Móvil: avatar y
+ * nombre en una fila y, debajo a todo el ancho, arquetipo, bio, contadores y botones; «Mis 4» al
+ * final. Es UN solo marcado: la colocación la decide el CSS (grid-template-areas), para no duplicar
+ * HTML por tamaño de pantalla.
+ *
+ * Reglas de lo que ve cada uno: el dueño ve la invitación a escribir su bio y los huecos vacíos de
+ * «Mis 4»; un visitante no ve nada de lo que esté vacío.
+ */
+import { Icon } from 'astro-icon/components';
+import ProfileActions, { type ProfileRelation } from './ProfileActions.astro';
+import PosterTile from './PosterTile.astro';
+import type { PublicProfileView } from '../../services/BD/social/publicProfile';
+
+interface Props {
+    view: PublicProfileView;
+    relation: ProfileRelation;
+    avatarSrc: string | null;
+}
+const { view, relation, avatarSrc } = Astro.props;
+const isOwner = view.viewerRole === 'owner';
+const firstName = view.name.split(/\s+/)[0] || view.name;
+const initial = view.name.trim().charAt(0).toUpperCase() || '?';
+const nf = new Intl.NumberFormat('es-ES');
+const counts = [
+    { n: view.counts.episodes, label: view.counts.episodes === 1 ? 'episodio' : 'episodios' },
+    { n: view.counts.movies, label: view.counts.movies === 1 ? 'película' : 'películas' },
+    { n: view.counts.series, label: view.counts.series === 1 ? 'serie' : 'series' },
+    ...(view.counts.publicCollections > 0
+        ? [{ n: view.counts.publicCollections, label: view.counts.publicCollections === 1 ? 'colección pública' : 'colecciones públicas' }]
+        : []),
+];
+const four = view.four;
+const showFour = isOwner || four.length > 0;
+const slots = isOwner ? [0, 1, 2, 3] : four.map((_, i) => i);
+const typeLabel = (t: 'movie' | 'tv', year: string | null) => `${t === 'movie' ? 'Película' : 'Serie'}${year ? ` · ${year}` : ''}`;
+---
+<section class="pf-head" aria-label={`Perfil de ${view.name}`}>
+    <div class="pf-idcol">
+        <div class="pf-av">
+            {avatarSrc ? <img src={avatarSrc} alt="" decoding="async" /> : <span aria-hidden="true">{initial}</span>}
+        </div>
+        <div class="pf-who">
+            <h1 class="pf-name">{view.name}</h1>
+            <div class="pf-handle">@{view.handle}</div>
+        </div>
+        <div class="pf-more">
+            {view.archetype && (
+                <span class="pf-arch" title={view.archetype.description}>
+                    <Icon name={`lucide:${view.archetype.icon}`} />{view.archetype.name}
+                </span>
+            )}
+            {view.bio
+                ? <p class="pf-bio">{view.bio}</p>
+                : isOwner && (
+                    <a class="pf-bio-add" href="/perfil/publico#bio"><Icon name="lucide:pencil" />Añade unas líneas sobre ti</a>
+                )}
+            <div class="pf-counts">
+                {counts.map((c) => <span><b>{nf.format(c.n)}</b>{c.label}</span>)}
+            </div>
+            <ProfileActions relation={relation} firstName={firstName} />
+        </div>
+    </div>
+
+    {showFour && (
+        <div class="pf-four">
+            <h2>{isOwner ? 'Mis 4' : `Las 4 de ${firstName}`}<span>· elegidas a mano</span></h2>
+            <div class="pf-four-grid">
+                {slots.map((i) => {
+                    const pick = four[i];
+                    if (!pick) {
+                        return (
+                            <div>
+                                <a class="pf-slot" href="/perfil/publico#mis4">
+                                    <Icon name="lucide:plus" />{i === 0 ? 'Elegir' : ''}
+                                    <span class="sr-only">Elegir el hueco {i + 1} de tus 4</span>
+                                </a>
+                                <div class="pf-m" style="margin-top:7px">Hueco {i + 1}</div>
+                            </div>
+                        );
+                    }
+                    return (
+                        <div class="pf-four-item">
+                            <PosterTile
+                                mediaType={pick.media_type} tmdbId={pick.tmdb_id} title={pick.title} posterPath={pick.poster_path}
+                                meta={typeLabel(pick.media_type, pick.year)} canSave={!isOwner} size="w342"
+                            />
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    )}
+</section>

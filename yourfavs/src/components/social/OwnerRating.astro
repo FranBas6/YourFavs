@@ -1,0 +1,24 @@
+---
+/**
+ * Nota del DUEÑO del perfil público (handoff §6.7): rosa, con su mini-avatar y con coma decimal.
+ * En el perfil no se pintan el badge de TMDB ni el ámbar de «tu nota»: solo esta, para que no haya
+ * dos notas compitiendo y quede claro de quién es.
+ */
+import { formatScore } from '../../utils/constants/helpers/media-helpers';
+
+interface Props {
+    score: number;
+    ownerName: string;
+    /** Avatar del dueño (ruta pública /api/u/{handle}/avatar) o null → inicial. */
+    avatarSrc: string | null;
+    size?: 'md' | 'sm';
+}
+const { score, ownerName, avatarSrc, size = 'md' } = Astro.props;
+const label = `Nota de ${ownerName}: ${formatScore(score)}`;
+const initial = ownerName.trim().charAt(0).toUpperCase() || '?';
+---
+<span class:list={['pf-rt', { sm: size === 'sm' }]} title={label} aria-label={label}>
+    <span class="pf-rt-mini" aria-hidden="true">{avatarSrc ? <img src={avatarSrc} alt="" loading="lazy" decoding="async" /> : initial}</span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    <span aria-hidden="true">{formatScore(score)}</span>
+</span>
