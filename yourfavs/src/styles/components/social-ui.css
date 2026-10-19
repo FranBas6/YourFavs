@@ -54,12 +54,22 @@
     box-shadow: var(--sh-lg); padding: 6px;
 }
 .pf-menu[hidden] { display: none; }
-.pf-menu button {
+.pf-menu button, .pf-menu a {
     width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px;
     border: 0; border-radius: 8px; background: none; color: var(--text); font: 500 13px var(--font);
     cursor: pointer; text-align: left;
 }
-.pf-menu button:hover, .pf-menu button:focus-visible { background: var(--bg-tint); }
+.pf-menu button:hover, .pf-menu button:focus-visible, .pf-menu a:hover, .pf-menu a:focus-visible { background: var(--bg-tint); outline: none; }
+.pf-menu a { text-decoration: none; }
+/* Opción que llega en otra fase: gris y con «Pronto». */
+.pf-menu .is-soon { color: var(--text-3); cursor: default; }
+.pf-menu .is-soon:hover { background: none; }
+.so-soon {
+    margin-left: auto; padding: 1px 6px; border-radius: var(--r-full); background: var(--bg-tint);
+    border: 1px solid var(--border); font: 600 9.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3);
+}
+/* Nota bajo «Eliminar amigo»: qué implica (seguir no cambia, nadie recibe aviso). */
+.pf-menu small { display: block; padding: 0 10px 6px 36px; font-size: 11.5px; line-height: 1.4; color: var(--text-2); max-width: 250px; }
 .pf-menu button svg { width: 16px; height: 16px; }
 .pf-menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 4px; }
 .pf-danger { color: var(--accent-dark) !important; }
@@ -120,6 +130,8 @@ a.so-row-name:focus-visible::after { outline: 2px solid var(--primary); outline-
 .so-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
 .so-row-a { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; width: 100%; padding-left: 56px; }
 .so-row-a:empty { display: none; }
+/* Con un menú abierto, su fila por encima de las siguientes (si no, la tapa la de abajo). */
+.so-row-a:has([aria-expanded="true"]) { z-index: 5; }
 .so-row-a .pf-btn:not(.ico) { flex: 1; }
 @media (min-width: 1024px) {
     .so-row { flex-wrap: nowrap; gap: 14px; padding: 14px 18px; }
@@ -168,3 +180,11 @@ a.so-row-name:focus-visible::after { outline: 2px solid var(--primary); outline-
 .so-cons svg { width: 16px; height: 16px; margin-top: 2px; }
 .so-dlg-f { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 @media (max-width: 1023.98px) { .so-dlg-f .pf-btn { flex: 1; } }
+
+/* Toast con «Deshacer» (Eliminar amigo, 6 s). Sobre el .toast global de layout.css. */
+.so-undo-toast { display: flex; align-items: center; gap: 14px; }
+.so-undo-toast button {
+    flex-shrink: 0; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; cursor: pointer;
+    background: rgba(255, 255, 255, .2); color: #fff; font: 600 12.5px var(--font);
+}
+.so-undo-toast button:hover { background: rgba(255, 255, 255, .3); }

@@ -48,7 +48,11 @@ function paint(selector: string, n: number, label: (n: number) => string) {
     });
     // Filas que cambian de aspecto con pendientes (la de «Amigos» en la hoja Perfil).
     if (selector === '.js-pending-badge') {
-        document.querySelectorAll<HTMLElement>('.js-pending-row').forEach((r) => r.classList.toggle('has-pending', n > 0));
+        // Con pendientes, la fila «Amigos» de la hoja Perfil se tiñe y lleva directa a «Pendientes».
+        document.querySelectorAll<HTMLAnchorElement>('.js-pending-row').forEach((r) => {
+            r.classList.toggle('has-pending', n > 0);
+            r.href = n > 0 ? '/mislistas/amigos?tab=pendientes' : '/mislistas/amigos';
+        });
         document.querySelectorAll<HTMLElement>('.js-pending-line').forEach((l) => {
             l.hidden = n <= 0;
             l.textContent = n === 1 ? '1 solicitud sin responder' : `${n} solicitudes sin responder`;
@@ -80,6 +84,11 @@ if (hasBadges) {
 
 // Actuar desde un aviso (relations.ts) o abrirlo lo da por leído.
 document.addEventListener('yf:notif-read', () => setCounts({ ...counts, unread: counts.unread - 1 }));
+// Aceptar o rechazar una solicitud (desde donde sea) baja el número rojo.
+document.addEventListener('yf:pending-delta', (e) => {
+    const delta = (e as CustomEvent<{ delta: number }>).detail?.delta ?? 0;
+    setCounts({ ...counts, pending: counts.pending + delta });
+});
 
 function markRead(item: HTMLElement) {
     if (!item.classList.contains('is-unread')) return;

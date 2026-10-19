@@ -95,7 +95,7 @@ function btn(label: string, o: { kind?: string; icon?: string; sa?: string; pres
  * El botón de seguir según la relación, o '' si no se puede seguir (sin perfil activo).
  * «Siguiendo» lleva `aria-pressed="true"` y al pulsarlo deja de seguir.
  */
-export function followButtonHtml(p: Pick<PersonCard, 'handle'>, rel: Relation, o: RelOpts): string {
+export function followButtonHtml(p: Pick<PersonCard, 'handle'>, rel: Relation, o: RelOpts & { quiet?: boolean }): string {
     if (!o.phase.follow) return '';
     const size = o.size ?? 'sm';
     // Dejar de seguir siempre se puede, aunque esa persona haya apagado su perfil después.
@@ -103,19 +103,98 @@ export function followButtonHtml(p: Pick<PersonCard, 'handle'>, rel: Relation, o
     if (!p.handle) return '';
     if (rel.followsMe) return btn('Seguir también', { kind: 'pri', icon: 'plus', pressed: false, sa: 'follow', size });
     // Con una solicitud enviada o ya amigos, la acción principal es la de amistad: Seguir va en gris.
-    const quiet = o.phase.friends && (rel.requestOut || rel.friends);
+    const quiet = o.quiet || (o.phase.friends && (rel.requestOut || rel.friends));
     return btn('Seguir', { kind: quiet ? '' : 'pri', icon: 'plus', pressed: false, sa: 'follow', size });
 }
 
+// ---- Amistad (F3) -----------------------------------------------------------------------
+const menuWrap = (toggle: string, items: string) =>
+    `<span class="pf-menu-wrap">${toggle}<div class="pf-menu" role="menu" hidden>${items}</div></span>`;
+
+function menuToggle(label: string, o: { kind?: string; icon?: string; size?: 'sm' | 'md'; ico?: boolean }): string {
+    const cls = ['pf-btn', o.size === 'sm' ? 'sm' : '', o.kind ?? '', o.ico ? 'ico' : ''].filter(Boolean).join(' ');
+    const body = o.ico ? icon('ellipsis') : `${o.icon ? icon(o.icon) : ''}${esc(label)}${icon('chevron-down', 'pf-car')}`;
+    return `<button type="button" class="${cls}" aria-haspopup="menu" aria-expanded="false" data-menu-toggle${o.ico ? ` aria-label="${esc(label)}"` : ''}>${body}</button>`;
+}
+
+/** Menú de un amigo: Ver perfil · Recomendar algo (F4) · Eliminar amigo, con lo que implica. */
+function friendMenuItems(p: Pick<PersonCard, 'handle' | 'name'>, rel: Relation, o: RelOpts, withProfileLink: boolean): string {
+    const first = firstName(p.name);
+    const keeps = rel.iFollow && rel.followsMe ? 'Seguiréis siguiéndoos. ' : rel.iFollow ? 'Le seguirás siguiendo. ' : '';
+    return (withProfileLink && p.handle ? `<a role="menuitem" href="/u/${esc(p.handle)}">${icon('user')}Ver perfil</a>` : '')
+        + (o.phase.recommend
+            ? `<button type="button" role="menuitem" data-action="recommend">${icon('send')}Recomendar algo</button>`
+            : `<button type="button" role="menuitem" aria-disabled="true" class="is-soon">${icon('send')}Recomendar algo<span class="so-soon">Pronto</span></button>`)
+        + '<hr>'
+        + `<button type="button" role="menuitem" class="pf-danger" data-sa="friend-remove">${icon('user-minus')}Eliminar amigo</button>`
+        + `<small>${esc(keeps)}${esc(first)} no recibe aviso.</small>`;
+}
+
+/**
+ * El botón de amistad según la relación, o '' si no aplica:
+ * «Añadir amigo» · «Solicitud enviada ▾» (Cancelar) · «Amigos ▾» (menú del amigo).
+ * La solicitud recibida no va aquí: se pinta como Aceptar / Rechazar.
+ */
+export function friendButtonHtml(p: Pick<PersonCard, 'handle' | 'name'>, rel: Relation, o: RelOpts & { primary?: boolean }): string {
+    if (!o.phase.friends || rel.blockedByMe || rel.requestIn) return '';
+    const size = o.size ?? 'sm';
+    if (rel.friends) {
+        return menuWrap(menuToggle('Amigos', { kind: 'friend', icon: 'user-check', size }), friendMenuItems(p, rel, o, true));
+    }
+    if (rel.requestOut) {
+        return menuWrap(menuToggle('Solicitud enviada', { kind: 'wait', icon: 'clock', size }),
+            `<button type="button" role="menuitem" data-sa="friend-cancel">${icon('x')}Cancelar solicitud</button>`);
+    }
+    if (!p.handle) return '';
+    return btn('Añadir amigo', { kind: o.primary ? 'pri' : '', icon: 'user-plus', sa: 'friend-request', size });
+}
+
+const acceptRejectHtml = (size: 'sm' | 'md', acceptLabel = 'Aceptar') =>
+    btn(acceptLabel, { kind: 'pri', icon: 'user-check', sa: 'friend-accept', size })
+    + btn('Rechazar', { kind: 'ghost', sa: 'friend-reject', size });
+
+export type RowActions = 'row' | 'cmdk' | 'friendRow' | 'sent';
+
 /** Las acciones de una fila de persona (centro «Amigos», buscador). */
-export function rowActionsHtml(p: PersonCard, rel: Relation, o: RelOpts & { isMe?: boolean }): string {
+export function rowActionsHtml(p: PersonCard, rel: Relation, o: RelOpts & { isMe?: boolean; actions?: RowActions }): string {
     if (o.isMe) return '';
     if (rel.blockedByMe) return btn('Desbloquear', { icon: 'shield-off', sa: 'unblock', size: 'sm' });
-    if (o.phase.friends && rel.requestIn) {
-        return btn('Aceptar', { kind: 'pri', icon: 'user-check', sa: 'friend-accept', size: 'sm' })
-            + btn('Rechazar', { kind: 'ghost', sa: 'friend-reject', size: 'sm' });
+    // Pestaña «Pendientes», grupo «Enviadas».
+    if (o.actions === 'sent' && rel.requestOut) return btn('Cancelar solicitud', { icon: 'x', sa: 'friend-cancel', size: 'sm' });
+    // Pestaña «Amigos»: «Ver perfil» a la vista y lo demás en «···».
+    if (o.actions === 'friendRow' && rel.friends) {
+        return (p.handle ? `<a class="pf-btn sm ghost" href="/u/${esc(p.handle)}">Ver perfil</a>` : '')
+            + menuWrap(menuToggle('Más opciones', { size: 'sm', ico: true }), friendMenuItems(p, rel, o, true));
     }
-    return followButtonHtml(p, rel, { ...o, size: 'sm' });
+    if (o.phase.friends && rel.requestIn) return acceptRejectHtml('sm');
+    return followButtonHtml(p, rel, { ...o, size: 'sm' }) + friendButtonHtml(p, rel, { ...o, size: 'sm' });
+}
+
+/**
+ * Las acciones de la cabecera del perfil público para quien tiene sesión (handoff perfil público
+ * §7, social §6.1). `locked`: perfil «Solo amigos» visto por quien no lo es (D4): la amistad pasa
+ * delante y es la acción principal. El invitado lo pinta `ProfileActions.astro` (abre el acceso).
+ */
+export function profileActionsHtml(p: Pick<PersonCard, 'id' | 'handle' | 'name'>, rel: Relation, o: RelOpts & { locked?: boolean }): string {
+    const first = firstName(p.name);
+    const md = { ...o, size: 'md' as const };
+    if (rel.blockedByMe) return `<div class="pf-acts-row">${btn('Desbloquear', { icon: 'shield-off', sa: 'unblock', size: 'md' })}</div>`;
+    const received = o.phase.friends && rel.requestIn;
+    let row = '';
+    if (received) row += acceptRejectHtml('md', 'Aceptar solicitud');
+    const follow = followButtonHtml(p, rel, { ...md, quiet: o.locked });
+    const friend = friendButtonHtml(p, rel, { ...md, primary: o.locked });
+    row += o.locked ? friend + follow : follow + friend;
+    if (o.phase.recommend && rel.friends) {
+        row += `<button type="button" class="pf-btn pf-ico-mobile" data-action="recommend" aria-label="Recomendar">${icon('send')}<span class="pf-lbl-wide">Recomendar</span></button>`;
+    }
+    if (o.phase.block && !o.locked) {
+        row += menuWrap(menuToggle('Más opciones', { ico: true }),
+            `<button type="button" role="menuitem" data-action="copy-link">${icon('link')}Copiar enlace</button><hr>`
+            + `<button type="button" role="menuitem" class="pf-danger" data-sa="block">${icon('ban')}Bloquear a ${esc(first)}</button>`);
+    }
+    const req = received ? `<div class="pf-req">${icon('user-plus')}${esc(first)} te ha enviado una solicitud de amistad.</div>` : '';
+    return `${req}<div class="pf-acts-row"${received ? ' style="margin-top: 12px"' : ''}>${row}</div>`;
 }
 
 /** ⌘K: un único botón, el de seguir, y solo si aún no le sigues (handoff §7.5). */
@@ -138,7 +217,7 @@ export interface RowOpts extends RelOpts {
     cls?: string;
     /** HTML extra al final de las acciones (el ↵ de ⌘K). */
     extra?: string;
-    actions?: 'row' | 'cmdk';
+    actions?: RowActions;
 }
 
 export function relationTags(rel: Relation, o: { isMe?: boolean; phase: SocialPhaseFlags }): string[] {
@@ -160,11 +239,12 @@ export function personRowHtml(p: PersonCard, rel: Relation, o: RowOpts): string 
     const meta = [arch, ...(o.meta ?? []).map((m) => `<span>${esc(m)}</span>`)].filter(Boolean)
         .join('<span class="so-dot" aria-hidden="true"></span>');
     const acts = o.actions === 'cmdk' ? cmdkActionsHtml(p, rel, o) : rowActionsHtml(p, rel, o);
+    const host = o.actions === 'cmdk' ? 'cmdk' : 'row';
     return `<div class="so-row${o.cls ? ' ' + o.cls : ''}" data-person="${esc(p.id)}" data-handle="${esc(p.handle ?? '')}" data-name="${esc(p.name)}">`
         + avatarHtml(p, o.avatarSize ?? 44)
         + `<div class="so-row-b"><div class="so-row-n">${nameHtml}${handleHtml}${tags}</div>`
         + (meta ? `<div class="so-row-m">${meta}</div>` : '')
-        + `</div><div class="so-row-a" data-rel-host="${o.actions === 'cmdk' ? 'cmdk' : 'row'}">${acts}${o.extra ?? ''}</div></div>`;
+        + `</div><div class="so-row-a" data-rel-host="${host}" data-acts="${o.actions ?? 'row'}">${acts}${o.extra ?? ''}</div></div>`;
 }
 
 // -------------------------------------------------------------------------------------
@@ -193,25 +273,42 @@ export function notifStatusHtml(text: string, o: { ok?: boolean; icon?: string; 
 }
 
 /** Zona de acciones/estado de un aviso social según la relación ACTUAL (handoff §5.3). */
-export function notifZoneHtml(it: Pick<NotifView, 'type' | 'actor' | 'rel'>, o: RelOpts & { mobile?: boolean }): { html: string; state: string } {
+export function notifZoneHtml(it: Pick<NotifView, 'type' | 'actor' | 'rel' | 'req'>, o: RelOpts & { mobile?: boolean }): { html: string; state: string } {
     const p = it.actor;
     const rel = it.rel;
     if (!p || !rel) return { html: '', state: '' };
     const size = o.mobile ? 'md' : 'sm';
+    const first = firstName(p.name);
     if (it.type === 'follow') {
         if (!p.handle || !o.phase.follow) return { html: '', state: '' };
-        if (rel.iFollow) return { html: notifStatusHtml(`Ahora sigues a ${firstName(p.name)}`, { ok: true }), state: 'ya le sigues' };
+        if (rel.iFollow) return { html: notifStatusHtml(`Ahora sigues a ${first}`, { ok: true }), state: 'ya le sigues' };
         return { html: `<div class="nt-acts">${btn('Seguir también', { kind: 'pri', icon: 'plus', pressed: false, sa: 'follow', size })}</div>`, state: '' };
+    }
+    if (it.type === 'friend_request') {
+        if (rel.friends || it.req === 'accepted') return { html: notifStatusHtml('Ahora sois amigos', { ok: true }), state: 'aceptada' };
+        if (it.req === 'pending' && rel.requestIn) return { html: `<div class="nt-acts">${acceptRejectHtml(size)}</div>`, state: 'pendiente' };
+        if (it.req === 'rejected') return { html: notifStatusHtml('Solicitud rechazada.', { small: `${first} no recibe ningún aviso.` }), state: 'rechazada' };
+        return { html: notifStatusHtml('Esta solicitud ya no está pendiente.', { icon: 'info' }), state: 'ya no está pendiente' };
+    }
+    if (it.type === 'friend_accepted') {
+        return rel.friends ? { html: notifStatusHtml('Ahora sois amigos', { ok: true }), state: '' } : { html: '', state: '' };
     }
     return { html: '', state: '' };
 }
 
-function socialSentence(it: NotifView): { html: string; plain: string } {
+/** La frase del aviso social. Sin dato de género, formas neutras (handoff §8). */
+export function notifSentenceHtml(it: Pick<NotifView, 'type' | 'actor' | 'req'>): { html: string; plain: string } {
     const p = it.actor!;
     const name = p.handle
         ? `<a href="/u/${esc(p.handle)}" class="nt-who" data-notif-open><b>${esc(p.name)}</b></a>`
         : `<b>${esc(p.name)}</b>`;
     if (it.type === 'follow') return { html: `${name} te sigue`, plain: `${p.name} te sigue` };
+    if (it.type === 'friend_request') {
+        // Ya resuelta, en pasado.
+        const verb = it.req === 'pending' ? 'te ha pedido amistad' : 'te pidió amistad';
+        return { html: `${name} ${verb}`, plain: `Solicitud de amistad de ${p.name}` };
+    }
+    if (it.type === 'friend_accepted') return { html: `${name} ha aceptado tu solicitud`, plain: `${p.name} ha aceptado tu solicitud` };
     return { html: name, plain: p.name };
 }
 
@@ -221,10 +318,10 @@ export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; no
     const st = NOTIF_STAMP[it.type] ?? ['blue', 'bell'];
 
     if (SOCIAL_NOTIF_TYPES.has(it.type) && it.actor) {
-        const s = socialSentence(it);
+        const s = notifSentenceHtml(it);
         const zone = notifZoneHtml(it, o);
         const label = [s.plain, zone.state, unread ? 'sin leer' : ''].filter(Boolean).join(', ');
-        return `<div class="notif-item nt-social${unread ? ' is-unread' : ''}" role="article" aria-label="${esc(label)}" data-id="${esc(it.id)}" data-type="${esc(it.type)}" data-person="${esc(it.actor.id)}" data-handle="${esc(it.actor.handle ?? '')}" data-name="${esc(it.actor.name)}">`
+        return `<div class="notif-item nt-social${unread ? ' is-unread' : ''}" role="article" aria-label="${esc(label)}" data-id="${esc(it.id)}" data-type="${esc(it.type)}" data-req="${esc(it.req ?? '')}" data-person="${esc(it.actor.id)}" data-handle="${esc(it.actor.handle ?? '')}" data-name="${esc(it.actor.name)}">`
             + avatarHtml(it.actor, 40, st)
             + `<div class="nt-b"><p class="nt-t">${s.html}</p><div class="nt-w">${esc(when)}</div>`
             + `<div class="nt-zone" data-rel-host="notif" aria-live="polite">${zone.html}</div></div>`

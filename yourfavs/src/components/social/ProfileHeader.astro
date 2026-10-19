@@ -65,7 +65,10 @@ const typeLabel = (t: 'movie' | 'tv', year: string | null) => `${t === 'movie' ?
                     {counts.map((c) => <span><b>{nf.format(c.n)}</b>{c.label}</span>)}
                 </div>
             )}
-            <ProfileActions viewer={viewer} rel={view.rel ?? undefined} person={{ id: view.ownerId, handle: view.handle, name: view.name }} />
+            {/* «Solo amigos» visto por quien no es su amigo: los botones van en el panel del candado (D4). */}
+            {!(view.locked && !view.rel?.blockedByMe) && (
+                <ProfileActions viewer={viewer} rel={view.rel ?? undefined} person={{ id: view.ownerId, handle: view.handle, name: view.name }} />
+            )}
         </div>
     </div>
 
