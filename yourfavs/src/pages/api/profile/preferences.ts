@@ -23,7 +23,7 @@ function json(data: unknown, status = 200): Response {
 }
 
 /** Claves de la campana. Ausente en el body = no se toca; presente = booleano. */
-const NOTIF_KEYS = ['episodes', 'releases', 'anniversary', 'platform', 'streak'] as const;
+const NOTIF_KEYS = ['episodes', 'releases', 'anniversary', 'platform', 'streak', 'social'] as const;
 
 /** Maestro + desglose del modo sin spoilers. `hide*` = true significa TAPAR. */
 const SPOILER_KEYS = ['enabled', 'hideStills', 'hideSynopsis', 'hideCalendarTitles'] as const;

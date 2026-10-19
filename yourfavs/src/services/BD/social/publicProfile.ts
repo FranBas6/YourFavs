@@ -23,6 +23,8 @@ import { normalizeHandle, handleShapeProblem } from './handles';
 import { sanitizeFour, type PublicPick, type PublicArchetype, type PublicVisibility } from './publicSettings';
 import { resolvePublicSections, type PublicSectionPref } from '../../../utils/constants/publicSections';
 import { getTitleSummaries, titleKey, type TitleRef } from '../../API/shared/titleSummaries';
+import { getRelation, isBlockedBy } from './graph';
+import type { Relation } from '../../../lib/social/types';
 
 export type ViewerRole = 'owner' | 'member' | 'guest';
 
@@ -67,6 +69,8 @@ export interface PublicProfileView {
     viewerRole: ViewerRole;
     /** «Solo amigos» visto por quien no lo es (F3): solo identidad, sin secciones. */
     locked: boolean;
+    /** Relación de quien mira con el dueño (solo `member`; null para dueño e invitado). */
+    rel: Relation | null;
     bio: string;
     archetype: PublicArchetype | null;
     indexable: boolean;
@@ -87,7 +91,7 @@ const LOG_SCAN = 300;
 const BEST_LIMIT = 12;
 const CACHE_TTL_MS = 60 * 1000;
 
-type CachedData = Omit<PublicProfileView, 'viewerRole' | 'locked' | 'ownCollectionsTotal'>;
+type CachedData = Omit<PublicProfileView, 'viewerRole' | 'locked' | 'ownCollectionsTotal' | 'rel'>;
 const cache = new Map<string, { data: CachedData; expires: number }>();
 
 /** Vacía la entrada de un handle en esta instancia (cambio de handle o de visibilidad). */
@@ -396,13 +400,21 @@ export async function getPublicProfile(rawHandle: string, viewerId: string | nul
     if (!row) return null;
     const viewerRole: ViewerRole = viewerId === row.id ? 'owner' : viewerId ? 'member' : 'guest';
 
-    if (!canSeeContent(row, viewerRole)) {
+    // Bloqueos (F2): a quien el dueño bloqueó le sale el MISMO 404 que a un perfil inexistente, sin
+    // pistas. Quien bloqueó al dueño ve solo la cabecera reducida con «Desbloquear».
+    let rel: Relation | null = null;
+    if (viewerRole === 'member' && viewerId) {
+        if (await isBlockedBy(viewerId, row.id)) return null;
+        rel = await getRelation(viewerId, row.id);
+    }
+
+    if (!canSeeContent(row, viewerRole) || rel?.blockedByMe) {
         const identity = await resolveIdentity(row);
         return {
             ownerId: row.id, handle: row.public_handle, name: identity.name,
             hasAvatar: Boolean(identity.avatarSrc), avatarVersion: String(new Date(row.updated_at).getTime() || 0),
             visibility: row.public_visibility as PublicVisibility, since: row.public_since,
-            viewerRole, locked: true, bio: '', archetype: null, indexable: row.public_indexable === true,
+            viewerRole, locked: true, rel, bio: '', archetype: null, indexable: row.public_indexable === true,
             counts: { episodes: 0, movies: 0, series: 0, publicCollections: 0 },
             four: [], sections: [], favs: [], log: [], best: [], collections: [], ownCollectionsTotal: null,
         };
@@ -419,7 +431,7 @@ export async function getPublicProfile(rawHandle: string, viewerId: string | nul
     }
 
     const ownCollectionsTotal = viewerRole === 'owner' ? await countRows('custom_lists', row.id) : null;
-    return { ...data, viewerRole, locked: false, ownCollectionsTotal };
+    return { ...data, viewerRole, locked: false, rel, ownCollectionsTotal };
 }
 
 /** Una colección pública en solo lectura (`/u/{handle}/coleccion/{id}`), o null → 404. */
@@ -428,6 +440,10 @@ export async function getPublicCollection(rawHandle: string, listId: string, vie
     if (!row) return null;
     const viewerRole: ViewerRole = viewerId === row.id ? 'owner' : viewerId ? 'member' : 'guest';
     if (!canSeeContent(row, viewerRole)) return null;
+    // Con un bloqueo en cualquier sentido, la colección tampoco existe para quien mira.
+    if (viewerRole === 'member' && viewerId) {
+        if (await isBlockedBy(viewerId, row.id) || (await getRelation(viewerId, row.id)).blockedByMe) return null;
+    }
 
     const { data: list, error } = await supabaseAdmin()
         .from('custom_lists')

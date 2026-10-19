@@ -17,9 +17,16 @@
  * llegará nada y hay que entrar o recuperar la contraseña.
  *
  * El perfil (`profiles`) lo crea el trigger `on_auth_user_created`.
+ *
+ * Llegar por el enlace de alguien (F2 social): si hay cookie `yf_ref` de un perfil activo, el handle
+ * se guarda en los metadatos de la cuenta para aplicar la invitación (seguir a esa persona) al
+ * confirmar el email, aunque el enlace se abra en otro dispositivo. Con `SIGNUP_MODE=invite`, sin
+ * esa cookie no se crea la cuenta (`invite_only`).
  */
 import type { APIRoute } from 'astro';
 import { json, mapAuthError, safeNext, setSessionFlag } from '../../../lib/supabase/authHttp';
+import { signupMode } from '../../../lib/social/signupMode';
+import { REF_COOKIE, applyReferral, findInviter } from '../../../services/BD/social/referral';
 
 export const prerender = false;
 
@@ -37,10 +44,18 @@ export const POST: APIRoute = async ({ request, locals, cookies, url }) => {
     const redirectTo = new URL('/auth/callback', url.origin);
     redirectTo.searchParams.set('next', safeNext(typeof body?.next === 'string' ? body.next : '/'));
 
+    const inviter = await findInviter(cookies.get(REF_COOKIE)?.value);
+    if (signupMode() === 'invite' && !inviter) {
+        return json({ ok: false, code: 'invite_only', error: 'Ahora mismo, las cuentas nuevas son solo por invitación: entra desde el enlace del perfil de alguien que ya esté dentro.' }, 403);
+    }
+
     const { data, error } = await locals.supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: redirectTo.toString() },
+        options: {
+            emailRedirectTo: redirectTo.toString(),
+            ...(inviter?.handle ? { data: { yf_ref: inviter.handle } } : {}),
+        },
     });
     // Registrar otra vez un email aún sin confirmar hace que Supabase intente reenviar el correo,
     // y si fue hace menos de un minuto lo frena con `over_email_send_rate_limit`. Para quien pulsa
@@ -52,6 +67,11 @@ export const POST: APIRoute = async ({ request, locals, cookies, url }) => {
 
     if (!data.session) return json({ ok: true, pendingConfirmation: true });
 
+    // Confirmación apagada: la cuenta ya está dentro, así que la invitación se aplica aquí.
+    if (inviter && data.user) {
+        await applyReferral(data.user.id, inviter.handle);
+        cookies.delete(REF_COOKIE, { path: '/' });
+    }
     setSessionFlag(cookies);
     return json({ ok: true, isNewUser: true });
 };
