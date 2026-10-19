@@ -14,9 +14,16 @@
  * Confirmación de email (F0 de docs/PLAN_SOCIAL.md): si el registro queda pendiente de confirmar,
  * o alguien intenta entrar sin haber confirmado, la tarjeta pasa a la vista «Revisa tu correo»
  * (`#auth-pending`) con botón de reenviar. Al volver de un enlace caducado, `?auth=link`.
+ *
+ * Invitaciones (F2 social, handoff D14): si el navegador trae la cookie `yf_ref` (visitó un perfil
+ * público), el registro enseña «Te invita Ana · @ana» y que la seguirá al crear la cuenta. Con
+ * `SIGNUP_MODE=invite` y sin invitación, el modal abre en «Entrar» y cambia «¿No tienes cuenta?
+ * Regístrate» por la explicación, ANTES de que lo intente. `?auth=invite` = Google rechazado.
  */
+import { signupMode } from '../lib/social/signupMode';
+const mode = signupMode();
 ---
-<div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" hidden>
+<div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-signup-mode={mode} hidden>
     <div class="auth-card" role="document">
         <button type="button" class="auth-close" data-auth-close aria-label="Cerrar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -24,6 +31,15 @@
 
         <h2 class="auth-title" id="auth-title">Entra en YourFavs</h2>
         <p class="auth-sub" id="auth-sub">Guarda tus pelis y series, sigue actores y más.</p>
+
+        <!-- «Te invita…»: solo en «Crear cuenta» y si se llegó por el enlace de un perfil activo. -->
+        <div class="auth-inv" id="auth-inv" hidden>
+            <span class="auth-inv-av" id="auth-inv-av" aria-hidden="true"><img id="auth-inv-img" alt="" hidden /><span id="auth-inv-ini"></span></span>
+            <div>
+                <div class="auth-inv-t">Te invita <span id="auth-inv-name"></span> · @<span id="auth-inv-handle"></span></div>
+                <div class="auth-inv-s" id="auth-inv-s"></div>
+            </div>
+        </div>
 
         <button type="button" class="auth-google" data-auth-google>
             <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
@@ -64,6 +80,15 @@
             <span data-mode="login">¿No tienes cuenta? <button type="button" class="auth-link" data-auth-switch="register">Regístrate</button></span>
             <span data-mode="register" hidden>¿Ya tienes cuenta? <button type="button" class="auth-link" data-auth-switch="login">Entra</button></span>
         </p>
+
+        <!-- Modo invitación sin invitación: sustituye a «¿No tienes cuenta? Regístrate». -->
+        <div class="auth-gate" id="auth-gate" role="note" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
+            <div>
+                <b>Ahora mismo, cuentas nuevas solo por invitación</b>
+                Durante una temporada solo se registra quien llega desde el enlace de alguien que ya está dentro. Pide a un amigo el enlace de su perfil. Si ya tienes cuenta, entra con normalidad.
+            </div>
+        </div>
 
         <!-- «Revisa tu correo»: sustituye a Google + formulario mientras falta confirmar el email. -->
         <div class="auth-pending" id="auth-pending" hidden>
@@ -218,10 +243,10 @@
         font-size: 12.5px;
         padding: 9px 11px;
         border-radius: 8px;
-        background: rgba(239, 68, 68, .12);
-        color: #ef4444;
+        background: var(--stamp-red);
+        color: var(--stamp-red-ink);
     }
-    .auth-msg.is-ok { background: rgba(16, 185, 129, .14); color: #10b981; }
+    .auth-msg.is-ok { background: var(--ok-soft); color: var(--ok-ink); }
 
     .auth-submit {
         margin-top: 3px;
@@ -229,14 +254,15 @@
         padding: 11px 16px;
         border-radius: var(--r-full, 999px);
         border: none;
-        background: var(--accent);
+        /* --accent-dark en reposo: blanco sobre --accent da 4,2:1 y no pasa AA (handoff social §7.7). */
+        background: var(--accent-dark);
         color: #fff;
         font-size: 14px;
         font-weight: 600;
         cursor: pointer;
         transition: background .15s ease;
     }
-    .auth-submit:hover { background: var(--accent-dark, var(--accent)); }
+    .auth-submit:hover { background: var(--accent); }
     .auth-submit:disabled, .auth-google:disabled { opacity: .6; cursor: progress; }
 
     .auth-forgot {
@@ -262,13 +288,37 @@
     .auth-link {
         background: none;
         border: none;
-        color: var(--accent);
+        color: var(--accent-dark);
         font-weight: 600;
         font-size: 13px;
         cursor: pointer;
         padding: 0;
     }
     .auth-link:hover { text-decoration: underline; }
+    :global([data-theme="dark"]) .auth-link { color: var(--stamp-red-ink); }
+
+    /* Invitación (handoff social D14). */
+    .auth-inv {
+        display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 18px;
+        border-radius: var(--r-md); background: var(--stamp-green); color: var(--stamp-green-ink);
+    }
+    .auth-inv[hidden] { display: none; }
+    .auth-inv-av {
+        position: relative;
+        width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+        display: grid; place-items: center; background: var(--sb, var(--bg-elev)); color: var(--si, var(--text));
+        font: 600 12px var(--font);
+    }
+    .auth-inv-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .auth-inv-t { font: 600 13px var(--font); }
+    .auth-inv-s { font-size: 12px; line-height: 1.45; opacity: .95; }
+    .auth-gate {
+        display: flex; gap: 12px; padding: 14px; margin-top: 16px; border-radius: var(--r-md);
+        background: var(--stamp-amber); color: var(--stamp-amber-ink); font-size: 12.5px; line-height: 1.5;
+    }
+    .auth-gate[hidden] { display: none; }
+    .auth-gate b { display: block; font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+    .auth-gate svg { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; }
 
     /* Vista «Revisa tu correo» (confirmación de email pendiente). */
     .auth-pending { display: flex; flex-direction: column; gap: 12px; }
@@ -296,6 +346,7 @@
 
 <script>
     import type * as AuthActions from '../utils/authActions';
+    import { SOCIAL_PHASE } from '../utils/constants/social';
 
     const overlay = document.getElementById('auth-modal') as HTMLElement | null;
     if (overlay) {
@@ -323,6 +374,50 @@
         let pendingEmail = '';
         let resendTimer: number | undefined;
 
+        // ---- Invitaciones (F2 social) ----
+        // Quién invita sale de la cookie `yf_ref` que dejó el perfil público visitado. Se pregunta
+        // al cargar (si hay cookie y no hay sesión) para tenerlo listo antes de abrir el modal.
+        const invEl = document.getElementById('auth-inv') as HTMLElement;
+        const gateEl = document.getElementById('auth-gate') as HTMLElement;
+        const inviteMode = overlay.dataset.signupMode === 'invite';
+        type Inviter = { name: string; firstName: string; handle: string; avatar: string | null; initials: string; color: string };
+        let inviter: Inviter | null = null;
+        const hasSessionCookie = document.cookie.split('; ').some((c) => c.startsWith('has_session='));
+        const refHandle = document.cookie.split('; ').find((c) => c.startsWith('yf_ref='))?.slice(7) ?? '';
+        if (refHandle && !hasSessionCookie) {
+            fetch(`/api/social/invite?h=${encodeURIComponent(decodeURIComponent(refHandle))}`, { headers: { Accept: 'application/json' } })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((d) => { if (d?.inviter) { inviter = d.inviter; paintInviter(); } })
+                .catch(() => {});
+        }
+        const inviteOnly = () => inviteMode && !inviter;
+
+        function paintInviter() {
+            if (!inviter) return;
+            (document.getElementById('auth-inv-name') as HTMLElement).textContent = inviter.name;
+            (document.getElementById('auth-inv-handle') as HTMLElement).textContent = inviter.handle;
+            (document.getElementById('auth-inv-s') as HTMLElement).textContent =
+                `Al crear la cuenta seguirás a ${inviter.firstName}.` + (SOCIAL_PHASE.friends ? ' Si queréis ser amigos, se lo pides tú.' : '');
+            const av = document.getElementById('auth-inv-av') as HTMLElement;
+            av.style.setProperty('--sb', `var(--stamp-${inviter.color})`);
+            av.style.setProperty('--si', `var(--stamp-${inviter.color}-ink)`);
+            const img = document.getElementById('auth-inv-img') as HTMLImageElement;
+            const ini = document.getElementById('auth-inv-ini') as HTMLElement;
+            if (inviter.avatar) { img.src = inviter.avatar; img.hidden = false; ini.hidden = true; }
+            else { ini.textContent = inviter.initials; }
+            paintInviteExtras();
+        }
+
+        // Bloques de invitación según la vista: «Te invita…» en registro; la explicación del modo
+        // invitación en lugar de «¿No tienes cuenta? Regístrate».
+        function paintInviteExtras() {
+            const pending = !pendingEl.hidden;
+            invEl.hidden = !(mode === 'register' && inviter && !pending);
+            const gate = inviteOnly();
+            gateEl.hidden = !(gate && mode === 'login' && !pending);
+            (overlay!.querySelector('[data-mode="login"]') as HTMLElement).hidden = mode !== 'login' || gate;
+        }
+
         let mode: 'login' | 'register' = 'login';
         let lastFocus: HTMLElement | null = null;
         let actions: typeof AuthActions | null = null;
@@ -347,6 +442,8 @@
         }
 
         function setMode(next: 'login' | 'register') {
+            // Modo invitación sin invitación: no hay registro, se queda en «Entrar» con la explicación.
+            if (next === 'register' && inviteOnly()) next = 'login';
             mode = next;
             clearMsg();
             pendingEl.hidden = true;
@@ -361,6 +458,7 @@
             (overlay!.querySelector('[data-mode="login"]') as HTMLElement).hidden = !isLogin;
             (overlay!.querySelector('[data-mode="register"]') as HTMLElement).hidden = isLogin;
             (overlay!.querySelector('[data-auth-forgot]') as HTMLElement).hidden = !isLogin;
+            paintInviteExtras();
         }
 
         // «Revisa tu correo». `note` sustituye al subtítulo (p. ej. al intentar entrar sin confirmar).
@@ -368,6 +466,7 @@
             pendingEmail = email;
             standardEls.forEach((el) => { if (el) el.hidden = true; });
             pendingEl.hidden = false;
+            paintInviteExtras();
             pendingEmailEl.textContent = email;
             pendingMsgEl.hidden = true;
             titleEl.textContent = 'Revisa tu correo';
@@ -464,8 +563,10 @@
             if (opener) {
                 e.preventDefault();
                 open();
-                // `data-auth-open="register"` abre directamente en «Crear cuenta» (perfil público).
-                if (opener.getAttribute('data-auth-open') === 'register') setMode('register');
+                // `data-auth-open="register"` abre directamente en «Crear cuenta» (perfil público). Con
+                // invitación, también cualquier otro disparador salvo «login» explícito (handoff D14).
+                const want = opener.getAttribute('data-auth-open');
+                if (want === 'register' || (inviter && want !== 'login')) setMode('register');
             }
             else if (t.closest('[data-auth-logout]')) {
                 e.preventDefault();
@@ -556,6 +657,7 @@
             const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
             if (res.ok && res.pendingConfirmation) { showPending(email); return; }
             if (res.ok) { afterAuth(res); return; }
+            if (res.code === 'invite_only') { setMode('login'); setLoading(false); showMsg(res.error); return; }
             if (res.code === 'email_not_confirmed') {
                 showPending(email, 'Aún no has confirmado tu email. Usa el enlace que te enviamos o pide otro.');
                 return;
@@ -602,6 +704,10 @@
             if (authReturn === 'error') {
                 open();
                 showMsg('No se pudo entrar con Google. Inténtalo de nuevo.');
+            } else if (authReturn === 'invite') {
+                // Cuenta nueva de Google sin invitación en modo invitación: el servidor no la creó.
+                open();
+                showMsg('Ahora mismo, las cuentas nuevas son solo por invitación. Si ya tienes cuenta, entra con normalidad.');
             } else if (authReturn === 'link') {
                 // Enlace del email caducado o ya usado. Si era de confirmar, al intentar entrar
                 // el login responde «sin confirmar» y el modal ofrece reenviarlo.

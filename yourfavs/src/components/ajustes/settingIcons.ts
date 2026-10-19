@@ -9,6 +9,8 @@
 export const SETTING_ICONS: Record<string, string[]> = {
     tv: ['M2 7h20v12H2z', 'm7 3 5 4 5-4'],
     layers: ['m12 2 9 5-9 5-9-5 9-5', 'm3 12 9 5 9-5', 'm3 17 9 5 9-5'],
+    // Capa social (F2): la fila «Gente que te sigue» de Notificaciones.
+    users: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M5 7a4 4 0 1 0 8 0a4 4 0 1 0-8 0', 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75'],
     userPlus: ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M12 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0', 'M19 8v6M22 11h-6'],
     zap: ['M13 2 4 14h7l-1 8 9-12h-7l1-8z'],
     history: ['M3 12a9 9 0 1 0 3-6.7', 'M3 4v4h4', 'M12 8v4l3 2'],
