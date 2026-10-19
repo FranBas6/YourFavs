@@ -8,7 +8,10 @@
  */
 import { db, getAuthId, requireAuthId } from '../shared/userScope';
 
-export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change' | 'streak';
+export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change' | 'streak'
+    // Entre personas (capa social). No los crea el generador: los escribe el servidor en el buzón de
+    // quien los recibe al pasar (`social_follow`, migración 20261020090000).
+    | 'follow';
 
 export interface NotificationDoc {
     id: string;
@@ -19,6 +22,8 @@ export interface NotificationDoc {
     poster_path: string | null;
     created_at: number; // ms
     read: boolean;
+    /** Quién lo provocó, en los avisos entre personas. */
+    actor_id: string | null;
 }
 
 export interface NotifInput {
@@ -35,7 +40,7 @@ export interface NotifInput {
 // cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
 // desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
 // pendiente ENTRA o SALE de tus plataformas (diff contra snapshot, ver el generador).
-const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak']);
+const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow']);
 
 function toMs(v: any): number {
     if (!v) return 0;
@@ -53,7 +58,7 @@ export async function listNotifications(limit = 30): Promise<NotificationDoc[]> 
         // Solo los tipos activos, filtrados en la BD (en Firestore se pedía de más y se filtraba
         // en memoria para no necesitar un índice compuesto).
         const { data, error } = await db().from('notifications')
-            .select('id, type, title, subtitle, href, poster_path, created_at, read')
+            .select('id, type, title, subtitle, href, poster_path, created_at, read, actor_id')
             .eq('user_id', userId).in('type', [...ACTIVE_TYPES])
             .order('created_at', { ascending: false }).limit(limit);
         if (error) throw new Error(error.message);
@@ -68,6 +73,7 @@ export async function listNotifications(limit = 30): Promise<NotificationDoc[]> 
                     poster_path: x.poster_path ?? null,
                     created_at: toMs(x.created_at),
                     read: !!x.read,
+                    actor_id: x.actor_id ?? null,
                 } as NotificationDoc;
             });
     } catch (error) {

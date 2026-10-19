@@ -62,6 +62,19 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"blocks": {
+                  Row: {
+                    "blocked_id": string,"blocker_id": string,"created_at": string
+                  }
+                  Insert: {
+                    "blocked_id": string,"blocker_id": string,"created_at"?: string
+                  }
+                  Update: {
+                    "blocked_id"?: string,"blocker_id"?: string,"created_at"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"custom_list_items": {
                   Row: {
                     "added_at": string,"list_id": string,"media_type": Database["public"]['Enums']["media_type"],"position": number | null,"poster_path": string | null,"title": string | null,"tmdb_id": number,"user_id": string
@@ -107,6 +120,19 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"follows": {
+                  Row: {
+                    "created_at": string,"followee_id": string,"follower_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"followee_id": string,"follower_id": string
+                  }
+                  Update: {
+                    "created_at"?: string,"followee_id"?: string,"follower_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"library_items": {
                   Row: {
                     "added_at": string,"collection": string,"media_type": Database["public"]['Enums']["media_type"],"opinion": string | null,"position": number | null,"rating": number | null,"tmdb_id": number,"user_id": string
@@ -148,13 +174,13 @@ isOneToOne: false
                   ]
                 },"notifications": {
                   Row: {
-                    "created_at": string,"href": string | null,"id": string,"poster_path": string | null,"read": boolean,"subtitle": string | null,"title": string | null,"type": string,"user_id": string
+                    "actor_id": string | null,"created_at": string,"href": string | null,"id": string,"poster_path": string | null,"read": boolean,"subtitle": string | null,"title": string | null,"type": string,"user_id": string
                   }
                   Insert: {
-                    "created_at"?: string,"href"?: string | null,"id": string,"poster_path"?: string | null,"read"?: boolean,"subtitle"?: string | null,"title"?: string | null,"type": string,"user_id"?: string
+                    "actor_id"?: string | null,"created_at"?: string,"href"?: string | null,"id": string,"poster_path"?: string | null,"read"?: boolean,"subtitle"?: string | null,"title"?: string | null,"type": string,"user_id"?: string
                   }
                   Update: {
-                    "created_at"?: string,"href"?: string | null,"id"?: string,"poster_path"?: string | null,"read"?: boolean,"subtitle"?: string | null,"title"?: string | null,"type"?: string,"user_id"?: string
+                    "actor_id"?: string | null,"created_at"?: string,"href"?: string | null,"id"?: string,"poster_path"?: string | null,"read"?: boolean,"subtitle"?: string | null,"title"?: string | null,"type"?: string,"user_id"?: string
                   }
                   Relationships: [
                     
@@ -174,13 +200,13 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"region": string | null,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
+                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"referral_suggestion_dismissed": boolean,"referred_by": string | null,"region": string | null,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
                   }
                   Insert: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -276,6 +302,25 @@ isOneToOne: false
                            },
 "shift_list_positions":
 { Args: { "p_collection": string,"p_delta": number,"p_from": number,"p_to": number }; Returns: undefined
+                           },
+"social_block":
+{ Args: { "p_me": string,"p_them": string }; Returns: undefined
+                           },
+"social_follow":
+{ Args: { "p_me": string,"p_them": string }; Returns: string
+                           },
+"social_people":
+{ Args: { "p_ids": (string)[] }; Returns: {
+              "archetype": Json,"handle": string,"has_avatar": boolean,"id": string,"name": string,"updated_at": string
+            }[]
+                           },
+"social_search":
+{ Args: { "p_limit": number,"p_me": string,"p_q": string }; Returns: {
+              "id": string
+            }[]
+                           },
+"social_unfollow":
+{ Args: { "p_me": string,"p_them": string }; Returns: undefined
                            }
           }
           Enums: {

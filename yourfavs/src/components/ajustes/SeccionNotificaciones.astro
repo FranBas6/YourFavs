@@ -2,15 +2,16 @@
 /**
  * Qué te avisa la campana.
  *
- * Cinco avisos con motor real (`new_episode`, `person_release`, `platform_change`,
- * `anniversary`, `streak` en `services/API/notifications/generator.ts`) y cuatro que el
+ * Seis avisos con motor real (`new_episode`, `person_release`, `platform_change`,
+ * `anniversary`, `streak` en `services/API/notifications/generator.ts`, y `social`: los avisos
+ * entre personas de la capa social, que crea la BD al pasar, ver `social_follow`) y cuatro que el
  * diseño pide pero que **no tienen backend**: resumen semanal y correo necesitarían una
  * Scheduled Function y un proveedor de email, y «nuevas temporadas» todavía llega como un
  * episodio más. Se pintan en gris con «Pronto» para que se vea a dónde va esto, pero no
  * guardan nada — un toggle que no hace nada es peor que no tenerlo.
  *
  * Semántica del POST de reserva: un checkbox ausente significa DESACTIVADO, así que las
- * cinco filas reales tienen que estar todas en el formulario.
+ * seis filas reales tienen que estar todas en el formulario.
  */
 import type { UserProfile } from "../../services/BD/profile/userProfile";
 import FilaAjuste from "./FilaAjuste.astro";
@@ -53,6 +54,12 @@ const np = profile.notifPrefs ?? {};
             title="Racha en peligro"
             desc="Te recuerda ver algo si tu racha se va a romper hoy. Desactivado por defecto."
             name="notif_streak" fieldKey="streak" checked={np.streak === true}
+        />
+        <FilaAjuste
+            icon="users" tone="like"
+            title="Gente que te sigue"
+            desc="Cuando alguien empieza a seguirte. Solo aquí, en la campana: nunca por correo."
+            name="notif_social" fieldKey="social" checked={np.social !== false}
         />
     </div>
 

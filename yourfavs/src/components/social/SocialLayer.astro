@@ -1,0 +1,35 @@
+---
+/**
+ * Lo social que necesita cualquier página con sesión (F2+): el diálogo «¿Bloquear a…?» y el
+ * script que atiende los botones de relación allá donde salgan (`scripts/social/relations.ts`).
+ * Se monta una vez en el Layout, solo con sesión.
+ *
+ * Diálogo (handoff social F2/F3 §6.5): `<dialog>` nativo, que ya atrapa el foco y se cierra con
+ * Esc. Foco inicial en «Cancelar». En móvil se pega abajo. El nombre lo rellena el script.
+ */
+import { Icon } from 'astro-icon/components';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+---
+{SOCIAL_PHASE.block && (
+    <dialog id="so-block-dlg" class="so-dlg" role="alertdialog" aria-labelledby="so-block-t" aria-describedby="so-block-d">
+        <span class="so-dlg-st" style="--sb: var(--stamp-red); --si: var(--stamp-red-ink)"><Icon name="lucide:ban" /></span>
+        <h3 id="so-block-t">¿Bloquear a <span data-bl-name></span>?</h3>
+        <p id="so-block-d">Corta cualquier relación entre vosotros. Puedes deshacerlo más tarde, pero lo que se borra no vuelve solo.</p>
+        <div class="so-cons">
+            <div><Icon name="lucide:user-minus" /><span>Dejáis de seguiros, <b>en los dos sentidos</b>.</span></div>
+            {SOCIAL_PHASE.friends && (
+                <div><Icon name="lucide:handshake" /><span>Se borran vuestra amistad y las solicitudes pendientes.</span></div>
+            )}
+            <div><Icon name="lucide:eye-off" /><span><span data-bl-first></span> <b>no podrá ver tu perfil</b>: le saldrá como no disponible. Tampoco te encontrará al buscar.</span></div>
+            <div><Icon name="lucide:mail-x" /><span><b>No le avisamos</b> de nada.</span></div>
+        </div>
+        <div class="so-dlg-f">
+            <button type="button" class="pf-btn" data-bl-cancel>Cancelar</button>
+            <button type="button" class="pf-btn dgr" data-bl-confirm><Icon name="lucide:ban" />Bloquear</button>
+        </div>
+    </dialog>
+)}
+
+<script>
+    import '../../scripts/social/relations';
+</script>

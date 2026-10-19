@@ -90,12 +90,15 @@ const { id, title, hideTitle = false } = Astro.props;
 
     /* Contador de no leídas. Lo rellena el script de la campana (Header) por `.js-notif-badge`. */
     .yf-sheet-badge {
-        min-width: 20px; height: 20px; padding: 0 6px; border-radius: 9999px; flex-shrink: 0;
-        background: var(--accent, #E63946); color: #fff;
-        font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 800;
+        min-width: 22px; height: 22px; padding: 0 7px; border-radius: 9999px; flex-shrink: 0;
+        /* --accent-dark: blanco sobre --accent no pasa AA a este tamaño (handoff social §6.4). */
+        background: var(--accent-dark); color: #fff;
+        font-family: var(--font-mono, monospace); font-size: 11px; font-weight: 700;
         display: flex; align-items: center; justify-content: center;
     }
     .yf-sheet-badge[hidden] { display: none; }
+    /* Fila con algo que responder (Amigos con solicitudes, F3). */
+    .yf-sheet-row.has-pending { background: var(--bg-tint); }
 
     /* Banda separadora entre grupos de filas. Al no ser `.yf-sheet-row`, corta la cadena
        del selector hermano y aporta ella misma sus dos líneas. */

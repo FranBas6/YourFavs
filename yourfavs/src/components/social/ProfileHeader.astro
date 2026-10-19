@@ -8,20 +8,22 @@
  * HTML por tamaño de pantalla.
  *
  * Reglas de lo que ve cada uno: el dueño ve la invitación a escribir su bio y los huecos vacíos de
- * «Mis 4»; un visitante no ve nada de lo que esté vacío.
+ * «Mis 4»; un visitante no ve nada de lo que esté vacío. Con el perfil cerrado para quien mira
+ * (`view.locked`: lo bloqueaste, o «Solo amigos» en la F3) queda solo la identidad y los botones.
  */
 import { Icon } from 'astro-icon/components';
-import ProfileActions, { type ProfileRelation } from './ProfileActions.astro';
+import ProfileActions from './ProfileActions.astro';
 import PosterTile from './PosterTile.astro';
 import type { PublicProfileView } from '../../services/BD/social/publicProfile';
 
 interface Props {
     view: PublicProfileView;
-    relation: ProfileRelation;
     avatarSrc: string | null;
 }
-const { view, relation, avatarSrc } = Astro.props;
+const { view, avatarSrc } = Astro.props;
 const isOwner = view.viewerRole === 'owner';
+const viewer = isOwner ? 'owner' : view.viewerRole === 'guest' ? 'guest' : 'member';
+const followsYou = Boolean(view.rel?.followsMe && !view.rel.blockedByMe);
 const firstName = view.name.split(/\s+/)[0] || view.name;
 const initial = view.name.trim().charAt(0).toUpperCase() || '?';
 const nf = new Intl.NumberFormat('es-ES');
@@ -34,7 +36,7 @@ const counts = [
         : []),
 ];
 const four = view.four;
-const showFour = isOwner || four.length > 0;
+const showFour = !view.locked && (isOwner || four.length > 0);
 const slots = isOwner ? [0, 1, 2, 3] : four.map((_, i) => i);
 const typeLabel = (t: 'movie' | 'tv', year: string | null) => `${t === 'movie' ? 'Película' : 'Serie'}${year ? ` · ${year}` : ''}`;
 ---
@@ -45,10 +47,10 @@ const typeLabel = (t: 'movie' | 'tv', year: string | null) => `${t === 'movie' ?
         </div>
         <div class="pf-who">
             <h1 class="pf-name">{view.name}</h1>
-            <div class="pf-handle">@{view.handle}</div>
+            <div class="pf-handle">@{view.handle}{followsYou && <span class="pf-tag">Te sigue</span>}</div>
         </div>
         <div class="pf-more">
-            {view.archetype && (
+            {!view.locked && view.archetype && (
                 <span class="pf-arch" title={view.archetype.description}>
                     <Icon name={`lucide:${view.archetype.icon}`} />{view.archetype.name}
                 </span>
@@ -58,10 +60,12 @@ const typeLabel = (t: 'movie' | 'tv', year: string | null) => `${t === 'movie' ?
                 : isOwner && (
                     <a class="pf-bio-add" href="/perfil/publico#bio"><Icon name="lucide:pencil" />Añade unas líneas sobre ti</a>
                 )}
-            <div class="pf-counts">
-                {counts.map((c) => <span><b>{nf.format(c.n)}</b>{c.label}</span>)}
-            </div>
-            <ProfileActions relation={relation} firstName={firstName} />
+            {!view.locked && (
+                <div class="pf-counts">
+                    {counts.map((c) => <span><b>{nf.format(c.n)}</b>{c.label}</span>)}
+                </div>
+            )}
+            <ProfileActions viewer={viewer} rel={view.rel ?? undefined} person={{ id: view.ownerId, handle: view.handle, name: view.name }} />
         </div>
     </div>
 

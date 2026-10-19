@@ -20,7 +20,6 @@ import PosterTile from '../../../components/social/PosterTile.astro';
 import LogCard from '../../../components/social/LogCard.astro';
 import CollectionCard from '../../../components/social/CollectionCard.astro';
 import OwnerEmptyRow from '../../../components/social/OwnerEmptyRow.astro';
-import type { ProfileRelation } from '../../../components/social/ProfileActions.astro';
 import { Icon } from 'astro-icon/components';
 import { getPublicProfile } from '../../../services/BD/social/publicProfile';
 import { safeFetch } from '../../../utils/safeFetch';
@@ -40,7 +39,6 @@ if (handle !== view.handle) return Astro.redirect(`/u/${view.handle}`, 301);
 
 const isOwner = view.viewerRole === 'owner';
 const isGuest = view.viewerRole === 'guest';
-const relation: ProfileRelation = isOwner ? 'owner' : isGuest ? 'guest' : 'stranger';
 const firstName = view.name.split(/\s+/)[0] || view.name;
 const avatarSrc = view.hasAvatar ? `/api/u/${view.handle}/avatar?v=${view.avatarVersion}` : null;
 const canSave = !isOwner;
@@ -90,7 +88,7 @@ const ownCollections = view.ownCollectionsTotal ?? 0;
     ogUrl={publicUrl}
     robots={robots}
 >
-    <div class="pf-page" data-pf-page data-handle={view.handle} data-owner={isOwner ? '1' : ''} data-url={publicUrl}
+    <div class="pf-page" data-pf-page data-handle={view.handle} data-owner={isOwner ? '1' : ''} data-guest={isGuest ? '1' : ''} data-url={publicUrl}
          data-name={view.name} data-archetype-stale={isOwner && (!view.archetype || Date.now() - new Date(view.archetype.computed_at).getTime() > 7 * 24 * 60 * 60 * 1000) ? '1' : ''}>
 
         {isOwner && (
@@ -110,7 +108,15 @@ const ownCollections = view.ownCollectionsTotal ?? 0;
             </div>
         )}
 
-        <ProfileHeader view={view} relation={relation} avatarSrc={avatarSrc} />
+        <ProfileHeader view={view} avatarSrc={avatarSrc} />
+
+        {view.rel?.blockedByMe && (
+            <section class="pf-locked" aria-labelledby="pf-blocked-t">
+                <Stamp color="red" icon="ban" />
+                <h2 id="pf-blocked-t">Has bloqueado a {firstName}</h2>
+                <p>No ve tu perfil ni te encuentra al buscar, y no le hemos avisado. Desbloquear no recupera los follows.</p>
+            </section>
+        )}
 
         {blocks.map((b, i) => (
             <Fragment>

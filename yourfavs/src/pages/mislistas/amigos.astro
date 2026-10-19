@@ -1,0 +1,140 @@
+---
+/**
+ * Centro «Amigos» · /mislistas/amigos (F2 de la capa social; handoff social F2/F3 §7.1, D7–D7d y M4).
+ *
+ * Buscador «Añadir amigo» arriba (la acción principal), pestañas con contador y, a la derecha, tu
+ * enlace y la diferencia entre seguir y ser amigos. En la F2 las pestañas son Siguiendo, Seguidores
+ * y Bloqueados; Pendientes y Amigos llegan con la amistad (F3, `SOCIAL_PHASE.friends`).
+ *
+ * La pestaña de `?tab=` se pinta en el servidor; cambiar de pestaña, «Cargar más» y buscar los
+ * pinta `scripts/social/amigos.ts` con el mismo marcado (`lib/social/amigosView.ts`). Los botones
+ * de cada fila los atiende `scripts/social/relations.ts`.
+ *
+ * Todo es tuyo y de nadie más: ni el perfil público ni nadie enseña a quién sigues o quién te sigue.
+ */
+import Layout from '../../layouts/Layout.astro';
+import PersonalNav from '../../components/personal/PersonalNav.astro';
+import Stamp from '../../components/Stamp.astro';
+import { Icon } from 'astro-icon/components';
+import { listTab, tabCounts } from '../../services/BD/social/graph';
+import { panelHtml, tabsFor, TAB_LABEL } from '../../lib/social/amigosView';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+import type { FriendsTab } from '../../lib/social/types';
+import '../../styles/pages/social/amigos.css';
+
+export const prerender = false;
+
+const user = Astro.locals.user;
+const tabs = tabsFor(SOCIAL_PHASE);
+const asked = Astro.url.searchParams.get('tab') as FriendsTab | null;
+const tab: FriendsTab = asked && tabs.includes(asked) ? asked : tabs[0];
+const myHandle = user?.publicHandle && user.publicVisibility && user.publicVisibility !== 'off' ? user.publicHandle : null;
+
+let counts: Partial<Record<FriendsTab, number>> = {};
+let initial = '';
+if (user) {
+    const [c, page] = await Promise.all([tabCounts(user.uid), listTab(user.uid, tab)]);
+    counts = c;
+    initial = panelHtml(tab, page.items, { phase: SOCIAL_PHASE, myHandle, hasMore: page.hasMore });
+}
+const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
+---
+<Layout title="Amigos · YourFavs" robots="noindex, nofollow">
+    <div class="am" data-am data-tab={tab} data-my-handle={myHandle ?? ''} data-url={publicUrl}>
+        <div class="am-nav"><PersonalNav currentPage="/mislistas/amigos" /></div>
+
+        {!user ? (
+            <div class="so-emp am-guest">
+                <Stamp color="pink" icon="handshake" />
+                <h2>Entra para ver a tu gente</h2>
+                <p>Sigue a quien quieras, busca por nombre o @dirección y decide quién te ve.</p>
+                <button type="button" class="pf-btn pri sm" data-auth-open>Entrar</button>
+            </div>
+        ) : (
+            <div class="am-grid">
+                <div class="am-main">
+                    <h1 class="am-h1">Amigos</h1>
+                    <p class="am-sub">Busca a gente que conozcas, responde solicitudes y decide a quién sigues.</p>
+
+                    {!myHandle && (
+                        <div class="so-emp is-amber am-noprof">
+                            <Stamp color="amber" icon="at-sign" />
+                            <div>
+                                <h2>{SOCIAL_PHASE.friends ? 'Activa tu perfil para añadir amigos' : 'Activa tu perfil para que te encuentren'}</h2>
+                                <p>{SOCIAL_PHASE.friends
+                                    ? 'Quien recibe la solicitud tiene que saber quién eres. Solo hace falta elegir tu dirección; lo demás puede esperar.'
+                                    : 'Seguir a otros funciona sin él. Para salir en las búsquedas y tener tu enlace, solo hace falta elegir tu dirección.'}</p>
+                            </div>
+                            <a class="pf-btn pri sm" href="/perfil/publico#direccion">Activar mi perfil</a>
+                        </div>
+                    )}
+
+                    <label class="am-find" for="am-q">
+                        <Icon name="lucide:user-plus" />
+                        <span class="sr-only">Añadir amigo: nombre o @dirección</span>
+                        <input id="am-q" type="search" placeholder="Añadir amigo: nombre o @dirección" autocomplete="off" spellcheck="false"
+                               role="combobox" aria-expanded="false" aria-controls="am-results" aria-autocomplete="list" maxlength="60" />
+                        <kbd aria-hidden="true">/</kbd>
+                    </label>
+                    <p class="am-help"><Icon name="lucide:info" />Solo salen perfiles públicos. Nadie sabe a quién buscas.</p>
+
+                    <div id="am-results" class="am-results" aria-live="polite" hidden></div>
+
+                    <div id="am-tabsview">
+                        <div class="am-tabs" role="tablist" aria-label="Personas">
+                            {tabs.map((t) => {
+                                const n = counts[t] ?? 0;
+                                const hot = t === 'pendientes' && n > 0;
+                                return (
+                                    <button type="button" role="tab" class="am-tab" id={`am-tab-${t}`} data-tab={t}
+                                            aria-selected={t === tab ? 'true' : 'false'} aria-controls="am-panel" tabindex={t === tab ? 0 : -1}>
+                                        {TAB_LABEL[t]}
+                                        <span class:list={['c', { hot }]} aria-label={hot ? `${n} sin responder` : String(n)} data-count={t}>{n}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div id="am-panel" class="am-panel" role="tabpanel" aria-labelledby={`am-tab-${tab}`} tabindex="0" set:html={initial} />
+                    </div>
+                </div>
+
+                <aside class="am-side">
+                    <div class="am-card">
+                        <h3><Icon name="lucide:link" />Tu enlace</h3>
+                        {myHandle ? (
+                            <>
+                                <p>Quien se registre desde él te seguirá{SOCIAL_PHASE.friends ? ' y podrá pedirte amistad' : ''}.</p>
+                                <div class="am-copy">
+                                    <span class="am-copy-u">yourfavs.app/u/{myHandle}</span>
+                                    <button type="button" class="pf-btn sm" data-am-copy><Icon name="lucide:copy" />Copiar</button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p>Activa tu perfil para tener enlace: quien se registre desde él te seguirá.</p>
+                                <a class="pf-btn sm am-card-btn" href="/perfil/publico#direccion">Activar mi perfil</a>
+                            </>
+                        )}
+                    </div>
+                    <div class="am-card">
+                        <h3>Seguir y ser amigos</h3>
+                        <p>Son dos cosas distintas y no dependen una de otra.</p>
+                        <div class="am-rel">
+                            <span class="am-rel-st" style="--sb: var(--stamp-slate); --si: var(--stamp-slate-ink)"><Icon name="lucide:user-plus" /></span>
+                            <div><b>Seguir</b> es libre y en un sentido. No pide permiso.</div>
+                            <span class="am-rel-st" style="--sb: var(--stamp-pink); --si: var(--stamp-pink-ink)"><Icon name="lucide:handshake" /></span>
+                            <div>{SOCIAL_PHASE.friends
+                                ? <Fragment><b>Amigos</b> es por solicitud. Desbloquea perfiles «Solo amigos» y, pronto, recomendaros cosas.</Fragment>
+                                : <Fragment><b>Amigos</b> será por solicitud: la otra persona acepta o no. Llega muy pronto.</Fragment>}</div>
+                        </div>
+                        <p class="am-note"><Icon name="lucide:eye-off" />{SOCIAL_PHASE.friends ? 'Rechazar o bloquear no avisa a nadie.' : 'Bloquear no avisa a nadie.'}</p>
+                    </div>
+                </aside>
+            </div>
+        )}
+    </div>
+</Layout>
+
+<script>
+    import '../../scripts/social/amigos';
+</script>

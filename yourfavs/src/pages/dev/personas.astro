@@ -1,0 +1,88 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO (handoff social F2/F3, hoja de componentes CS): la fila de
+ * persona en todos sus estados y los avisos de la campana, con todas las fases encendidas, para
+ * revisarlos en claro, oscuro y móvil. Datos inventados: los botones no tocan nada real (los uid no
+ * existen, así que el servidor responde con error y el botón vuelve a su sitio). En producción: 404.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { avatarHtml, initialsOf, notifItemHtml, personRowHtml, stampFor } from '../../lib/social/ui';
+import { NO_RELATION, type NotifView, type PersonCard, type Relation } from '../../lib/social/types';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+const ALL = { follow: true, friends: true, recommend: true, block: true };
+const F2 = { follow: true, friends: false, recommend: false, block: true };
+let n = 0;
+const P = (name: string, handle: string | null, arch: [string, string] | null = ['El Cinéfilo de Autor', 'clapperboard']): PersonCard => {
+    const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+    return { id, handle, name, avatar: null, archetype: arch ? { name: arch[0], icon: arch[1] } : null, color: stampFor(id), initials: initialsOf(name) };
+};
+const r = (p: Partial<Relation>): Relation => ({ ...NO_RELATION, ...p });
+
+const ROWS: [string, PersonCard, Relation, Record<string, unknown>][] = [
+    ['Desconocido', P('Luna Vidal', 'lunavidal'), r({}), {}],
+    ['Le sigues', P('Luis Prado', 'luisprado', ['El Devorador de Series', 'tv']), r({ iFollow: true }), {}],
+    ['Te sigue', P('Ana Ruiz', 'ana_ve'), r({ followsMe: true }), {}],
+    ['Os seguís', P('Pablo Rey', 'pablorey', ['El Explorador Curioso', 'compass']), r({ iFollow: true, followsMe: true }), {}],
+    ['Sin perfil activo (te sigue)', P('Marta Vela', null, null), r({ followsMe: true }), {}],
+    ['Bloqueado', P('Diego Sanz', 'dsanz'), r({ blockedByMe: true }), { meta: ['bloqueado hace 2 semanas'], hideArchetype: true }],
+    ['Tú', P('Fran Bas', 'fran'), r({}), { isMe: true, meta: ['así sales en las búsquedas'] }],
+    ['[F3] Solicitud recibida', P('Marcos Gil', 'marcosgil', ['El Devorador de Series', 'tv']), r({ requestIn: true }), { meta: ['hace 3 h'], phase: ALL }],
+    ['[F3] Amigos', P('Lucía Ferrer', 'lucia_cine'), r({ iFollow: true, friends: true }), { meta: ['Amigos desde mayo'], phase: ALL }],
+];
+
+const now = Date.now();
+const H = 3600 * 1000;
+const ana = P('Ana Ruiz', 'ana_ve');
+const NOTIFS: [string, NotifView][] = [
+    ['Un botón', { id: 'a', type: 'follow', title: '', subtitle: '', href: '', poster_path: null, created_at: now - 2 * H, read: false, actor: ana, rel: r({ followsMe: true }) }],
+    ['Un botón · resuelto', { id: 'b', type: 'follow', title: '', subtitle: '', href: '', poster_path: null, created_at: now - 2 * H, read: true, actor: ana, rel: r({ followsMe: true, iFollow: true }) }],
+    ['De siempre · enlace', { id: 'c', type: 'new_episode', title: 'Severance', subtitle: 'Nuevo episodio · T2 · E5', href: '/serie/95396', poster_path: '/pPHpeI2X1qEd1CS1SeyrdhZ4qnT.jpg', created_at: now - 5 * H, read: false }],
+    ['De siempre · leído', { id: 'd', type: 'person_release', title: 'Thunderbolts*', subtitle: 'Estreno · Florence Pugh', href: '/movie/986056', poster_path: null, created_at: now - 4 * 24 * H, read: true }],
+];
+---
+<Layout title="Prueba · personas y avisos" robots="noindex, nofollow">
+    <div style="max-width: 980px; margin: 0 auto; padding: 0 4px 48px;">
+        <h1 style="font: 700 22px var(--font); margin: 0 0 6px;">Personas y avisos · todos los estados</h1>
+        <p style="font-size: 13px; color: var(--text-2); margin: 0 0 24px;">
+            Marcado de <code>lib/social/ui.ts</code>, el mismo que pintan el centro «Amigos», el ⌘K y la campana.
+            Lo marcado [F3] sale con la amistad encendida.
+        </p>
+
+        <h2 style="font: 600 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); margin: 0 0 12px;">Fila de persona</h2>
+        <div style="display: grid; gap: 8px;">
+            {ROWS.map(([label, p, rel, o]) => (
+                <div>
+                    <div style="font: 600 10px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); margin-bottom: 4px;">{label}</div>
+                    <div class="so-list" set:html={personRowHtml(p, rel, { phase: F2, ...o } as any)} />
+                </div>
+            ))}
+        </div>
+
+        <h2 style="font: 600 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); margin: 32px 0 12px;">Avatar · tamaños</h2>
+        <div style="display: flex; gap: 14px; align-items: center;" set:html={[56, 44, 40, 38, 36].map((s) => avatarHtml(ana, s)).join('') + avatarHtml(ana, 40, ['slate', 'user-plus'])} />
+
+        <h2 style="font: 600 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); margin: 32px 0 12px;">Aviso de la campana</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 404px), 1fr)); gap: 16px;">
+            {NOTIFS.map(([label, it]) => (
+                <div>
+                    <div style="font: 600 10px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-2); margin-bottom: 4px;">{label}</div>
+                    <div class="notif-list" style="background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; padding: 0;"
+                         set:html={notifItemHtml(it, { phase: F2, now })} />
+                </div>
+            ))}
+        </div>
+
+        <h2 style="font: 600 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); margin: 32px 0 12px;">Bloquear</h2>
+        <div class="pf-acts" data-person="00000000-0000-4000-8000-999999999999" data-name="Diego Sanz" data-handle="dsanz">
+            <button type="button" class="pf-btn" data-sa="block">Abrir el diálogo «¿Bloquear a Diego Sanz?»</button>
+        </div>
+        <p style="font-size: 12px; color: var(--text-2); margin-top: 8px;">Al confirmar, el servidor responde con error (el uid no existe) y no se cierra: es lo esperado aquí.</p>
+    </div>
+</Layout>

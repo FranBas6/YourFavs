@@ -57,7 +57,8 @@ export interface UserProfile {
     /** Catálogo y ruleta arrancan ya filtrados a `platforms` (Ajustes · A3). */
     platformsFilterDefault?: boolean;
     /** Toggles de la campana por tipo (Bloque 4). Ausente = todo activado. */
-    notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean; streak?: boolean };
+    /** `social`: avisos entre personas (alguien te sigue…); los respeta la BD al crearlos. */
+    notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean; streak?: boolean; social?: boolean };
     /**
      * §2 modo sin spoilers, versión original: un único booleano que tapaba fotograma + sinopsis
      * juntos. **Ya no se escribe**; se conserva solo para LEER perfiles que nunca han vuelto a

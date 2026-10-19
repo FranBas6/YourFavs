@@ -7,6 +7,11 @@
  *     `POST /api/profile/hidden`, y ofrece Deshacer (`DELETE`) devolviéndolo a su sitio.
  *   · Menús de los botones de relación (fases F2+; en F1 no se pintan).
  *   · Arquetipo (solo dueño): si el guardado tiene más de 7 días, se recalcula en segundo plano.
+ *   · Invitado: recuerda por qué perfil llegó (cookie `yf_ref`, 30 días) para que, si crea la
+ *     cuenta, siga a esa persona y el modal diga quién le invita (F2). Va en el navegador porque
+ *     la página del invitado sale del CDN y no puede llevar `Set-Cookie`.
+ *
+ * Seguir, bloquear y demás botones de relación los atiende `scripts/social/relations.ts`.
  */
 export {};
 
@@ -29,6 +34,13 @@ function toast(message: string, type: 'success' | 'error' = 'success') {
 function init(root: HTMLElement) {
     const url = root.dataset.url || location.href;
     const name = root.dataset.name || '';
+
+    // ---- Llegada por enlace (invitado) -------------------------------------------------
+    // La última dirección visitada es la que cuenta: es el enlace que acabó convenciendo.
+    if (root.dataset.guest && root.dataset.handle) {
+        const secure = location.protocol === 'https:' ? '; Secure' : '';
+        document.cookie = `yf_ref=${encodeURIComponent(root.dataset.handle)}; Max-Age=${30 * 24 * 60 * 60}; Path=/; SameSite=Lax${secure}`;
+    }
 
     // ---- Compartir / copiar enlace -----------------------------------------------
     // Hoja nativa solo donde tiene sentido (pantallas táctiles): en escritorio, Chrome y Safari
@@ -146,7 +158,7 @@ function init(root: HTMLElement) {
         const action = t.closest<HTMLElement>('[data-action]')?.dataset.action;
         if (action === 'share') { share(); return; }
         if (action === 'copy-link') { closeMenus(); copyLink(); return; }
-        // follow-toggle, friend-*, recommend, block: se conectan en sus fases (F2–F4).
+        // recommend: llega en la F4.
     });
 
     // ---- Arquetipo (dueño) ------------------------------------------------------------

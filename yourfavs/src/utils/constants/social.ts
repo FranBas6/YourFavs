@@ -5,15 +5,15 @@
  * relación), pero cada botón solo se pinta si su fase está activa. Así, F2/F3/F4 consisten en
  * cambiar una constante y conectar sus endpoints, no en rehacer la cabecera del perfil.
  *
- * En F1 está todo apagado: a un visitante solo le queda el botón «Compartir».
+ * F1: todo apagado (a un visitante solo le quedaba «Compartir»). F2: seguir y bloquear.
  */
 export const SOCIAL_PHASE = {
     /** F2 · seguir / dejar de seguir. */
-    follow: false,
+    follow: true,
     /** F3 · amistad por solicitud y la visibilidad «Solo amigos». */
     friends: false,
     /** F4 · recomendar a un amigo. */
     recommend: false,
     /** F2 · bloquear. */
-    block: false,
+    block: true,
 } as const;

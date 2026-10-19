@@ -1,0 +1,114 @@
+/* =====================================================================================
+   Centro «Amigos» · /mislistas/amigos (handoff social F2/F3 §7.1). Filas, botones y avatares
+   vienen de styles/components/social-ui.css. Solo tokens. Móvil por debajo de 1024 px: sin
+   PersonalNav ni columna lateral, buscador a todo el ancho y pestañas en carril.
+   ===================================================================================== */
+
+.am { padding: 4px 1px 28px; }
+@media (min-width: 1024px) { .am { padding: 0 0 64px; } }
+.am-nav { display: none; }
+@media (min-width: 1024px) { .am-nav { display: block; margin-bottom: 4px; } }
+
+.am-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+@media (min-width: 1024px) { .am-grid { grid-template-columns: minmax(0, 1fr) 300px; gap: 40px; align-items: start; } }
+.am-side { display: none; }
+@media (min-width: 1024px) { .am-side { display: block; } }
+
+.am-h1 { font: 700 24px var(--font); letter-spacing: -.02em; color: var(--text); margin: 0; }
+@media (min-width: 1024px) { .am-h1 { font-size: 28px; } }
+.am-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 14px; max-width: 60ch; }
+@media (min-width: 1024px) { .am-sub { font-size: 13.5px; margin-bottom: 20px; } }
+
+/* Buscador «Añadir amigo» */
+.am-find {
+    display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; cursor: text;
+    border-radius: var(--r-md); background: var(--bg-elev); border: 1px solid var(--border-strong);
+}
+.am-find:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.am-find > svg { width: 18px; height: 18px; color: var(--text-3); flex-shrink: 0; }
+.am-find input {
+    flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; padding: 0;
+    font: 400 14px var(--font); color: var(--text);
+}
+.am-find input::placeholder { color: var(--text-3); }
+.am-find input::-webkit-search-cancel-button { cursor: pointer; }
+.am-find kbd {
+    font: 500 11px var(--font-mono); color: var(--text-3); border: 1px solid var(--border);
+    border-radius: 6px; padding: 2px 6px; background: var(--bg-tint);
+}
+@media (max-width: 1023.98px) { .am-find kbd { display: none; } }
+.am-help { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-size: 12px; color: var(--text-2); }
+.am-help svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* Pestañas: píldoras, la activa invertida (sirve en los dos temas sin reglas propias). */
+.am-tabs {
+    display: flex; gap: 6px; margin: 18px -12px 14px 0; padding-right: 12px;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.am-tabs::-webkit-scrollbar { display: none; }
+@media (min-width: 1024px) { .am-tabs { flex-wrap: wrap; overflow: visible; margin: 26px 0 18px; padding: 0; } }
+.am-tab {
+    flex-shrink: 0; display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px;
+    border-radius: var(--r-full); border: 1px solid var(--border); background: var(--bg-elev);
+    font: 500 13px var(--font); color: var(--text-2); white-space: nowrap; cursor: pointer;
+}
+@media (min-width: 1024px) { .am-tab { height: 36px; } }
+.am-tab:hover { color: var(--text); border-color: var(--border-strong); }
+.am-tab[aria-selected="true"] { background: var(--text); border-color: var(--text); color: var(--bg-elev); font-weight: 600; }
+.am-tab .c { font: 600 11px var(--font-mono); opacity: .75; }
+.am-tab .c.hot {
+    opacity: 1; min-width: 19px; height: 19px; padding: 0 5px; border-radius: var(--r-full);
+    background: var(--accent-dark); color: #fff; display: grid; place-items: center; font-weight: 700;
+}
+.am-panel:focus { outline: none; }
+.am-panel:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: var(--r-lg); }
+
+/* Resultados del buscador */
+.am-results { margin-top: 18px; }
+.am-grp {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 10px;
+    font: 600 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2);
+}
+.am-grp span { font: 400 12px var(--font); letter-spacing: 0; text-transform: none; white-space: nowrap; }
+.am-grp hr { flex: 1; border: 0; border-top: 1px solid var(--border); margin: 0; }
+
+.am-note { display: flex; align-items: center; gap: 7px; margin: 10px 0 0; font-size: 12px; color: var(--text-2); }
+.am-note svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--text-3); }
+.am-more { margin: 12px auto 0; display: flex; }
+
+/* Vacíos (y avisos sin perfil): stamp, etiqueta, título, texto y botón. */
+.so-emp {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 22px;
+    border-radius: var(--r-lg); background: var(--bg-elev); border: 1px solid var(--border);
+}
+.so-emp h2 { font: 600 14.5px var(--font); color: var(--text); margin: 0; }
+.so-emp p { font-size: 12.5px; line-height: 1.5; color: var(--text-2); margin: 0 0 8px; max-width: 60ch; }
+.so-emp-st { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 6px; background: var(--sb); color: var(--si); }
+.so-emp-st svg { width: 19px; height: 19px; }
+.so-emp.is-flat { padding: 16px 18px; }
+.am-noprof { margin-bottom: 16px; }
+@media (min-width: 1024px) {
+    .am-noprof { flex-direction: row; align-items: center; gap: 16px; }
+    .am-noprof p { margin: 2px 0 0; }
+    .am-noprof .pf-btn { margin-left: auto; flex-shrink: 0; }
+}
+.am-noprof .yf-stamp { flex-shrink: 0; }
+.am-guest { max-width: 520px; margin: 24px auto; align-items: center; text-align: center; }
+
+/* Columna lateral */
+.am-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; margin-bottom: 14px; }
+.am-card h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; font: 600 14px var(--font); color: var(--text); }
+.am-card h3 svg { width: 16px; height: 16px; color: var(--text-2); }
+.am-card > p { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+.am-card-btn { margin-top: 12px; }
+.am-copy { display: flex; gap: 8px; align-items: center; margin-top: 12px; }
+.am-copy-u {
+    flex: 1; min-width: 0; height: 38px; padding: 0 10px; display: flex; align-items: center;
+    border-radius: 8px; background: var(--bg-tint); border: 1px solid var(--border);
+    font: 500 12px var(--font-mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.am-rel { display: grid; grid-template-columns: 28px 1fr; gap: 4px 10px; margin-top: 12px; font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
+.am-rel b { color: var(--text); font-weight: 600; }
+.am-rel > div { padding-bottom: 10px; }
+.am-rel-st { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--sb); color: var(--si); }
+.am-rel-st svg { width: 15px; height: 15px; }

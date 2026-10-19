@@ -6,6 +6,11 @@
  * stacking del panel móvil). Se abre con ⌘K / Ctrl+K o con el evento
  * `yf:open-palette` (lo dispara la lupa del header). Una llamada con debounce
  * a /api/search/multi por tecleo; navegación ↑↓ + Enter; Esc cierra.
+ *
+ * Ámbito «Personas» (capa social F2, solo con sesión): busca perfiles públicos en
+ * /api/social/people y pinta cada fila con `window.yfSocial` (lo pone scripts/social/relations.ts,
+ * que se carga con sesión), el mismo marcado que el centro «Amigos». ↵ abre el perfil y ⌥↵ sigue
+ * sin cerrar.
  */
 import '../styles/components/command-palette.css';
 // 4.3 · el toggle "Lo mío" solo aparece con sesión (necesita la biblioteca del uid).
@@ -36,6 +41,12 @@ const isLogged = !!Astro.locals.user;
                 <button class="cmdk-scope-btn" type="button" data-scope="mine" role="tab" aria-selected="false">Lo mío</button>
             )}
             <button class="cmdk-scope-btn" type="button" data-scope="cast" role="tab" aria-selected="false">Por reparto</button>
+            {isLogged && (
+                <button class="cmdk-scope-btn" type="button" data-scope="people" role="tab" aria-selected="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Personas<span class="cmdk-new">Nuevo</span>
+                </button>
+            )}
         </div>
 
         <!-- Barra "Por reparto": chips de actores + toggle Y/O + contador (solo en ese modo) -->
@@ -55,8 +66,11 @@ const isLogged = !!Astro.locals.user;
         </div>
 
         <div class="cmdk-footer">
-            <span class="cmdk-hint-keys"><span class="cmdk-kbd">↵</span> ver todos</span>
-            <span class="cmdk-hint-keys"><span class="cmdk-kbd">↑↓</span>+<span class="cmdk-kbd">↵</span> abrir</span>
+            <span class="cmdk-hint-keys" data-hint="search"><span class="cmdk-kbd">↵</span> ver todos</span>
+            <span class="cmdk-hint-keys" data-hint="search"><span class="cmdk-kbd">↑↓</span>+<span class="cmdk-kbd">↵</span> abrir</span>
+            <span class="cmdk-hint-keys" data-hint="people" hidden><span class="cmdk-kbd">↵</span> abrir perfil</span>
+            <span class="cmdk-hint-keys" data-hint="people" hidden><span class="cmdk-kbd">⌥</span><span class="cmdk-kbd">↵</span> seguir</span>
+            <span class="cmdk-people-note" data-hint="people" hidden>Solo perfiles públicos</span>
             <a class="cmdk-see-all" id="cmdk-see-all" href="/catalogo/busqueda" hidden>Ver todos los resultados</a>
         </div>
     </div>
@@ -77,7 +91,7 @@ const isLogged = !!Astro.locals.user;
     var debounceTimer = null;
     var controller = null;   // AbortController del fetch en vuelo
     var lastFocus = null;    // foco previo, para restaurarlo al cerrar
-    var mode = 'all';        // 'all' = TMDB (multi) · 'mine' = mi biblioteca (4.3) · 'cast' = por reparto
+    var mode = 'all';        // 'all' = TMDB (multi) · 'mine' = mi biblioteca (4.3) · 'cast' = por reparto · 'people' = personas (F2 social)
 
     // ---- "Por reparto": chips de actores + intersección de sus repartos ----
     var castBar = document.getElementById('cmdk-cast');
@@ -169,6 +183,9 @@ const isLogged = !!Astro.locals.user;
             b.setAttribute('aria-selected', on ? 'true' : 'false');
         });
         castBar.hidden = (m !== 'cast');
+        overlay.querySelectorAll('[data-hint]').forEach(function (h) {
+            h.hidden = (h.getAttribute('data-hint') === 'people') !== (m === 'people');
+        });
 
         if (m === 'cast') {
             input.value = '';
@@ -182,7 +199,9 @@ const isLogged = !!Astro.locals.user;
 
         input.placeholder = m === 'mine'
             ? 'Buscar en tu biblioteca (título o etiqueta)...'
-            : 'Buscar películas, series, personas...';
+            : m === 'people'
+                ? 'Buscar gente por nombre o @dirección…'
+                : 'Buscar películas, series, personas...';
         var q = input.value.trim();
         if (q.length >= (m === 'mine' ? 1 : 2)) runSearch(q); else { renderEmpty(); updateSeeAll(''); }
         input.focus();
@@ -229,6 +248,7 @@ const isLogged = !!Astro.locals.user;
     });
 
     function runSearch(q) {
+        if (mode === 'people') { runPeople(q); return; }
         if (controller) controller.abort();
         controller = new AbortController();
 
@@ -250,6 +270,41 @@ const isLogged = !!Astro.locals.user;
             });
     }
 
+    // ---- Personas (capa social F2) ----
+    function runPeople(q) {
+        if (controller) controller.abort();
+        controller = new AbortController();
+        fetch('/api/social/people?limit=8&q=' + encodeURIComponent(q), { signal: controller.signal })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (mode !== 'people' || input.value.trim() !== q) return;
+                if (!data || !data.ok) { renderHint('No se pudo buscar. Inténtalo de nuevo.'); return; }
+                renderPeople(data.items || []);
+            })
+            .catch(function (err) {
+                if (err && err.name === 'AbortError') return;
+                renderHint('No se pudo buscar. Inténtalo de nuevo.');
+            });
+    }
+
+    function renderPeople(list) {
+        items = [];
+        selected = -1;
+        if (!list.length || !window.yfSocial) {
+            renderHint('Nadie con «' + input.value.trim() + '». Solo salen perfiles públicos.');
+            return;
+        }
+        var html = '<div class="cmdk-group-label">PERFILES</div>';
+        list.forEach(function (e) {
+            var idx = items.length;
+            items.push({ title: e.person.name, href: e.person.handle ? '/u/' + e.person.handle : '#', person: true });
+            html += '<div class="cmdk-item cmdk-person" role="option" aria-selected="false" data-idx="' + idx + '">' + window.yfSocial.cmdkRowHtml(e) + '</div>';
+        });
+        results.innerHTML = html;
+        // Aquí ↵ abre el perfil resaltado o, sin resaltado, el primero: se preselecciona.
+        select(0, true);
+    }
+
     // ---- render ----
     function renderHint(text) {
         items = [];
@@ -262,6 +317,7 @@ const isLogged = !!Astro.locals.user;
     function renderEmpty() {
         items = [];
         selected = -1;
+        if (mode === 'people') { renderHint('Escribe un nombre o una @dirección.'); return; }
         var html = '';
 
         var recents = getRecents();
@@ -504,7 +560,7 @@ const isLogged = !!Astro.locals.user;
 
     function updateSeeAll(q) {
         // "Lo mío" y "Por reparto" no tienen página de "ver todos".
-        if (!q || mode === 'mine' || mode === 'cast') {
+        if (!q || mode === 'mine' || mode === 'cast' || mode === 'people') {
             seeAll.hidden = true;
             if (goBtn) goBtn.hidden = true;
             return;
@@ -537,6 +593,13 @@ const isLogged = !!Astro.locals.user;
         else if (e.key === 'ArrowUp') { e.preventDefault(); select(selected - 1, true); }
         else if (e.key === 'Enter') {
             e.preventDefault();
+            if (mode === 'people') {
+                var node = results.querySelectorAll('.cmdk-item')[selected];
+                // ⌥↵ sigue sin cerrar; ↵ abre el perfil.
+                if (e.altKey) { if (node && window.yfSocial) window.yfSocial.follow(node.querySelector('[data-person]') || node); }
+                else if (items[selected]) openItem(items[selected]);
+                return;
+            }
             if (selected >= 0 && navKeyboard && items[selected]) {
                 // Selección explícita con ↑↓ → abre ese item (ficha o acción)
                 openItem(items[selected]);

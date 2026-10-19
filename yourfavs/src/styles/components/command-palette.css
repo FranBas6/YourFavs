@@ -346,3 +346,28 @@
     .cmdk-panel { max-height: 88vh; }
     .cmdk-footer .cmdk-hint-keys { display: none; }
 }
+
+/* ---- Ámbito «Personas» (capa social F2) ----
+   La fila es la de persona de styles/components/social-ui.css (.so-row), sin su borde ni su
+   padding de lista. La resaltada lleva --bg-tint (handoff social D12) y enseña el ↵. */
+.cmdk-scope-btn[data-scope="people"] { display: inline-flex; align-items: center; gap: 6px; }
+.cmdk-scope-btn svg { width: 14px; height: 14px; }
+.cmdk-new {
+    font: 600 9px var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+    padding: 1px 5px; border-radius: var(--r-full); background: var(--stamp-blue); color: var(--stamp-blue-ink);
+}
+.cmdk-person { display: block; padding: 0; }
+.cmdk-person[aria-selected="true"] { background: var(--bg-tint); }
+.cmdk-person .so-row { padding: 10px 12px; border: 0; }
+.cmdk-person .so-row:hover { background: none; }
+.cmdk-enter {
+    display: none; font: 500 11px var(--font-mono); color: var(--text-3);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
+}
+@media (min-width: 1024px) { .cmdk-person[aria-selected="true"] .cmdk-enter { display: inline-block; } }
+.cmdk-people-note { margin-left: auto; font-size: 11.5px; color: var(--text-2); }
+.cmdk-hint-keys[hidden], .cmdk-people-note[hidden] { display: none; }
+/* Con cuatro ámbitos no caben en un móvil: carril horizontal. */
+.cmdk-scope { overflow-x: auto; scrollbar-width: none; }
+.cmdk-scope::-webkit-scrollbar { display: none; }
+.cmdk-scope-btn { flex-shrink: 0; white-space: nowrap; }

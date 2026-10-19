@@ -69,6 +69,8 @@ const myListsItems = [
     { href: "/mislistas/actores",    color: "slate",  icon: "user",     title: "Actores",    desc: "Favoritos y avisos" },
     { href: "/mislistas/colecciones", color: "purple", icon: "library", title: "Mis colecciones", desc: "Listas personalizadas" },
     { href: "/mislistas/actividad",  color: "green",  icon: "activity", title: "Actividad",  desc: "Tu historial" },
+    // Capa social (F2): el globo es de solicitudes de amistad sin responder (F3), lo rellena bell.ts.
+    { href: "/mislistas/amigos",     color: "pink",   icon: "handshake", title: "Amigos",   desc: "Seguir y amistad", pendingBadge: true },
 ];
 const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
 ---
@@ -124,6 +126,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                             id="mislistas-btn" aria-haspopup="true" aria-expanded="false">
                         <Icon name="lucide:bookmark" class="w-4 h-4" />
                         Mis listas
+                        <span class="header-pending-badge js-pending-badge" hidden></span>
                         <svg class="header-discover-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
                         </svg>
@@ -138,6 +141,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                         <span class="hd-t">{it.title}</span>
                                         <span class="hd-s">{it.desc}</span>
                                     </span>
+                                    {it.pendingBadge && <span class="header-pending-badge js-pending-badge" hidden></span>}
                                 </a>
                             ))}
                         </div>
@@ -669,123 +673,14 @@ yfRegisterDropdown('account', 'account-btn');
     }
 })();
 
-// ── Campana (Bloque 4): desplegable de notificaciones + badge de no leídas ──
-(function () {
-    var badges = document.querySelectorAll('.js-notif-badge');
-    function setBadge(n) {
-        var txt = n > 9 ? '9+' : String(n);
-        badges.forEach(function (b) { if (n > 0) { b.textContent = txt; b.hidden = false; } else { b.hidden = true; } });
-    }
-    // Dieta de lecturas: el badge se cachea en localStorage. Las notificaciones se
-    // materializan 1×/día (dentro de /api/notifications/count), así que consultarlo en
-    // CADA navegación es tirar lecturas de Firestore a la basura. Solo consultamos si el
-    // caché es de OTRO día (para disparar la materialización diaria) o si venció el TTL.
-    // Leer / leer-todo actualizan el caché al instante → el badge siempre va fino.
-    var NKEY = 'yf_notif_badge', NTTL = 30 * 60 * 1000;
-    function nToday() { return new Date().toISOString().slice(0, 10); }
-    function nCacheGet() { try { var o = JSON.parse(localStorage.getItem(NKEY) || 'null'); return (o && typeof o.count === 'number') ? o : null; } catch (e) { return null; } }
-    function nCacheSet(n) { try { localStorage.setItem(NKEY, JSON.stringify({ count: n | 0, ts: Date.now(), day: nToday() })); } catch (e) { } }
-    function nFetch() {
-        fetch('/api/notifications/count', { headers: { Accept: 'application/json' } })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) { if (d) { setBadge(d.count | 0); nCacheSet(d.count | 0); } })
-            .catch(function () { });
-    }
-    var nc = nCacheGet();
-    if (nc && nc.day === nToday() && (Date.now() - nc.ts) < NTTL) setBadge(nc.count | 0);
-    else nFetch();
+// ── Campana (Bloque 4): el globo y el desplegable viven en scripts/notifications/bell.ts
+// (módulo, debajo): desde la F2 social pintan avisos con botones con lib/social/ui.ts. ──
+</script>
 
-    var btn = document.getElementById('notif-toggle-btn');
-    var drop = document.getElementById('notif-dropdown');
-    var list = document.getElementById('notif-list');
-    var markAllBtn = document.getElementById('notif-markall');
-    if (!btn || !drop || !list) return;
-
-    var isOpen = false, loaded = false;
-    var IMG = 'https://image.tmdb.org/t/p/w92';
-    var ICON = {
-        new_episode: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M8 3l4 3 4-3"/>',
-        on_platform: '<path d="M4 8l2 12h12l2-12z"/><path d="M4 8l3-4 5 3 5-3 3 4"/>',
-        person_release: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M11 4v16"/>',
-        anniversary: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/>',
-        platform_change: '<path d="M4 8l2 12h12l2-12z"/><path d="M4 8l3-4 5 3 5-3 3 4"/>',
-        streak: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>'
-    };
-    var COLOR = { new_episode: '#3b82f6', on_platform: '#2f7d52', person_release: '#c4392f', anniversary: '#6d4aa0', platform_change: '#2f7d52', streak: '#d97706' };
-
-    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-    function svg(type) { return '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (ICON[type] || ICON.new_episode) + '</svg>'; }
-    function bucket(ts) { var d = 86400000, n = Date.now(); if (n - ts < d) return 'Hoy'; if (n - ts < 7 * d) return 'Esta semana'; return 'Antes'; }
-
-    function render(items) {
-        if (!items.length) { list.innerHTML = '<p class="notif-empty">No hay notificaciones.</p>'; return; }
-        var html = '', lastBucket = '';
-        items.forEach(function (it) {
-            var b = bucket(it.created_at);
-            if (b !== lastBucket) { html += '<p class="notif-group">' + b + '</p>'; lastBucket = b; }
-            var color = COLOR[it.type] || '#3b82f6';
-            html += '<a href="' + esc(it.href) + '" class="notif-item' + (it.read ? '' : ' is-unread') + '" data-id="' + esc(it.id) + '">';
-            html += '<span class="notif-ico" style="color:' + color + ';background:' + color + '1a;">' + svg(it.type) + '</span>';
-            html += it.poster_path ? '<img class="notif-poster" src="' + IMG + it.poster_path + '" alt="" loading="lazy"/>' : '<span class="notif-poster"></span>';
-            html += '<span class="notif-body"><span class="notif-sub">' + esc(it.subtitle) + '</span><span class="notif-name">' + esc(it.title) + '</span></span>';
-            html += it.read ? '' : '<span class="notif-dot"></span>';
-            html += '</a>';
-        });
-        list.innerHTML = html;
-    }
-
-    function load() {
-        fetch('/api/notifications', { headers: { Accept: 'application/json' } })
-            .then(function (r) { return r.ok ? r.json() : null; })
-            .then(function (d) {
-                if (!d || !d.ok) { list.innerHTML = '<p class="notif-empty">No se pudieron cargar.</p>'; return; }
-                render(d.items || []);
-                setBadge(d.unread | 0);
-                nCacheSet(d.unread | 0); // el desplegable trae el conteo fresco → refresca caché
-            })
-            .catch(function () { list.innerHTML = '<p class="notif-empty">No se pudieron cargar.</p>'; });
-    }
-
-    function setOpen(v) {
-        isOpen = v;
-        btn.setAttribute('aria-expanded', v ? 'true' : 'false');
-        drop.style.display = v ? 'block' : 'none';
-        if (v && !loaded) { loaded = true; load(); }
-    }
-
-    var panel = { isOpen: function () { return isOpen; }, close: function () { setOpen(false); } };
-    if (window.yfHeaderPanels) window.yfHeaderPanels.push(panel);
-
-    btn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        // Móvil (<1024px): el desplegable no cabe → navegar a la página (como el calendario).
-        if (window.innerWidth < 1024) { window.location.href = '/mislistas/notificaciones'; return; }
-        if (!isOpen) yfClosePanels(panel);
-        setOpen(!isOpen);
-    });
-    document.addEventListener('click', function (e) {
-        if (isOpen && !drop.contains(e.target) && !btn.contains(e.target)) setOpen(false);
-    });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen) setOpen(false); });
-
-    // Al abrir una notificación: marcar leída (keepalive para que persista pese a navegar).
-    list.addEventListener('click', function (e) {
-        var item = e.target.closest('.notif-item');
-        if (!item || !item.classList.contains('is-unread')) return;
-        item.classList.remove('is-unread');
-        var dot = item.querySelector('.notif-dot'); if (dot) dot.remove();
-        var _c = nCacheGet(); var _n = Math.max(0, ((_c && _c.count) || 1) - 1); nCacheSet(_n); setBadge(_n);
-        fetch('/api/notifications', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read', id: item.getAttribute('data-id') }) }).catch(function () {});
-    });
-
-    if (markAllBtn) markAllBtn.addEventListener('click', function () {
-        fetch('/api/notifications', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read_all' }) })
-            .then(function () {
-                list.querySelectorAll('.notif-item.is-unread').forEach(function (el) { el.classList.remove('is-unread'); var d = el.querySelector('.notif-dot'); if (d) d.remove(); });
-                setBadge(0); nCacheSet(0);
-            }).catch(function () {});
-    });
-})();
+<script>
+    // Campana: globos de no leídos y de solicitudes, y el desplegable. Sin sesión no hay campana
+    // ni globos, y el módulo no hace nada.
+    import '../scripts/notifications/bell';
 </script>
 
 

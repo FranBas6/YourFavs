@@ -1,0 +1,170 @@
+/* =====================================================================================
+   Piezas sociales compartidas (F1–F3 de docs/PLAN_SOCIAL.md · handoff
+   docs/design_handoff_social_f2_f3): botones de relación, menús, avatar con iniciales, fila de
+   persona, avisos entre personas y diálogos. Global (Layout) porque salen en el perfil público,
+   el centro «Amigos», la campana del Header, la página de notificaciones y el ⌘K.
+   El marcado lo genera src/lib/social/ui.ts. Solo tokens: el oscuro sale solo.
+   Móvil = por debajo de 1024 px (como el resto de la capa social).
+   ===================================================================================== */
+
+/* ---- Botones (ProfileActions y resto de la página) -------------------------------- */
+.pf-btn {
+    height: 44px; padding: 0 15px; border-radius: 9px;
+    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    font: 600 13px var(--font);
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    cursor: pointer; white-space: nowrap; text-decoration: none;
+    transition: border-color .15s ease, background-color .15s ease;
+}
+@media (min-width: 1024px) { .pf-btn { height: 38px; } }
+.pf-btn:hover { border-color: var(--text-3); color: var(--text); }
+.pf-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.pf-btn .pf-car { width: 13px; height: 13px; margin-left: -2px; opacity: .8; }
+/* Principal: --accent-dark en reposo. Blanco sobre --accent da 4,2:1 y no pasa AA a 13 px. */
+.pf-btn.pri { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+.pf-btn.pri:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pf-btn[aria-pressed="true"] { background: var(--bg-tint); border-color: var(--border-strong); color: var(--text); }
+.pf-btn.friend { background: var(--ok-soft); border-color: transparent; color: var(--ok-ink); }
+.pf-btn.wait { background: var(--bg-tint); border-style: dashed; color: var(--text-2); }
+.pf-btn.ghost { background: none; border-color: transparent; color: var(--text-2); }
+.pf-btn.ico { width: 44px; padding: 0; }
+@media (min-width: 1024px) { .pf-btn.ico { width: 38px; } }
+.pf-acts-row { display: flex; gap: 8px; flex-wrap: nowrap; }
+.pf-acts-row .pf-btn:not(.ico) { flex: 1; padding: 0 10px; }
+@media (min-width: 1024px) {
+    .pf-acts-row { flex-wrap: wrap; }
+    .pf-acts-row .pf-btn:not(.ico) { flex: 0 0 auto; padding: 0 15px; }
+}
+/* «Recomendar» es icono en móvil y texto en escritorio. */
+.pf-btn .pf-lbl-wide { display: none; }
+@media (min-width: 1024px) { .pf-btn .pf-lbl-wide { display: inline; } }
+.pf-btn.pf-ico-mobile { width: 44px; padding: 0; flex: 0 0 auto !important; }
+@media (min-width: 1024px) { .pf-btn.pf-ico-mobile { width: auto; padding: 0 15px; } }
+
+/* Etiqueta distinta por tamaño: «Copiar enlace» en escritorio, «Compartir» en móvil. */
+.pf-desk, .pf-mob { display: inline-flex; align-items: center; gap: 7px; }
+.pf-desk { display: none; }
+@media (min-width: 1024px) { .pf-desk { display: inline-flex; } .pf-mob { display: none; } }
+
+/* Menús de los botones (F2+) */
+.pf-menu-wrap { position: relative; display: inline-flex; }
+.pf-menu {
+    position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; min-width: 210px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md);
+    box-shadow: var(--sh-lg); padding: 6px;
+}
+.pf-menu[hidden] { display: none; }
+.pf-menu button {
+    width: 100%; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px;
+    border: 0; border-radius: 8px; background: none; color: var(--text); font: 500 13px var(--font);
+    cursor: pointer; text-align: left;
+}
+.pf-menu button:hover, .pf-menu button:focus-visible { background: var(--bg-tint); }
+.pf-menu button svg { width: 16px; height: 16px; }
+.pf-menu hr { border: 0; border-top: 1px solid var(--border); margin: 5px 4px; }
+.pf-danger { color: var(--accent-dark) !important; }
+[data-theme="dark"] .pf-danger { color: var(--stamp-red-ink) !important; }
+
+
+.pf-tag {
+    font: 600 10.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: var(--r-full);
+    background: var(--bg-tint); border: 1px solid var(--border-strong); color: var(--text-2);
+}
+
+/* Talla pequeña: filas, avisos y ⌘K. En móvil vuelve a 44 px (dedo). */
+.pf-btn.sm { height: 44px; padding: 0 12px; font-size: 13px; gap: 6px; border-radius: 9px; }
+.pf-btn.sm.ico { width: 44px; padding: 0; }
+@media (min-width: 1024px) {
+    .pf-btn.sm { height: 34px; font-size: 12.5px; border-radius: 8px; }
+    .pf-btn.sm.ico { width: 34px; }
+    .pf-btn.sm svg { width: 15px; height: 15px; }
+}
+/* Destructivo (Bloquear): --accent-dark con blanco (5,5:1). */
+.pf-btn.dgr, .pf-btn.dgr:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+.pf-btn[disabled] { opacity: .5; cursor: not-allowed; }
+.pf-btn[aria-busy="true"] { cursor: progress; }
+
+/* ---- Avatar: foto o iniciales sobre stamp (el color sale del id) ------------------- */
+.so-av {
+    position: relative; flex-shrink: 0; border-radius: 50%;
+    display: grid; place-items: center;
+    background: var(--sb); color: var(--si);
+    font-family: var(--font); font-weight: 600; letter-spacing: .02em; line-height: 1;
+}
+/* La foto ocupa el círculo entero. Como hija de un grid, `height: 100%` no se resolvía contra los
+   44 px del avatar sino contra la altura natural de la imagen, y una foto vertical salía ovalada. */
+.so-av img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.so-av-bdg {
+    position: absolute; right: -3px; bottom: -3px; width: 20px; height: 20px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--bb); color: var(--bi);
+    box-shadow: 0 0 0 2px var(--bg-elev);
+}
+.so-av-bdg svg { width: 11px; height: 11px; stroke-width: 2.5; }
+
+/* ---- Fila de persona --------------------------------------------------------------- */
+.so-list { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.so-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; }
+.so-row + .so-row { border-top: 1px solid var(--border); }
+.so-row-b { flex: 1; min-width: 0; }
+.so-row-n { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font: 600 14px var(--font); color: var(--text); }
+.so-row-name { color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+/* La fila entera lleva al perfil; los botones quedan por encima del enlace estirado. */
+a.so-row-name::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+a.so-row-name:focus-visible { outline: none; }
+a.so-row-name:focus-visible::after { outline: 2px solid var(--primary); outline-offset: -2px; }
+.so-row:has(a.so-row-name):hover { background: var(--bg-tint); }
+.so-row-h { font: 500 12px var(--font-mono); color: var(--text-2); }
+.so-row-n .pf-tag { align-self: center; }
+.so-row-m { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-top: 5px; font-size: 12px; color: var(--text-2); }
+.so-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
+.so-row-a { position: relative; z-index: 1; display: flex; align-items: center; gap: 6px; width: 100%; padding-left: 56px; }
+.so-row-a:empty { display: none; }
+.so-row-a .pf-btn:not(.ico) { flex: 1; }
+@media (min-width: 1024px) {
+    .so-row { flex-wrap: nowrap; gap: 14px; padding: 14px 18px; }
+    .so-row-a { width: auto; padding-left: 0; flex-shrink: 0; }
+    .so-row-a .pf-btn:not(.ico) { flex: 0 0 auto; }
+}
+.so-arch {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px 0 6px;
+    border-radius: var(--r-full); background: var(--stamp-purple); color: var(--stamp-purple-ink);
+    font: 600 11px var(--font); white-space: nowrap;
+}
+.so-arch svg { width: 12px; height: 12px; }
+
+/* ---- Avisos de la campana (Header y /mislistas/notificaciones) ---------------------- */
+.notif-when { font-size: 11.5px; color: var(--text-2); margin-top: 1px; }
+.notif-item.nt-social { align-items: flex-start; position: relative; }
+.nt-b { flex: 1; min-width: 0; }
+.nt-t { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text); }
+.nt-t b { font-weight: 600; }
+.nt-who { color: inherit; text-decoration: none; }
+.nt-who:hover { text-decoration: underline; }
+.nt-w { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
+.nt-acts { display: flex; gap: 6px; margin-top: 9px; }
+.nt-st { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; row-gap: 2px; margin-top: 8px; font: 600 12px var(--font); color: var(--text-2); }
+.nt-st svg { width: 14px; height: 14px; flex-shrink: 0; }
+.nt-st.ok { color: var(--ok-ink); }
+.nt-st small { font-weight: 400; color: var(--text-2); font-size: 12px; }
+.nt-social .notif-dot { margin-top: 6px; }
+@media (max-width: 1023.98px) { .nt-acts .pf-btn { flex: 1; } }
+
+/* ---- Diálogos (Bloquear) ------------------------------------------------------------ */
+.so-dlg {
+    width: min(460px, calc(100vw - 24px)); padding: 22px 18px 16px; margin: auto auto 12px;
+    border: 1px solid var(--border); border-radius: var(--r-xl); background: var(--bg-elev);
+    color: var(--text); box-shadow: var(--sh-lg);
+}
+.so-dlg::backdrop { background: rgba(11, 17, 32, .5); }
+@media (min-width: 1024px) { .so-dlg { margin: auto; padding: 26px 26px 20px; } }
+.so-dlg-st { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; margin-bottom: 14px; background: var(--sb); color: var(--si); }
+.so-dlg-st svg { width: 22px; height: 22px; }
+.so-dlg h3 { margin: 0; font: 700 19px var(--font); letter-spacing: -.01em; }
+.so-dlg > p { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--text-2); }
+.so-cons { display: flex; flex-direction: column; gap: 11px; margin: 18px 0 6px; padding: 16px; border-radius: var(--r-md); background: var(--bg-tint); }
+.so-cons div { display: grid; grid-template-columns: 18px 1fr; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.so-cons b { color: var(--text); font-weight: 600; }
+.so-cons svg { width: 16px; height: 16px; margin-top: 2px; }
+.so-dlg-f { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+@media (max-width: 1023.98px) { .so-dlg-f .pf-btn { flex: 1; } }

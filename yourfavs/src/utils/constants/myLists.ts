@@ -43,4 +43,5 @@ export const MY_LISTS_ITEMS: NavItem[] = [
     { href: "/mislistas/actores",     color: "slate",  icon: "user",     title: "Actores",         desc: "Favoritos y avisos" },
     { href: "/mislistas/colecciones", color: "purple", icon: "library",  title: "Mis colecciones", desc: "Listas personalizadas", countKey: "colecciones" },
     { href: "/mislistas/actividad",   color: "green",  icon: "activity", title: "Actividad",       desc: "Tu historial" },
+    { href: "/mislistas/amigos",      color: "pink",   icon: "handshake", title: "Amigos",         desc: "Seguir y amistad" },
 ];

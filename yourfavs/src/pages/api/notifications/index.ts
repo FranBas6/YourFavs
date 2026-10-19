@@ -1,7 +1,9 @@
 /**
  * /api/notifications — buzón de la campana (Bloque 4).
  *
- *  GET  → materializa (una vez/día) desde las señales y devuelve { ok, items, unread }.
+ *  GET  → materializa (una vez/día) desde las señales y devuelve { ok, items, unread }. Los avisos
+ *         entre personas (`follow`…) llegan con la persona y la relación ACTUAL para pintar sus
+ *         botones o su estado final (`withSocialState`).
  *  POST → { op: 'read', id }  marca una leída · { op: 'read_all' } marca todas.
  *
  * Invitado → 401. El uid sale de la sesión.
@@ -9,6 +11,7 @@
 import type { APIRoute } from 'astro';
 import { syncNotifications } from '../../../services/API/notifications/generator';
 import { listNotifications, unreadCount, markRead, markAllRead } from '../../../services/BD/notifications/notifications';
+import { withSocialState } from '../../../services/BD/social/notifState';
 
 export const prerender = false;
 
@@ -20,7 +23,8 @@ export const GET: APIRoute = async ({ locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
         await syncNotifications(locals.user.platforms ?? []);
-        const [items, unread] = await Promise.all([listNotifications(30), unreadCount()]);
+        const [docs, unread] = await Promise.all([listNotifications(30), unreadCount()]);
+        const items = await withSocialState(locals.user.uid, docs);
         return json({ ok: true, items, unread });
     } catch (err) {
         console.error('[api/notifications GET] error:', (err as Error).message);
