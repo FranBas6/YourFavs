@@ -28,7 +28,9 @@ import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from 
  * Ahora la decisión vive aquí, que es el único sitio que sabe si hay sesión, y `netlify.toml` ya
  * no declara caché para estas rutas (así no hay dos fuentes de verdad peleándose).
  */
-const PUBLIC_CACHEABLE_PREFIXES = ['/catalogo', '/movie/', '/serie/', '/actor/'];
+// `/u/` es el perfil público (F1 social): para un invitado es la misma página para todos, perfil
+// encendido, apagado o inexistente (404). Con sesión, como todo, `private, no-store`.
+const PUBLIC_CACHEABLE_PREFIXES = ['/catalogo', '/movie/', '/serie/', '/actor/', '/u/'];
 const GUEST_CACHE = 'public, s-maxage=300, max-age=60, stale-while-revalidate=600';
 
 function applyCacheHeaders(res: Response, path: string, hasSession: boolean): void {
@@ -147,6 +149,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 // saber que existió un formato anterior.
                 context.locals.user.spoilers = resolveSpoilerSettings(profile);
                 context.locals.user.homeLayout = profile?.homeLayout; // §4 home a tu medida (bloques ocultos)
+                // Perfil público: el menú de cuenta y la hoja Perfil enlazan a /u/{handle} si está activo.
+                context.locals.user.publicHandle = profile?.publicHandle;
+                context.locals.user.publicVisibility = profile?.publicVisibility ?? 'off';
                 // Idioma/región del perfil → contexto del request (los leen tmdbFetch y providers).
                 setRequestPrefs({ language: profile?.language, region: profile?.region });
             } catch { /* perfil opcional */ }

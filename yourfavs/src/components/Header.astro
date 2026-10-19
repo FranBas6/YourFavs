@@ -256,6 +256,24 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                 <span class="ami-sub">Nombre, avatar, región</span>
                             </span>
                         </a>
+                        {/* Perfil público (F1 social): con él activo, a tu página; si no, a activarlo. */}
+                        {user.publicHandle && user.publicVisibility === 'public' ? (
+                            <a href={`/u/${user.publicHandle}`} class="account-menu-item account-menu-item-2l" role="menuitem">
+                                <Icon name="lucide:at-sign" />
+                                <span class="ami-body">
+                                    <span class="ami-title">Tu perfil público</span>
+                                    <span class="ami-sub">@{user.publicHandle}</span>
+                                </span>
+                            </a>
+                        ) : (
+                            <a href="/perfil/publico" class="account-menu-item account-menu-item-2l" role="menuitem">
+                                <Icon name="lucide:at-sign" />
+                                <span class="ami-body">
+                                    <span class="ami-title">Activar perfil público</span>
+                                    <span class="ami-sub">Una página para enseñar lo que ves</span>
+                                </span>
+                            </a>
+                        )}
                         <a href="/mislistas/actividad" class="account-menu-item" role="menuitem">
                             <Icon name="lucide:activity" /> Tu actividad
                         </a>

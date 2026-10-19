@@ -29,6 +29,9 @@ interface SessionUser {
         hideCalendarTitles: boolean;
     };
     homeLayout?: { key: string; hidden?: boolean }[];  // §4 home a tu medida (bloques ocultos)
+    /** Perfil público (F1 social): para el menú de cuenta y la hoja Perfil («Ver mi perfil»). */
+    publicHandle?: string;
+    publicVisibility?: 'off' | 'public' | 'friends';
 }
 
 declare namespace App {
