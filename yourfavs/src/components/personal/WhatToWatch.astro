@@ -8,8 +8,13 @@
  * "Otra" no repite hasta agotar (barajado Fisher-Yates + cursor). Las
  * plataformas elegidas persisten en localStorage (yf_roulette_platforms).
  * También se abre vía CustomEvent `yf:open-roulette` (⌘K, F3) o `?roulette=1`.
+ *
+ * F5 social: con «En pareja» o «Con amigos» sale una fila con tus amigos (lazy, de
+ * /api/roulette/friends). Con uno elegido, los candidatos pasan a lo que tenéis pendiente LOS DOS
+ * (`?with=`); si no hay nada en común, se avisa y siguen saliendo los tuyos.
  */
 import '../../styles/components/roulette.css';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
 
 const COMPANION_OPTIONS = [
     { key: 'solo', label: 'Solo' },
@@ -32,6 +37,8 @@ const MOOD_OPTIONS = [
 // "Dónde ver" se vuelve preferencia automática por tus plataformas del perfil
 // (no chips manuales): el plan se inclina a lo que puedes ver ya.
 const myPlatforms = Astro.locals.user?.platforms ?? [];
+// Elegir con qué amigo: solo con sesión y con la amistad encendida.
+const withFriends = SOCIAL_PHASE.friends && Boolean(Astro.locals.user);
 ---
 <button type="button" class="wtw-trigger" data-wtw-open>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -95,10 +102,17 @@ const myPlatforms = Astro.locals.user?.platforms ?? [];
                     ))}
                 </div>
             </div>
+            {withFriends && (
+                <div class="wtw-filter-group wtw-with" id="wtw-with" hidden>
+                    <div class="wtw-filter-label">¿CON QUIÉN? · LO QUE TENÉIS PENDIENTE LOS DOS</div>
+                    <div class="wtw-chips" id="wtw-with-chips"><span class="wtw-with-note">Cargando tus amigos…</span></div>
+                </div>
+            )}
         </div>
 
         <div class="wtw-body">
-            <div class="wtw-kicker">● TU PLAN DE HOY</div>
+            <div class="wtw-kicker" id="wtw-kicker">● TU PLAN DE HOY</div>
+            <p class="wtw-note" id="wtw-note" hidden></p>
             <div id="wtw-result">
                 <p class="wtw-empty">Cargando tus pendientes…</p>
             </div>
@@ -130,6 +144,7 @@ const myPlatforms = Astro.locals.user?.platforms ?? [];
     var FUN_GENRES = [35, 28, 16, 12];                  // para "con amigos": comedia, acción, animación, aventura
 
     var all = null;        // candidatos del endpoint (null = sin cargar)
+    var mine = null;       // tus pendientes (para volver a ellos al quitar al amigo)
     var order = [];        // candidatos filtrados y ordenados por encaje
     var cursor = -1;       // posición en `order`
     var companion = 'solo';
@@ -175,15 +190,21 @@ const myPlatforms = Astro.locals.user?.platforms ?? [];
     if (new URLSearchParams(location.search).get('roulette') === '1') openModal();
 
     // ---- datos ----
+    function ownSubtitle() {
+        subtitle.textContent = mine && mine.length
+            ? 'De tus ' + mine.length + ' pendientes, según tu momento'
+            : 'No tienes pendientes todavía';
+    }
+
     function load() {
         result.innerHTML = '<p class="wtw-empty">Cargando tus pendientes…</p>';
         fetch('/api/roulette/candidates')
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                all = data.candidates || [];
-                subtitle.textContent = all.length
-                    ? 'De tus ' + all.length + ' pendientes, según tu momento'
-                    : 'No tienes pendientes todavía';
+                mine = data.candidates || [];
+                if (withId) return; // mientras, eligieron a un amigo: manda su respuesta
+                all = mine;
+                ownSubtitle();
                 reroll();
             })
             .catch(function () {
@@ -253,8 +274,111 @@ const myPlatforms = Astro.locals.user?.platforms ?? [];
         if (!chip) return;
         companion = chip.dataset.companion;
         singleSelect(companionChips, chip);
+        showWith(companion !== 'solo');
         reroll();
     });
+
+    // ---- con un amigo (F5 social) ----
+    var withBox = document.getElementById('wtw-with');
+    var withChips = document.getElementById('wtw-with-chips');
+    var kicker = document.getElementById('wtw-kicker');
+    var note = document.getElementById('wtw-note');
+    var friends = null;    // null = sin cargar
+    var withId = '';
+    var withReq = 0;       // descarta respuestas de un amigo que ya no está elegido
+    var commonCache = {};  // id del amigo → respuesta de ?with=
+
+    function showWith(on) {
+        if (!withBox) return;
+        withBox.hidden = !on;
+        if (on && friends === null) loadFriends();
+        if (!on && withId) clearWith();
+    }
+
+    function loadFriends() {
+        friends = [];
+        fetch('/api/roulette/friends')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                friends = data.friends || [];
+                withChips.innerHTML = friends.length
+                    ? friends.map(function (f) {
+                        return '<button type="button" class="wtw-chip wtw-fchip" data-with="' + escapeHtml(f.id) + '" data-name="' + escapeHtml(f.name) + '" aria-pressed="false">' +
+                            f.avatar + escapeHtml(f.name) + '</button>';
+                    }).join('')
+                    : '<span class="wtw-with-note">Cuando tengas amigos en YourFavs podrás elegir con quién. <a href="/mislistas/amigos">Buscar amigos</a></span>';
+            })
+            .catch(function () {
+                friends = null; // se reintenta al volver a elegir compañía
+                withChips.innerHTML = '<span class="wtw-with-note">No se pudieron cargar tus amigos.</span>';
+            });
+    }
+
+    function markWith() {
+        withChips.querySelectorAll('[data-with]').forEach(function (c) {
+            var on = c.dataset.with === withId;
+            c.classList.toggle('is-active', on);
+            c.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
+    }
+
+    function applyWith(name, data) {
+        if (data.common) {
+            all = data.candidates || [];
+            kicker.textContent = '● LO TENÉIS PENDIENTE LOS DOS';
+            note.hidden = true;
+            subtitle.textContent = all.length === 1
+                ? 'Tenéis 1 pendiente en común tú y ' + name
+                : 'Tenéis ' + all.length + ' pendientes en común tú y ' + name;
+        } else {
+            all = mine || data.candidates || [];
+            kicker.textContent = '● TU PLAN DE HOY';
+            note.textContent = 'No tenéis nada pendiente en común tú y ' + name + '; te propongo de los tuyos.';
+            note.hidden = false;
+            ownSubtitle();
+        }
+        reroll();
+    }
+
+    function selectWith(id, name) {
+        withId = id;
+        markWith();
+        var req = ++withReq;
+        if (commonCache[id]) { applyWith(name, commonCache[id]); return; }
+        result.innerHTML = '<p class="wtw-empty">Buscando lo que tenéis pendiente los dos…</p>';
+        fetch('/api/roulette/candidates?with=' + encodeURIComponent(id))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (req !== withReq) return;
+                commonCache[id] = data;
+                applyWith(name, data);
+            })
+            .catch(function () {
+                if (req !== withReq) return;
+                clearWith();
+            });
+    }
+
+    function clearWith() {
+        withId = '';
+        withReq++;
+        markWith();
+        kicker.textContent = '● TU PLAN DE HOY';
+        note.hidden = true;
+        if (mine === null) { if (all === null) load(); return; }
+        all = mine;
+        ownSubtitle();
+        reroll();
+    }
+
+    if (withChips) {
+        withChips.addEventListener('click', function (e) {
+            var chip = e.target.closest('[data-with]');
+            if (!chip) return;
+            if (chip.dataset.with === withId) clearWith();
+            else selectWith(chip.dataset.with, chip.dataset.name || '');
+        });
+    }
 
     timeChips.addEventListener('click', function (e) {
         var chip = e.target.closest('.wtw-chip');

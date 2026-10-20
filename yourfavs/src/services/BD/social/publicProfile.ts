@@ -24,6 +24,7 @@ import { sanitizeFour, type PublicPick, type PublicArchetype, type PublicVisibil
 import { resolvePublicSections, type PublicSectionPref } from '../../../utils/constants/publicSections';
 import { getTitleSummaries, titleKey, type TitleRef } from '../../API/shared/titleSummaries';
 import { getRelation, isBlockedBy } from './graph';
+import { inCommon, type CommonView } from './inCommon';
 import type { Relation } from '../../../lib/social/types';
 
 export type ViewerRole = 'owner' | 'member' | 'guest';
@@ -83,6 +84,8 @@ export interface PublicProfileView {
     collections: PublicCollection[];
     /** Solo dueño: cuántas colecciones propias tiene en total (para el vacío de «Colecciones»). */
     ownCollectionsTotal: number | null;
+    /** «En común contigo» (F5): solo para un AMIGO que mira, con la sección encendida. */
+    common: CommonView | null;
 }
 
 const FAVS_LIMIT = 10;
@@ -91,7 +94,7 @@ const LOG_SCAN = 300;
 const BEST_LIMIT = 12;
 const CACHE_TTL_MS = 60 * 1000;
 
-type CachedData = Omit<PublicProfileView, 'viewerRole' | 'locked' | 'ownCollectionsTotal' | 'rel'>;
+type CachedData = Omit<PublicProfileView, 'viewerRole' | 'locked' | 'ownCollectionsTotal' | 'rel' | 'common'>;
 const cache = new Map<string, { data: CachedData; expires: number }>();
 
 /** Vacía la entrada de un handle en esta instancia (cambio de handle o de visibilidad). */
@@ -417,7 +420,7 @@ export async function getPublicProfile(rawHandle: string, viewerId: string | nul
             visibility: row.public_visibility as PublicVisibility, since: row.public_since,
             viewerRole, locked: true, rel, bio: '', archetype: null, indexable: row.public_indexable === true,
             counts: { episodes: 0, movies: 0, series: 0, publicCollections: 0 },
-            four: [], sections: [], favs: [], log: [], best: [], collections: [], ownCollectionsTotal: null,
+            four: [], sections: [], favs: [], log: [], best: [], collections: [], ownCollectionsTotal: null, common: null,
         };
     }
 
@@ -432,7 +435,13 @@ export async function getPublicProfile(rawHandle: string, viewerId: string | nul
     }
 
     const ownCollectionsTotal = viewerRole === 'owner' ? await countRows('custom_lists', row.id) : null;
-    return { ...data, viewerRole, locked: false, rel, ownCollectionsTotal };
+    // «En común contigo» depende de quién mira: se calcula aparte y nunca entra en la caché por
+    // handle. Las notas del dueño solo salen si su perfil ya enseña notas («Mejor valoradas»).
+    const on = (id: string) => data.sections.some((s) => s.id === id && s.on);
+    const common = viewerId && viewerRole === 'member' && rel?.friends && on('common')
+        ? await inCommon(viewerId, row.id, { showTheirScores: on('best') })
+        : null;
+    return { ...data, viewerRole, locked: false, rel, ownCollectionsTotal, common };
 }
 
 /** Una colección pública en solo lectura (`/u/{handle}/coleccion/{id}`), o null → 404. */

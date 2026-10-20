@@ -373,11 +373,26 @@ isOneToOne: false
 "social_follow":
 { Args: { "p_me": string,"p_them": string }; Returns: string
                            },
+"social_friends_seen":
+{ Args: { "p_id": number,"p_me": string,"p_type": Database["public"]['Enums']["media_type"] }; Returns: {
+              "at": string,"friend_id": string,"score": number,"state": string
+            }[]
+                           },
+"social_in_common":
+{ Args: { "p_me": string,"p_them": string }; Returns: {
+              "at": string,"media_type": Database["public"]['Enums']["media_type"],"my_score": number,"their_score": number,"tmdb_id": number
+            }[]
+                           },
 "social_make_friends":
 { Args: { "p_x": string,"p_y": string }; Returns: undefined
                            },
 "social_notify":
 { Args: { "p_actor": string,"p_id": string,"p_to": string,"p_type": string }; Returns: undefined
+                           },
+"social_pending_common":
+{ Args: { "p_me": string,"p_them": string }; Returns: {
+              "media_type": Database["public"]['Enums']["media_type"],"tmdb_id": number
+            }[]
                            },
 "social_people":
 { Args: { "p_ids": (string)[] }; Returns: {
@@ -407,6 +422,11 @@ isOneToOne: false
               "id": string
             }[]
                            },
+"social_seen_titles":
+{ Args: { "p_user": string }; Returns: {
+              "at": string,"media_type": Database["public"]['Enums']["media_type"],"tmdb_id": number
+            }[]
+                           },
 "social_send_request":
 { Args: { "p_me": string,"p_them": string }; Returns: string
                            },
@@ -415,6 +435,11 @@ isOneToOne: false
                            },
 "social_unfriend":
 { Args: { "p_me": string,"p_them": string }; Returns: undefined
+                           },
+"social_visible_friends":
+{ Args: { "p_me": string }; Returns: {
+              "id": string
+            }[]
                            }
           }
           Enums: {

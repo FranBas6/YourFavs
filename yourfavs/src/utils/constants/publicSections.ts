@@ -25,7 +25,7 @@ export const PUBLIC_SECTIONS: PublicSectionDef[] = [
     { id: 'log', label: 'Lo último visto', desc: 'Las últimas 12, agrupadas por serie. Sin títulos de episodio.', color: 'blue', icon: 'history' },
     { id: 'best', label: 'Mejor valoradas', desc: 'Tus 12 notas más altas, con tu nota.', color: 'pink', icon: 'star' },
     { id: 'collections', label: 'Colecciones', desc: 'Las que actives más abajo.', color: 'green', icon: 'library' },
-    { id: 'common', label: 'En común contigo', desc: 'Lo que tenéis los dos en vuestras listas. Solo la verán tus amigos.', color: 'purple', icon: 'users', soon: true },
+    { id: 'common', label: 'En común contigo', desc: 'Lo que habéis visto los dos y en cuánto coincidís. Solo la ven tus amigos, cada uno lo suyo contigo.', color: 'purple', icon: 'users' },
 ];
 
 export type PublicSectionPref = { id: PublicSectionId; on: boolean };

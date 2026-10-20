@@ -23,6 +23,7 @@ import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/me
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
 import { SOCIAL_PHASE } from "../../utils/constants/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
+import FriendsSeen from "../../components/detail/FriendsSeen.astro";
 import { countMoviePasses } from "../../services/BD/lists/watchLog";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import NotificationBell from "../../components/personal/NotificationBell.astro";
@@ -591,6 +592,9 @@ const jsonLd = item ? {
                         linkByCountry={item?.providerLinksByCountry || {}}
                         myPlatformIds={((Astro.locals.user as any)?.platforms ?? []).map(Number).filter(Number.isFinite)}
                     />
+
+                    <!-- Amigos que la han visto (F5 social) -->
+                    <FriendsSeen mediaType="movie" tmdbId={item?.id} />
 
                     <!-- Nota personal -->
                     {!(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && <RecommendedBlock mediaType="movie" tmdbId={item?.id} alone />}
