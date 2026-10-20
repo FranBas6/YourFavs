@@ -21,6 +21,7 @@ import type { ActorsFavs } from "../../services/BD/actors/yourfavsActor";
 import { getFollowedPerson, handlePersonFollowAction } from "../../services/BD/people/yourfavsPeople";
 import { invalidateUpcomingPeopleCache } from "../../services/API/People/upcomingReleases";
 import FollowPersonButton from "../../components/personal/FollowPersonButton.astro";
+import { SOCIAL_PHASE } from "../../utils/constants/social";
 import type { ActorImage, TaggedImage } from "../../services/API/Actors/InfoActor";
 import { safeFetch } from "../../utils/safeFetch";
 import { getLibrarySnapshot } from "../../services/BD/shared/librarySnapshot";
@@ -396,7 +397,17 @@ const jsonLd = {
                             : `Activa los avisos y los estrenos de ${actorInfo.nombre} aparecerán en tu calendario.`}
                     </p>
                 </div>
-                <FollowPersonButton personId={actor} name={actorInfo.nombre} profilePath={actorInfo.imagen} isFollowing={isFollowingPerson} />
+                <div class="flex flex-wrap gap-2">
+                    <FollowPersonButton personId={actor} name={actorInfo.nombre} profilePath={actorInfo.imagen} isFollowing={isFollowingPerson} />
+                    {/* F4 social: recomendar esta persona a un amigo (misma talla que el botón de avisos). */}
+                    {SOCIAL_PHASE.recommend && Astro.locals.user && (
+                        <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white text-gray-700 border border-gray-300 hover:border-gray-400"
+                                data-recommend data-target-type="person" data-target-id={actor} data-title={actorInfo.nombre} data-image={actorInfo.imagen} aria-haspopup="dialog" aria-expanded="false">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                            Recomendar
+                        </button>
+                    )}
+                </div>
             </div>
 
             {isFollowingPerson && personUpcoming.length > 0 && (

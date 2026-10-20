@@ -14,6 +14,9 @@ import PersonalResultsBar from "../../components/personal/PersonalResultsBar.ast
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import WhatToWatch from "../../components/personal/WhatToWatch.astro";
+import { recommendedByMap } from "../../services/BD/social/recommendations";
+import { SOCIAL_PHASE } from "../../utils/constants/social";
+import { safeFetch } from "../../utils/safeFetch";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
@@ -31,6 +34,12 @@ const {
     seriesItemsToShow, moviesItemsToShow,
     availableGenres, availableTags, tagsFilter, stats, watchedMap, errorMessage,
 } = data;
+
+// F4 social: «Recomendada por Ana» en lo que añadiste desde una recomendación.
+const _me = Astro.locals.user?.uid;
+const recByMap = SOCIAL_PHASE.recommend && _me
+    ? await safeFetch(recommendedByMap(_me), 'pendientes/recommendedBy', new Map<string, { name: string; more: number }>())
+    : new Map<string, { name: string; more: number }>();
 ---
 <Layout title="Pendientes">
     <section class="px-1 sm:py-8">
@@ -97,6 +106,7 @@ const {
                                     status={item.status}
                                     watchedEpisodes={watchedMap[String(item.id)]?.watched}
                                     userRating={(item as any).userRating}
+                                    recommendedBy={recByMap.get(`tv:${item.id}`)}
                                 /></HoverPreview>
                             ))}
                         </div>
@@ -147,6 +157,7 @@ const {
                                     release_date={item.release_date}
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                     userRating={(item as any).userRating}
+                                    recommendedBy={recByMap.get(`movie:${item.id}`)}
                                 /></HoverPreview>
                             ))}
                         </div>

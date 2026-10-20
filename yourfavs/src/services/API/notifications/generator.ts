@@ -35,6 +35,8 @@ const TYPE_TO_PREF: Record<NotifType, string> = {
     follow: 'social',
     friend_request: 'social',
     friend_accepted: 'social',
+    recommendation: 'social',
+    rec_reply: 'social',
 };
 
 // Firestore no admite '/' en el id de documento.

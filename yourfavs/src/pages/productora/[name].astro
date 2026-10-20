@@ -6,6 +6,8 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName } from "../../utils/constants/genres";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import EmptyState from "../../components/EmptyState.astro";
+import { Icon } from "astro-icon/components";
+import { SOCIAL_PHASE } from "../../utils/constants/social";
 
 const { name } = Astro.params;
 const { searchParams } = Astro.url;
@@ -34,6 +36,8 @@ if (!success) {
 }
 
 const totalWorks = movies.length + series.length;
+// F4 social: la productora se recomienda por su id de TMDB (la ruta va por nombre).
+const companyId = Number(companyInfo?.id ?? companyIdParam) || null;
 const sortUrl = (sort: string) => companyIdParam ? `?sort=${sort}&companyId=${companyIdParam}` : `?sort=${sort}`;
 
 // C22 — Stats analíticas (cálculo cliente sobre los arrays ya cargados)
@@ -82,7 +86,14 @@ const showStats = topGenresProduced.length > 0 || topDecade !== null || avgRatin
     <section class="px-1 sm:py-8">
         <!-- Header -->
         <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">{name}</h1>
+            <div class="flex items-center gap-3 flex-wrap mb-1">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{name}</h1>
+                {SOCIAL_PHASE.recommend && Astro.locals.user && companyId && (
+                    <button type="button" class="pf-btn sm" data-recommend data-target-type="company" data-target-id={companyId} data-title={name} data-image={companyInfo?.logo_path ?? ''} aria-haspopup="dialog" aria-expanded="false">
+                        <Icon name="lucide:send" />Recomendar
+                    </button>
+                )}
+            </div>
             <p class="text-gray-500 text-base">Productora · {totalWorks} producciones</p>
         </header>
 

@@ -250,6 +250,38 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"recommendation_recipients": {
+                  Row: {
+                    "acted_at": string | null,"rec_id": number,"replied_at": string | null,"reply_key": string | null,"reply_kind": string | null,"reply_text": string | null,"status": string,"to_id": string
+                  }
+                  Insert: {
+                    "acted_at"?: string | null,"rec_id": number,"replied_at"?: string | null,"reply_key"?: string | null,"reply_kind"?: string | null,"reply_text"?: string | null,"status"?: string,"to_id": string
+                  }
+                  Update: {
+                    "acted_at"?: string | null,"rec_id"?: number,"replied_at"?: string | null,"reply_key"?: string | null,"reply_kind"?: string | null,"reply_text"?: string | null,"status"?: string,"to_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "recommendation_recipients_rec_id_fkey"
+      columns: ["rec_id"]
+isOneToOne: false
+      referencedRelation: "recommendations"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"recommendations": {
+                  Row: {
+                    "created_at": string,"from_id": string,"id": number,"image_path": string | null,"message": string | null,"target_id": number,"target_type": string,"title": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"from_id": string,"id"?: never,"image_path"?: string | null,"message"?: string | null,"target_id": number,"target_type": string,"title": string
+                  }
+                  Update: {
+                    "created_at"?: string,"from_id"?: string,"id"?: never,"image_path"?: string | null,"message"?: string | null,"target_id"?: number,"target_type"?: string,"title"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"spoiler_prefs": {
                   Row: {
                     "spoiler_free": boolean,"tmdb_id": number,"updated_at": string,"user_id": string
@@ -351,6 +383,18 @@ isOneToOne: false
 { Args: { "p_ids": (string)[] }; Returns: {
               "archetype": Json,"handle": string,"has_avatar": boolean,"id": string,"name": string,"updated_at": string
             }[]
+                           },
+"social_rec_act":
+{ Args: { "p_me": string,"p_rec": number,"p_status": string }; Returns: string
+                           },
+"social_rec_reply":
+{ Args: { "p_can_pending": boolean,"p_key": string,"p_me": string,"p_rec": number,"p_text": string }; Returns: string
+                           },
+"social_rec_send":
+{ Args: { "p_id": number,"p_image": string,"p_me": string,"p_message": string,"p_title": string,"p_to": (string)[],"p_type": string }; Returns: Json
+                           },
+"social_rec_withdraw":
+{ Args: { "p_me": string,"p_rec": number }; Returns: Json
                            },
 "social_respond_request":
 { Args: { "p_accept": boolean,"p_from": string,"p_me": string }; Returns: string

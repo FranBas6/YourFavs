@@ -1,0 +1,227 @@
+/* =====================================================================================
+   Recomendar a un amigo (F4 de la capa social; handoff docs/design_handoff_social_f4, medidas
+   de su rec.css). Global: el selector se abre en cualquier página, y el aviso vive en la campana.
+   Marcado: lib/social/recUi.ts y scripts/social/recommend.ts. Solo tokens.
+   Móvil = por debajo de 1024 px.
+   ===================================================================================== */
+
+/* ---- Selector (desplegable en escritorio, hoja inferior en móvil) ------------------- */
+.rk-backdrop { position: fixed; inset: 0; z-index: 1290; background: transparent; }
+@media (max-width: 1023.98px) { .rk-backdrop { background: rgba(11, 17, 32, .5); } }
+.rk-backdrop[hidden] { display: none; }
+.rk {
+    position: fixed; z-index: 1300; width: 360px; max-width: calc(100vw - 16px); max-height: min(560px, 80vh);
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg-elev); color: var(--text); border: 1px solid var(--border);
+    border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+}
+.rk[hidden] { display: none; }
+.rk.is-sheet {
+    left: 0; right: 0; bottom: 0; top: auto; width: auto; max-width: none; max-height: 82vh;
+    border-radius: 20px 20px 0 0; border-bottom: 0; box-shadow: 0 -12px 32px rgba(0, 0, 0, .28);
+    padding-bottom: env(safe-area-inset-bottom);
+}
+.rk-hd { width: 36px; height: 4px; border-radius: 9px; background: var(--border-strong); margin: 8px auto 2px; flex-shrink: 0; }
+
+/* Dentro de «Guardar en…»: el mismo popover crece y cambia de contenido. */
+.saveto-pop.saveto-wide { width: 360px; padding: 0; display: flex; flex-direction: column; max-height: min(560px, 80vh); overflow: hidden; }
+.saveto-pop.saveto-wide .saveto-inner { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+
+.rk-back {
+    display: flex; align-items: center; gap: 4px; padding: 10px 14px 0; border: 0; background: none;
+    font: 600 12.5px var(--font); color: var(--text-2); cursor: pointer; text-align: left;
+}
+.rk-back svg { width: 15px; height: 15px; }
+.rk-h { display: flex; align-items: center; gap: 11px; padding: 14px 14px 12px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.rk-h-b { flex: 1; min-width: 0; }
+.rk-k { font: 600 9.5px var(--font-mono); letter-spacing: .13em; text-transform: uppercase; color: var(--text-2); }
+.rk-h b { display: block; font: 600 14px/1.25 var(--font); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rk-x {
+    margin-left: auto; width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg-tint); display: grid; place-items: center; color: var(--text-2);
+}
+.rk-x svg { width: 14px; height: 14px; }
+.rk-to {
+    display: flex; align-items: center; gap: 9px; width: fit-content; max-width: 100%; margin-top: 4px; padding: 6px 10px 6px 6px;
+    border-radius: var(--r-full); background: var(--bg-tint); border: 1px solid var(--border);
+}
+.rk-to b { font: 600 13px var(--font); }
+.rk-to span { font: 500 11.5px var(--font-mono); color: var(--text-2); }
+
+.rk-s { padding: 10px 14px; flex-shrink: 0; }
+.rk-in {
+    display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 11px; cursor: text;
+    border-radius: 9px; border: 1px solid var(--border-strong); background: var(--bg);
+}
+@media (min-width: 1024px) { .rk-in { height: 38px; } }
+.rk-in:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rk-in svg { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; }
+.rk-in input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 0; font: 400 13.5px var(--font); color: var(--text); }
+.rk-in input::placeholder { color: var(--text-3); }
+.rk-tabs { display: flex; gap: 5px; margin-top: 9px; overflow-x: auto; scrollbar-width: none; }
+.rk-tabs button {
+    flex-shrink: 0; height: 28px; padding: 0 11px; border-radius: var(--r-full); border: 1px solid var(--border);
+    background: var(--bg-elev); font: 600 11.5px var(--font); color: var(--text-2); cursor: pointer;
+}
+.rk-tabs button[aria-selected="true"] { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+
+.rk-l { flex: 1 1 auto; min-height: 60px; overflow-y: auto; overscroll-behavior: contain; padding: 0 0 6px; }
+.rk-kk {
+    display: flex; justify-content: space-between; gap: 10px; padding: 8px 16px 4px;
+    font: 600 9.5px var(--font-mono); letter-spacing: .13em; text-transform: uppercase; color: var(--text-2);
+}
+.rk-kk span { letter-spacing: 0; text-transform: none; font: 400 11.5px var(--font); white-space: nowrap; }
+.rk-r { display: flex; align-items: center; gap: 11px; min-height: 56px; padding: 7px 16px; cursor: pointer; outline: none; }
+@media (min-width: 1024px) { .rk-r { min-height: 48px; } }
+.rk-r:hover, .rk-r:focus-visible { background: var(--bg-tint); }
+.rk-r:focus-visible { box-shadow: inset 0 0 0 2px var(--primary); }
+.rk-tx { flex: 1; min-width: 0; }
+.rk-tx b { display: block; font: 500 13.5px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-r.on .rk-tx b { font-weight: 600; }
+.rk-tx span { display: block; font: 500 11.5px var(--font-mono); color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk-tx span.is-p { font-family: var(--font); font-weight: 400; }
+.rk-ck {
+    width: 20px; height: 20px; border-radius: 6px; flex-shrink: 0; display: grid; place-items: center;
+    border: 1.5px solid var(--border-strong); background: var(--bg-elev); color: #fff;
+}
+.rk-ck svg { width: 13px; height: 13px; stroke-width: 3; opacity: 0; }
+.rk-r.on .rk-ck { background: var(--accent-dark); border-color: var(--accent-dark); }
+.rk-r.on .rk-ck svg { opacity: 1; }
+.rk-r.rad .rk-ck { border-radius: 50%; }
+.rk-r.dis { cursor: default; }
+.rk-r.dis:hover { background: none; }
+.rk-r.dis .rk-tx b, .rk-r.dis .so-av, .rk-r.dis .rc-lead { opacity: .55; }
+.rk-already { display: inline-flex; align-items: center; gap: 5px; font: 600 11px var(--font); color: var(--text-2); white-space: nowrap; }
+.rk-already svg { width: 13px; height: 13px; }
+.rk-note { padding: 10px 16px; margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+
+.rk-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 10px 14px 0; border-top: 1px solid var(--border); }
+.rk-lb { font: 600 11.5px var(--font); color: var(--text-2); margin-right: 2px; }
+.rk-chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 3px;
+    border-radius: var(--r-full); background: var(--bg-tint); border: 1px solid var(--border-strong); font: 600 12px var(--font);
+}
+.rk-chip button { width: 22px; height: 22px; border: 0; background: none; color: var(--text-2); display: grid; place-items: center; cursor: pointer; border-radius: 50%; }
+.rk-chip button svg { width: 13px; height: 13px; }
+.rk-msg { padding: 10px 14px 0; flex-shrink: 0; }
+.rk-msg textarea {
+    width: 100%; min-height: 58px; resize: none; padding: 9px 11px; border-radius: 9px;
+    border: 1px solid var(--border-strong); background: var(--bg); font: 400 13.5px/1.45 var(--font); color: var(--text);
+}
+.rk-msg textarea::placeholder { color: var(--text-3); }
+.rk-msg textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rk-cnt { display: flex; justify-content: space-between; margin-top: 5px; font-size: 11.5px; color: var(--text-2); }
+.rk-cnt b { font: 500 11px var(--font-mono); }
+.rk-f { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 14px; margin-top: 10px; border-top: 1px solid var(--border); background: var(--bg-elev); flex-shrink: 0; }
+.rk-f .pf-btn { width: 100%; height: 48px; }
+@media (min-width: 1024px) { .rk-f .pf-btn { height: 40px; } }
+.rk-pv { display: flex; align-items: center; gap: 6px; font-size: 11.5px; line-height: 1.4; color: var(--text-2); }
+.rk-pv svg { width: 13px; height: 13px; color: var(--text-3); flex-shrink: 0; }
+.rk-err { display: flex; gap: 9px; padding: 10px 12px; border-radius: var(--r-md); background: var(--stamp-red); color: var(--stamp-red-ink); font-size: 12.5px; line-height: 1.45; }
+.rk-err svg { width: 16px; height: 16px; margin-top: 1px; flex-shrink: 0; }
+.rk-emp { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 22px 18px 18px; }
+.rk-emp h4 { font: 600 14.5px var(--font); margin: 6px 0 0; }
+.rk-emp p { font-size: 12.5px; line-height: 1.5; color: var(--text-2); margin: 0 0 8px; }
+.rk-st { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; background: var(--stamp-pink); color: var(--stamp-pink-ink); }
+.rk-st svg { width: 19px; height: 19px; }
+/* Móvil con el teclado abierto sobre el mensaje: fuera buscador y lista, «Enviar» a la vista. */
+.rk.is-typing .rk-s, .rk.is-typing .rk-l { display: none; }
+
+/* ---- Imagen del objeto: póster, cara o tesela de productora ------------------------- */
+.rc-lead { position: relative; flex-shrink: 0; display: grid; place-items: center; overflow: hidden; border-radius: 5px; background: var(--bg-tint); color: var(--text-3); }
+.rc-lead img { width: 100%; height: 100%; object-fit: cover; }
+.rc-lead svg { width: 45%; height: 45%; }
+.rc-lead.is-face { border-radius: 50%; }
+.rc-lead.is-logo { border-radius: 8px; background: var(--bg-elev); border: 1px solid var(--border-strong); color: var(--text); padding: 2px; }
+.rc-lead.is-logo span { font: 700 10px/1.1 var(--font); text-align: center; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+
+/* ---- Aviso de recomendación (campana y notificaciones) ------------------------------ */
+.rc-badged { position: relative; flex-shrink: 0; }
+.rc-badged .so-av { position: absolute; right: -6px; bottom: -6px; box-shadow: 0 0 0 2px var(--bg-elev); }
+.notif-item.is-unread .rc-badged .so-av { box-shadow: 0 0 0 2px var(--bg-tint); }
+.rc-q {
+    display: block; margin-top: 5px; padding: 6px 10px; border-radius: 8px; quotes: '“' '”';
+    background: var(--bg-tint); border: 1px solid var(--border); font-size: 12.5px; line-height: 1.45; color: var(--text);
+    overflow-wrap: anywhere;
+}
+.notif-item.is-unread .rc-q { background: var(--bg-elev); }
+.nt-go { display: flex; align-items: center; gap: 3px; margin-top: 4px; font: 600 12px var(--font); color: var(--primary); }
+.nt-go svg { width: 13px; height: 13px; }
+@media (max-width: 1023.98px) { .nt-rec .nt-acts { flex-wrap: wrap; } .nt-rec .nt-acts .pf-btn { flex: 1 1 auto; } }
+
+/* ---- Respuestas rápidas: botones, no burbujas -------------------------------------- */
+.qr { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; }
+.qr-b {
+    height: 44px; padding: 0 14px; border-radius: var(--r-full); cursor: pointer; white-space: nowrap;
+    border: 1px solid var(--border-strong); background: var(--bg-elev); font: 600 13px var(--font); color: var(--text);
+}
+@media (min-width: 1024px) { .qr-b { height: 30px; padding: 0 12px; font-size: 12px; } }
+.qr-b:hover { border-color: var(--text-3); }
+.qr-b[disabled] { opacity: .5; cursor: progress; }
+.qr-l {
+    display: inline-flex; align-items: center; gap: 5px; height: 44px; padding: 0 4px; border: 0; background: none; cursor: pointer;
+    font: 600 12px var(--font); color: var(--text-2); white-space: nowrap;
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong);
+}
+@media (min-width: 1024px) { .qr-l { height: 30px; } }
+.qr-l svg { width: 13px; height: 13px; }
+.qr-w { margin-top: 10px; }
+.qr-reply { display: flex; gap: 6px; align-items: center; }
+.qr-in {
+    flex: 1; min-width: 0; height: 44px; padding: 0 10px; border-radius: 9px; scroll-margin-bottom: 120px;
+    border: 1px solid var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--bg-elev);
+    font: 400 13px var(--font); color: var(--text); outline: none;
+}
+@media (min-width: 1024px) { .qr-in { height: 34px; font-size: 12.5px; } }
+.qr-c { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11px; color: var(--text-2); }
+.qr-x { border: 0; background: none; padding: 0; cursor: pointer; font: 600 11.5px var(--font); color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+.qr-n { font: 500 10.5px var(--font-mono); }
+.qr-done { display: flex; align-items: flex-start; gap: 6px; margin-top: 6px; font-size: 12px; line-height: 1.45; color: var(--text-2); }
+.qr-done svg { width: 13px; height: 13px; margin-top: 2px; flex-shrink: 0; }
+.qr-done span { min-width: 0; overflow-wrap: anywhere; }
+
+/* ---- Tarjetas del centro «Amigos» → Pendientes ------------------------------------- */
+.rc-list { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+.rc { display: flex; flex-wrap: wrap; gap: 14px; padding: 14px 16px; align-items: flex-start; scroll-margin-top: 90px; transition: background-color .6s ease; }
+@media (min-width: 1024px) { .rc { flex-wrap: nowrap; padding: 14px 18px; } }
+.rc + .rc { border-top: 1px solid var(--border); }
+.rc.is-hl { background: var(--bg-tint); }
+.rc-leadlink { flex-shrink: 0; display: block; }
+.rc-b { flex: 1; min-width: 0; }
+.rc-t { font: 600 14px var(--font); color: var(--text); text-decoration: none; }
+.rc-t:hover { text-decoration: underline; }
+.rc-m { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-top: 4px; font-size: 12px; color: var(--text-2); }
+.rc .rc-q { background: none; border: 0; padding: 0; margin-top: 7px; font-size: 13px; }
+.rc .rc-q.is-mine { color: var(--text-2); quotes: none; }
+.rc-a { display: flex; gap: 6px; align-items: center; width: 100%; padding-left: 60px; }
+.rc-a:empty { display: none; }
+.rc-a .pf-btn { flex: 1; }
+@media (min-width: 1024px) { .rc-a { width: auto; padding-left: 0; flex-shrink: 0; } .rc-a .pf-btn { flex: 0 0 auto; } }
+.rc-to { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.rc-to > div { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12.5px; color: var(--text-2); }
+.rc-to b { color: var(--text); font-weight: 600; }
+.stt {
+    display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: var(--r-full); white-space: nowrap;
+    background: var(--bg-tint); border: 1px solid var(--border-strong); font: 600 11.5px var(--font); color: var(--text-2);
+}
+.stt svg { width: 12px; height: 12px; }
+.stt.ok { background: var(--ok-soft); border-color: transparent; color: var(--ok-ink); }
+.rq { display: flex; align-items: flex-start; gap: 6px; flex-basis: 100%; padding-left: 30px; font-size: 12.5px; color: var(--text); }
+.rq svg { width: 13px; height: 13px; margin-top: 3px; color: var(--text-2); flex-shrink: 0; }
+.rq q { quotes: '«' '»'; overflow-wrap: anywhere; }
+.rq small { font-size: 11.5px; color: var(--text-2); white-space: nowrap; }
+
+/* ---- Bloque «Te la recomendó Ana» (ficha, dentro de la tarjeta de tu nota) ---------- */
+.recb { display: flex; align-items: flex-start; gap: 12px; padding: 0 0 16px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+.recb-avs { display: flex; flex-shrink: 0; }
+.recb-avs .so-av + .so-av { margin-left: -10px; box-shadow: 0 0 0 2px var(--bg-elev); }
+.recb-tx { font-size: 13px; line-height: 1.5; color: var(--text-2); min-width: 0; }
+.recb-tx b { color: var(--text); font-weight: 600; }
+.recb-tx q { display: block; margin-top: 3px; font-size: 13.5px; color: var(--text); quotes: '“' '”'; overflow-wrap: anywhere; }
+.recb-w { font-size: 11.5px; color: var(--text-2); margin-top: 4px; }
+.recb.is-alone { padding: 16px; margin: 0 0 16px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg-elev); }
+
+/* ---- Fila «Recomendar a un amigo…» de «Guardar en…» -------------------------------- */
+.saveto-rec .saveto-emoji { color: var(--text-2); display: grid; place-items: center; }
+.saveto-rec .saveto-emoji svg { width: 17px; height: 17px; }
+.saveto-rec .saveto-chev { width: 15px; height: 15px; color: var(--text-3); margin-left: auto; flex-shrink: 0; }

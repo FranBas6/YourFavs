@@ -10,7 +10,7 @@
  */
 import { moreButtonHtml, panelHtml, rowsHtml, searchHtml } from '../../lib/social/amigosView';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
-import type { FriendsTab, PersonEntry, Relation } from '../../lib/social/types';
+import type { FriendsTab, PersonEntry, RecReceived, RecSent, Relation } from '../../lib/social/types';
 
 const root = document.querySelector<HTMLElement>('[data-am]');
 if (root) init(root);
@@ -39,7 +39,7 @@ function init(root: HTMLElement) {
     let seq = 0;
 
     // ---- Pestañas -----------------------------------------------------------------------
-    async function fetchTab(tab: FriendsTab, offset = 0): Promise<{ items: PersonEntry[]; hasMore: boolean; sent?: PersonEntry[] } | null> {
+    async function fetchTab(tab: FriendsTab, offset = 0): Promise<{ items: PersonEntry[]; hasMore: boolean; sent?: PersonEntry[]; recsReceived?: RecReceived[]; recsSent?: RecSent[] } | null> {
         try {
             const res = await fetch(`/api/social/lists?tab=${tab}&offset=${offset}`, { headers: { Accept: 'application/json' } });
             const d = await res.json();
@@ -66,7 +66,7 @@ function init(root: HTMLElement) {
         if (mine !== seq) return;
         panel.removeAttribute('aria-busy');
         panel.innerHTML = d
-            ? panelHtml(tab, d.items, { ...ctx, hasMore: d.hasMore, sent: d.sent })
+            ? panelHtml(tab, d.items, { ...ctx, hasMore: d.hasMore, sent: d.sent, recsReceived: d.recsReceived, recsSent: d.recsSent })
             : '<p class="am-note">No se ha podido cargar. Inténtalo otra vez.</p>';
     }
 
@@ -186,7 +186,8 @@ function init(root: HTMLElement) {
                 const next = scope!.nextElementSibling;
                 scope!.remove();
                 if (list === 'received' && next?.classList.contains('am-note')) next.remove();
-                if (!panel.querySelector('.so-row')) panel.innerHTML = panelHtml('pendientes', [], { ...ctx, hasMore: false });
+                // Sin solicitudes ni recomendaciones, el vacío de la pestaña; con recomendaciones, se quedan.
+                if (!panel.querySelector('.so-row') && !panel.querySelector('.rc')) panel.innerHTML = panelHtml('pendientes', [], { ...ctx, hasMore: false });
             }
         } else if (!panel.querySelector('.so-row')) {
             panel.innerHTML = panelHtml(current, [], { ...ctx, hasMore: false });
@@ -206,4 +207,16 @@ function init(root: HTMLElement) {
         if (current === 'amigos' && action === 'friend-remove') dropRow(uid);
         if (current === 'amigos' && action === 'friend-restore') showTab('amigos');
     });
+}
+
+// Llegar desde el aviso «Ana ha respondido a tu recomendación» (#enviadas-{id}): la tarjeta se
+// resalta 2 s (handoff F4 §6.5).
+const hash = location.hash.match(/^#enviadas-(\d+)$/);
+if (hash) {
+    const card = document.getElementById(`enviadas-${hash[1]}`);
+    if (card) {
+        card.scrollIntoView({ block: 'center' });
+        card.classList.add('is-hl');
+        window.setTimeout(() => card.classList.remove('is-hl'), 2000);
+    }
 }
