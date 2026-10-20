@@ -36,6 +36,8 @@ export interface CustomList {
     cover: CustomListCover | null;
     itemCount: number;
     position: number;
+    /** Sale en el perfil público (sección «Colecciones»). */
+    isPublic?: boolean;
     created_at?: unknown;
     updated_at?: unknown;
 }
@@ -100,7 +102,7 @@ function itemIdFor(mediaType: 'movie' | 'tv', tmdbId: number | string): string {
 
 // ---- lecturas ----
 
-const LIST_COLUMNS = 'id, name, description, icon, color_stamp, cover, item_count, position, created_at, updated_at';
+const LIST_COLUMNS = 'id, name, description, icon, color_stamp, cover, item_count, position, is_public, created_at, updated_at';
 const ITEM_COLUMNS = 'media_type, tmdb_id, title, poster_path, position, added_at';
 
 function toList(r: Record<string, any>): CustomList {
@@ -113,6 +115,7 @@ function toList(r: Record<string, any>): CustomList {
         cover: (r.cover ?? null) as CustomListCover | null,
         itemCount: r.item_count ?? 0,
         position: r.position ?? 0,
+        isPublic: r.is_public === true,
         created_at: r.created_at,
         updated_at: r.updated_at,
     };
