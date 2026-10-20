@@ -1022,9 +1022,24 @@
 .aj-btn[disabled] { opacity: .45; cursor: default; }
 .aj-btn svg { width: 14px; height: 14px; }
 
-/* Secciones: asa en gris (reordenar llega más adelante). */
-.aj-grip { width: 26px; height: 34px; display: grid; place-items: center; color: var(--text-4); opacity: .6; flex-shrink: 0; }
+/* Secciones del perfil: asa para reordenar (F6), mismo comportamiento que la de «Tu Home». */
+.aj-grip {
+    width: 26px; height: 34px; display: grid; place-items: center; flex-shrink: 0;
+    border: 0; background: none; border-radius: var(--r-sm); color: var(--text-4);
+    cursor: grab; touch-action: none;   /* imprescindible: si no, el navegador se queda el gesto */
+}
+.aj-grip:hover { background: var(--bg-tint); color: var(--text-3); }
+.aj-grip:active { cursor: grabbing; }
+.aj-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .aj-grip svg { width: 16px; height: 16px; }
+[data-section-row] { position: relative; background: var(--bg-elev); }
+[data-section-row].is-dragging {
+    z-index: 5; border-radius: var(--r-md); border: 1px solid var(--accent); box-shadow: var(--sh-lg);
+    cursor: grabbing;
+}
+[data-section-row].is-dragging .aj-grip { color: var(--accent); background: var(--accent-soft); }
+[data-section-row].is-shifting { transition: transform 160ms ease; }
+@media (max-width: 640px) { .aj-grip { width: 34px; height: 44px; } }
 
 /* Colecciones públicas y títulos ocultos */
 .aj-coll-th {

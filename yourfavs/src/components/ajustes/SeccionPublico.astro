@@ -212,14 +212,19 @@ const boot = {
         <div class="aj-card-head">
             <div>
                 <h2 id="pp-sec-title">Secciones</h2>
-                <p>Lo que sale en tu perfil, en este orden.</p>
+                <p>Lo que sale en tu perfil, en este orden. Arrástralas por el asa para cambiarlo.</p>
             </div>
-            <span class="aj-soon">Reordenar · Pronto</span>
+            <button type="button" class="aj-btn aj-btn-ghost" id="pp-sec-reset">Restablecer orden</button>
         </div>
-        <div data-save-group="sections" data-save-url="/api/profile/public">
+        <!-- `data-save-order`: se guarda como lista, en el orden de las filas (F6). -->
+        <div data-save-group="sections" data-save-url="/api/profile/public" data-save-order>
             {sectionDefs.map((s) => (
-                <div class:list={['aj-row', { 'is-soon': s.def.soon }]} data-section-row={s.id}>
-                    <span class="aj-grip" aria-hidden="true"><Icon name="lucide:grip-vertical" /></span>
+                <div class:list={['aj-row', { 'is-soon': s.def.soon }]} data-section-row={s.id}
+                     data-default={PUBLIC_SECTIONS.findIndex((d) => d.id === s.id)}>
+                    <button type="button" class="aj-grip" data-sec-handle
+                            aria-label={`Mover ${s.def.label}. Usa las flechas arriba y abajo para cambiar su posición.`}>
+                        <Icon name="lucide:grip-vertical" aria-hidden="true" />
+                    </button>
                     <Stamp color={s.def.color} icon={s.def.icon} size={34} />
                     <span class="aj-row-text">
                         <span class="aj-row-title">{s.def.label}{s.def.soon && <span class="aj-soon">Pronto</span>}</span>
@@ -340,6 +345,9 @@ const boot = {
     </div>
 </div>
 
+<div class="sr-only" aria-live="polite" id="pp-sec-live"></div>
+
 <script>
     import '../../scripts/ajustes/publico';
+    import '../../scripts/ajustes/sections-reorder';
 </script>

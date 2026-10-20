@@ -252,13 +252,13 @@ isOneToOne: false
                   ]
                 },"recommendation_recipients": {
                   Row: {
-                    "acted_at": string | null,"rec_id": number,"replied_at": string | null,"reply_key": string | null,"reply_kind": string | null,"reply_text": string | null,"status": string,"to_id": string
+                    "acted_at": string | null,"rec_id": number,"replied_at": string | null,"reply_key": string | null,"reply_kind": string | null,"reply_text": string | null,"status": string,"to_id": string,"watched_at": string | null
                   }
                   Insert: {
-                    "acted_at"?: string | null,"rec_id": number,"replied_at"?: string | null,"reply_key"?: string | null,"reply_kind"?: string | null,"reply_text"?: string | null,"status"?: string,"to_id": string
+                    "acted_at"?: string | null,"rec_id": number,"replied_at"?: string | null,"reply_key"?: string | null,"reply_kind"?: string | null,"reply_text"?: string | null,"status"?: string,"to_id": string,"watched_at"?: string | null
                   }
                   Update: {
-                    "acted_at"?: string | null,"rec_id"?: number,"replied_at"?: string | null,"reply_key"?: string | null,"reply_kind"?: string | null,"reply_text"?: string | null,"status"?: string,"to_id"?: string
+                    "acted_at"?: string | null,"rec_id"?: number,"replied_at"?: string | null,"reply_key"?: string | null,"reply_kind"?: string | null,"reply_text"?: string | null,"status"?: string,"to_id"?: string,"watched_at"?: string | null
                   }
                   Relationships: [
                     {
@@ -402,6 +402,9 @@ isOneToOne: false
 "social_rec_act":
 { Args: { "p_me": string,"p_rec": number,"p_status": string }; Returns: string
                            },
+"social_rec_mark_watched":
+{ Args: { "p_id": number,"p_me": string,"p_type": string }; Returns: undefined
+                           },
 "social_rec_reply":
 { Args: { "p_can_pending": boolean,"p_key": string,"p_me": string,"p_rec": number,"p_text": string }; Returns: string
                            },
@@ -410,6 +413,11 @@ isOneToOne: false
                            },
 "social_rec_withdraw":
 { Args: { "p_me": string,"p_rec": number }; Returns: Json
+                           },
+"social_recent_activity":
+{ Args: { "p_days": number,"p_me": string }; Returns: {
+              "episodes": number,"media_type": Database["public"]['Enums']["media_type"],"person_id": string,"score": number,"season": number,"tmdb_id": number,"watched_on": string
+            }[]
                            },
 "social_respond_request":
 { Args: { "p_accept": boolean,"p_from": string,"p_me": string }; Returns: string

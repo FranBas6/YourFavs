@@ -10,6 +10,7 @@
  * no lleva el texto de la respuesta: enlaza a Pendientes → Enviadas.
  */
 import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
+import { formatScore } from '../../utils/constants/helpers/media-helpers';
 import { QUICK_TEXT, type NotifView, type PersonCard, type QuickKey, type RecReceived, type RecSent, type RecShown, type RecView } from './types';
 
 const IMG = (size: 'w92' | 'w185', path: string) => `https://image.tmdb.org/t/p/${size}${path}`;
@@ -123,6 +124,18 @@ export function recNotifHtml(it: NotifView, o: { mobile?: boolean; now?: number 
     const from = it.actor!;
     const unread = !it.read;
     const when = esc(relTime(it.created_at, o.now));
+    if (it.type === 'rec_watched') {
+        // F6, cierre del bucle: quien la recibió ya la vio. Lleva a la ficha, donde sale con su nota
+        // en «Amigos que la han visto».
+        const href = r.targetType === 'movie' ? `/movie/${r.targetId}` : `/serie/${r.targetId}`;
+        const score = it.recScore != null ? ` (★ ${formatScore(it.recScore)})` : '';
+        const plain = `${from.name} ha visto ${r.title}${score}, que le recomendaste`;
+        return `<a href="${href}" class="notif-item nt-social${unread ? ' is-unread' : ''}" data-id="${esc(it.id)}" aria-label="${esc(plain + (unread ? ', sin leer' : ''))}">`
+            + `<span class="rc-badged">${recLeadHtml(r, 34)}${avatarHtml(from, 20)}</span>`
+            + `<div class="nt-b"><p class="nt-t"><b>${esc(from.name)}</b> ha visto <b>${esc(r.title)}</b>${esc(score)}, que le recomendaste</p>`
+            + `<span class="nt-go">${icon('chevron-right')}Ver la ficha</span><div class="nt-w">${when}</div></div>`
+            + (unread ? '<span class="notif-dot" aria-hidden="true"></span>' : '') + `</a>`;
+    }
     if (it.type === 'rec_reply') {
         // Para quien la envió: SIN el texto. Todo el aviso lleva a Pendientes → Enviadas.
         const href = `/mislistas/amigos?tab=pendientes#enviadas-${r.id}`;

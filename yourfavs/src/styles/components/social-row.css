@@ -1,0 +1,53 @@
+/* =====================================================================================
+   Fila «Lo que ven tus amigos» de la portada (F6, components/Sections/SocialRow.astro).
+   Carril con snap como «Enganchan» y «Estás viendo»; pósters del tamaño del perfil público.
+   Solo tokens: el tema oscuro sale solo. La nota de otra persona va en rosa (el ámbar es la tuya).
+   ===================================================================================== */
+
+.sr-lane {
+    display: flex; gap: 12px; overflow-x: auto; padding: 2px 4px 10px;
+    scroll-snap-type: x mandatory; scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) var(--bg-tint);
+}
+.sr-lane::-webkit-scrollbar { height: 8px; }
+.sr-lane::-webkit-scrollbar-track { background: var(--bg-tint); border-radius: 4px; }
+.sr-lane::-webkit-scrollbar-thumb { background-color: var(--border-strong); border-radius: 4px; }
+
+.sr-card { position: relative; flex: 0 0 120px; min-width: 0; scroll-snap-align: start; }
+@media (min-width: 1024px) { .sr-card { flex-basis: 140px; } .sr-lane { gap: 16px; } }
+
+.sr-po {
+    position: relative; display: block; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden;
+    background: var(--bg-tint);
+}
+.sr-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sr-po:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sr-noimg { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: 8px; font: 600 11px/1.25 var(--font); color: var(--text-2); }
+
+/* Caras de quien lo vio, abajo a la izquierda del póster. */
+.sr-avs { position: absolute; left: 7px; bottom: 7px; display: flex; z-index: 2; }
+.sr-avs .so-av { box-shadow: 0 0 0 2px rgba(0, 0, 0, .55); }
+.sr-avs .so-av + .so-av { margin-left: -8px; }
+
+/* El ⊕ de las cards (SaveToPopover); aquí solo se coloca. */
+.sr-card .card-saveto { position: absolute; right: 7px; top: 7px; z-index: 3; width: 32px; height: 32px; }
+.sr-card:focus-within .card-saveto { opacity: 1; }
+
+.sr-t {
+    display: block; margin-top: 7px; font: 500 12.5px var(--font); color: var(--text); text-decoration: none;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sr-who { font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sr-m {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; margin-top: 3px;
+    font-size: 11.5px; color: var(--text-3);
+}
+.sr-sc {
+    display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 6px;
+    border-radius: var(--r-full); background: var(--stamp-pink); color: var(--stamp-pink-ink);
+    font: 700 10.5px var(--font-mono);
+}
+.sr-sc svg { width: 9px; height: 9px; fill: currentColor; }
+
+.sr-empty { margin: 0; padding: 4px 4px 0; font-size: 13px; line-height: 1.5; color: var(--text-2); max-width: 70ch; }
+.sr-empty a { color: var(--primary); font-weight: 600; margin-left: 4px; }

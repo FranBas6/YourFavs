@@ -264,8 +264,9 @@ const NOTIF_STAMP: Record<string, [StampColor, string]> = {
     friend_accepted: ['pink', 'handshake'],
     recommendation: ['amber', 'send'],
     rec_reply: ['amber', 'send'],
+    rec_watched: ['pink', 'eye'],
 };
-export const SOCIAL_NOTIF_TYPES = new Set(['follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply']);
+export const SOCIAL_NOTIF_TYPES = new Set(['follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched']);
 
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w92';
 const srOnly = (t: string) => `<span class="sr-only">${esc(t)}</span>`;
@@ -320,7 +321,7 @@ export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; no
     const unread = !it.read;
     const st = NOTIF_STAMP[it.type] ?? ['blue', 'bell'];
     // Recomendaciones (F4): su propio marcado, en recUi.ts.
-    if ((it.type === 'recommendation' || it.type === 'rec_reply') && it.rec && it.actor) return recNotifHtml(it, o);
+    if ((it.type === 'recommendation' || it.type === 'rec_reply' || it.type === 'rec_watched') && it.rec && it.actor) return recNotifHtml(it, o);
 
     if (SOCIAL_NOTIF_TYPES.has(it.type) && it.actor) {
         const s = notifSentenceHtml(it);

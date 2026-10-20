@@ -15,11 +15,12 @@
  *
  * Guardado: no se toca la red desde aquí. Se emite `yf:home-order` y `autosave.ts` lee el orden
  * del DOM y lo manda — un único sitio que sabe hablar con el servidor.
+ *
+ * El arrastre en sí (puntero, teclado y FLIP) vive en `reorder.ts`, que comparte con las secciones
+ * del perfil público (F6 social); aquí queda lo propio de la portada: el separador, los contadores,
+ * el interruptor y «Restablecer orden».
  */
-export {};   // hace del fichero un módulo: sin esto su `init` choca con el de autosave.ts
-
-const LONG_PRESS_MS = 150;   // en táctil, hasta aquí el gesto sigue siendo un scroll
-const MOVE_TOLERANCE = 8;    // px que se perdonan antes de decidir que es scroll y no arrastre
+import { initReorder } from './reorder';
 
 const list = document.getElementById('home-layout');
 if (list) init(list);
@@ -71,175 +72,21 @@ function init(list: HTMLElement) {
         document.dispatchEvent(new CustomEvent('yf:home-order'));
     }
 
-    // ---- FLIP: mover en el DOM sin que las vecinas salten -------------------
-    /**
-     * Ejecuta `mutate()` y anima a todas las filas desde donde estaban. `exclude` es la fila
-     * arrastrada, que sigue al dedo y no debe llevar transición.
-     */
-    function flip(mutate: () => void, exclude?: HTMLElement | null) {
-        const before = new Map<HTMLElement, number>();
-        for (const r of rows()) before.set(r, r.getBoundingClientRect().top);
-
-        mutate();
-
-        for (const r of rows()) {
-            if (r === exclude) continue;
-            const from = before.get(r);
-            if (from === undefined) continue;
-            const delta = from - r.getBoundingClientRect().top;
-            if (!delta) continue;
-            r.classList.remove('is-shifting');
-            r.style.transform = `translateY(${delta}px)`;
-            // Dos frames: uno para que el navegador acepte la posición de partida, otro para animar.
-            requestAnimationFrame(() => requestAnimationFrame(() => {
-                r.classList.add('is-shifting');
-                r.style.transform = '';
-            }));
-        }
-    }
-
-    // ---- Arrastre ----------------------------------------------------------
-    let drag: {
-        row: HTMLElement;
-        pointerId: number;
-        startY: number;
-        /** Corrección acumulada: cada reordenación cambia la posición de reposo de la fila. */
-        correction: number;
-        started: boolean;
-        timer: number;
-    } | null = null;
-
-    function moveTo(y: number) {
-        if (!drag) return;
-        drag.row.style.transform = `translateY(${y - drag.startY + drag.correction}px) rotate(-.5deg) scale(1.012)`;
-    }
-
-    function beginDrag() {
-        if (!drag) return;
-        drag.started = true;
-        drag.row.classList.add('is-dragging');
-        drag.row.classList.remove('is-shifting');
-        document.body.style.userSelect = 'none';
-    }
-
-    function endDrag(commit: boolean) {
-        if (!drag) return;
-        const { row, started } = drag;
-        window.clearTimeout(drag.timer);
-        drag = null;
-        document.body.style.userSelect = '';
-        if (!started) return;
-
-        row.classList.remove('is-dragging');
-        // Volver al hueco animado: la fila ya está en su sitio del DOM, solo hay que
-        // deshacer el transform del gesto.
-        row.classList.add('is-shifting');
-        row.style.transform = '';
-        window.setTimeout(() => row.classList.remove('is-shifting'), 180);
-
-        if (commit) save();
-    }
-
-    list.addEventListener('pointerdown', (e) => {
-        const handle = (e.target as HTMLElement).closest<HTMLElement>('[data-home-handle]');
-        if (!handle || e.button !== 0) return;
-        const row = handle.closest<HTMLElement>('.aj-home-row');
-        if (!row) return;
-
-        handle.setPointerCapture(e.pointerId);
-        drag = { row, pointerId: e.pointerId, startY: e.clientY, correction: 0, started: false, timer: 0 };
-
-        if (e.pointerType === 'touch') {
-            // Pulsación mantenida: hasta los 150 ms el dedo puede estar haciendo scroll.
-            drag.timer = window.setTimeout(beginDrag, LONG_PRESS_MS);
-        } else {
-            beginDrag();
-        }
-    });
-
-    list.addEventListener('pointermove', (e) => {
-        if (!drag || e.pointerId !== drag.pointerId) return;
-
-        if (!drag.started) {
-            // Se movió antes de que venciera la pulsación → era un scroll, no un arrastre.
-            if (Math.abs(e.clientY - drag.startY) > MOVE_TOLERANCE) { endDrag(false); }
-            return;
-        }
-        e.preventDefault();
-        moveTo(e.clientY);
-
-        // ¿Sobre qué elemento está el centro de la fila arrastrada?
-        const rect = drag.row.getBoundingClientRect();
-        const center = rect.top + rect.height / 2;
-
-        const items = Array.from(list.querySelectorAll<HTMLElement>('.aj-home-row, .aj-home-sep'));
-        for (const other of items) {
-            if (other === drag.row) continue;
-            const r = other.getBoundingClientRect();
-            // Solo se cruza cuando se pasa del centro del vecino: evita el temblor cuando dos
-            // elementos se intercambian y vuelven a intercambiarse en el mismo píxel.
-            const otherCenter = r.top + r.height / 2;
-            const pos = drag.row.compareDocumentPosition(other);
-            const goingUp = center < otherCenter && Boolean(pos & Node.DOCUMENT_POSITION_PRECEDING);
-            const goingDown = center > otherCenter && Boolean(pos & Node.DOCUMENT_POSITION_FOLLOWING);
-            if (!goingUp && !goingDown) continue;
-
-            const row = drag.row;
-            const beforeTop = row.getBoundingClientRect().top;
-            flip(() => {
-                if (goingUp) list.insertBefore(row, other);
-                else list.insertBefore(row, other.nextSibling);
-            }, row);
-            // La fila cambió de sitio en el flujo: hay que compensar para que no dé un salto
-            // bajo el dedo.
-            drag.correction += beforeTop - row.getBoundingClientRect().top;
-            moveTo(e.clientY);
-
-            // Cruzar el separador enciende o apaga: se toca el checkbox, que es la fuente
-            // de verdad, y así el interruptor y el arrastre no pueden discrepar.
-            if (other.hasAttribute('data-home-sep')) {
-                const sw = switchOf(row);
-                if (sw) sw.checked = goingUp;
-                refresh();
-            }
-            break;
-        }
-    }, { passive: false });
-
-    list.addEventListener('pointerup', (e) => {
-        if (drag && e.pointerId === drag.pointerId) endDrag(true);
-    });
-    list.addEventListener('pointercancel', (e) => {
-        if (drag && e.pointerId === drag.pointerId) endDrag(true);
-    });
-
-    // ---- Teclado: el asa es un <button>, así que ↑/↓ mueven la fila ---------
-    list.addEventListener('keydown', (e) => {
-        const handle = (e.target as HTMLElement).closest<HTMLElement>('[data-home-handle]');
-        if (!handle) return;
-        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-        const row = handle.closest<HTMLElement>('.aj-home-row');
-        if (!row) return;
-        e.preventDefault();
-
-        const items = Array.from(list.querySelectorAll<HTMLElement>('.aj-home-row, .aj-home-sep'));
-        const i = items.indexOf(row);
-        const target = e.key === 'ArrowUp' ? items[i - 1] : items[i + 1];
-        if (!target) return;
-
-        flip(() => {
-            if (e.key === 'ArrowUp') list.insertBefore(row, target);
-            else list.insertBefore(row, target.nextSibling);
-        });
-
-        // Si lo que se ha saltado es el separador, además cambia de estado.
-        if (target.hasAttribute('data-home-sep')) {
+    // ---- Arrastre, teclado y FLIP: el motor común (reorder.ts) ----------------
+    // Cruzar el separador «Ocultos» enciende o apaga: se toca el checkbox, que es la fuente de
+    // verdad, y así el interruptor y el arrastre no pueden discrepar.
+    const { flip } = initReorder(list, {
+        rowSelector: '.aj-home-row',
+        itemSelector: '.aj-home-row, .aj-home-sep',
+        handleSelector: '[data-home-handle]',
+        onCross: (row, other, goingUp) => {
+            if (!other.hasAttribute('data-home-sep')) return;
             const sw = switchOf(row);
-            if (sw) sw.checked = e.key === 'ArrowUp';
-        }
-        save();
-        announce(row);
-        handle.focus();   // el DOM se ha movido; no perder el foco
+            if (sw) sw.checked = goingUp;
+            refresh();
+        },
+        onCommit: () => save(),
+        onKeyMove: (row) => announce(row),
     });
 
     // ---- Interruptor: apagar baja la fila bajo el separador -----------------

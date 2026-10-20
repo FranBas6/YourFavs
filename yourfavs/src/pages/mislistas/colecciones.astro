@@ -13,6 +13,9 @@ import { getCustomLists, LIST_COLORS } from "../../services/BD/lists/customLists
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 
 const lists = await getCustomLists();
+// «Pública» del diálogo (F6 social): con el perfil apagado se puede marcar, pero se avisa de que
+// no se verá hasta activarlo.
+const profileOn = Boolean(Astro.locals.user?.publicHandle && Astro.locals.user?.publicVisibility && Astro.locals.user.publicVisibility !== 'off');
 
 const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','📺','🎞️','🏆','🌟','🎃','💀','🧠','🌍'];
 ---
@@ -69,7 +72,8 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
                         </a>
                         <button type="button" class="edit-list-btn absolute top-2 right-2 w-8 h-8 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur text-white flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
                                 aria-label="Editar colección"
-                                data-id={l.id} data-name={l.name} data-desc={l.description} data-icon={l.icon} data-color={l.colorStamp}>
+                                data-id={l.id} data-name={l.name} data-desc={l.description} data-icon={l.icon} data-color={l.colorStamp}
+                                data-public={l.isPublic ? '1' : ''}>
                             <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
                         </button>
                     </div>
@@ -110,6 +114,20 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
                     {LIST_COLORS.map((c) => (
                         <button type="button" class={`cl-color cl-c-${c}`} data-color={c} aria-label={c}></button>
                     ))}
+                </div>
+
+                <!-- Solo al editar: enseñarla en el perfil público (F6 social). -->
+                <div class="cl-pub" id="cl-pub" hidden>
+                    <span class="cl-pub-tx">
+                        <span class="cl-pub-t">Pública</span>
+                        <span class="cl-pub-d">{profileOn
+                            ? 'Sale en la sección «Colecciones» de tu perfil público.'
+                            : 'Saldrá en tu perfil público cuando lo actives en Ajustes.'}</span>
+                    </span>
+                    <label class="cl-switch">
+                        <input type="checkbox" role="switch" id="cl-public" aria-label="Pública: mostrar en tu perfil público" />
+                        <span class="cl-switch-track"></span>
+                    </label>
                 </div>
             </div>
             <div class="cl-foot">
@@ -209,6 +227,28 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
         border: none; background: #E63946; color: #fff; cursor: pointer;
     }
     .cl-save:disabled { opacity: .6; cursor: default; }
+    .cl-pub {
+        display: flex; align-items: center; gap: 12px; margin-top: 18px; padding-top: 16px;
+        border-top: 1px solid var(--border, #efeae0);
+    }
+    .cl-pub[hidden] { display: none; }
+    .cl-pub-tx { flex: 1; min-width: 0; }
+    .cl-pub-t { display: block; font-size: 14px; font-weight: 600; color: var(--text, #16130f); }
+    .cl-pub-d { display: block; font-size: 12px; line-height: 1.4; color: var(--text-3, #9a9082); margin-top: 2px; }
+    /* El interruptor de Ajustes (.aj-switch), copiado: aquí no se carga ajustes.css. */
+    .cl-switch { position: relative; flex-shrink: 0; display: inline-flex; }
+    .cl-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+    .cl-switch-track {
+        width: 42px; height: 25px; border-radius: var(--r-full); background: var(--border-strong);
+        transition: background-color .18s ease; position: relative; pointer-events: none;
+    }
+    .cl-switch-track::after {
+        content: ''; position: absolute; top: 3px; left: 3px; width: 19px; height: 19px;
+        border-radius: var(--r-full); background: #fff; box-shadow: var(--sh-md); transition: transform .18s ease;
+    }
+    .cl-switch input:checked + .cl-switch-track { background: var(--ok); }
+    .cl-switch input:checked + .cl-switch-track::after { transform: translateX(17px); }
+    .cl-switch input:focus-visible + .cl-switch-track { box-shadow: 0 0 0 3px var(--accent-soft); }
 
     /* Drag-reorder (L3b) */
     .js-list-card { cursor: grab; }
@@ -253,6 +293,9 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
     var delBtn = document.getElementById('cl-delete');
     var cancelBtn = document.getElementById('cl-cancel');
     var closeBtn = document.getElementById('cl-close');
+    var pubRow = document.getElementById('cl-pub');
+    var pubEl = document.getElementById('cl-public');
+    var pubWas = false;
 
     var editingId = null;
     var selEmoji = '🎬';
@@ -287,6 +330,9 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
         setEmoji(mode === 'edit' && data.icon ? data.icon : '🎬');
         setColor(mode === 'edit' && data.color ? data.color : 'slate');
         delBtn.hidden = mode !== 'edit';
+        pubWas = mode === 'edit' && data.isPublic === true;
+        pubEl.checked = pubWas;
+        pubRow.hidden = mode !== 'edit';
         modal.hidden = false;
         document.body.style.overflow = 'hidden';
         setTimeout(function () { nameEl.focus(); }, 30);
@@ -311,6 +357,7 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
                 desc: btn.getAttribute('data-desc'),
                 icon: btn.getAttribute('data-icon'),
                 color: btn.getAttribute('data-color'),
+                isPublic: btn.getAttribute('data-public') === '1',
             });
         });
     });
@@ -334,7 +381,16 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
                 if (r.status === 401) { document.dispatchEvent(new CustomEvent('yf:require-auth')); throw new Error('auth'); }
                 return r.json();
             })
-            .then(function (res) { if (!res.ok) throw new Error(res.error || 'fail'); location.reload(); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.error || 'fail');
+                // «Pública» va por su propio endpoint (el del perfil público), solo si cambió.
+                if (!editingId || pubEl.checked === pubWas) return;
+                return fetch('/api/profile/collections/' + encodeURIComponent(editingId) + '/public', {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isPublic: pubEl.checked }),
+                }).then(function (r) { return r.json(); }).then(function (r2) { if (!r2.ok) throw new Error('public'); });
+            })
+            .then(function () { location.reload(); })
             .catch(function () { saveBtn.disabled = false; });
     });
 
