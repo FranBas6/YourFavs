@@ -11,6 +11,7 @@
  */
 import { ICONS } from './icons';
 import type { NotifView, PersonCard, Relation, SocialPhaseFlags, StampColor } from './types';
+import { recNotifHtml } from './recUi';
 
 export function esc(s: unknown): string {
     return String(s ?? '')
@@ -84,7 +85,7 @@ export interface RelOpts {
     size?: 'sm' | 'md';
 }
 
-function btn(label: string, o: { kind?: string; icon?: string; sa?: string; pressed?: boolean; size?: 'sm' | 'md'; attrs?: string }): string {
+export function btn(label: string, o: { kind?: string; icon?: string; sa?: string; pressed?: boolean; size?: 'sm' | 'md'; attrs?: string }): string {
     const cls = ['pf-btn', o.size === 'sm' ? 'sm' : '', o.kind ?? ''].filter(Boolean).join(' ');
     const pressed = o.pressed === undefined ? '' : ` aria-pressed="${o.pressed}"`;
     const sa = o.sa ? ` data-sa="${o.sa}"` : '';
@@ -122,11 +123,11 @@ function friendMenuItems(p: Pick<PersonCard, 'handle' | 'name'>, rel: Relation, 
     const first = firstName(p.name);
     const keeps = rel.iFollow && rel.followsMe ? 'Seguiréis siguiéndoos. ' : rel.iFollow ? 'Le seguirás siguiendo. ' : '';
     return (withProfileLink && p.handle ? `<a role="menuitem" href="/u/${esc(p.handle)}">${icon('user')}Ver perfil</a>` : '')
-        + (o.phase.recommend
-            ? `<button type="button" role="menuitem" data-action="recommend">${icon('send')}Recomendar algo</button>`
+        + (o.phase.recommend && p.handle
+            ? `<button type="button" role="menuitem" data-recommend data-to="${esc(p.handle)}">${icon('send')}Recomendar algo</button>`
             : `<button type="button" role="menuitem" aria-disabled="true" class="is-soon">${icon('send')}Recomendar algo<span class="so-soon">Pronto</span></button>`)
         + '<hr>'
-        + `<button type="button" role="menuitem" class="pf-danger" data-sa="friend-remove">${icon('user-minus')}Eliminar amigo</button>`
+        + `<button type="button" role="menuitem" class="pf-danger" data-sa="friend-remove">${icon('user-minus')}Eliminar de amigos</button>`
         + `<small>${esc(keeps)}${esc(first)} no recibe aviso.</small>`;
 }
 
@@ -185,8 +186,8 @@ export function profileActionsHtml(p: Pick<PersonCard, 'id' | 'handle' | 'name'>
     const follow = followButtonHtml(p, rel, { ...md, quiet: o.locked });
     const friend = friendButtonHtml(p, rel, { ...md, primary: o.locked });
     row += o.locked ? friend + follow : follow + friend;
-    if (o.phase.recommend && rel.friends) {
-        row += `<button type="button" class="pf-btn pf-ico-mobile" data-action="recommend" aria-label="Recomendar">${icon('send')}<span class="pf-lbl-wide">Recomendar</span></button>`;
+    if (o.phase.recommend && rel.friends && p.handle) {
+        row += `<button type="button" class="pf-btn pf-ico-mobile" data-recommend data-to="${esc(p.handle)}" aria-haspopup="dialog" aria-expanded="false" aria-label="Recomendar a ${esc(first)}">${icon('send')}<span class="pf-lbl-wide">Recomendar</span></button>`;
     }
     if (o.phase.block && !o.locked) {
         row += menuWrap(menuToggle('Más opciones', { ico: true }),
@@ -261,8 +262,10 @@ const NOTIF_STAMP: Record<string, [StampColor, string]> = {
     follow: ['slate', 'user-plus'],
     friend_request: ['pink', 'handshake'],
     friend_accepted: ['pink', 'handshake'],
+    recommendation: ['amber', 'send'],
+    rec_reply: ['amber', 'send'],
 };
-export const SOCIAL_NOTIF_TYPES = new Set(['follow', 'friend_request', 'friend_accepted']);
+export const SOCIAL_NOTIF_TYPES = new Set(['follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply']);
 
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w92';
 const srOnly = (t: string) => `<span class="sr-only">${esc(t)}</span>`;
@@ -316,6 +319,8 @@ export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; no
     const when = relTime(it.created_at, o.now);
     const unread = !it.read;
     const st = NOTIF_STAMP[it.type] ?? ['blue', 'bell'];
+    // Recomendaciones (F4): su propio marcado, en recUi.ts.
+    if ((it.type === 'recommendation' || it.type === 'rec_reply') && it.rec && it.actor) return recNotifHtml(it, o);
 
     if (SOCIAL_NOTIF_TYPES.has(it.type) && it.actor) {
         const s = notifSentenceHtml(it);

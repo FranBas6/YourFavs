@@ -23,31 +23,12 @@ import {
     profileActionsHtml, rowActionsHtml, type RowActions,
 } from '../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
+import { showToast } from './toast';
 import type { NotifView, PersonCard, PersonEntry, Relation } from '../../lib/social/types';
 
 const phase = SOCIAL_PHASE;
 
-function toast(message: string, type: 'success' | 'error' = 'success', undo?: () => void) {
-    const box = document.getElementById('toast-container');
-    if (!box) return;
-    const el = document.createElement('div');
-    el.className = `toast toast-${type}${undo ? ' so-undo-toast' : ''}`;
-    const text = document.createElement('span');
-    text.textContent = message;
-    el.appendChild(text);
-    if (undo) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = 'Deshacer';
-        b.addEventListener('click', () => { el.remove(); undo(); });
-        el.appendChild(b);
-    }
-    box.appendChild(el);
-    window.setTimeout(() => {
-        el.style.animation = 'toastOut 0.3s ease forwards';
-        window.setTimeout(() => el.remove(), 300);
-    }, undo ? 6000 : 2800);
-}
+const toast = showToast;
 
 /** Lo mínimo de la persona que necesitan los botones, leído de los data-* de su pieza. */
 function personFrom(host: HTMLElement): PersonCard {

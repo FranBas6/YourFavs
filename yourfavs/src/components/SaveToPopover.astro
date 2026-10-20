@@ -8,6 +8,11 @@
  * (POST /api/lists/items), además de crear una colección nueva en el sitio.
  *
  * Invitado (sin cookie has_session) → abre el modal de registro (gating), sin fetch.
+ *
+ * Recomendar (F4 social): con sesión, una fila final «Recomendar a un amigo…» (películas y series).
+ * Al pulsarla, ESTE MISMO popover crece y pinta el selector de amigos (`window.yfRec.mountIn`, de
+ * scripts/social/recommend.ts), con «‹ Volver a Guardar en…»; no se abre otra capa. Esc vuelve
+ * primero a «Guardar en…» y la segunda vez cierra.
  */
 ---
 <div class="saveto-backdrop" id="saveto-backdrop" hidden></div>
@@ -49,19 +54,20 @@
         display: flex; align-items: center; justify-content: center; color: #fff;
     }
     .saveto-row.is-on .saveto-name { font-weight: 600; }
-    .saveto-row.is-on .saveto-check { background: #E63946; border-color: #E63946; }
+    .saveto-row.is-on .saveto-check { background: var(--accent-dark); border-color: var(--accent-dark); }
     .saveto-row .saveto-check svg { display: none; width: 13px; height: 13px; }
     .saveto-row.is-on .saveto-check svg { display: block; }
-    .saveto-create { color: #E63946; font-weight: 600; font-size: 13.5px; }
-    .saveto-create .saveto-emoji { color: #E63946; }
+    .saveto-create { color: var(--accent-dark); font-weight: 600; font-size: 13.5px; }
+    .saveto-create .saveto-emoji { color: var(--accent-dark); }
+    [data-theme="dark"] .saveto-create, [data-theme="dark"] .saveto-create .saveto-emoji { color: var(--stamp-red-ink); }
     .saveto-newform { padding: 8px 16px; display: flex; gap: 7px; }
     .saveto-newform input {
         flex: 1; min-width: 0; border: 1.5px solid var(--border, #e2dccd); border-radius: 8px;
         padding: 7px 10px; font-size: 13px; font-family: inherit; background: var(--bg, #fff); color: var(--text, #16130f);
     }
-    .saveto-newform input:focus { outline: none; border-color: #E63946; }
+    .saveto-newform input:focus { outline: none; border-color: var(--accent); }
     .saveto-newform button {
-        flex-shrink: 0; border: none; background: #E63946; color: #fff; border-radius: 8px;
+        flex-shrink: 0; border: none; background: var(--accent-dark); color: #fff; border-radius: 8px;
         padding: 0 12px; font-size: 13px; font-weight: 700; cursor: pointer;
     }
 
@@ -73,9 +79,9 @@
         font-size: 13px; font-family: inherit; line-height: 1.4;
         background: var(--bg, #fff); color: var(--text, #16130f);
     }
-    .saveto-note textarea:focus { outline: none; border-color: #E63946; }
+    .saveto-note textarea:focus { outline: none; border-color: var(--accent); }
     .saveto-note button {
-        margin-top: 8px; width: 100%; border: none; background: #E63946; color: #fff;
+        margin-top: 8px; width: 100%; border: none; background: var(--accent-dark); color: #fff;
         border-radius: 8px; padding: 9px 12px; font-size: 13.5px; font-weight: 700; cursor: pointer;
     }
     .saveto-note button:disabled { opacity: .6; cursor: default; }
@@ -150,6 +156,9 @@
 
     var cur = null; // { mt, id, title, poster }
     var busy = false;
+    var lastData = null; // lo último pintado, para volver desde «Recomendar a un amigo…»
+    var SEND_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>';
+    var CHEV_ICON = '<svg class="saveto-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
 
     function loggedIn() {
         return document.cookie.split('; ').some(function (c) { return c.indexOf('has_session=') === 0; });
@@ -169,6 +178,8 @@
     function close() {
         pop.hidden = true; cur = null;
         pop.classList.remove('saveto-sheet');
+        pop.classList.remove('saveto-wide');
+        if (window.yfRec) window.yfRec.forget();
         if (backdrop) backdrop.hidden = true;
         unlockScroll();
     }
@@ -186,6 +197,7 @@
     }
 
     function render(data) {
+        lastData = data;
         var memberIds = data.memberIds || [];
         var fixed = data.fixed || {};
         if (cur) cur.fixed = fixed; // estado previo (para un Deshacer fiel al reubicar)
@@ -222,6 +234,11 @@
         }
         html += '<div class="saveto-sep"></div>' +
             '<button type="button" class="saveto-row saveto-create js-create"><span class="saveto-emoji">+</span><span class="saveto-name">Crear nueva colección</span></button>';
+        // F4 social: recomendar este título a un amigo, en este mismo popover.
+        if (window.yfRec && cur && (cur.mt === 'movie' || cur.mt === 'tv')) {
+            html += '<div class="saveto-sep"></div>' +
+                '<button type="button" class="saveto-row saveto-rec js-rec" role="menuitem"><span class="saveto-emoji">' + SEND_ICON + '</span><span class="saveto-name">Recomendar a un amigo…</span>' + CHEV_ICON + '</button>';
+        }
         inner.innerHTML = html;
     }
 
@@ -392,12 +409,29 @@
             e.target.click();
         }
     });
-    window.addEventListener('resize', function () { if (isOpen()) close(); });
-    window.addEventListener('scroll', function () { if (isOpen() && !pop.classList.contains('saveto-sheet')) close(); }, true);
+    // Con el selector de recomendar dentro, el teclado del móvil cambia el tamaño: no se cierra.
+    window.addEventListener('resize', function () { if (isOpen() && !pop.classList.contains('saveto-wide')) close(); });
+    // Desplazar DENTRO del popover (la lista de amigos) no lo cierra; desplazar la página, sí.
+    window.addEventListener('scroll', function (e) {
+        if (e.target && e.target.nodeType === 1 && pop.contains(e.target)) return;
+        if (isOpen() && !pop.classList.contains('saveto-sheet')) close();
+    }, true);
 
     // ---- toggles dentro del popover ----
     inner.addEventListener('click', function (e) {
         if (busy || !cur) return;
+        // F4 social: «Recomendar a un amigo…» → el selector de amigos en este mismo popover.
+        if (e.target.closest('.js-rec') && window.yfRec) {
+            var trig = cur.trigger;
+            pop.classList.add('saveto-wide');
+            window.yfRec.mountIn(inner, { type: cur.mt, id: cur.id, title: cur.title, image: cur.poster }, function () {
+                pop.classList.remove('saveto-wide');
+                if (cur && lastData) { render(lastData); if (trig && !cur.sheet) position(trig); }
+                var row = inner.querySelector('.js-rec'); if (row) row.focus();
+            }, !!cur.sheet);
+            if (trig && !cur.sheet) position(trig);
+            return;
+        }
         var fixedBtn = e.target.closest('.js-fixed');
         var collBtn = e.target.closest('.js-coll');
         var createBtn = e.target.closest('.js-create');

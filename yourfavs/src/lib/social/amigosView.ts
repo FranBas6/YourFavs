@@ -7,7 +7,8 @@
  * mismas funciones.
  */
 import { esc, icon, personRowHtml, relTime } from './ui';
-import type { FriendsTab, PersonEntry, SocialPhaseFlags, StampColor } from './types';
+import { recReceivedCardHtml, recSentCardHtml } from './recUi';
+import type { FriendsTab, PersonEntry, RecReceived, RecSent, SocialPhaseFlags, StampColor } from './types';
 
 export const TAB_LABEL: Record<FriendsTab, string> = {
     pendientes: 'Pendientes',
@@ -81,10 +82,50 @@ export function rowsHtml(tab: FriendsTab, items: PersonEntry[], ctx: ViewCtx, gr
 const grp = (label: string, n: number, key: string, extra = '') =>
     `<div class="am-grp" data-grp="${key}">${esc(label)} · <b data-grp-n>${n}</b>${extra ? `<span>${esc(extra)}</span>` : ''}<hr></div>`;
 
-/** «Pendientes» (F3): recibidas, enviadas y el hueco de las recomendaciones (F4). */
-function pendingHtml(received: PersonEntry[], sent: PersonEntry[], o: ViewCtx): string {
-    const recs = o.phase.recommend ? '' : `<div class="am-grp">Recomendaciones<hr></div><div class="am-soon">${stamp('slate', 'inbox', 36)}<div><b>Pronto.</b> Cuando un amigo te recomiende algo, lo verás aquí para añadirlo a Pendientes o descartarlo.</div></div>`;
-    if (!received.length && !sent.length) return emptyHtml('pendientes', o) + recs;
+export interface RecsCtx { recsReceived?: RecReceived[]; recsSent?: RecSent[] }
+
+const blockHead = (c: StampColor, i: string, title: string, sub = '') =>
+    `<div class="am-blk">${stamp(c, i, 34)}<div><h2>${esc(title)}</h2>${sub ? `<p>${esc(sub)}</p>` : ''}</div></div>`;
+
+const unanswered = (r: RecReceived) => !r.reply && (r.shown === 'pending' || r.shown === 'had' || r.shown === 'seen');
+
+/** Bloque «Recomendaciones» (F4, handoff F4 §6.5): recibidas y enviadas. */
+function recsHtml(o: ViewCtx & RecsCtx): string {
+    const recv = o.recsReceived ?? [];
+    const sent = o.recsSent ?? [];
+    const now = o.now ?? Date.now();
+    let html = blockHead('amber', 'send', 'Recomendaciones', 'Lo que te mandan tus amigos y lo que mandas tú.');
+    if (!recv.length && !sent.length) {
+        return html + `<p class="am-note">${icon('send')}Todavía no hay recomendaciones. En cualquier película, serie o persona, «Recomendar» se la manda a tus amigos.</p>`;
+    }
+    if (recv.length) {
+        // Número NEUTRO: el rojo sigue siendo solo de solicitudes de amistad.
+        html += `<div class="am-grp" data-grp="rec-received">Recibidas · <b data-grp-n>${recv.filter(unanswered).length}</b><span>sin responder</span><hr></div>`
+            + `<div class="rc-list">${recv.map((r) => recReceivedCardHtml(r, now)).join('')}</div>`
+            + `<p class="am-note">${icon('eye-off')}Si descartas sin responder, no se lo decimos.</p>`;
+    }
+    if (sent.length) {
+        html += `<div class="am-grp" id="enviadas" data-grp="rec-sent">Enviadas · <b>${sent.length}</b><hr></div>`
+            + `<div class="rc-list">${sent.map((r) => recSentCardHtml(r, now)).join('')}</div>`;
+    }
+    return html;
+}
+
+/** «Pendientes» (F3): recibidas y enviadas; y desde la F4, el bloque de recomendaciones. */
+function pendingHtml(received: PersonEntry[], sent: PersonEntry[], o: ViewCtx & RecsCtx): string {
+    if (o.phase.recommend) {
+        const friends = !received.length && !sent.length
+            ? `<p class="am-note">${icon('inbox')}No tienes solicitudes por responder. Cuando alguien te pida amistad, saldrá aquí y en la campana.</p>`
+            : friendRequestsHtml(received, sent, o);
+        return `<section class="am-sec">${blockHead('pink', 'handshake', 'Solicitudes de amistad')}${friends}</section>`
+            + `<section class="am-sec">${recsHtml(o)}</section>`;
+    }
+    const soon = `<div class="am-grp">Recomendaciones<hr></div><div class="am-soon">${stamp('slate', 'inbox', 36)}<div><b>Pronto.</b> Cuando un amigo te recomiende algo, lo verás aquí para añadirlo a Pendientes o descartarlo.</div></div>`;
+    if (!received.length && !sent.length) return emptyHtml('pendientes', o) + soon;
+    return friendRequestsHtml(received, sent, o) + soon;
+}
+
+function friendRequestsHtml(received: PersonEntry[], sent: PersonEntry[], o: ViewCtx): string {
     let html = '';
     if (received.length) {
         html += grp('Recibidas', received.length, 'received')
@@ -95,7 +136,7 @@ function pendingHtml(received: PersonEntry[], sent: PersonEntry[], o: ViewCtx): 
         html += grp('Enviadas', sent.length, 'sent', 'de 20 como máximo')
             + `<div class="so-list" data-list="sent">${rowsHtml('pendientes', sent, o, 'sent')}</div>`;
     }
-    return html + recs;
+    return html;
 }
 
 export function moreButtonHtml(offset: number): string {
@@ -103,7 +144,7 @@ export function moreButtonHtml(offset: number): string {
 }
 
 /** El panel entero de una pestaña. */
-export function panelHtml(tab: FriendsTab, items: PersonEntry[], o: ViewCtx & { hasMore: boolean; sent?: PersonEntry[] }): string {
+export function panelHtml(tab: FriendsTab, items: PersonEntry[], o: ViewCtx & RecsCtx & { hasMore: boolean; sent?: PersonEntry[] }): string {
     if (tab === 'pendientes') return pendingHtml(items, o.sent ?? [], o);
     if (!items.length) return emptyHtml(tab, o);
     let html = `<div class="so-list">${rowsHtml(tab, items, o)}</div>`;

@@ -17,6 +17,7 @@ import PersonalNav from '../../components/personal/PersonalNav.astro';
 import Stamp from '../../components/Stamp.astro';
 import { Icon } from 'astro-icon/components';
 import { listTab, tabCounts } from '../../services/BD/social/graph';
+import { listReceived, listSent } from '../../services/BD/social/recommendations';
 import { panelHtml, tabsFor, TAB_LABEL } from '../../lib/social/amigosView';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
 import type { FriendsTab } from '../../lib/social/types';
@@ -36,8 +37,13 @@ if (user) {
     counts = await tabCounts(user.uid);
     // Sin pestaña pedida: Pendientes si hay algo que responder; si no, tus amigos (F3).
     if (!(asked && tabs.includes(asked)) && SOCIAL_PHASE.friends && !counts.pendientes) tab = 'amigos';
-    const page = await listTab(user.uid, tab);
-    initial = panelHtml(tab, page.items, { phase: SOCIAL_PHASE, myHandle, hasMore: page.hasMore, sent: page.sent });
+    const withRecs = tab === 'pendientes' && SOCIAL_PHASE.recommend;
+    const [page, recsReceived, recsSent] = await Promise.all([
+        listTab(user.uid, tab),
+        withRecs ? listReceived(user.uid) : Promise.resolve(undefined),
+        withRecs ? listSent(user.uid) : Promise.resolve(undefined),
+    ]);
+    initial = panelHtml(tab, page.items, { phase: SOCIAL_PHASE, myHandle, hasMore: page.hasMore, sent: page.sent, recsReceived, recsSent });
 }
 const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
 ---

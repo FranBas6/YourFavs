@@ -16,9 +16,12 @@ interface Props {
     userRating?: number;
     /** 4.4 · "Porque viste X": semilla que originó la reco (solo en recomendaciones). */
     seedTitle?: string;
+    /** F4 social: «Recomendada por Ana» en /mislistas/pendientes, si la añadiste desde una recomendación.
+     *  Excluyente con `seedTitle` (gana esta). */
+    recommendedBy?: { name: string; more: number };
 }
 
-const { id, title, img, vote_average, overview, release_date, genres, character, userRating, seedTitle } = Astro.props;
+const { id, title, img, vote_average, overview, release_date, genres, character, userRating, seedTitle, recommendedBy } = Astro.props;
 
 const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(release_date);
@@ -76,7 +79,12 @@ const showSaveBtn = !_p.startsWith('/mislistas') || _p.startsWith('/mislistas/re
 
         <!-- Content -->
         <div class="p-3.5 flex flex-col flex-grow">
-            {seedTitle && (
+            {recommendedBy ? (
+                <p class="flex items-center gap-1 text-[11px] mb-1.5 line-clamp-1" style="color: var(--card-text-3)" title={`Recomendada por ${recommendedBy.name}${recommendedBy.more ? ` y ${recommendedBy.more} más` : ''}`}>
+                    <svg class="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                    <span class="truncate">Recomendada por <span class="font-semibold" style="color: var(--card-text)">{recommendedBy.name}</span>{recommendedBy.more > 0 && ` y ${recommendedBy.more} más`}</span>
+                </p>
+            ) : seedTitle && (
                 <p class="flex items-center gap-1 text-[11px] text-white/55 mb-1.5 line-clamp-1" title={`Porque viste ${seedTitle}`}>
                     <svg class="w-3 h-3 text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l1.9 5.6L19.5 9l-5.6 1.9L12 16l-1.9-5.1L4.5 9l5.6-1.4L12 2z"/></svg>
                     <span class="truncate">Porque viste <span class="font-semibold text-white/90">{seedTitle}</span></span>
