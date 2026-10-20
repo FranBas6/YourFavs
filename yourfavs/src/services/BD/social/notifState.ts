@@ -15,6 +15,10 @@ import type { NotifView } from '../../../lib/social/types';
 import { SOCIAL_NOTIF_TYPES } from '../../../lib/social/ui';
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { getPeople, getRelations } from './graph';
+import { recViewsForNotifs } from './recommendations';
+
+/** Id de la recomendación de un aviso: `rec:{id}` o `recrep:{id}:{uid}`. */
+const recIdOf = (notifId: string) => Number(notifId.split(':')[1]);
 
 /** Estado de las solicitudes recibidas por `me` con esos ids. Las que no estén: «gone». */
 async function requestStates(me: string, ids: number[]): Promise<Map<number, NotifView['req']>> {
@@ -28,7 +32,11 @@ export async function withSocialState(me: string, docs: NotificationDoc[]): Prom
     const actorIds = docs.filter((d) => SOCIAL_NOTIF_TYPES.has(d.type) && d.actor_id).map((d) => d.actor_id!);
     if (!actorIds.length) return docs.map(({ actor_id: _drop, ...d }) => d);
     const reqIds = docs.filter((d) => d.type === 'friend_request').map((d) => Number(d.id.split(':')[1])).filter(Number.isFinite);
-    const [people, rels, reqs] = await Promise.all([getPeople(actorIds), getRelations(me, actorIds), requestStates(me, reqIds)]);
+    const recvIds = docs.filter((d) => d.type === 'recommendation').map((d) => recIdOf(d.id)).filter(Number.isFinite);
+    const sentIds = docs.filter((d) => d.type === 'rec_reply').map((d) => recIdOf(d.id)).filter(Number.isFinite);
+    const [people, rels, reqs, recs] = await Promise.all([
+        getPeople(actorIds), getRelations(me, actorIds), requestStates(me, reqIds), recViewsForNotifs(me, recvIds, sentIds),
+    ]);
     const out: NotifView[] = [];
     for (const { actor_id, ...d } of docs) {
         if (!SOCIAL_NOTIF_TYPES.has(d.type)) { out.push(d); continue; }
@@ -37,7 +45,11 @@ export async function withSocialState(me: string, docs: NotificationDoc[]): Prom
         if (!actor || !rel || rel.blockedByMe) continue;
         if (d.type === 'follow' && !rel.followsMe) continue;
         const req = d.type === 'friend_request' ? reqs.get(Number(d.id.split(':')[1])) ?? 'gone' : undefined;
-        out.push({ ...d, actor, rel, ...(req ? { req } : {}) });
+        // Recomendaciones (F4): sin la recomendación (retirada) el aviso no se pinta.
+        const rec = d.type === 'recommendation' ? recs.received.get(recIdOf(d.id))
+            : d.type === 'rec_reply' ? recs.sent.get(recIdOf(d.id)) : undefined;
+        if ((d.type === 'recommendation' || d.type === 'rec_reply') && !rec) continue;
+        out.push({ ...d, actor, rel, ...(req ? { req } : {}), ...(rec ? { rec } : {}) });
     }
     return out;
 }

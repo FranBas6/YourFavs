@@ -71,4 +71,48 @@ export interface NotifView {
     rel?: Relation;
     /** Solo `friend_request`: cómo está ahora esa solicitud. */
     req?: 'pending' | 'accepted' | 'rejected' | 'gone';
+    /** Solo `recommendation` y `rec_reply` (F4): la recomendación, con su estado para quien mira. */
+    rec?: RecView;
 }
+
+// -------------------------------------------------------------------------------------
+// Recomendaciones (F4)
+// -------------------------------------------------------------------------------------
+export type RecTarget = 'movie' | 'tv' | 'person' | 'company';
+export type RecStatus = 'pending' | 'added' | 'alerts' | 'opened' | 'discarded';
+/** Lo que ve quien recibe: su estado o, si sigue pendiente, «ya la tenías» / «ya la viste». */
+export type RecShown = RecStatus | 'had' | 'seen';
+export type QuickKey = 'thanks' | 'seen_it' | 'saving' | 'not_for_me';
+
+export const QUICK_TEXT: Record<QuickKey, string> = {
+    thanks: '¡Gracias!',
+    seen_it: 'Ya la había visto',
+    saving: 'Me la apunto',
+    not_for_me: 'No es para mí',
+};
+
+export interface RecReply { kind: 'quick' | 'text'; key: QuickKey | null; text: string | null; at: number }
+
+export interface RecView {
+    id: number;
+    targetType: RecTarget;
+    targetId: number;
+    title: string;
+    image: string | null;
+    message: string | null;
+    createdAt: number;
+    /** Para quien recibe. En `rec_reply` (quien envía) no se usa. */
+    shown: RecShown;
+    reply: RecReply | null;
+}
+
+export interface RecReceived extends RecView { from: PersonCard }
+
+export interface RecSentRecipient {
+    person: PersonCard;
+    /** Lo único que ve quien envía: descartar y abrir sin responder siguen «sent». */
+    visible: 'sent' | 'added' | 'alerts';
+    reply: RecReply | null;
+}
+
+export interface RecSent extends Omit<RecView, 'shown' | 'reply'> { recipients: RecSentRecipient[] }
