@@ -43,6 +43,13 @@ export const HOME_SECTIONS: HomeSectionDef[] = [
         // Apagado: quien ya tiene Tendencias y Más populares no necesita una tercera fila de lo mismo.
         defaultHidden: true,
     },
+    {
+        key: 'social',
+        label: 'Lo que ven tus amigos',
+        desc: 'Lo que han visto esta semana tus amigos y las personas que sigues.',
+        // Apagado: solo tiene sentido con gente a la que sigues, y la portada no se llena sola de caras.
+        defaultHidden: true,
+    },
 ];
 
 export type HomeLayoutPref = { key: string; hidden?: boolean };

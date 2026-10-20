@@ -1,0 +1,86 @@
+---
+/**
+ * Fila «Lo que ven tus amigos» de la portada (F6 de la capa social, docs/PLAN_SOCIAL.md).
+ *
+ * Nace APAGADA (`defaultHidden` en `homeSections.ts`): se enciende en Ajustes → Tu Home. Lo que
+ * vieron en los últimos 7 días tus amigos y las personas que sigues, una tarjeta por título con las
+ * caras de quien lo vio. Sin spoilers, como «Lo último visto» del perfil: en series solo temporada y
+ * cuántos episodios. Fila plana (`.yf-row` + `SectionHeader`) con carril horizontal.
+ *
+ * Encendida y sin nada que enseñar, deja una línea con el porqué en vez de desaparecer: quien la
+ * acaba de encender tiene que ver que funciona.
+ */
+import SectionHeader from '../SectionHeader.astro';
+import SaveToButton from '../social/SaveToButton.astro';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import { avatarHtml } from '../../lib/social/ui';
+import { relativeDayLabel } from '../../utils/appTime';
+import { formatScore } from '../../utils/constants/helpers/media-helpers';
+import type { ActivityItem } from '../../services/BD/social/activity';
+import '../../styles/components/social-row.css';
+
+interface Props {
+    items: ActivityItem[];
+}
+const { items } = Astro.props;
+
+const first = (name: string) => name.split(/\s+/)[0] || name;
+const namesOf = (it: ActivityItem) => {
+    const n = it.who.map((w) => first(w.person.name));
+    return n.length === 1 ? n[0] : n.length === 2 ? `${n[0]} y ${n[1]}` : `${n[0]} y ${n.length - 1} más`;
+};
+const detailOf = (it: ActivityItem) => {
+    const w = it.who[0];
+    if (it.media_type === 'movie') return '';
+    const ep = w.episodes === 1 ? '1 episodio' : w.episodes > 1 ? `${w.episodes} episodios` : '';
+    return [w.season != null ? `T${w.season}` : '', ep].filter(Boolean).join(' · ');
+};
+---
+<article class="yf-row">
+    <SectionHeader
+        title="Lo que ven tus amigos"
+        subtitle="Lo que han visto esta semana tus amigos y las personas que sigues. Sin títulos de episodio."
+        why="de sus perfiles"
+        color="pink"
+        icon="users"
+        count={items.length || undefined}
+    />
+
+    {items.length === 0 ? (
+        <p class="sr-empty">
+            Nadie de tu gente ha visto nada estos 7 días. Cuantas más personas sigas, más se llena esta fila.
+            <a href="/mislistas/amigos">Buscar personas</a>
+        </p>
+    ) : (
+        <div class="sr-lane">
+            {items.map((it) => {
+                const href = `/${it.media_type === 'movie' ? 'movie' : 'serie'}/${it.tmdb_id}`;
+                const w = it.who[0];
+                const detail = detailOf(it);
+                const all = it.who.map((x) => x.person.name).join(', ');
+                return (
+                    <div class="sr-card group">
+                        <a class="sr-po" href={href} aria-label={`${it.title}, visto por ${all}`}>
+                            {it.poster_path
+                                ? <img src={posterUrl(it.poster_path, 'w185')} alt="" loading="lazy" decoding="async" />
+                                : <span class="sr-noimg">{it.title}</span>}
+                            <span class="sr-avs" aria-hidden="true" set:html={it.who.slice(0, 3).map((x) => avatarHtml(x.person, 26)).join('')} />
+                        </a>
+                        <SaveToButton mediaType={it.media_type} tmdbId={it.tmdb_id} title={it.title} posterPath={it.poster_path} />
+                        <a class="sr-t" href={href} tabindex="-1" title={it.title}>{it.title}</a>
+                        <div class="sr-who" title={all}>{namesOf(it)}</div>
+                        <div class="sr-m">
+                            {it.media_type === 'movie' && w.score != null && (
+                                <span class="sr-sc" title={`Nota de ${w.person.name}: ${formatScore(w.score)}`}>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>{formatScore(w.score)}
+                                </span>
+                            )}
+                            {detail && <span>{detail}</span>}
+                            <span>{relativeDayLabel(w.watchedOn)}</span>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    )}
+</article>

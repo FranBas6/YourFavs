@@ -14,6 +14,9 @@ import NextEpisode from "../components/Sections/NextEpisode.astro";
 import RescatarSeries from "../components/Sections/RescatarSeries.astro";
 import HookRow from "../components/Sections/HookRow.astro";
 import RankingRow from "../components/Sections/RankingRow.astro";
+import SocialRow from "../components/Sections/SocialRow.astro";
+import { recentActivity, type ActivityItem } from "../services/BD/social/activity";
+import { SOCIAL_PHASE } from "../utils/constants/social";
 import { readHooksDoc, buildHookRow } from "../services/API/shared/hookRows";
 import { getWeeklyRanking } from "../services/API/shared/weeklyRanking";
 import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
@@ -119,6 +122,13 @@ const ranking = showRanking
     ? await safeFetch(getWeeklyRanking(rankRegion, rankPlatforms), 'home/ranking', null)
     : null;
 const rankRegionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === rankRegion)?.label || rankRegion;
+
+// «Lo que ven tus amigos» (F6 social): también nace apagado, así que solo se consulta si está encendido.
+const showSocial = SOCIAL_PHASE.follow && Boolean(Astro.locals.user)
+    && !hiddenHomeKeys(Astro.locals.user?.homeLayout).has('social');
+const socialItems = showSocial
+    ? await safeFetch(recentActivity(Astro.locals.user!.uid), 'home/social', [] as ActivityItem[])
+    : [];
 
 const hookRow = buildHookRow(hooksDoc, {
     platforms: Astro.locals.user?.platforms ?? [],
@@ -351,6 +361,11 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 {key === 'popular-region' && ranking && ranking.entries.length > 0 && (
                     <div class="content-wrapper">
                         <RankingRow entries={ranking.entries} regionLabel={rankRegionLabel} regionOnly={rankPlatforms.length === 0} />
+                    </div>
+                )}
+                {key === 'social' && showSocial && (
+                    <div class="content-wrapper">
+                        <SocialRow items={socialItems} />
                     </div>
                 )}
                 {key === 'que-veo' && (

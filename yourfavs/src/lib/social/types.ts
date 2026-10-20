@@ -71,8 +71,10 @@ export interface NotifView {
     rel?: Relation;
     /** Solo `friend_request`: cómo está ahora esa solicitud. */
     req?: 'pending' | 'accepted' | 'rejected' | 'gone';
-    /** Solo `recommendation` y `rec_reply` (F4): la recomendación, con su estado para quien mira. */
+    /** Solo `recommendation`, `rec_reply` y `rec_watched`: la recomendación, con su estado para quien mira. */
     rec?: RecView;
+    /** Solo `rec_watched` (F6): la nota que le puso quien la vio, leída al pintar. */
+    recScore?: number | null;
 }
 
 // -------------------------------------------------------------------------------------

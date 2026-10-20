@@ -13,11 +13,15 @@
  *   id="home-layout"                     → lista de la Home (orden + visibilidad)
  *   data-save-url="/api/profile/public"  → en el campo o en su grupo: a qué endpoint va (por
  *                                          defecto, /api/profile/preferences)
+ *   data-save-order                      → en un grupo con `data-key`: se manda como LISTA
+ *                                          `[{id, on}]` en el orden de las filas (secciones del
+ *                                          perfil, que se reordenan arrastrando; F6)
  *
  * Eventos para otros scripts de la página (Ajustes → «Perfil público»):
  *   `yf:save-state` { state, msg }  → usa este mismo indicador «Guardando… / Guardado»
  *   `yf:undo` { label, revert }      → usa esta misma barra de Deshacer
  *   `yf:saved` { field, value }      → avisa de cada guardado confirmado por el servidor
+ *   `yf:reorder` { field }           → otro script ha cambiado el orden de un grupo: guárdalo
  *
  * Cola: UNA petición en vuelo por campo. Un cambio nuevo sobre el mismo campo aborta la
  * anterior (si no, dos toques rápidos podían aplicarse en orden inverso y dejar guardado el
@@ -68,6 +72,14 @@ function init(root: HTMLElement) {
 
     const els = (sel: string) => Array.from(root.querySelectorAll<HTMLElement>(sel));
 
+    /** Grupo de interruptores como `{ clave: encendido }`, venga como objeto o como lista ordenada. */
+    function asOnMap(value: unknown): Record<string, boolean> {
+        if (Array.isArray(value)) {
+            return Object.fromEntries(value.map((x) => [String((x as { id?: unknown }).id), (x as { on?: unknown }).on === true]));
+        }
+        return (value && typeof value === 'object' ? value : {}) as Record<string, boolean>;
+    }
+
     function groupBox(field: string) {
         return root.querySelector<HTMLElement>(`[data-save-group="${field}"]`);
     }
@@ -89,6 +101,10 @@ function init(root: HTMLElement) {
             //  · con `data-key` en las casillas → OBJETO de booleanos (notifPrefs, spoilers)
             //  · sin él                        → ARRAY de números (platforms)
             if (inputs.some((i) => i.dataset.key)) {
+                // Con orden: la lista de filas tal cual está en pantalla.
+                if (box.hasAttribute('data-save-order')) {
+                    return inputs.filter((i) => i.dataset.key).map((i) => ({ id: i.dataset.key!, on: i.checked }));
+                }
                 const out: Record<string, boolean> = {};
                 for (const i of inputs) {
                     if (i.dataset.key) out[i.dataset.key] = i.checked;
@@ -114,7 +130,8 @@ function init(root: HTMLElement) {
         if (box) {
             const inputs = Array.from(box.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
             if (inputs.some((i) => i.dataset.key)) {
-                const map = (value ?? {}) as Record<string, boolean>;
+                // Revertir devuelve los interruptores, no el orden (como la Home).
+                const map = asOnMap(value);
                 for (const i of inputs) {
                     const k = i.dataset.key;
                     if (k && k in map) i.checked = map[k];
@@ -225,8 +242,8 @@ function init(root: HTMLElement) {
         // Perfil público: apagar una sección y desactivar el perfil (handoff §8.1 y §8.4).
         if (field === 'sections') {
             if (!prev || !next || typeof prev !== 'object' || typeof next !== 'object') return null;
-            const p = prev as Record<string, boolean>;
-            const n = next as Record<string, boolean>;
+            const p = asOnMap(prev);
+            const n = asOnMap(next);
             const off = Object.keys(n).filter((k) => p[k] === true && n[k] === false);
             if (off.length !== 1) return null;
             const input = root.querySelector<HTMLInputElement>(`[data-save-group="sections"] input[data-key="${off[0]}"]`);
@@ -361,6 +378,10 @@ function init(root: HTMLElement) {
 
     // Reordenar con ↑/↓ (A4: y con el asa) no dispara ningún evento de formulario.
     document.addEventListener('yf:home-order', () => queue(HOME_FIELD, 0));
+    document.addEventListener('yf:reorder', (e) => {
+        const field = ((e as CustomEvent).detail as { field?: string })?.field;
+        if (field && groupBox(field)) queue(field, 0);
+    });
 
     indRetry?.addEventListener('click', () => {
         if (lastFailed) queue(lastFailed, 0);
