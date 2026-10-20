@@ -5,6 +5,8 @@ import { getMoviesPendientes } from '../../../services/BD/movies/yourfavsMovie';
 import { getSeriesPendientes } from '../../../services/BD/series/yourfavsSerie';
 import { processBatch } from '../../../utils/processBatch';
 import { getCurrentRegion } from '../../../services/BD/shared/userScope';
+import { pendingCommon } from '../../../services/BD/social/inCommon';
+import { SOCIAL_PHASE } from '../../../utils/constants/social';
 
 export const prerender = false;
 
@@ -13,6 +15,10 @@ export const prerender = false;
  * runtime + proveedores ES (un fetch por item vía append_to_response).
  * El cliente filtra por tiempo/plataforma y elige aleatorio — este endpoint
  * solo precalcula y cachea. TTL corto: pendientes cambian a menudo.
+ *
+ * `?with={uuid de un amigo}` (F5 social): solo lo que tenéis pendiente LOS DOS. Es un subconjunto de
+ * tus Pendientes, así que se filtran tus candidatos ya enriquecidos (sin más llamadas a TMDB). Si no
+ * hay nada en común (o no sois amigos), vuelven los tuyos con `common: false`.
  */
 const TTL_MS = 30 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
@@ -39,7 +45,11 @@ interface RouletteCandidate {
 
 interface RoulettePayload {
     candidates: RouletteCandidate[];
+    /** Solo con `?with=`: true si son pendientes de los dos; false si son solo los tuyos. */
+    common?: boolean;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function enrich(id: string, type: 'movie' | 'tv'): Promise<RouletteCandidate | null> {
     try {
@@ -68,40 +78,55 @@ async function enrich(id: string, type: 'movie' | 'tv'): Promise<RouletteCandida
     }
 }
 
-export const GET: APIRoute = async ({ locals }) => {
+/** Tus candidatos, de la caché por usuario o calculados y guardados. */
+async function ownCandidates(uid: string): Promise<RoulettePayload> {
+    const now = Date.now();
+    const cached = memCache.get(uid);
+    if (cached && cached.expires > now) return cached.data;
+    const [movies, series] = await Promise.all([getMoviesPendientes(), getSeriesPendientes()]);
+    const jobs = [
+        ...movies.map((m: any) => ({ id: String(m.id), type: 'movie' as const })),
+        ...series.map((s: any) => ({ id: String(s.id), type: 'tv' as const })),
+    ];
+    const enriched = await processBatch(jobs, (j) => enrich(j.id, j.type), 8);
+    const payload: RoulettePayload = {
+        candidates: enriched.filter((c): c is RouletteCandidate => c !== null && !!c.title),
+    };
+    memCache.set(uid, { data: payload, expires: now + TTL_MS });
+    return payload;
+}
+
+export const GET: APIRoute = async ({ locals, url }) => {
     const uid = locals.user?.uid;
     if (!uid) return json({ candidates: [] } satisfies RoulettePayload, 200); // invitado: sin pendientes
 
-    const now = Date.now();
-    const cached = memCache.get(uid);
-    if (cached && cached.expires > now) return json(cached.data, 200, true);
-
+    const withId = url.searchParams.get('with');
     try {
-        const [movies, series] = await Promise.all([getMoviesPendientes(), getSeriesPendientes()]);
-        const jobs = [
-            ...movies.map((m: any) => ({ id: String(m.id), type: 'movie' as const })),
-            ...series.map((s: any) => ({ id: String(s.id), type: 'tv' as const })),
-        ];
-        const enriched = await processBatch(jobs, (j) => enrich(j.id, j.type), 8);
-        const payload: RoulettePayload = {
-            candidates: enriched.filter((c): c is RouletteCandidate => c !== null && !!c.title),
-        };
-        memCache.set(uid, { data: payload, expires: now + TTL_MS });
-        return json(payload, 200, true);
+        const own = await ownCandidates(uid);
+        if (!withId || !SOCIAL_PHASE.friends) return json(own, 200, true);
+        if (!UUID_RE.test(withId) || withId === uid) return json({ candidates: [] } satisfies RoulettePayload, 400);
+
+        // Lo del amigo cambia sin que lo sepas: caché corta y sin guardar en el servidor.
+        const both = new Set((await pendingCommon(uid, withId)).map((r) => `${r.media_type}:${r.tmdb_id}`));
+        const common = own.candidates.filter((c) => both.has(`${c.media_type}:${c.id}`));
+        const payload: RoulettePayload = common.length
+            ? { candidates: common, common: true }
+            : { candidates: own.candidates, common: false };
+        return json(payload, 200, false, 'private, max-age=60');
     } catch (err) {
         console.error('[api/roulette] error:', (err as Error).message);
         return json({ candidates: [] } satisfies RoulettePayload, 200); // sin cachear el fallo
     }
 };
 
-function json(data: unknown, status: number, cacheable = false): Response {
+function json(data: unknown, status: number, cacheable = false, cacheControl?: string): Response {
     return new Response(JSON.stringify(data), {
         status,
         headers: {
             'Content-Type': 'application/json',
             // `private`: son TUS pendientes. Con `public` un CDN compartido podía guardarlos y
             // servírselos a otra cuenta.
-            ...(cacheable ? { 'Cache-Control': 'private, max-age=1800' } : {}),
+            ...(cacheControl ? { 'Cache-Control': cacheControl } : cacheable ? { 'Cache-Control': 'private, max-age=1800' } : {}),
         },
     });
 }

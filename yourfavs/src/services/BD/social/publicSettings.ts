@@ -230,6 +230,22 @@ export async function saveOwnArchetype(a: Omit<PublicArchetype, 'computed_at'>):
     if (error) throw new Error(error.message);
 }
 
+const ARCHETYPE_STALE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * «Tu cine en números» ya calcula el arquetipo con la sesión del dueño (F5): si el guardado del
+ * perfil público no existe o tiene más de 7 días, se aprovecha para guardar el de ahora. Con el
+ * perfil apagado no hace nada. Devuelve el handle si guardó (para vaciar la caché del perfil).
+ */
+export async function refreshArchetypeIfStale(a: Omit<PublicArchetype, 'computed_at'>): Promise<string | null> {
+    const current = await getOwnPublicSettings();
+    if (!current.handle || current.visibility === 'off') return null;
+    const computedAt = current.archetype?.computed_at ? new Date(current.archetype.computed_at).getTime() : 0;
+    if (Date.now() - computedAt < ARCHETYPE_STALE_MS) return null;
+    await saveOwnArchetype(a);
+    return current.handle;
+}
+
 // -------------------------------------------------------------------------------------
 // Colecciones públicas
 // -------------------------------------------------------------------------------------
