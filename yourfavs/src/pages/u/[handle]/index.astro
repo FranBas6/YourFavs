@@ -27,6 +27,7 @@ import { shouldSuggestFriend } from '../../../services/BD/social/referral';
 import { avatarHtml, initialsOf, stampFor } from '../../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 import { safeFetch } from '../../../utils/safeFetch';
+import { formatScore } from '../../../utils/constants/helpers/media-helpers';
 import '../../../styles/pages/social/perfil-publico.css';
 
 export const prerender = false;
@@ -86,14 +87,32 @@ for (const s of view.sections) {
     } else if (s.id === 'collections') {
         if (view.collections.length) blocks.push({ id: 'collections', kind: 'content' });
         else if (isOwner) blocks.push({ id: 'collections', kind: 'empty' });
+    } else if (s.id === 'common') {
+        // Solo la ve un amigo (cada uno lo suyo). El dueño ve qué es; los demás, nada.
+        if (view.common?.items.length) blocks.push({ id: 'common', kind: 'content' });
+        else if (isOwner) blocks.push({ id: 'common', kind: 'empty' });
     }
-    // 'common' (En común contigo) llega en la F5.
 }
 // Tarjeta de invitación: solo invitados, después de la SEGUNDA sección que se pinte (o al final).
 const inviteAfter = isGuest ? Math.min(2, blocks.length) : -1;
 
 const seasonsLabel = (n: number | null) => (n == null ? '' : n === 1 ? '1 temporada' : `${n} temporadas`);
 const ownCollections = view.ownCollectionsTotal ?? 0;
+
+// «En común contigo» (F5): «Tú 8 · Ana 9» bajo cada póster; sin notas, el tipo.
+const common = view.common;
+const commonMeta = (t: { media_type: 'movie' | 'tv'; mine: number | null; theirs: number | null }) => {
+    const parts = [
+        t.mine != null ? `Tú ${formatScore(t.mine)}` : '',
+        t.theirs != null ? `${firstName} ${formatScore(t.theirs)}` : '',
+    ].filter(Boolean);
+    return parts.length ? `★ ${parts.join(' · ')}` : (t.media_type === 'movie' ? 'Película' : 'Serie');
+};
+const commonSub = common
+    ? (common.same > 0
+        ? `${common.same === 1 ? '1 que valoráis igual' : `${common.same} que valoráis igual`} de ${common.ratedBoth} que habéis puntuado los dos. Primero, lo que más os gustó a los dos.`
+        : 'Lo que habéis visto los dos. Primero, lo que más os gustó a los dos.')
+    : '';
 ---
 <Layout
     title={`${view.name} (@${view.handle}) · YourFavs`}
@@ -243,6 +262,30 @@ const ownCollections = view.ownCollectionsTotal ?? 0;
                             ctaLabel="Crear una colección" ctaHref="/mislistas/colecciones"
                         />
                     )
+                )}
+                {b.id === 'common' && b.kind === 'content' && common && (
+                    <section class="pf-row" aria-labelledby="pf-sec-common">
+                        <SectionHeader
+                            headingId="pf-sec-common" title="En común contigo" color="purple" icon="users"
+                            cap={`${common.total} en común`}
+                            subtitle={commonSub}
+                            why="solo lo ves tú, como amigo"
+                        />
+                        <div class="pf-lane">
+                            {common.items.map((t) => (
+                                <PosterTile mediaType={t.media_type} tmdbId={t.tmdb_id} title={t.title} posterPath={t.poster_path}
+                                    meta={commonMeta(t)} />
+                            ))}
+                        </div>
+                    </section>
+                )}
+                {b.id === 'common' && b.kind === 'empty' && (
+                    <OwnerEmptyRow
+                        id="common" title="En común contigo" color="purple" icon="users"
+                        heading="Cada amigo ve aquí lo vuestro"
+                        text="Cuando un amigo abre tu perfil, ve lo que habéis visto los dos y en cuántas coincidís con la nota. Tú no lo ves porque es tu perfil."
+                        ctaLabel="Ver tus amigos" ctaHref="/mislistas/amigos?tab=amigos"
+                    />
                 )}
                 {i + 1 === inviteAfter && (
                     <aside class="pf-invite">

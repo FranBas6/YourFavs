@@ -1,0 +1,29 @@
+/* =====================================================================================
+   «Amigos que la han visto» en las fichas (F5, components/detail/FriendsSeen.astro). La caja es
+   la misma tarjeta que «Dónde ver»; dentro, solo tokens (el tema oscuro sale solo). La nota de
+   un amigo va en rosa, como la nota del dueño en su perfil público: el ámbar es solo la tuya.
+   ===================================================================================== */
+
+.fsn-list {
+    list-style: none; margin: 0; padding: 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 12px 8px;
+}
+.fsn-p {
+    display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 0;
+    text-decoration: none; color: inherit; border-radius: var(--r-md); padding: 2px 0;
+}
+a.fsn-p:hover .fsn-n { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+a.fsn-p:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.fsn-n {
+    max-width: 100%; font-size: 12px; font-weight: 500; color: var(--text-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fsn-s {
+    display: inline-flex; align-items: center; gap: 3px; height: 20px; padding: 0 7px;
+    border-radius: var(--r-full); background: var(--stamp-pink); color: var(--stamp-pink-ink);
+    font: 700 11px var(--font-mono); white-space: nowrap;
+}
+.fsn-s svg { width: 10px; height: 10px; fill: currentColor; }
+.fsn-s.is-w, .fsn-s.is-n { background: var(--bg-tint); color: var(--text-2); font: 500 10.5px var(--font); }
+.fsn-f { margin: 12px 0 0; font-size: 12.5px; color: var(--text-2); }
+.fsn-f.is-solo { margin: 0; }

@@ -15,6 +15,8 @@ import { deriveArchetype } from "../../../utils/cinemaIdentity";
 import { getGenreName } from "../../../utils/constants/genres";
 import { getLanguageDisplayName } from "../../../utils/constants/helpers/media-helpers";
 import { posterUrl } from "../../../services/API/shared/tmdbClient";
+import { refreshArchetypeIfStale } from "../../../services/BD/social/publicSettings";
+import { invalidatePublicProfileCache } from "../../../services/BD/social/publicProfile";
 import '../../../styles/pages/personal/personal.css';
 
 const currentYear = new Date().getFullYear();
@@ -46,6 +48,16 @@ const topDirector = stats.topDirectors[0] || null;
 
 // ④ Identidad cinéfila: arquetipo (reglas) + ADN por género (barras), sin fetches nuevos.
 const archetype = deriveArchetype(stats, streak.max);
+// F5 social: si el arquetipo de tu perfil público tiene más de una semana, se guarda este. Un fallo
+// aquí no puede romper la página.
+if (Astro.locals.user) {
+    try {
+        const handle = await refreshArchetypeIfStale({ name: archetype.name, icon: archetype.icon, description: archetype.description });
+        if (handle) invalidatePublicProfileCache(handle);
+    } catch (err) {
+        console.error('[year/siempre] archetype', (err as Error).message);
+    }
+}
 const dnaGenres = stats.topGenres.slice(0, 6);
 const maxGenre = Math.max(1, ...dnaGenres.map(g => g.count));
 const DNA_COLORS = ['#E63946', '#6d4aa0', '#2f6fb0', '#9a6a12', '#2f7d52', '#b8417a'];
