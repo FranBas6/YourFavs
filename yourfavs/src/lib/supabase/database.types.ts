@@ -238,13 +238,13 @@ isOneToOne: false
                   ]
                 },"messages": {
                   Row: {
-                    "author_id": string | null,"body": string | null,"client_id": string | null,"conv_id": number,"created_at": string,"deleted_at": string | null,"id": number,"kind": string,"sys": Json | null,"undo_md5": string | null
+                    "author_id": string | null,"body": string | null,"card_ref": Json | null,"card_type": string | null,"client_id": string | null,"conv_id": number,"created_at": string,"deleted_at": string | null,"id": number,"kind": string,"spoiler": Json | null,"sys": Json | null,"undo_md5": string | null
                   }
                   Insert: {
-                    "author_id"?: string | null,"body"?: string | null,"client_id"?: string | null,"conv_id": number,"created_at"?: string,"deleted_at"?: string | null,"id"?: never,"kind"?: string,"sys"?: Json | null,"undo_md5"?: string | null
+                    "author_id"?: string | null,"body"?: string | null,"card_ref"?: Json | null,"card_type"?: string | null,"client_id"?: string | null,"conv_id": number,"created_at"?: string,"deleted_at"?: string | null,"id"?: never,"kind"?: string,"spoiler"?: Json | null,"sys"?: Json | null,"undo_md5"?: string | null
                   }
                   Update: {
-                    "author_id"?: string | null,"body"?: string | null,"client_id"?: string | null,"conv_id"?: number,"created_at"?: string,"deleted_at"?: string | null,"id"?: never,"kind"?: string,"sys"?: Json | null,"undo_md5"?: string | null
+                    "author_id"?: string | null,"body"?: string | null,"card_ref"?: Json | null,"card_type"?: string | null,"client_id"?: string | null,"conv_id"?: number,"created_at"?: string,"deleted_at"?: string | null,"id"?: never,"kind"?: string,"spoiler"?: Json | null,"sys"?: Json | null,"undo_md5"?: string | null
                   }
                   Relationships: [
                     {
@@ -422,6 +422,11 @@ isOneToOne: false
 "msg_can_reach":
 { Args: { "p_me": string,"p_them": string }; Returns: boolean
                            },
+"msg_card_states":
+{ Args: { "p_conv": number,"p_me": string,"p_refs": Json }; Returns: {
+              "episode": number,"media_type": Database["public"]['Enums']["media_type"],"score": number,"season": number,"state": string,"tmdb_id": number,"user_id": string
+            }[]
+                           },
 "msg_clean_name":
 { Args: { "p_name": string }; Returns: string
                            },
@@ -489,7 +494,7 @@ isOneToOne: false
 { Args: { "p_kind": string,"p_me": string,"p_sys": Json }; Returns: boolean
                            },
 "msg_send":
-{ Args: { "p_body": string,"p_client": string,"p_conv": number,"p_me": string }; Returns: Json
+{ Args: { "p_body": string,"p_card_ref"?: Json,"p_card_type"?: string,"p_client": string,"p_conv": number,"p_me": string }; Returns: Json
                            },
 "msg_sys":
 { Args: { "p_actor": string,"p_conv": number,"p_extra": Json,"p_targets": (string)[],"p_type": string }; Returns: undefined

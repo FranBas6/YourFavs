@@ -112,7 +112,7 @@ function init(root: HTMLElement, chat: ChatView) {
     function announce(fresh: ChatMessage[]) {
         const lines = fresh
             .filter((m) => m.author !== me && m.kind === 'text' && !m.deleted)
-            .map((m) => `${nameOf(m.author)}: ${m.folded ? FOLDED_TEXT : m.body ?? ''}`);
+            .map((m) => `${nameOf(m.author)}: ${m.folded ? FOLDED_TEXT : m.body || (m.card ? `ha compartido ${m.card.ref.title}` : '')}`);
         if (lines.length) live.textContent = lines.join('. ');
     }
 
@@ -278,11 +278,94 @@ function init(root: HTMLElement, chat: ChatView) {
         form.addEventListener('submit', (e) => { e.preventDefault(); submit(); });
         // Que pulsar Enviar no quite el foco al campo (en móvil cerraría el teclado).
         sendBtn.addEventListener('pointerdown', (e) => e.preventDefault());
-        root.querySelector('.ms-plus')?.addEventListener('click', (e) => e.preventDefault());
+    }
+
+    // ---- ＋ del compositor (M4): menú anclado en escritorio, hoja en móvil ---------------------
+    const plusBtn = root.querySelector<HTMLButtonElement>('[data-ms-plus]');
+    const plusMenu = root.querySelector<HTMLElement>('#ms-pm');
+    const plusSheet = document.getElementById('ms-pm-sheet') as HTMLDialogElement | null;
+    const setPlus = (open: boolean) => {
+        plusBtn?.classList.toggle('open', open);
+        plusBtn?.setAttribute('aria-expanded', String(open));
+        // El icono (＋ / ✕) cambia por CSS: si se sustituyera el <svg>, el clic que lo abre quedaría
+        // «fuera» del botón (su objetivo ya no estaría en la página) y el menú se cerraría al momento.
+    };
+    function closePlus(restoreFocus = false) {
+        if (plusMenu && !plusMenu.hidden) plusMenu.hidden = true;
+        if (plusSheet?.open) plusSheet.close();
+        setPlus(false);
+        if (restoreFocus) plusBtn?.focus();
+    }
+    plusBtn?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (plusBtn.getAttribute('aria-expanded') === 'true') { closePlus(); return; }
+        setPlus(true);
+        if (mobile.matches) { plusSheet?.showModal(); return; }
+        if (!plusMenu) return;
+        plusMenu.hidden = false;
+        plusMenu.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    });
+    plusSheet?.addEventListener('close', () => setPlus(false));
+    plusSheet?.addEventListener('click', (e) => {
+        // Tocar fuera de la hoja (el fondo) o elegir una acción la cierra.
+        if (e.target === plusSheet || (e.target as Element).closest('[role="menuitem"]')) plusSheet.close();
+    });
+    plusMenu?.addEventListener('click', (e) => { if ((e.target as Element).closest('[role="menuitem"]')) closePlus(); });
+    plusMenu?.addEventListener('keydown', (e) => {
+        const items = [...plusMenu.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+        const i = items.indexOf(document.activeElement as HTMLElement);
+        if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePlus(true); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length]?.focus(); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
+        else if (e.key === 'Tab') closePlus();
+    });
+    document.addEventListener('click', (e) => {
+        const path = e.composedPath();
+        if (plusMenu && !plusMenu.hidden && !path.includes(plusMenu) && !(plusBtn && path.includes(plusBtn))) closePlus();
+    });
+
+    // Tarjeta enviada desde el selector («Compartir un título»): entra como un mensaje más.
+    document.addEventListener('yf:ms-card-sent', (e) => {
+        const d = (e as CustomEvent<{ conv: number; message: ChatMessage }>).detail;
+        if (!d || d.conv !== conv) return;
+        merge([d.message]);
+        readSent = Math.max(readSent, d.message.id);
+        render('bottom');
+        refreshList();
+        input?.focus();
+    });
+
+    // «Añadir a Pendientes» desde una tarjeta: tu píldora cambia en todas las de ese título.
+    async function addPending(btn: HTMLButtonElement) {
+        const mt = btn.dataset.mt;
+        const id = Number(btn.dataset.tmdb);
+        if ((mt !== 'movie' && mt !== 'tv') || !id) return;
+        btn.disabled = true;
+        let ok = false;
+        try {
+            const res = await fetch('/api/lists/fixed', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ media_type: mt, tmdb_id: id, list: 'pendientes', action: 'add' }),
+            });
+            ok = res.ok && (await res.json()).ok;
+        } catch { /* sin red */ }
+        if (!ok) { btn.disabled = false; showToast('No se ha podido añadir. Inténtalo otra vez.', 'error'); return; }
+        for (const m of msgs) {
+            if (m.card && m.card.ref.mediaType === mt && m.card.ref.tmdbId === id && !m.card.viewer) m.card.viewer = { state: 'pending' };
+        }
+        render();
+        showToast('Añadida a Pendientes');
     }
 
     // ---- Acciones sobre un mensaje ----------------------------------------------------------
-    const bodyOf = (m: ChatMessage) => (m.folded ? revealed[m.id] ?? '' : m.body ?? '');
+    // Una tarjeta se copia con su enlace (el comentario, si lo hay, delante).
+    const bodyOf = (m: ChatMessage) => {
+        const text = m.folded ? revealed[m.id] ?? '' : m.body ?? '';
+        if (!m.card) return text;
+        const r = m.card.ref;
+        const link = `${r.title} · ${location.origin}/${r.mediaType === 'movie' ? 'movie' : 'serie'}/${r.tmdbId}`;
+        return text ? `${text}\n${link}` : link;
+    };
 
     async function copy(id: number) {
         const m = find(id);
@@ -366,7 +449,7 @@ function init(root: HTMLElement, chat: ChatView) {
         if (m.folded && !(id in revealed)) {
             return [{ key: 'reveal', label: 'Mostrar', icon: 'eye' }, { key: 'report', label: 'Reportar', icon: 'flag' }];
         }
-        const copyA = { key: 'copy', label: 'Copiar texto', icon: 'copy' };
+        const copyA = m.card ? { key: 'copy', label: 'Copiar enlace', icon: 'link' } : { key: 'copy', label: 'Copiar texto', icon: 'copy' };
         return m.author === me
             ? [copyA, { key: 'delete', label: 'Borrar mensaje', icon: 'trash-2', danger: true }]
             : [copyA, { key: 'report', label: 'Reportar', icon: 'flag' }];
@@ -442,6 +525,8 @@ function init(root: HTMLElement, chat: ChatView) {
             else openMenu(act, id);
             return;
         }
+        const add = t.closest<HTMLButtonElement>('[data-tc-add]');
+        if (add) { void addPending(add); return; }
         const rv = t.closest<HTMLElement>('[data-reveal]');
         if (rv) { void reveal(Number(rv.dataset.reveal)); return; }
         const retry = t.closest<HTMLElement>('[data-retry]');

@@ -12,8 +12,10 @@
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { getPeople, getRelations } from './graph';
 import { previewOf } from '../../../lib/social/messagesText';
+import { resolveCards } from './chatCards';
+import type { Json } from '../../../lib/supabase/database.types';
 import type {
-    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard,
+    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, TitleCardRef,
 } from '../../../lib/social/types';
 
 export const MSG_MAX = 2000;
@@ -37,6 +39,7 @@ function unwrap<T>(r: { data: unknown; error: { message: string } | null }): T {
 interface RawMsg {
     id: number; author: string | null; kind: 'text' | 'system'; body: string | null; sys: MsgSys | null;
     created_at: string; deleted: boolean; folded: boolean; client_id: string | null;
+    card?: { type: 'title'; ref: TitleCardRef } | null;
 }
 interface RawConv {
     id: number; kind: ConvKind; name: string | null; role: ConvRole; muted: boolean; last_msg_at: string;
@@ -59,6 +62,8 @@ export function toMessage(r: RawMsg): ChatMessage {
     return {
         id: r.id, author: r.author, kind: r.kind, body: r.body, sys: r.sys, at: ms(r.created_at),
         deleted: r.deleted, folded: r.folded, clientId: r.client_id,
+        // Solo con la copia de TMDB: el estado de cada cual lo pone `resolveCards` al pintar.
+        card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] } : null,
     };
 }
 
@@ -130,10 +135,12 @@ export async function getHistory(
     const memberIds = h.members.map((m) => m.id);
     const ids = [me, ...memberIds, ...h.messages.flatMap(idsOf)];
     const others = memberIds.filter((id) => id !== me);
+    const messages = h.messages.map(toMessage);
     const [people, rels] = await Promise.all([
         getPeople(ids),
         // «Has bloqueado» (grupos) y «Amigos desde» (1:1): la relación de quien mira con los demás.
         others.length ? getRelations(me, others) : Promise.resolve(new Map()),
+        resolveCards(me, conv, messages),
     ]);
     const members: ChatMember[] = h.members
         .map((m) => {
@@ -151,7 +158,7 @@ export async function getHistory(
             title: group ? h.conv.name ?? '' : other?.name ?? 'Cuenta eliminada',
             me: { id: me, role: h.me.role, muted: h.me.muted, lastReadId: h.me.last_read_id },
             members,
-            messages: h.messages.map(toMessage),
+            messages,
             people: Object.fromEntries(people),
             hasMore: h.has_more,
             deletedIds: h.deleted_ids ?? [],
@@ -191,14 +198,23 @@ export async function openDirect(me: string, them: string): Promise<OpenDirectRe
 // -------------------------------------------------------------------------------------
 // Mensajes
 // -------------------------------------------------------------------------------------
-export type SendError = 'none' | 'read_only' | 'empty' | 'too_long' | 'rate';
+export type SendError = 'none' | 'read_only' | 'empty' | 'too_long' | 'rate' | 'card';
 export type SendResult = { ok: true; message: ChatMessage } | { ok: false; error: SendError };
+/** Código HTTP de cada error al enviar (`read_only` nunca dice por qué). */
+export const SEND_STATUS: Record<SendError, number> = { none: 404, read_only: 403, empty: 400, too_long: 400, rate: 429, card: 400 };
 
-export async function sendMessage(me: string, conv: number, body: string, clientId: string): Promise<SendResult> {
+/** Un mensaje: texto, o tarjeta de título (`card`, la copia de TMDB) con el texto como comentario. */
+export async function sendMessage(
+    me: string, conv: number, body: string, clientId: string, card: TitleCardRef | null = null,
+): Promise<SendResult> {
     const r = unwrap<{ ok: boolean; error?: SendError; message?: RawMsg }>(await db().rpc('msg_send', {
         p_me: me, p_conv: conv, p_body: body, p_client: clientId,
+        ...(card ? { p_card_type: 'title', p_card_ref: card as unknown as Json } : {}),
     }));
-    return r.ok && r.message ? { ok: true, message: toMessage(r.message) } : { ok: false, error: r.error ?? 'none' };
+    if (!r.ok || !r.message) return { ok: false, error: r.error ?? 'none' };
+    const message = toMessage(r.message);
+    await resolveCards(me, conv, [message]);
+    return { ok: true, message };
 }
 
 /** Borra uno tuyo de la conversación `conv`. */
@@ -325,4 +341,20 @@ export async function friendCount(me: string): Promise<number> {
     if (x.error) throw new Error(x.error.message);
     if (y.error) throw new Error(y.error.message);
     return (x.count ?? 0) + (y.count ?? 0);
+}
+
+// -------------------------------------------------------------------------------------
+// «Enviar a…» (M4, handoff M4 §3.5)
+// -------------------------------------------------------------------------------------
+
+/**
+ * A dónde se puede mandar algo: tus conversaciones en las que puedes escribir (la más reciente
+ * primero; las de solo lectura no salen) y tus amigos con los que aún no tienes un 1:1.
+ */
+export async function sendTargets(me: string): Promise<{ convs: ConvSummary[]; friends: PersonCard[] }> {
+    const [convs, cands] = await Promise.all([listConversations(me), groupCandidates(me, null)]);
+    const open = convs.filter((c) => !c.readOnly);
+    const withDirect = new Set(convs.filter((c) => c.kind === 'direct').flatMap((c) => c.faces.map((f) => f.id)));
+    const friends = cands.map((c) => c.person).filter((p) => !withDirect.has(p.id) && p.handle);
+    return { convs: open, friends };
 }

@@ -147,7 +147,7 @@
 .ms-seen svg { width: 13px; height: 13px; }
 
 /* ---- Compositor --------------------------------------------------------------------- */
-.ms-c { padding: 10px 20px 14px; flex-shrink: 0; background: var(--bg-elev); }
+.ms-c { position: relative; padding: 10px 20px 14px; flex-shrink: 0; background: var(--bg-elev); }
 .ms-cb {
     display: flex; align-items: flex-end; gap: 6px; padding: 6px;
     border-radius: 12px; border: 1px solid var(--border-strong); background: var(--bg);
@@ -159,6 +159,12 @@
     display: grid; place-items: center; cursor: not-allowed;
 }
 .ms-plus svg { width: 17px; height: 17px; }
+/* M4: el ＋ ya hace algo. */
+.ms-plus.on { border-style: solid; color: var(--text-2); background: var(--bg-elev); cursor: pointer; }
+.ms-plus.on:hover { color: var(--text); }
+.ms-plus.on.open { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+.ms-plus .i-x, .ms-plus.open .i-plus { display: none; }
+.ms-plus.open .i-x { display: block; }
 .ms-tip {
     display: none; position: absolute; bottom: 44px; left: 0; z-index: 3; white-space: nowrap;
     background: var(--text); color: var(--bg-elev); font: 600 11.5px var(--font); padding: 6px 10px;
@@ -405,3 +411,84 @@
 .rk-note2 svg { width: 15px; height: 15px; margin-top: 2px; flex-shrink: 0; }
 .rk-note2 b { color: var(--text); font-weight: 600; }
 .ms-sec .pf-btn.sm svg { width: 14px; height: 14px; }
+
+/* ---- M4: menú del ＋ y tarjetas (handoff M4 §3–§4; medidas de m4.css) -------------------- */
+.pm {
+    position: absolute; left: 20px; bottom: calc(100% - 2px); z-index: 7; width: 320px; padding: 6px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-lg);
+}
+.pm[hidden] { display: none; }
+.pm-i {
+    display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px; padding: 8px 10px; border: 0; border-radius: 9px;
+    background: none; text-align: left; cursor: pointer; color: var(--text);
+}
+.pm-i:hover, .pm-i:focus-visible { background: var(--bg-tint); outline: none; }
+.pm-i b { display: block; font: 600 13.5px var(--font); color: var(--text); }
+.pm-i small { display: block; font-size: 12px; color: var(--text-2); margin-top: 1px; line-height: 1.35; }
+.pm.m { position: static; width: auto; border: 0; box-shadow: none; padding: 0; }
+.pm.m .pm-i { min-height: 64px; padding: 8px 2px; border-radius: 0; }
+.pm.m .pm-i + .pm-i { border-top: 1px solid var(--border); }
+.tc-st {
+    display: grid; place-items: center; flex-shrink: 0; width: 22px; height: 22px; border-radius: 7px;
+    background: var(--sb); color: var(--si);
+}
+.tc-st svg { width: 13px; height: 13px; }
+.pm-i .tc-st { width: 32px; height: 32px; border-radius: 9px; }
+.pm-i .tc-st svg { width: 16px; height: 16px; }
+.pm.m .tc-st { width: 40px; height: 40px; }
+.pm.m .tc-st svg { width: 19px; height: 19px; }
+
+/* Tarjeta: un bloque dentro del grupo de su autor (nunca a todo el ancho ni en burbuja). */
+.mm.has-card .mm-t { display: block; }
+.tc {
+    display: grid; grid-template-columns: 64px minmax(0, 1fr); column-gap: 14px; max-width: 460px; margin: 6px 0 4px;
+    padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-tint); white-space: normal;
+}
+.tc-k {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    font: 600 9.5px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-2);
+}
+.tc-k em { margin-left: auto; font: 500 12px var(--font); font-style: normal; letter-spacing: 0; text-transform: none; color: var(--text-2); white-space: nowrap; }
+.tc-po {
+    display: grid; place-items: center; width: 64px; aspect-ratio: 2 / 3; align-self: start; overflow: hidden;
+    border-radius: 6px; background: var(--border); color: var(--text-3);
+}
+.tc-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tc-po svg { width: 22px; height: 22px; }
+.tc-b { min-width: 0; }
+.tc-t { display: block; font: 600 15px/1.25 var(--font); color: var(--text); text-decoration: none; }
+.mm .tc-t { color: var(--text); text-decoration: none; }
+.tc-t:hover { text-decoration: underline; text-underline-offset: 2px; }
+.tc-m { font: 500 11px var(--font-mono); color: var(--text-2); margin-top: 3px; }
+.tc-me {
+    display: inline-flex; align-items: center; gap: 6px; height: 26px; margin-top: 9px; padding: 0 10px; border-radius: var(--r-full);
+    background: var(--bg-elev); border: 1px solid var(--border-strong); font: 600 12px var(--font); color: var(--text);
+}
+.tc-me svg { width: 14px; height: 14px; color: var(--text-2); }
+.tc-me.ok > svg { color: var(--ok-ink); }
+.rt { display: inline-flex; align-items: center; gap: 3px; font: 700 11.5px var(--font-mono); color: var(--text); }
+.rt svg { width: 11px; height: 11px; }
+.rt svg.str, .rt svg.str path { fill: var(--stamp-amber-ink); stroke: var(--stamp-amber-ink); color: var(--stamp-amber-ink); }
+.tc-fr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 9px; font-size: 12px; color: var(--text-2); }
+.tc-fr .f { display: inline-flex; align-items: center; gap: 5px; }
+.tc-fr .f b { font-weight: 600; color: var(--text); }
+.tc-fr .dot { color: var(--text-3); }
+.tc-more { position: relative; }
+.tc-more summary {
+    list-style: none; cursor: pointer; font-weight: 600; color: var(--text-2);
+    text-decoration: underline; text-decoration-color: var(--border-strong); text-underline-offset: 2px;
+}
+.tc-more summary::-webkit-details-marker { display: none; }
+.tc-more-l.pf-menu { display: flex; flex-direction: column; gap: 2px; top: 22px; left: 0; right: auto; width: max-content; min-width: 200px; padding: 6px; }
+.tc-more-l > div { display: flex; align-items: center; gap: 8px; padding: 5px 6px; font-size: 12.5px; color: var(--text-2); }
+.tc-more-l > div b { font-weight: 600; color: var(--text); }
+.tc-a { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.tc-a .pf-btn { white-space: nowrap; }
+.tc-a .pf-btn.ghost { padding: 0 8px; }
+.mm .tc-a a.pf-btn { color: var(--text); text-decoration: none; }
+@media (max-width: 1023.98px) {
+    .ms-chat .pm { left: 8px; right: 8px; width: auto; }
+    .ms-chat .tc { grid-template-columns: 56px minmax(0, 1fr); column-gap: 12px; max-width: none; }
+    .ms-chat .tc-po { width: 56px; }
+    .ms-chat .tc .pf-btn { height: 40px; }
+}

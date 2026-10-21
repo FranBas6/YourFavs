@@ -1,19 +1,21 @@
 /**
- * POST /api/social/messages/{id}/messages { body, clientId } → { ok, message }
+ * POST /api/social/messages/{id}/messages { body, clientId, card? } → { ok, message }
  *
  * Enviar (handoff §2.2 y §4.7). `clientId` (uuid del navegador) hace idempotente el reintento:
  * el mismo `clientId` devuelve el mismo mensaje. Errores: `read_only` (403; nunca dice por qué),
  * `empty` / `too_long` (400), `rate` (429, 30 por minuto), `none` (404: no estás en ella).
+ *
+ * M4: `card: { type: 'title', mediaType, tmdbId }` comparte un título (el texto es el comentario,
+ * opcional). Los datos del título los pide el servidor a TMDB; `card` (400) si no existe.
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../../lib/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
-import { MSG_MAX, sendMessage } from '../../../../../../services/BD/social/messages';
+import { MSG_MAX, SEND_STATUS, sendMessage } from '../../../../../../services/BD/social/messages';
+import { readTitleCard } from '../../../../../../services/BD/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
 
 export const prerender = false;
-
-const STATUS = { none: 404, read_only: 403, empty: 400, too_long: 400, rate: 429 } as const;
 
 export const POST: APIRoute = async ({ params, request, locals }) => {
     const me = locals.user?.uid;
@@ -25,9 +27,11 @@ export const POST: APIRoute = async ({ params, request, locals }) => {
     // Holgura para espacios de los bordes; el recorte y el tope exacto los hace la función SQL.
     if (b.body.length > MSG_MAX * 2) return jsonNoStore({ ok: false, error: 'too_long' }, 400);
     try {
-        const r = await sendMessage(me, conv, b.body, b.clientId.toLowerCase());
+        const card = b.card == null ? null : await readTitleCard(b.card);
+        if (card === false) return jsonNoStore({ ok: false, error: 'card' }, 400);
+        const r = await sendMessage(me, conv, b.body, b.clientId.toLowerCase(), card);
         if (r.ok) return jsonNoStore({ ok: true, message: r.message }, 201);
-        return jsonNoStore({ ok: false, error: r.error }, STATUS[r.error]);
+        return jsonNoStore({ ok: false, error: r.error }, SEND_STATUS[r.error]);
     } catch (err) {
         return serverError('api/social/messages/[id]/messages POST', err);
     }

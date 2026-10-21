@@ -8,10 +8,11 @@
  * Madrid (`APP_TZ`) en los dos lados, para que lo pintado en el servidor no cambie al repintar.
  * Todo lo que escribe el usuario pasa por `esc()`.
  */
-import { avatarHtml, esc, firstName, icon } from './ui';
+import { avatarHtml, btn, esc, firstName, icon } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../../utils/appTime';
-import type { ChatMessage, ChatView, ConvSummary, PersonCard, SysType } from './types';
+import { formatScore } from '../../utils/constants/helpers/media-helpers';
+import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, SysType, TitleCardRef } from './types';
 
 export const MSG_MAX = 2000;
 /** Mismo autor con 5 min o menos entre mensajes → mismo grupo (handoff §4.4). */
@@ -186,10 +187,110 @@ function actionsHtml(): string {
         + `</span>`;
 }
 
-function lineHtml(m: ChatMessage, body: string | null, own: boolean): string {
+// -------------------------------------------------------------------------------------
+// Tarjetas (M4, handoff M4 §3.1–§3.2 y §4): un bloque dentro del grupo de su autor, debajo de la
+// línea del comentario. Mismo marco para los tres tipos; los distingue el sello y el texto.
+// -------------------------------------------------------------------------------------
+const POSTER = (path: string) => `https://image.tmdb.org/t/p/w185${path}`;
+
+/** Ficha del título. */
+export const titleHref = (r: Pick<TitleCardRef, 'mediaType' | 'tmdbId'>) => `/${r.mediaType === 'movie' ? 'movie' : 'serie'}/${r.tmdbId}`;
+
+/** «Película · 2023 · 2 h 4 min» / «Serie · 2022 · 2 temporadas». */
+export function titleMeta(r: TitleCardRef): string {
+    const parts = [r.mediaType === 'movie' ? 'Película' : 'Serie'];
+    if (r.year) parts.push(r.year);
+    if (r.mediaType === 'movie' && r.runtime) {
+        const h = Math.floor(r.runtime / 60), m = r.runtime % 60;
+        parts.push(h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`);
+    }
+    if (r.mediaType === 'tv' && r.seasons) parts.push(r.seasons === 1 ? '1 temporada' : `${r.seasons} temporadas`);
+    return parts.join(' · ');
+}
+
+const ratingHtml = (score: number) => `<span class="rt">${icon('star', 'str')}${esc(formatScore(score))}</span>`;
+const stampMini = (color: string, name: string) =>
+    `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
+
+/** Tu píldora: «La tienes pendiente» · «La viste · ★ 8,5» · «Vas por T2 E3». */
+function viewerHtml(v: ChatCard['viewer']): { html: string; sr: string } {
+    if (!v) return { html: '', sr: 'No la tienes' };
+    if (v.state === 'pending') return { html: `<span class="tc-me">${icon('clock')}La tienes pendiente</span>`, sr: 'La tienes pendiente' };
+    if (v.state === 'seen') {
+        return {
+            html: `<span class="tc-me ok">${icon('circle-check')}La viste${v.score != null ? ` · ${ratingHtml(v.score)}` : ''}</span>`,
+            sr: `La viste${v.score != null ? `, tu nota ${formatScore(v.score)}` : ''}`,
+        };
+    }
+    const ep = v.season != null && v.episode != null ? `T${v.season} E${v.episode}` : '';
+    const text = !ep ? 'La estás viendo' : v.upToDate ? `Al día · ${ep}` : `Vas por ${ep}`;
+    return { html: `<span class="tc-me">${icon('play')}${text}</span>`, sr: text };
+}
+
+const PERSON_STATE: Record<CardPerson['state'], string> = { seen: 'la vio', watching: 'la está viendo', pending: 'pendiente' };
+
+/** Lo de una persona: su nota (si la vio y puntuó) o el estado. */
+function personBit(p: CardPerson, name: string, html: boolean): string {
+    if (p.state === 'seen' && p.score != null) return html ? `<b>${esc(name)}</b>${ratingHtml(p.score)}` : `${name}: nota ${formatScore(p.score)}`;
+    return html ? `<b>${esc(name)}</b><span>${PERSON_STATE[p.state]}</span>` : `${name}: ${PERSON_STATE[p.state]}`;
+}
+
+/** Línea de caras: como mucho 2 y «y N más» (que despliega la lista entera). */
+function peopleHtml(list: CardPerson[], people: Record<string, PersonCard>): string {
+    const known = list.filter((p) => people[p.id]);
+    if (!known.length) return '';
+    const bit = (p: CardPerson) => `<span class="f">${avatarHtml(people[p.id], 20)}${personBit(p, firstName(people[p.id].name), true)}</span>`;
+    const shown = known.slice(0, 2).map(bit).join('<span class="dot" aria-hidden="true">·</span>');
+    const rest = known.length - 2;
+    const more = rest > 0
+        ? `<details class="tc-more"><summary>y ${rest} más</summary><div class="pf-menu tc-more-l" role="list">`
+            + known.map((p) => `<div role="listitem">${avatarHtml(people[p.id], 22)}${personBit(p, people[p.id].name, true)}</div>`).join('')
+            + `</div></details>`
+        : '';
+    return `<div class="tc-fr">${shown}${more}</div>`;
+}
+
+/** Una tarjeta de título, con el estado de quien mira. */
+export function cardHtml(card: ChatCard, people: Record<string, PersonCard>): string {
+    const r = card.ref;
+    const href = titleHref(r);
+    const me = viewerHtml(card.viewer);
+    const poster = r.poster
+        ? `<img src="${POSTER(esc(r.poster))}" alt="" loading="lazy" decoding="async">`
+        : icon(r.mediaType === 'movie' ? 'film' : 'tv');
+    const acts = (card.viewer ? '' : btn('Añadir a Pendientes', {
+        kind: 'pri', icon: 'bookmark-plus', size: 'sm',
+        attrs: `data-tc-add data-mt="${r.mediaType}" data-tmdb="${r.tmdbId}"`,
+    })) + `<a class="pf-btn sm ghost" href="${href}">${icon('arrow-up-right')}Ver ficha</a>`;
+    const known = card.people.filter((p) => people[p.id]);
+    const sr = [`Título: ${r.title}`, me.sr, ...known.map((p) => personBit(p, firstName(people[p.id].name), false))].join('. ');
+    return `<div class="tc" role="article" aria-label="${esc(sr)}">`
+        + `<div class="tc-k">${stampMini('slate', 'clapperboard')}<span>Título</span></div>`
+        + `<a class="tc-po" href="${href}" tabindex="-1" aria-hidden="true">${poster}</a>`
+        + `<div class="tc-b"><a class="tc-t" href="${href}">${esc(r.title)}</a><div class="tc-m">${esc(titleMeta(r))}</div>`
+        + me.html + peopleHtml(card.people, people)
+        + `<div class="tc-a">${acts}</div></div></div>`;
+}
+
+/**
+ * Menú del ＋ (handoff M4 §4): Compartir un título · Recomendar · ¿Qué vemos? · Marcar como spoiler.
+ * Las acciones abren su selector con los `data-*` de cada fila (los atiende `SocialLayer`).
+ */
+export function plusMenuHtml(conv: { id: number; group: boolean; title: string }): string {
+    const stamp = (color: string, name: string) =>
+        `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
+    const item = (attrs: string, color: string, ico: string, title: string, text: string) =>
+        `<button type="button" class="pm-i" role="menuitem" ${attrs}>${stamp(color, ico)}<span><b>${esc(title)}</b><small>${esc(text)}</small></span></button>`;
+    const share = `data-share-title data-conv="${conv.id}" data-conv-title="${esc(conv.title)}"${conv.group ? ' data-group' : ''} data-anchor="[data-ms-plus]"`;
+    return item(share, 'slate', 'clapperboard', 'Compartir un título', 'Película o serie, con lo que lleva cada cual');
+}
+
+function lineHtml(m: ChatMessage, body: string | null, own: boolean, people: Record<string, PersonCard>): string {
     const t = `<span class="gt" aria-hidden="true">${hm(m.at)}</span>`;
     if (m.deleted) return `<div class="mm del" data-mid="${m.id}">${t}${icon('trash-2')}${DELETED_TEXT}</div>`;
-    return `<div class="mm" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}<span class="mm-t">${linkify(body ?? '')}</span>${actionsHtml()}</div>`;
+    const text = body ? `<span class="mm-t">${linkify(body)}</span>` : '';
+    const card = m.card ? cardHtml(m.card, people) : '';
+    return `<div class="mm${card ? ' has-card' : ''}" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}${text}${card}${actionsHtml()}</div>`;
 }
 
 function pendingLineHtml(p: PendingMsg): string {
@@ -255,7 +356,7 @@ export function logHtml(msgs: ChatMessage[], ctx: LogCtx): string {
             continue;
         }
         const own = it.author === ctx.me;
-        const line = m ? lineHtml(m, m.folded ? ctx.revealed[m.id] : m.body, own) : pendingLineHtml(it.p!);
+        const line = m ? lineHtml(m, m.folded ? ctx.revealed[m.id] : m.body, own, ctx.people) : pendingLineHtml(it.p!);
         if (cur && cur.author !== null && cur.author === it.author && it.at - cur.at <= GROUP_GAP_MS) {
             cur.lines += line;
             cur.at = it.at;

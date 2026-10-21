@@ -66,7 +66,8 @@ export function previewOf(m: ChatMessage | null, me: string, group: boolean, peo
     if (m.kind === 'system' && m.sys) return plain(sysParts(m.sys, me, name));
     if (m.deleted) return DELETED_TEXT;
     if (m.folded) return FOLDED_TEXT;
-    const body = (m.body ?? '').replace(/\s+/g, ' ').trim();
+    // Una tarjeta sin comentario: su título entre comillas («Tú: «Perfect Days»»).
+    const body = (m.body ?? '').replace(/\s+/g, ' ').trim() || (m.card ? `«${m.card.ref.title}»` : '');
     if (m.author === me) return `Tú: ${body}`;
     return group ? `${firstName(name(m.author))}: ${body}` : body;
 }

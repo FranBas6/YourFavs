@@ -144,6 +144,37 @@ export interface ChatMessage {
     folded: boolean;
     /** Solo en los tuyos: casa el envío optimista con el mensaje guardado. */
     clientId: string | null;
+    /** Tarjeta (M4), ya resuelta para quien pide. null en los de texto, los borrados y los plegados. */
+    card: ChatCard | null;
+}
+
+// Tarjetas del chat (M4; docs/Mensajes/design_handoff_m4 §2–§3)
+/** Copia de TMDB guardada con el mensaje (para pintar sin pedir nada). */
+export interface TitleCardRef {
+    mediaType: 'movie' | 'tv';
+    tmdbId: number;
+    title: string;
+    poster?: string;
+    year?: string;
+    /** Películas: minutos. */
+    runtime?: number;
+    /** Series: temporadas. */
+    seasons?: number;
+}
+/** Tu estado con el título, calculado al pintar (nunca se guarda). */
+export type CardViewer =
+    | { state: 'pending' }
+    | { state: 'seen'; score: number | null }
+    /** Serie empezada: el SIGUIENTE episodio por ver; `upToDate` si ya viste todo lo emitido. Sin episodio: «La estás viendo». */
+    | { state: 'progress'; season: number | null; episode: number | null; upToDate: boolean };
+/** Un amigo de la conversación con algo que ver con el título (mismo filtro que «Amigos que la han visto»). */
+export interface CardPerson { id: string; state: 'seen' | 'watching' | 'pending'; score: number | null }
+export interface ChatCard {
+    type: 'title';
+    ref: TitleCardRef;
+    viewer: CardViewer | null;
+    /** Ordenadas: vistas con nota, vistas, viéndola, pendientes. El cliente pinta 2 + «y N más». */
+    people: CardPerson[];
 }
 
 /** Fila de la lista de conversaciones. */

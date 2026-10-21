@@ -1,8 +1,9 @@
 /**
  * Toasts de la capa social, sobre el `#toast-container` de siempre (Layout). Con `undo`, lleva el
- * botón «Deshacer» y dura 6 s (Eliminar amigo en F3, recomendar en F4); sin él, 2,8 s.
+ * botón «Deshacer» y dura 6 s (Eliminar amigo en F3, recomendar en F4); sin él, 2,8 s. `label`
+ * cambia el texto de ese botón («Abrir chat» al enviar una tarjeta, M4).
  */
-export function showToast(message: string, type: 'success' | 'error' = 'success', undo?: () => void): void {
+export function showToast(message: string, type: 'success' | 'error' = 'success', undo?: () => void, label = 'Deshacer'): void {
     const box = document.getElementById('toast-container');
     if (!box) return;
     const el = document.createElement('div');
@@ -14,7 +15,7 @@ export function showToast(message: string, type: 'success' | 'error' = 'success'
     if (undo) {
         const b = document.createElement('button');
         b.type = 'button';
-        b.textContent = 'Deshacer';
+        b.textContent = label;
         b.addEventListener('click', () => { el.remove(); undo(); });
         el.appendChild(b);
     }

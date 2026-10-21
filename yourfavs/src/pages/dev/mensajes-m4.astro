@@ -1,0 +1,95 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO de Mensajes M4 (handoff M4 §5): las tarjetas, el ＋ y sus
+ * estados con datos inventados, para revisarlos en claro, oscuro y móvil. Es estática: nada se
+ * envía. En producción: 404. Crece con cada fase de M4.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { Icon } from 'astro-icon/components';
+import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
+import { initialsOf, stampFor } from '../../lib/social/ui';
+import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, TitleCardRef } from '../../lib/social/types';
+import '../../styles/pages/social/mensajes.css';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+let n = 0;
+const P = (name: string, handle: string): PersonCard => {
+    const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+    return { id, handle, name, avatar: null, archetype: null, color: stampFor(id), initials: initialsOf(name) };
+};
+const ME = P('Fran Bas', 'franbas');
+const ANA = P('Ana Ruiz', 'ana_ve');
+const CARLA = P('Carla Méndez', 'carlam');
+const IVAN = P('Iván Soler', 'ivansoler');
+const LUCIA = P('Lucía Prado', 'luciap');
+const people = Object.fromEntries([ME, ANA, CARLA, IVAN, LUCIA].map((p) => [p.id, p]));
+
+const PERFECT: TitleCardRef = { mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days', poster: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', year: '2023', runtime: 124 };
+const SEV: TitleCardRef = { mediaType: 'tv', tmdbId: 95396, title: 'Severance', year: '2022', seasons: 2 };
+const card = (ref: TitleCardRef, viewer: CardViewer | null, ppl: CardPerson[] = []): ChatCard => ({ type: 'title', ref, viewer, people: ppl });
+const seen = (p: PersonCard, score: number | null = null): CardPerson => ({ id: p.id, state: 'seen', score });
+
+// Tarjeta de título por quien mira (§5).
+const states: [string, ChatCard][] = [
+    ['No la tienes · amigos con nota', card(PERFECT, null, [seen(ANA, 9), seen(CARLA, 7.5)])],
+    ['Pendiente · y 2 más', card(PERFECT, { state: 'pending' }, [seen(ANA, 9), seen(CARLA, 7.5), { id: IVAN.id, state: 'watching', score: null }, { id: LUCIA.id, state: 'pending', score: null }])],
+    ['Vista con nota', card(PERFECT, { state: 'seen', score: 8.5 }, [seen(ANA)])],
+    ['En progreso (serie)', card(SEV, { state: 'progress', season: 2, episode: 4, upToDate: false }, [{ id: ANA.id, state: 'watching', score: null }])],
+    ['Al día', card(SEV, { state: 'progress', season: 2, episode: 10, upToDate: true })],
+    ['Ningún amigo con estado · sin póster', card(SEV, null)],
+];
+
+const now = Date.now();
+let mid = 100;
+const M = (author: PersonCard, body: string, at: number, c: ChatCard | null = null): ChatMessage =>
+    ({ id: ++mid, author: author.id, kind: 'text', body, sys: null, at, deleted: false, folded: false, clientId: null, card: c });
+const log = logHtml([
+    M(ANA, 'Ayer vi esta y me acordé de ti', now - 30 * 60_000),
+    M(ANA, '', now - 29 * 60_000, card(PERFECT, null, [seen(ANA, 9)])),
+    M(ME, '¡Me la apunto!', now - 20 * 60_000),
+    M(ME, 'Y esta, que la estoy viendo', now - 19 * 60_000, card(SEV, { state: 'progress', season: 2, episode: 4, upToDate: false })),
+], { me: ME.id, group: false, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now });
+---
+<Layout title="Dev · Mensajes M4" robots="noindex, nofollow">
+    <div class="dv">
+        <h1>Mensajes M4 · estados (solo desarrollo)</h1>
+        <p class="dv-sub">Datos inventados y estáticos. Cambia de tema y estrecha la ventana para ver oscuro y móvil.</p>
+
+        <h2>Conversación — la tarjeta va dentro del grupo de su autor; el comentario, encima</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log} /></div>
+            <div class="ms-c"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: false, title: ANA.name })} />
+                <div class="ms-cb"><button type="button" class="ms-plus on open" aria-label="Añadir al mensaje" aria-expanded="true"><Icon name="lucide:x" /></button>
+                <textarea class="ms-ta" rows="1" aria-label="Mensaje para Ana" placeholder="Escribe a Ana"></textarea>
+                <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled><Icon name="lucide:send" /></button></div></div>
+        </section>
+
+        <h2>Tarjeta de título por quien mira</h2>
+        <div class="dv-grid">{states.map(([label, c]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people)} /></div>
+        ))}</div>
+
+        <h2>Menú del ＋ en móvil (hoja)</h2>
+        <div class="dv-box ms-sheet-like"><div class="pm m" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 2, group: true, title: 'Viernes de pelis' })} /></div>
+    </div>
+</Layout>
+
+<style>
+    .dv { max-width: 1100px; margin: 0 auto; padding-bottom: 60px; }
+    .dv h1 { font: 700 22px var(--font); color: var(--text); margin: 0; }
+    .dv-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 8px; }
+    .dv h2 { font: 600 14px var(--font); color: var(--text-2); margin: 28px 0 10px; }
+    .dv-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+    .dv .ms-main { overflow: visible; }
+    .dv .ms-log { overflow: visible; }
+    .dv .ms-c { margin-top: 240px; }
+    .dv-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .dv-card { padding: 12px; }
+    .dv-card small { display: block; font: 600 11px var(--font-mono); color: var(--text-2); margin-bottom: 4px; }
+    .ms-sheet-like { max-width: 420px; padding: 8px 16px; }
+</style>

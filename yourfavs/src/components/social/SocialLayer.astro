@@ -5,7 +5,8 @@
  * atiende los botones de relación allá donde salgan (`scripts/social/relations.ts`). Desde la F4,
  * también el selector «Recomendar» (`#rk`, `scripts/social/recommend.ts`) y lo que hace quien
  * recibe una recomendación (`scripts/social/recActions.ts`). Desde M1, «Enviar mensaje»
- * (`scripts/social/messages/open.ts`). Se monta una vez en el Layout, solo con sesión.
+ * (`scripts/social/messages/open.ts`). Desde M4, el selector de tarjetas (`#ck`,
+ * `scripts/social/messages/cardPick.ts`): «Compartir un título» y «Enviar a…». Se monta una vez en el Layout, solo con sesión.
  *
  * Diálogo (handoff social F2/F3 §6.5): `<dialog>` nativo, que ya atrapa el foco y se cierra con
  * Esc. Foco inicial en «Cancelar». En móvil se pega abajo. El nombre lo rellena el script.
@@ -69,6 +70,13 @@ const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.p
     </>
 )}
 
+{SOCIAL_PHASE.messages && (
+    <>
+        <div id="ck-bd" class="rk-backdrop" hidden></div>
+        <div id="ck" class="rk ck" role="dialog" aria-modal="true" aria-label="Enviar" hidden></div>
+    </>
+)}
+
 {live && <script type="application/json" id="yf-live" is:inline set:html={live}></script>}
 
 <script>
@@ -82,5 +90,13 @@ const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.p
         import('../../scripts/social/messages/open');
         import('../../scripts/social/messages/headerMsgs');
         import('../../scripts/social/live');
+        // Tarjetas (M4): «Compartir un título» (＋ del chat) y «Enviar a…» (fichas). El selector se
+        // carga al primer clic.
+        document.addEventListener('click', (e) => {
+            const t = (e.target as Element).closest?.<HTMLElement>('[data-send-to], [data-share-title]');
+            if (!t) return;
+            e.preventDefault();
+            import('../../scripts/social/messages/cardPick').then((m) => m.openPick(t));
+        });
     }
 </script>
