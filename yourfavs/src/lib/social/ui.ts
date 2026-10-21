@@ -118,11 +118,15 @@ function menuToggle(label: string, o: { kind?: string; icon?: string; size?: 'sm
     return `<button type="button" class="${cls}" aria-haspopup="menu" aria-expanded="false" data-menu-toggle${o.ico ? ` aria-label="${esc(label)}"` : ''}>${body}</button>`;
 }
 
-/** Menú de un amigo: Ver perfil · Recomendar algo (F4) · Eliminar amigo, con lo que implica. */
-function friendMenuItems(p: Pick<PersonCard, 'handle' | 'name'>, rel: Relation, o: RelOpts, withProfileLink: boolean): string {
+/** Botón o fila «Enviar mensaje» (M1): abre el 1:1 con ese amigo (`scripts/social/messages/open.ts`). */
+const msgAttrs = (p: Pick<PersonCard, 'id' | 'name'>) => `data-msg-to="${esc(p.id)}"`;
+
+/** Menú de un amigo: Ver perfil · Enviar mensaje (M1) · Recomendar algo (F4) · Eliminar amigo, con lo que implica. */
+function friendMenuItems(p: Pick<PersonCard, 'id' | 'handle' | 'name'>, rel: Relation, o: RelOpts, withProfileLink: boolean): string {
     const first = firstName(p.name);
     const keeps = rel.iFollow && rel.followsMe ? 'Seguiréis siguiéndoos. ' : rel.iFollow ? 'Le seguirás siguiendo. ' : '';
     return (withProfileLink && p.handle ? `<a role="menuitem" href="/u/${esc(p.handle)}">${icon('user')}Ver perfil</a>` : '')
+        + (o.phase.messages ? `<button type="button" role="menuitem" ${msgAttrs(p)}>${icon('message-circle')}Enviar mensaje</button>` : '')
         + (o.phase.recommend && p.handle
             ? `<button type="button" role="menuitem" data-recommend data-to="${esc(p.handle)}">${icon('send')}Recomendar algo</button>`
             : `<button type="button" role="menuitem" aria-disabled="true" class="is-soon">${icon('send')}Recomendar algo<span class="so-soon">Pronto</span></button>`)
@@ -136,7 +140,7 @@ function friendMenuItems(p: Pick<PersonCard, 'handle' | 'name'>, rel: Relation, 
  * «Añadir amigo» · «Solicitud enviada ▾» (Cancelar) · «Amigos ▾» (menú del amigo).
  * La solicitud recibida no va aquí: se pinta como Aceptar / Rechazar.
  */
-export function friendButtonHtml(p: Pick<PersonCard, 'handle' | 'name'>, rel: Relation, o: RelOpts & { primary?: boolean }): string {
+export function friendButtonHtml(p: Pick<PersonCard, 'id' | 'handle' | 'name'>, rel: Relation, o: RelOpts & { primary?: boolean }): string {
     if (!o.phase.friends || rel.blockedByMe || rel.requestIn) return '';
     const size = o.size ?? 'sm';
     if (rel.friends) {
@@ -162,9 +166,13 @@ export function rowActionsHtml(p: PersonCard, rel: Relation, o: RelOpts & { isMe
     if (rel.blockedByMe) return btn('Desbloquear', { icon: 'shield-off', sa: 'unblock', size: 'sm' });
     // Pestaña «Pendientes», grupo «Enviadas».
     if (o.actions === 'sent' && rel.requestOut) return btn('Cancelar solicitud', { icon: 'x', sa: 'friend-cancel', size: 'sm' });
-    // Pestaña «Amigos»: «Ver perfil» a la vista y lo demás en «···».
+    // Pestaña «Amigos»: «Ver perfil» a la vista (con mensajes, «Mensaje»: el perfil sigue en el
+    // nombre y en el menú) y lo demás en «···».
     if (o.actions === 'friendRow' && rel.friends) {
-        return (p.handle ? `<a class="pf-btn sm ghost" href="/u/${esc(p.handle)}">Ver perfil</a>` : '')
+        const lead = o.phase.messages
+            ? `<button type="button" class="pf-btn sm" ${msgAttrs(p)}>${icon('message-circle')}Mensaje</button>`
+            : p.handle ? `<a class="pf-btn sm ghost" href="/u/${esc(p.handle)}">Ver perfil</a>` : '';
+        return lead
             + menuWrap(menuToggle('Más opciones', { size: 'sm', ico: true }), friendMenuItems(p, rel, o, true));
     }
     if (o.phase.friends && rel.requestIn) return acceptRejectHtml('sm');
@@ -186,6 +194,9 @@ export function profileActionsHtml(p: Pick<PersonCard, 'id' | 'handle' | 'name'>
     const follow = followButtonHtml(p, rel, { ...md, quiet: o.locked });
     const friend = friendButtonHtml(p, rel, { ...md, primary: o.locked });
     row += o.locked ? friend + follow : follow + friend;
+    if (o.phase.messages && rel.friends) {
+        row += `<button type="button" class="pf-btn pf-ico-mobile" ${msgAttrs(p)} aria-label="Enviar mensaje a ${esc(first)}">${icon('message-circle')}<span class="pf-lbl-wide">Enviar mensaje</span></button>`;
+    }
     if (o.phase.recommend && rel.friends && p.handle) {
         row += `<button type="button" class="pf-btn pf-ico-mobile" data-recommend data-to="${esc(p.handle)}" aria-haspopup="dialog" aria-expanded="false" aria-label="Recomendar a ${esc(first)}">${icon('send')}<span class="pf-lbl-wide">Recomendar</span></button>`;
     }

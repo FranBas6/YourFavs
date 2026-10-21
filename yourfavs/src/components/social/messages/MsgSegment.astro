@@ -1,0 +1,22 @@
+---
+/**
+ * Segmentado móvil «Personas · Mensajes» bajo el H1 «Amigos» (handoff de mensajes §9). Son
+ * enlaces (cada uno es una página), con el rojo de solicitudes en Personas y el contador de
+ * mensajes en Mensajes; los dos los rellena `scripts/notifications/bell.ts`. Oculto en escritorio.
+ */
+import { Icon } from 'astro-icon/components';
+import { SOCIAL_PHASE } from '../../../utils/constants/social';
+
+interface Props { on: 'people' | 'messages' }
+const { on } = Astro.props;
+---
+{SOCIAL_PHASE.messages && (
+    <nav class="ms-seg" aria-label="Amigos">
+        <a href="/mislistas/amigos" aria-current={on === 'people' ? 'page' : undefined}>
+            <Icon name="lucide:users" />Personas<span class="rn js-pending-badge" hidden></span>
+        </a>
+        <a href="/mislistas/amigos/mensajes" aria-current={on === 'messages' ? 'page' : undefined}>
+            <Icon name="lucide:message-circle" />Mensajes<span class="mcnt js-msg-badge" hidden><Icon name="lucide:message-circle" /><span class="js-msg-n"></span></span>
+        </a>
+    </nav>
+)}

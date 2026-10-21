@@ -13,6 +13,7 @@ import { Icon } from 'astro-icon/components';
 import { EXPLORE_ITEMS, MY_LISTS_ITEMS } from '../utils/constants/myLists';
 import { withMode } from '../utils/catalogUrl';
 import { appDateParts } from '../utils/appTime';
+import { SOCIAL_PHASE } from '../utils/constants/social';
 
 const user = Astro.locals.user;
 // La hoja «Explorar» es la forma de saltar entre subpáginas del catálogo en móvil, así que sus filas
@@ -112,6 +113,15 @@ const THEME_OPTIONS = [
             <span class="yf-sheet-badge js-pending-badge" hidden></span>
             <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
         </a>
+        {/* Mensajes (M1): fila propia con el contador neutro (no van a la campana). */}
+        {SOCIAL_PHASE.messages && (
+            <a class="yf-sheet-row" href="/mislistas/amigos/mensajes">
+                <Stamp color="blue" icon="message-circle" size={38} />
+                <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Mensajes</span></span>
+                <span class="mcnt js-msg-badge" hidden><Icon name="lucide:message-circle" /><span class="js-msg-n"></span></span>
+                <Icon name="lucide:chevron-right" class="yf-sheet-chev" />
+            </a>
+        )}
         <a class="yf-sheet-row" href="/mislistas/actividad">
             <Stamp color="green" icon="activity" size={38} />
             <span class="yf-sheet-rowtext"><span class="yf-sheet-rowtitle">Actividad</span></span>

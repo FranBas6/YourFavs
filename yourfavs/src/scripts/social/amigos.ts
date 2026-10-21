@@ -139,6 +139,8 @@ function init(root: HTMLElement) {
             restore();
         }
     });
+    // Llegar desde «Buscar personas» de los mensajes (#am-q): foco en el buscador.
+    if (location.hash === '#am-q') input?.focus();
     // «/» pone el foco en el buscador (salvo escribiendo en otro campo).
     document.addEventListener('keydown', (e) => {
         if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;

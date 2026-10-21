@@ -13,6 +13,7 @@
  * Singleton montado en Layout (oculto en flujos a pantalla completa: /gustos, login).
  */
 import { Icon } from 'astro-icon/components';
+import { SOCIAL_PHASE } from '../utils/constants/social';
 
 const user = Astro.locals.user;
 const path = Astro.url.pathname;
@@ -58,6 +59,8 @@ const perfilActive = isActive('/perfil');
             <span class="tabbar-iconwrap">
                 <Icon name="lucide:user" class="tabbar-icon" />
                 <span class="tabbar-badge js-notif-badge" hidden></span>
+                {/* Mensajes sin leer (M1): globo neutro SIN número, arriba a la izquierda (bell.ts). */}
+                {SOCIAL_PHASE.messages && <span class="tabbar-msgdot js-msg-dot" hidden><Icon name="lucide:message-circle" /></span>}
             </span>
             <span>Perfil</span>
         </button>
@@ -135,6 +138,13 @@ const perfilActive = isActive('/perfil');
             box-shadow: 0 0 0 2px var(--bg-elev);
         }
         .tabbar-badge[hidden] { display: none; }
+        .tabbar-msgdot {
+            position: absolute; top: -5px; left: -11px; width: 17px; height: 17px; border-radius: 50%;
+            background: var(--text); color: var(--bg-elev); display: grid; place-items: center;
+            box-shadow: 0 0 0 2px var(--bg-elev);
+        }
+        .tabbar-msgdot[hidden] { display: none; }
+        .tabbar-msgdot svg { width: 9px; height: 9px; stroke-width: 3; }
         .tabbar-item.is-active { color: var(--accent, #E63946); }
         .tabbar-item.is-active span { font-weight: 700; }
 

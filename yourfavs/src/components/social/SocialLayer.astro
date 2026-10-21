@@ -4,8 +4,8 @@
  * «Para pedir amistad, activa tu perfil» (F3, solo si aún no lo tienes activo) y el script que
  * atiende los botones de relación allá donde salgan (`scripts/social/relations.ts`). Desde la F4,
  * también el selector «Recomendar» (`#rk`, `scripts/social/recommend.ts`) y lo que hace quien
- * recibe una recomendación (`scripts/social/recActions.ts`). Se monta una vez en el Layout, solo
- * con sesión.
+ * recibe una recomendación (`scripts/social/recActions.ts`). Desde M1, «Enviar mensaje»
+ * (`scripts/social/messages/open.ts`). Se monta una vez en el Layout, solo con sesión.
  *
  * Diálogo (handoff social F2/F3 §6.5): `<dialog>` nativo, que ya atrapa el foco y se cierra con
  * Esc. Foco inicial en «Cancelar». En móvil se pega abajo. El nombre lo rellena el script.
@@ -62,4 +62,5 @@ const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.p
         import('../../scripts/social/recommend');
         import('../../scripts/social/recActions');
     }
+    if (SOCIAL_PHASE.messages) import('../../scripts/social/messages/open');
 </script>
