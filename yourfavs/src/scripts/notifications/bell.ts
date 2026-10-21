@@ -108,6 +108,21 @@ if (hasBadges) {
 
 // Actuar desde un aviso (relations.ts) o abrirlo lo da por leído.
 document.addEventListener('yf:notif-read', () => setCounts({ ...counts, unread: counts.unread - 1 }));
+// Tiempo real (M3, scripts/social/live.ts): un aviso de la campana pide los números otra vez; uno de
+// mensajes, solo el total de mensajes (en las páginas de mensajes ya lo hace su lista). Agrupados.
+let liveTimer = 0;
+document.addEventListener('yf:live-notif', () => {
+    window.clearTimeout(liveTimer);
+    liveTimer = window.setTimeout(fetchCounts, 300);
+});
+document.addEventListener('yf:live-msg', () => {
+    if (document.querySelector('[data-ms-shell]')) return;
+    fetch('/api/social/messages/unread', { headers: { Accept: 'application/json' } })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d && typeof d.total === 'number') setCounts({ ...counts, messages: d.total }); })
+        .catch(() => {});
+});
+
 // Mensajes: el sondeo de las páginas de mensajes o leer una conversación traen el total nuevo.
 document.addEventListener('yf:msg-total', (e) => {
     const total = (e as CustomEvent<{ total: number }>).detail?.total;

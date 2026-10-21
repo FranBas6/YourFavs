@@ -32,6 +32,8 @@ interface SessionUser {
     /** Perfil público (F1 social): para el menú de cuenta y la hoja Perfil («Ver mi perfil»). */
     publicHandle?: string;
     publicVisibility?: 'off' | 'public' | 'friends';
+    /** Mensajes M3: tu canal de tiempo real es `u:{rtKey}`. Solo para ti (SocialLayer). */
+    rtKey?: string;
 }
 
 declare namespace App {

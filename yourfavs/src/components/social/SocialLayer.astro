@@ -12,8 +12,22 @@
  */
 import { Icon } from 'astro-icon/components';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
+import { supabaseEnv } from '../../lib/supabase/env';
 
 const user = Astro.locals.user;
+// Tiempo real (mensajes M3): el canal es `u:{rt_key}`, un nombre secreto que solo se da a su dueño.
+// La clave publishable es pública por diseño (no abre nada con la RLS de la app).
+let live = '';
+if (SOCIAL_PHASE.messages && user?.rtKey) {
+    try {
+        const env = supabaseEnv();
+        live = JSON.stringify({
+            url: `${env.url.replace(/^http/, 'ws').replace(/\/$/, '')}/realtime/v1`,
+            key: env.publishableKey,
+            topic: `u:${user.rtKey}`,
+        }).replace(/</g, '\\u003c');
+    } catch { /* sin variables de Supabase: solo sondeo */ }
+}
 const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.publicVisibility !== 'off');
 ---
 {SOCIAL_PHASE.block && (
@@ -55,6 +69,8 @@ const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.p
     </>
 )}
 
+{live && <script type="application/json" id="yf-live" is:inline set:html={live}></script>}
+
 <script>
     import '../../scripts/social/relations';
     import { SOCIAL_PHASE } from '../../utils/constants/social';
@@ -62,5 +78,8 @@ const hasProfile = Boolean(user?.publicHandle && user.publicVisibility && user.p
         import('../../scripts/social/recommend');
         import('../../scripts/social/recActions');
     }
-    if (SOCIAL_PHASE.messages) import('../../scripts/social/messages/open');
+    if (SOCIAL_PHASE.messages) {
+        import('../../scripts/social/messages/open');
+        import('../../scripts/social/live');
+    }
 </script>

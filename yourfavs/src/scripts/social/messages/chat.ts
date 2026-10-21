@@ -136,7 +136,8 @@ function init(root: HTMLElement, chat: ChatView) {
         if (r.ok) refreshList();
     }
 
-    // ---- Sondeo (5 s) ------------------------------------------------------------------------
+    // ---- Sondeo (5 s; 30 s con el tiempo real conectado) ----------------------------------------
+    const BASE_POLL = 5000;
     const poller = createPoller(async () => {
         const last = lastId();
         const r = await msgApi.chat(conv, last ? { after: last, from: firstId() } : {});
@@ -165,7 +166,7 @@ function init(root: HTMLElement, chat: ChatView) {
         announce(fresh);
         if (fresh.some((m) => m.author !== me)) void markRead();
         return true;
-    }, 5000);
+    }, BASE_POLL);
 
     function repaintMeta(c: ChatView) {
         const t = root.querySelector('[data-ms-title]');
@@ -723,6 +724,18 @@ function init(root: HTMLElement, chat: ChatView) {
         if (e.key === 'Enter') { e.preventDefault(); if (box) void saveRename(box); }
         else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); stopRename(); }
     });
+
+    // ---- Tiempo real (M3, scripts/social/live.ts) --------------------------------------------------
+    // Un aviso de esta conversación (o el «todo» de reconectar) → una vuelta del sondeo ya. Con el
+    // canal conectado el sondeo pasa a 30 s, de respaldo; si se cae, vuelve a 5 s.
+    const LIVE_POLL = 30_000;
+    document.addEventListener('yf:live-msg', (e) => {
+        const ids = (e as CustomEvent<{ convs: number[] }>).detail?.convs ?? [];
+        if (!ids.length || ids.includes(conv)) poller.now();
+    });
+    const onLive = (up: boolean) => poller.setBase(up ? LIVE_POLL : BASE_POLL);
+    document.addEventListener('yf:live-status', (e) => onLive(Boolean((e as CustomEvent<{ up: boolean }>).detail?.up)));
+    onLive(Boolean(window.yfLive?.up));
 
     // ---- Arranque --------------------------------------------------------------------------------
     // Recién creado el grupo: foco en el compositor (groupPicker.ts).

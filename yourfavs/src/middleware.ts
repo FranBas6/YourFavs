@@ -152,6 +152,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 // Perfil público: el menú de cuenta y la hoja Perfil enlazan a /u/{handle} si está activo.
                 context.locals.user.publicHandle = profile?.publicHandle;
                 context.locals.user.publicVisibility = profile?.publicVisibility ?? 'off';
+                // Mensajes M3: el nombre secreto de su canal de tiempo real (lo usa SocialLayer).
+                context.locals.user.rtKey = profile?.rtKey;
                 // Idioma/región del perfil → contexto del request (los leen tmdbFetch y providers).
                 setRequestPrefs({ language: profile?.language, region: profile?.region });
             } catch { /* perfil opcional */ }

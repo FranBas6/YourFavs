@@ -76,6 +76,11 @@ export interface UserProfile {
      */
     publicHandle?: string;
     publicVisibility?: 'off' | 'public' | 'friends';
+    /**
+     * Mensajes M3: nombre secreto de tu canal de tiempo real (`u:{rtKey}`). SOLO LECTURA y solo para
+     * ti: el middleware lo pasa a `SocialLayer`, que lo da a tu navegador. Nunca sale en nada público.
+     */
+    rtKey?: string;
     updated_at?: unknown;
 }
 
@@ -96,9 +101,10 @@ const COLUMN: Record<Exclude<keyof UserProfile, 'updated_at'>, string> = {
     homeLayout: 'home_layout',
     publicHandle: 'public_handle',
     publicVisibility: 'public_visibility',
+    rtKey: 'rt_key',
 };
 /** Campos que `setUserProfile` NUNCA escribe: tienen su propio módulo con validación. */
-const READ_ONLY = new Set<string>(['publicHandle', 'publicVisibility']);
+const READ_ONLY = new Set<string>(['publicHandle', 'publicVisibility', 'rtKey']);
 const SELECT = [...Object.values(COLUMN), 'updated_at'].join(', ');
 
 export async function getUserProfile(): Promise<UserProfile | null> {
