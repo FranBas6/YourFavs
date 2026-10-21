@@ -40,7 +40,7 @@ interface RawMsg {
 }
 interface RawConv {
     id: number; kind: ConvKind; name: string | null; role: ConvRole; muted: boolean; last_msg_at: string;
-    count: number; members: string[]; last: RawMsg | null; unread: number; read_only: boolean;
+    count: number; members: string[]; last: RawMsg | null; unread: number; read_only: boolean; cleared: boolean;
 }
 interface RawHistory {
     ok: boolean; error?: 'none' | 'left';
@@ -95,8 +95,17 @@ export async function listConversations(me: string): Promise<ConvSummary[]> {
             unread: c.unread,
             muted: c.muted,
             readOnly: c.read_only,
+            cleared: Boolean(c.cleared),
         };
     });
+}
+
+/**
+ * «Limpiar» el desplegable de Mensajes de la cabecera (M3b): fuera de él y el contador a 0 hasta que
+ * llegue algo nuevo. NO marca como leído (nadie recibe un «Visto»).
+ */
+export async function clearInbox(me: string): Promise<void> {
+    unwrap(await db().rpc('msg_clear_inbox', { p_me: me }));
 }
 
 /** Total de sin leer de las conversaciones sin silenciar (contadores `.mcnt`, §6). */

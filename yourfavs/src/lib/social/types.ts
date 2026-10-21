@@ -163,6 +163,8 @@ export interface ConvSummary {
     muted: boolean;
     /** Solo 1:1. Nunca viene el motivo. */
     readOnly: boolean;
+    /** Limpiada en el desplegable de la cabecera y sin nada nuevo desde entonces (M3b). */
+    cleared: boolean;
 }
 
 export interface ChatMember {

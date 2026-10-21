@@ -202,6 +202,28 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </div>
             </div>
 
+            <!-- Mensajes (M3b): acceso rápido junto a la campana, con el contador neutro de mensajes sin
+                 leer. En escritorio abre las conversaciones recientes; en móvil lleva a Mensajes, igual que
+                 la campana. Lo atiende scripts/social/messages/headerMsgs.ts; el número, bell.ts. -->
+            {user && SOCIAL_PHASE.messages && (
+                <div class="header-notif header-msgs" id="msgs">
+                    <a class="header-notif-btn" id="msgs-toggle-btn" href="/mislistas/amigos/mensajes" aria-label="Mensajes" title="Mensajes" aria-haspopup="true" aria-expanded="false">
+                        <Icon name="lucide:message-circle" class="w-5 h-5" />
+                        <span class="header-msg-badge js-msg-badge" hidden><span class="js-msg-n"></span></span>
+                    </a>
+                    <div class="header-notif-dropdown" id="msgs-dropdown" style="display:none;" role="dialog" aria-label="Mensajes">
+                        <div class="notif-head">
+                            <span class="notif-title">Mensajes</span>
+                            <button type="button" class="notif-markall" id="msgs-clear" hidden title="Vacía este desplegable y el contador. No marca nada como leído.">Limpiar</button>
+                        </div>
+                        <ul class="hm-list" id="msgs-list" aria-label="Conversaciones recientes">
+                            <li class="notif-empty">Cargando…</li>
+                        </ul>
+                        <a href="/mislistas/amigos/mensajes" class="notif-footer">Ver todos los mensajes</a>
+                    </div>
+                </div>
+            )}
+
             <!-- Campana (Bloque 4): buzón de notificaciones (solo con sesión) -->
             {user && (
                 <div class="header-notif" id="notif">
