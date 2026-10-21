@@ -3,7 +3,7 @@
  * `{ ok, status, data }`; nunca lanzan (sin red → `status: 0`), para que el que llama decida entre
  * «No se ha enviado · Reintentar», un toast o el vacío de error.
  */
-import type { ChatMessage, ChatView, ConvSummary, PersonCard } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, ConvSummary, PersonCard, SpoilerRef } from '../../../lib/social/types';
 
 const BASE = '/api/social/messages';
 
@@ -41,10 +41,12 @@ export const msgApi = {
     patch: (conv: number, body: { name?: string; muted?: boolean }) => call('PATCH', `/${conv}`, body),
     read: (conv: number, lastId: number) => call('POST', `/${conv}/read`, { lastId }),
 
-    send: (conv: number, body: string, clientId: string) => call<{ message: ChatMessage }>('POST', `/${conv}/messages`, { body, clientId }),
+    send: (conv: number, body: string, clientId: string, spoiler?: SpoilerRef | null) =>
+        call<{ message: ChatMessage }>('POST', `/${conv}/messages`, { body, clientId, ...(spoiler ? { spoiler } : {}) }),
     remove: (conv: number, msg: number) => call('DELETE', `/${conv}/messages/${msg}`),
     restore: (conv: number, msg: number, body: string) => call('POST', `/${conv}/messages/${msg}/restore`, { body }),
     folded: (conv: number, msg: number) => call<{ body: string }>('GET', `/${conv}/messages/${msg}/folded`),
+    spoiler: (conv: number, msg: number) => call<{ body: string }>('GET', `/${conv}/messages/${msg}/spoiler`),
     report: (conv: number, msg: number, reason: 'spam' | 'harassment' | 'other', note?: string) =>
         call('POST', `/${conv}/messages/${msg}/report`, { reason, note }),
 

@@ -12,7 +12,7 @@ import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../../utils/appTime';
 import { formatScore } from '../../utils/constants/helpers/media-helpers';
-import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SysType, TitleCard, TitleCardRef } from './types';
+import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef } from './types';
 import { recHref, recLeadHtml } from './recUi';
 
 export const MSG_MAX = 2000;
@@ -148,7 +148,7 @@ export function linkify(text: string): string {
 // La conversación (handoff §4.4)
 // -------------------------------------------------------------------------------------
 /** Un mensaje tuyo que aún no ha llegado al servidor (o que falló). */
-export interface PendingMsg { clientId: string; body: string; at: number; failed: boolean }
+export interface PendingMsg { clientId: string; body: string; at: number; failed: boolean; spoiler?: SpoilerRef | null }
 
 export interface LogCtx {
     me: string;
@@ -368,17 +368,64 @@ export function plusMenuHtml(conv: { id: number; group: boolean; title: string; 
         html += item(`data-recommend data-friends="${esc(conv.friends.join(','))}" data-anchor="[data-ms-plus]"`, 'amber', 'send', 'Recomendar',
             'A alguien del grupo, como en Amigos');
     }
+    // Marcar como spoiler (M4c): lo que escribas a continuación sale oculto para quien no haya llegado.
+    html += item(`data-spoil-pick data-conv="${conv.id}" data-anchor="[data-ms-plus]"`, 'blue', 'shield', 'Marcar como spoiler',
+        'De una película o de un episodio');
     return html;
+}
+
+// -------------------------------------------------------------------------------------
+// Spoilers (M4c; handoff M4 §3.4): el escudo para quien no ha llegado (barras en lugar del texto,
+// que no ha llegado al navegador) y la etiqueta para los demás.
+// -------------------------------------------------------------------------------------
+/** «T2 E5», o nada si es de la serie entera o de una película. */
+export const spoilerEp = (sp: SpoilerRef) => (sp.season && sp.episode ? `T${sp.season} E${sp.episode}` : '');
+/** «Severance T2 E5» · «Perfect Days». */
+export const spoilerLabel = (sp: SpoilerRef) => [sp.title, spoilerEp(sp)].filter(Boolean).join(' ');
+const spoilerLong = (sp: SpoilerRef) => `${sp.title}${sp.season && sp.episode ? `, temporada ${sp.season}, episodio ${sp.episode}` : ''}`;
+
+/** Tu estado con el título, al pie del escudo: «Vas por T2 E3» · «La tienes pendiente»… */
+function shieldYou(m: ChatMessage): string {
+    const v = m.spoilerViewer;
+    if (!v) return m.spoiler?.mediaType === 'movie' ? 'No la has visto' : 'No la has empezado';
+    if (v.state === 'pending') return 'La tienes pendiente';
+    if (v.state === 'seen') return 'Aún no has llegado';
+    if (v.season != null && v.episode != null) return `Vas por T${v.season} E${v.episode}`;
+    return 'La estás viendo';
+}
+
+function shieldHtml(m: ChatMessage): string {
+    const sp = m.spoiler!;
+    const ep = spoilerEp(sp);
+    const bars = (m.lines?.length ? m.lines : [90]).map((w) => `<i style="width:${Math.max(20, Math.min(100, Number(w) || 100))}%"></i>`).join('');
+    return `<div class="shd" role="group" aria-label="${esc(`Spoiler de ${spoilerLong(sp)}. Mensaje oculto`)}">`
+        + `<div class="shd-h">${icon('shield')}<span>Spoiler de <b>${esc(sp.title)}</b>${ep ? ` · ${ep}` : ''}</span></div>`
+        + `<div class="shd-bars" aria-hidden="true">${bars}</div>`
+        + `<div class="shd-f"><span>${esc(shieldYou(m))}</span>`
+        + btn('Mostrar igualmente', { size: 'sm', icon: 'eye', attrs: `data-spoil-show="${m.id}"` }) + `</div></div>`;
+}
+
+/** Etiqueta encima del texto: tuyo («Spoiler»), ya lo has visto, o mostrado en esta sesión (+ «Ocultar»). */
+function spoilerTagHtml(m: ChatMessage, own: boolean, shown: boolean): string {
+    const sp = m.spoiler!;
+    const [cls, ico, text] = own ? ['own', 'shield', 'Spoiler'] : shown ? ['shown', 'eye', 'Mostrado'] : ['seen', 'circle-check', 'Ya lo has visto'];
+    return `<div class="sp-r"><span class="sptag ${cls}">${icon(ico)}${text} · ${esc(spoilerLabel(sp))}</span>`
+        + (shown && !own ? `<button type="button" class="lk" data-spoil-hide="${m.id}">Ocultar</button>` : '') + `</div>`;
 }
 
 function lineHtml(m: ChatMessage, body: string | null, own: boolean, ctx: LogCtx, now: number): string {
     const t = `<span class="gt" aria-hidden="true">${hm(m.at)}</span>`;
     if (m.deleted) return `<div class="mm del" data-mid="${m.id}">${t}${icon('trash-2')}${DELETED_TEXT}</div>`;
-    const text = body ? `<span class="mm-t">${linkify(body)}</span>` : '';
+    // Spoiler: bloqueado → escudo (la tarjeta, si la hay, se ve igual debajo); si no, la etiqueta encima.
+    const shown = m.id in ctx.revealed && m.locked;
+    let text = body ? `<span class="mm-t">${linkify(body)}</span>` : '';
+    if (m.spoiler && m.locked && !shown) text = shieldHtml(m);
+    else if (m.spoiler && (body || shown)) text = spoilerTagHtml(m, own, shown) + `<span class="mm-t" tabindex="-1" data-sp-text>${linkify(shown ? ctx.revealed[m.id] : body ?? '')}</span>`;
     // En una recomendación, «la otra persona»: quien la envía (si no eres tú) o a quien se la enviaste.
     const other = m.card?.type === 'rec' ? (m.author === ctx.me ? ctx.other ?? null : ctx.people[m.author ?? ''] ?? null) : null;
     const card = m.card ? cardHtml(m.card, ctx.people, { other, at: m.at, now }) : '';
-    return `<div class="mm${card ? ' has-card' : ''}" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}${text}${card}${actionsHtml()}</div>`;
+    const cls = `${card ? ' has-card' : ''}${m.spoiler ? ' sp' : ''}`;
+    return `<div class="mm${cls}" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}${text}${card}${actionsHtml()}</div>`;
 }
 
 function pendingLineHtml(p: PendingMsg): string {
@@ -387,7 +434,8 @@ function pendingLineHtml(p: PendingMsg): string {
             + `<button type="button" class="pf-btn sm" data-retry="${esc(p.clientId)}">${icon('refresh-cw')}Reintentar</button>`
             + `<button type="button" class="pf-btn sm ghost" data-discard="${esc(p.clientId)}">Borrar</button></span>`
         : `<span class="mm-st">${icon('clock')}Enviando…</span>`;
-    return `<div class="mm${p.failed ? '' : ' sending'}" data-cid="${esc(p.clientId)}"><span class="mm-t">${linkify(p.body)}</span>${st}</div>`;
+    const tag = p.spoiler ? `<div class="sp-r"><span class="sptag own">${icon('shield')}Spoiler · ${esc(spoilerLabel(p.spoiler))}</span></div>` : '';
+    return `<div class="mm${p.failed ? '' : ' sending'}${p.spoiler ? ' sp' : ''}" data-cid="${esc(p.clientId)}">${tag}<span class="mm-t">${linkify(p.body)}</span>${st}</div>`;
 }
 
 interface Item { m: ChatMessage | null; p: PendingMsg | null; at: number; author: string | null }

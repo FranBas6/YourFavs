@@ -16,14 +16,14 @@
  * entero; por eso los nuevos de otras personas se anuncian en una región aparte (`data-ms-live`).
  */
 import {
-    GROUP_NAME_MAX, MSG_MAX, cardHref, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, otherOf, renameHtml, type PendingMsg,
+    GROUP_NAME_MAX, MSG_MAX, cardHref, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, otherOf, renameHtml, spoilerLabel, type PendingMsg,
 } from '../../../lib/social/chatView';
 import { DELETED_ACCOUNT, FOLDED_TEXT } from '../../../lib/social/messagesText';
 import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { msgApi } from './api';
 import { createPoller } from './poller';
 import { showToast } from '../toast';
-import type { ChatMessage, ChatView, RecShown } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, RecShown, SpoilerRef } from '../../../lib/social/types';
 
 /** uuid v4 (crypto.randomUUID solo existe en contextos seguros). */
 function uuid(): string {
@@ -113,7 +113,7 @@ function init(root: HTMLElement, chat: ChatView) {
     function announce(fresh: ChatMessage[]) {
         const lines = fresh
             .filter((m) => m.author !== me && m.kind === 'text' && !m.deleted)
-            .map((m) => `${nameOf(m.author)}: ${m.folded ? FOLDED_TEXT : m.body || (m.card ? `ha compartido ${m.card.ref.title}` : '')}`);
+            .map((m) => `${nameOf(m.author)}: ${m.folded ? FOLDED_TEXT : m.locked && m.spoiler ? `spoiler de ${spoilerLabel(m.spoiler)}, oculto` : m.body || (m.card ? `ha compartido ${m.card.ref.title}` : '')}`);
         if (lines.length) live.textContent = lines.join('. ');
     }
 
@@ -207,7 +207,7 @@ function init(root: HTMLElement, chat: ChatView) {
         if (!pending.includes(p)) pending.push(p);
         saveFailed();
         render('bottom');
-        const r = await msgApi.send(conv, p.body, p.clientId);
+        const r = await msgApi.send(conv, p.body, p.clientId, p.spoiler);
         if (r.ok) {
             pending = pending.filter((x) => x !== p);
             saveFailed();
@@ -263,7 +263,10 @@ function init(root: HTMLElement, chat: ChatView) {
             input.value = '';
             sync();
             input.focus();
-            void send({ clientId: uuid(), body, at: Date.now(), failed: false });
+            // La marca de spoiler se va con este mensaje y se quita del compositor.
+            const sp = spoiler;
+            setSpoiler(null);
+            void send({ clientId: uuid(), body, at: Date.now(), failed: false, spoiler: sp });
         };
 
         input.value = store.get(sessionStorage, DRAFT_KEY) ?? '';
@@ -389,7 +392,7 @@ function init(root: HTMLElement, chat: ChatView) {
     // ---- Acciones sobre un mensaje ----------------------------------------------------------
     // Una tarjeta se copia con su enlace (el comentario, si lo hay, delante).
     const bodyOf = (m: ChatMessage) => {
-        const text = m.folded ? revealed[m.id] ?? '' : m.body ?? '';
+        const text = m.folded || m.locked ? revealed[m.id] ?? '' : m.body ?? '';
         if (!m.card) return text;
         const link = `${m.card.ref.title} · ${location.origin}${cardHref(m.card)}`;
         return text ? `${text}\n${link}` : link;
@@ -423,6 +426,47 @@ function init(root: HTMLElement, chat: ChatView) {
             if (u.ok) { m.deleted = false; m.body = body; render(); refreshList(); }
             else showToast('Ya no se puede deshacer', 'error');
         });
+    }
+
+    // ---- Spoilers (M4c) ----------------------------------------------------------------------
+    // La marca del compositor: lo siguiente que envíes sale oculto para quien no haya llegado.
+    let spoiler: SpoilerRef | null = null;
+    const tagRow = root.querySelector<HTMLElement>('[data-ms-ctag]');
+    const baseLabel = input?.getAttribute('aria-label') ?? '';
+    function setSpoiler(sp: SpoilerRef | null) {
+        spoiler = sp;
+        if (input) input.setAttribute('aria-label', sp ? `${baseLabel}, marcado como spoiler de ${spoilerLabel(sp)}` : baseLabel);
+        if (!tagRow) return;
+        tagRow.hidden = !sp;
+        tagRow.innerHTML = sp
+            ? `<span class="ctag">${icon('shield')}<span>Spoiler de <b>${esc(spoilerLabel(sp))}</b></span>`
+                + `<button type="button" data-ms-ctag-x aria-label="Quitar la marca de spoiler">${icon('x')}</button></span>`
+            : '';
+    }
+    tagRow?.addEventListener('click', (e) => {
+        if (!(e.target as Element).closest('[data-ms-ctag-x]')) return;
+        setSpoiler(null);
+        input?.focus();
+    });
+    document.addEventListener('yf:ms-spoiler-set', (e) => {
+        const d = (e as CustomEvent<{ conv: number; spoiler: SpoilerRef }>).detail;
+        if (!d || d.conv !== conv) return;
+        setSpoiler(d.spoiler);
+        input?.focus();
+    });
+
+    /** «Mostrar igualmente»: el texto solo para esta sesión; el foco va al texto. */
+    async function showSpoiler(id: number) {
+        const r = await msgApi.spoiler(conv, id);
+        if (!r.ok) { showToast('No se ha podido mostrar', 'error'); return; }
+        revealed[id] = r.data.body;
+        render();
+        logEl.querySelector<HTMLElement>(`[data-mid="${id}"] [data-sp-text]`)?.focus();
+    }
+    function hideSpoiler(id: number) {
+        delete revealed[id];
+        render();
+        logEl.querySelector<HTMLElement>(`[data-mid="${id}"] [data-spoil-show]`)?.focus();
     }
 
     async function reveal(id: number) {
@@ -477,6 +521,10 @@ function init(root: HTMLElement, chat: ChatView) {
         if (m.folded && !(id in revealed)) {
             return [{ key: 'reveal', label: 'Mostrar', icon: 'eye' }, { key: 'report', label: 'Reportar', icon: 'flag' }];
         }
+        // Spoiler aún oculto: sin copiar (no hay texto), y «Mostrar igualmente» a mano.
+        if (m.locked && !(id in revealed)) {
+            return [{ key: 'spoil', label: 'Mostrar igualmente', icon: 'eye' }, { key: 'report', label: 'Reportar', icon: 'flag' }];
+        }
         const copyA = m.card ? { key: 'copy', label: 'Copiar enlace', icon: 'link' } : { key: 'copy', label: 'Copiar texto', icon: 'copy' };
         return m.author === me
             ? [copyA, { key: 'delete', label: 'Borrar mensaje', icon: 'trash-2', danger: true }]
@@ -487,6 +535,7 @@ function init(root: HTMLElement, chat: ChatView) {
         else if (key === 'delete') void remove(id);
         else if (key === 'report') openReport(id);
         else if (key === 'reveal') void reveal(id);
+        else if (key === 'spoil') void showSpoiler(id);
     }
 
     let menuBtn: HTMLButtonElement | null = null;
@@ -559,6 +608,10 @@ function init(root: HTMLElement, chat: ChatView) {
         if (ra) { void actRec(ra); return; }
         const rv = t.closest<HTMLElement>('[data-reveal]');
         if (rv) { void reveal(Number(rv.dataset.reveal)); return; }
+        const sps = t.closest<HTMLElement>('[data-spoil-show]');
+        if (sps) { void showSpoiler(Number(sps.dataset.spoilShow)); return; }
+        const sph = t.closest<HTMLElement>('[data-spoil-hide]');
+        if (sph) { hideSpoiler(Number(sph.dataset.spoilHide)); return; }
         const retry = t.closest<HTMLElement>('[data-retry]');
         if (retry) { const p = pending.find((x) => x.clientId === retry.dataset.retry); if (p) void send(p); return; }
         const discard = t.closest<HTMLElement>('[data-discard]');

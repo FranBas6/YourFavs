@@ -494,7 +494,16 @@ isOneToOne: false
 { Args: { "p_kind": string,"p_me": string,"p_sys": Json }; Returns: boolean
                            },
 "msg_send":
-{ Args: { "p_body": string,"p_card_ref"?: Json,"p_card_type"?: string,"p_client": string,"p_conv": number,"p_me": string }; Returns: Json
+{ Args: { "p_body": string,"p_card_ref"?: Json,"p_card_type"?: string,"p_client": string,"p_conv": number,"p_me": string,"p_spoiler"?: Json }; Returns: Json
+                           },
+"msg_spoiler_body":
+{ Args: { "p_me": string,"p_msg": number }; Returns: string
+                           },
+"msg_spoiler_lines":
+{ Args: { "p_len": number }; Returns: Json
+                           },
+"msg_spoiler_reached":
+{ Args: { "p_me": string,"p_spoiler": Json }; Returns: boolean
                            },
 "msg_sys":
 { Args: { "p_actor": string,"p_conv": number,"p_extra": Json,"p_targets": (string)[],"p_type": string }; Returns: undefined

@@ -66,8 +66,11 @@ export function previewOf(m: ChatMessage | null, me: string, group: boolean, peo
     if (m.kind === 'system' && m.sys) return plain(sysParts(m.sys, me, name));
     if (m.deleted) return DELETED_TEXT;
     if (m.folded) return FOLDED_TEXT;
+    // Un spoiler nunca se adelanta en la lista: «Spoiler de Severance T2 E5» (M4c).
+    const sp = m.spoiler;
+    const spoiler = sp ? `Spoiler de ${sp.title}${sp.season && sp.episode ? ` T${sp.season} E${sp.episode}` : ''}` : '';
     // Una tarjeta sin comentario: su título entre comillas («Tú: «Perfect Days»»).
-    const body = (m.body ?? '').replace(/\s+/g, ' ').trim() || (m.card ? `«${m.card.ref.title}»` : '');
+    const body = spoiler || (m.body ?? '').replace(/\s+/g, ' ').trim() || (m.card ? `«${m.card.ref.title}»` : '');
     if (m.author === me) return `Tú: ${body}`;
     return group ? `${firstName(name(m.author))}: ${body}` : body;
 }

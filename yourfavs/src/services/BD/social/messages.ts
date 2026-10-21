@@ -15,7 +15,7 @@ import { previewOf } from '../../../lib/social/messagesText';
 import { resolveCards } from './chatCards';
 import type { Json } from '../../../lib/supabase/database.types';
 import type {
-    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, TitleCardRef,
+    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, SpoilerRef, TitleCardRef,
 } from '../../../lib/social/types';
 
 export const MSG_MAX = 2000;
@@ -40,6 +40,7 @@ interface RawMsg {
     id: number; author: string | null; kind: 'text' | 'system'; body: string | null; sys: MsgSys | null;
     created_at: string; deleted: boolean; folded: boolean; client_id: string | null;
     card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: unknown } | null;
+    spoiler?: SpoilerRef | null; locked?: boolean; lines?: number[] | null; spoiler_seen?: boolean;
 }
 interface RawConv {
     id: number; kind: ConvKind; name: string | null; role: ConvRole; muted: boolean; last_msg_at: string;
@@ -66,6 +67,7 @@ export function toMessage(r: RawMsg, me: string): ChatMessage {
         card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] }
             : r.card?.type === 'rec' ? { type: 'rec', ref: r.card.ref, dir: r.author === me ? 'out' : 'in', state: r.author === me ? 'sent' : 'pending' }
             : null,
+        spoiler: r.spoiler ?? null, locked: Boolean(r.locked), lines: r.lines ?? null, spoilerSeen: Boolean(r.spoiler_seen),
     };
 }
 
@@ -176,6 +178,12 @@ export async function getHistory(
     };
 }
 
+/** «Mostrar igualmente» un spoiler (M4c): su texto, si ves ese mensaje. No guarda nada. */
+export async function spoilerBody(me: string, conv: number, msg: number): Promise<string | null> {
+    if (!(await belongsTo(msg, conv))) return null;
+    return unwrap<string | null>(await db().rpc('msg_spoiler_body', { p_me: me, p_msg: msg }));
+}
+
 /** Texto de un mensaje plegado («Mostrar»): solo si es de un grupo y su autor lo bloqueaste tú. */
 export async function foldedBody(me: string, conv: number, msg: number): Promise<string | null> {
     if (!(await belongsTo(msg, conv))) return null;
@@ -204,18 +212,22 @@ export async function openDirect(me: string, them: string): Promise<OpenDirectRe
 // -------------------------------------------------------------------------------------
 // Mensajes
 // -------------------------------------------------------------------------------------
-export type SendError = 'none' | 'read_only' | 'empty' | 'too_long' | 'rate' | 'card';
+export type SendError = 'none' | 'read_only' | 'empty' | 'too_long' | 'rate' | 'card' | 'spoiler';
 export type SendResult = { ok: true; message: ChatMessage } | { ok: false; error: SendError };
 /** Código HTTP de cada error al enviar (`read_only` nunca dice por qué). */
-export const SEND_STATUS: Record<SendError, number> = { none: 404, read_only: 403, empty: 400, too_long: 400, rate: 429, card: 400 };
+export const SEND_STATUS: Record<SendError, number> = { none: 404, read_only: 403, empty: 400, too_long: 400, rate: 429, card: 400, spoiler: 400 };
 
-/** Un mensaje: texto, o tarjeta de título (`card`, la copia de TMDB) con el texto como comentario. */
+/**
+ * Un mensaje: texto, o tarjeta de título (`card`, la copia de TMDB) con el texto como comentario.
+ * `spoiler` marca el texto como spoiler de una película, un episodio o una serie (M4c).
+ */
 export async function sendMessage(
-    me: string, conv: number, body: string, clientId: string, card: TitleCardRef | null = null,
+    me: string, conv: number, body: string, clientId: string, card: TitleCardRef | null = null, spoiler: SpoilerRef | null = null,
 ): Promise<SendResult> {
     const r = unwrap<{ ok: boolean; error?: SendError; message?: RawMsg }>(await db().rpc('msg_send', {
         p_me: me, p_conv: conv, p_body: body, p_client: clientId,
         ...(card ? { p_card_type: 'title', p_card_ref: card as unknown as Json } : {}),
+        ...(spoiler ? { p_spoiler: spoiler as unknown as Json } : {}),
     }));
     if (!r.ok || !r.message) return { ok: false, error: r.error ?? 'none' };
     const message = toMessage(r.message, me);

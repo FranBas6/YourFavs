@@ -109,7 +109,7 @@ select is((select count(*)::int from public.msg_card_states(pg_temp.u('a'), pg_t
   'refs que no son una lista → nada (sin error)');
 
 select ok(not has_function_privilege('authenticated', 'public.msg_card_states(uuid, bigint, jsonb)', 'execute'), 'permisos: solo el servidor');
-select ok(not has_function_privilege('anon', 'public.msg_send(uuid, bigint, text, uuid, text, jsonb)', 'execute'), 'permisos: enviar, solo el servidor');
+select ok(not has_function_privilege('anon', 'public.msg_send(uuid, bigint, text, uuid, text, jsonb, jsonb)', 'execute'), 'permisos: enviar, solo el servidor');
 
 select * from finish();
 rollback;

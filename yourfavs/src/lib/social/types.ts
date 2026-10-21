@@ -146,7 +146,20 @@ export interface ChatMessage {
     clientId: string | null;
     /** Tarjeta (M4), ya resuelta para quien pide. null en los de texto, los borrados y los plegados. */
     card: ChatCard | null;
+    /** Marcado como spoiler (M4c). null si no, o si está borrado o plegado. */
+    spoiler: SpoilerRef | null;
+    /** Spoiler al que no has llegado: `body` no viene (el servidor no lo manda), solo `lines`. */
+    locked: boolean;
+    /** Anchos (%) de las barras que sustituyen al texto bloqueado. */
+    lines: number[] | null;
+    /** Ya has llegado a lo que destripa («✓ Ya lo has visto»). */
+    spoilerSeen: boolean;
+    /** Bloqueado: tu estado con ese título, para el pie del escudo («Vas por T2 E3»). */
+    spoilerViewer?: CardViewer | null;
 }
+
+/** De qué es un spoiler: una película, un episodio o una serie entera (sin `season`/`episode`). */
+export interface SpoilerRef { mediaType: 'movie' | 'tv'; tmdbId: number; title: string; season?: number; episode?: number }
 
 // Tarjetas del chat (M4; docs/Mensajes/design_handoff_m4 §2–§3)
 /** Copia de TMDB guardada con el mensaje (para pintar sin pedir nada). */

@@ -248,7 +248,7 @@ select is((select count(*)::int from conversation_members where conv_id = pg_tem
           'cuenta borrada: el grupo sigue teniendo admin');
 
 -- ================================================================ permisos
-select ok(not has_function_privilege('authenticated', 'public.msg_send(uuid, bigint, text, uuid, text, jsonb)', 'execute'), 'permisos: authenticated no puede llamar msg_send');
+select ok(not has_function_privilege('authenticated', 'public.msg_send(uuid, bigint, text, uuid, text, jsonb, jsonb)', 'execute'), 'permisos: authenticated no puede llamar msg_send');
 select ok(not has_function_privilege('anon', 'public.msg_list(uuid)', 'execute'), 'permisos: anon no puede llamar msg_list');
 select ok(has_function_privilege('service_role', 'public.msg_history(uuid, bigint, bigint, bigint, bigint, integer)', 'execute'), 'permisos: el servidor sí');
 

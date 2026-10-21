@@ -8,7 +8,7 @@ import Layout from '../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
 import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
 import { initialsOf, stampFor } from '../../lib/social/ui';
-import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, RecCard, RecCardRef, TitleCardRef } from '../../lib/social/types';
+import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, RecCard, RecCardRef, SpoilerRef, TitleCardRef } from '../../lib/social/types';
 import '../../styles/pages/social/mensajes.css';
 
 export const prerender = false;
@@ -61,8 +61,9 @@ const recStates: [string, RecCard][] = [
 
 const now = Date.now();
 let mid = 100;
-const M = (author: PersonCard, body: string, at: number, c: ChatCard | null = null): ChatMessage =>
-    ({ id: ++mid, author: author.id, kind: 'text', body, sys: null, at, deleted: false, folded: false, clientId: null, card: c });
+const M = (author: PersonCard, body: string, at: number, c: ChatCard | null = null, o: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ id: ++mid, author: author.id, kind: 'text', body, sys: null, at, deleted: false, folded: false, clientId: null, card: c,
+       spoiler: null, locked: false, lines: null, spoilerSeen: false, ...o });
 const log = logHtml([
     M(ANA, 'Ayer vi esta y me acordé de ti', now - 30 * 60_000),
     M(ANA, '', now - 29 * 60_000, card(PERFECT, null, [seen(ANA, 9)])),
@@ -70,6 +71,29 @@ const log = logHtml([
     M(ME, 'Y esta, que la estoy viendo', now - 19 * 60_000, card(SEV, { state: 'progress', season: 2, episode: 4, upToDate: false })),
     M(ANA, 'La vi el finde. Ojo, que dura casi 3 h', now - 10 * 60_000, rec('pending')),
 ], { me: ME.id, group: false, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now, other: ANA });
+
+// Escudo de spoilers (§3.4): el mismo grupo visto de tres maneras + una tarjeta con el comentario marcado.
+const SP: SpoilerRef = { mediaType: 'tv', tmdbId: 95396, title: 'Severance', season: 2, episode: 5 };
+const SPM: SpoilerRef = { mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days' };
+const spText = 'No me puedo creer lo de Mark en el ascensor. Y la escena final con Helly, sin palabras.';
+const lockedMsgs = (): ChatMessage[] => [
+    M(ANA, 'Acabo de ver el 5', now - 9 * 60_000),
+    M(ANA, '', now - 8 * 60_000, null, { spoiler: SP, locked: true, lines: [100, 30], spoilerViewer: { state: 'progress', season: 2, episode: 3, upToDate: false } }),
+    M(CARLA, '', now - 6 * 60_000, card(PERFECT, null, [seen(ANA, 9)]), { spoiler: SPM, locked: true, lines: [60] }),
+];
+const ctx = (me: string, revealed: Record<number, string> = {}) =>
+    ({ me, group: true, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed, now });
+mid = 300;
+const spLocked = logHtml(lockedMsgs(), ctx(ME.id));
+mid = 300;
+const spShown = logHtml(lockedMsgs(), ctx(ME.id, { 302: spText }));
+mid = 300;
+const spSeen = logHtml([
+    M(ANA, 'Acabo de ver el 5', now - 9 * 60_000),
+    M(ANA, spText, now - 8 * 60_000, null, { spoiler: SP, spoilerSeen: true }),
+], ctx(ME.id));
+mid = 300;
+const spOwn = logHtml([M(ANA, 'Acabo de ver el 5', now - 9 * 60_000), M(ANA, spText, now - 8 * 60_000, null, { spoiler: SP })], ctx(ANA.id));
 ---
 <Layout title="Dev · Mensajes M4" robots="noindex, nofollow">
     <div class="dv">
@@ -79,7 +103,7 @@ const log = logHtml([
         <h2>Conversación — la tarjeta va dentro del grupo de su autor; el comentario, encima</h2>
         <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log} /></div>
             <div class="ms-c"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: false, title: ANA.name, to: ANA.handle })} />
-                <div class="ms-cb"><button type="button" class="ms-plus on open" aria-label="Añadir al mensaje" aria-expanded="true"><Icon name="lucide:x" /></button>
+                <div class="ms-cb"><button type="button" class="ms-plus on open" aria-label="Añadir al mensaje" aria-expanded="true"><Icon name="lucide:plus" class="i-plus" /><Icon name="lucide:x" class="i-x" /></button>
                 <textarea class="ms-ta" rows="1" aria-label="Mensaje para Ana" placeholder="Escribe a Ana"></textarea>
                 <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled><Icon name="lucide:send" /></button></div></div>
         </section>
@@ -93,6 +117,19 @@ const log = logHtml([
         <div class="dv-grid">{recStates.map(([label, c]) => (
             <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people, { other: ANA, at: now - 3600_000, now })} /></div>
         ))}</div>
+
+        <h2>Spoiler — bloqueado (texto fuera del navegador) · tarjeta con el comentario oculto</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={spLocked} /></div></section>
+        <h2>Spoiler — «Mostrar igualmente» pulsado (solo esta sesión)</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={spShown} /></div></section>
+        <h2>Spoiler — ya lo has visto · y visto por quien lo escribió</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={spSeen} /></div></section>
+        <section class="ms-main dv-box" style="margin-top: 10px"><div class="ms-log"><div class="ms-log-in" set:html={spOwn} /></div></section>
+        <h2>Compositor con la marca de spoiler</h2>
+        <section class="ms-main dv-box"><div class="ms-c" style="margin-top: 0"><div class="ctag-row"><span class="ctag"><Icon name="lucide:shield" /><span>Spoiler de <b>Severance T2 E5</b></span><button type="button" aria-label="Quitar la marca de spoiler"><Icon name="lucide:x" /></button></span></div>
+            <div class="ms-cb"><button type="button" class="ms-plus on" aria-label="Añadir al mensaje"><Icon name="lucide:plus" class="i-plus" /><Icon name="lucide:x" class="i-x" /></button>
+            <textarea class="ms-ta" rows="1" aria-label="Mensaje para Viernes de pelis, marcado como spoiler de Severance T2 E5">Lo del final 😱</textarea>
+            <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar"><Icon name="lucide:send" /></button></div></div></section>
 
         <h2>Menú del ＋ en móvil (hoja)</h2>
         <div class="dv-box ms-sheet-like"><div class="pm m" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 2, group: true, title: 'Viernes de pelis', friends: [ANA.id] })} /></div>

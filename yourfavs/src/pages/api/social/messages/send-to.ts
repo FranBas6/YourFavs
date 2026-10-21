@@ -1,5 +1,5 @@
 /**
- * POST /api/social/messages/send-to { convId | handle, card, body?, clientId } → { ok, convId, message }
+ * POST /api/social/messages/send-to { convId | handle, card, body?, clientId, spoiler? } → { ok, convId, message }
  *
  * «Enviar a…» desde una ficha (M4, handoff M4 §3.5 y §7): una tarjeta de título a una conversación
  * tuya o, con `handle`, al 1:1 con ese amigo (se abre si no existe). Si no sois amigos, hay un
@@ -11,7 +11,7 @@ import { jsonNoStore } from '../../../../lib/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../lib/social/http';
 import { normalizeHandle } from '../../../../services/BD/social/handles';
 import { MSG_MAX, SEND_STATUS, idByHandle, openDirect, sendMessage } from '../../../../services/BD/social/messages';
-import { readTitleCard } from '../../../../services/BD/social/chatCards';
+import { readSpoiler, readTitleCard } from '../../../../services/BD/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 
 export const prerender = false;
@@ -27,6 +27,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if ((!conv && !handle) || !isUuid(b?.clientId) || b?.card == null) return badRequest();
     if (body.length > MSG_MAX * 2) return jsonNoStore({ ok: false, error: 'too_long' }, 400);
     try {
+        const spoiler = b.spoiler == null ? null : readSpoiler(b.spoiler);
+        if (spoiler === false) return jsonNoStore({ ok: false, error: 'spoiler' }, 400);
         const card = await readTitleCard(b.card);
         if (card === false) return jsonNoStore({ ok: false, error: 'card' }, 400);
         if (!conv) {
@@ -36,7 +38,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
             if (!o.ok) return jsonNoStore({ ok: false, error: o.error }, o.error === 'rate' ? 429 : 403);
             conv = o.id;
         }
-        const r = await sendMessage(me, conv, body, b.clientId.toLowerCase(), card);
+        const r = await sendMessage(me, conv, body, b.clientId.toLowerCase(), card, spoiler);
         if (r.ok) return jsonNoStore({ ok: true, convId: conv, message: r.message }, 201);
         return jsonNoStore({ ok: false, error: r.error }, SEND_STATUS[r.error]);
     } catch (err) {
