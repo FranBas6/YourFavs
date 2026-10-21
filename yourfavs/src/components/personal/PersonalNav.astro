@@ -4,11 +4,16 @@
  * (`--stamp-*` / `-ink`, handoff social §13): antes eran fondos de Tailwind fijos con texto blanco,
  * sin versión oscura propia. Las demás siguen como estaban.
  */
+import { Icon } from 'astro-icon/components';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+
 interface Props {
     currentPage: string;
 }
 
 const { currentPage } = Astro.props;
+// Mensajes (M1): contador neutro junto al rojo de «Amigos»; lo rellena bell.ts por `.js-msg-badge`.
+const msgOn = SOCIAL_PHASE.messages;
 
 const links = [
     { href: '/mislistas/favoritos', label: 'Favoritos', icon: 'M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z', stamp: 'amber', hoverColor: 'hover:text-yellow-600 hover:border-yellow-300' },
@@ -62,6 +67,7 @@ const activeLabel = activeLink?.label || 'Sección';
                     </svg>
                     {link.label}
                     {link.pendingBadge && <span class="pnav-badge js-pending-badge" hidden></span>}
+                    {link.pendingBadge && msgOn && <span class="mcnt js-msg-badge" hidden><Icon name="lucide:message-circle" /><span class="js-msg-n"></span></span>}
                 </a>
             );
         })}
@@ -86,6 +92,7 @@ const activeLabel = activeLink?.label || 'Sección';
                     </svg>
                     {link.label}
                     {link.pendingBadge && <span class="pnav-badge js-pending-badge" hidden></span>}
+                    {link.pendingBadge && msgOn && <span class="mcnt js-msg-badge" hidden><Icon name="lucide:message-circle" /><span class="js-msg-n"></span></span>}
                 </a>
             );
         })}
@@ -100,4 +107,5 @@ const activeLabel = activeLink?.label || 'Sección';
         font: 700 10px/17px var(--font-mono, monospace); text-align: center;
     }
     .pnav-badge[hidden] { display: none; }
+    .mcnt { height: 17px; font-size: 10px; padding: 0 5px; }
 </style>

@@ -50,7 +50,9 @@ const tasteHintEligible = !!Astro.locals.user && Astro.locals.user.onboarding !=
 
 // Tab bar móvil: oculta en flujos a pantalla completa (onboarding/auth).
 const _tbPath = Astro.url.pathname;
-const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p || _tbPath.startsWith(p + '/'));
+// También dentro de una conversación de mensajes: va a pantalla completa (handoff de mensajes §9).
+const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p || _tbPath.startsWith(p + '/'))
+    || /^\/mislistas\/amigos\/mensajes\/\d+\/?$/.test(_tbPath);
 ---
 <!DOCTYPE html>
 <html lang="es">

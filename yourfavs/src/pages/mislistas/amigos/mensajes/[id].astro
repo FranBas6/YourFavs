@@ -1,0 +1,192 @@
+---
+/**
+ * Una conversación · /mislistas/amigos/mensajes/{id} (handoff de mensajes §3, §4.3–§4.8).
+ *
+ *   · Escritorio: el panel con la lista, la conversación y el panel de información (plegable,
+ *     recordado en `yf:chat-info`).
+ *   · Móvil: la conversación a pantalla completa, sin barra inferior; la información en una hoja.
+ *
+ * El servidor pinta la cabecera, los mensajes (con `lib/social/chatView.ts`) y el panel; el
+ * navegador (`scripts/social/messages/chat.ts`) envía, sondea cada 5 s y repinta con lo mismo.
+ * Si no estás en ella: «Ya no estás en este grupo» o el «no disponible» de siempre (404).
+ */
+import Layout from '../../../../layouts/Layout.astro';
+import PersonalNav from '../../../../components/personal/PersonalNav.astro';
+import Stamp from '../../../../components/Stamp.astro';
+import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
+import { Icon } from 'astro-icon/components';
+import { friendCount, getHistory, listConversations } from '../../../../services/BD/social/messages';
+import {
+    GONE, chatSubtitle, emptyHtml, gavHtml, groupFaces, infoHtml, logHtml, newAnchor, otherOf,
+} from '../../../../lib/social/chatView';
+import { avatarHtml, firstName, icon } from '../../../../lib/social/ui';
+import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import type { ChatView, ConvSummary } from '../../../../lib/social/types';
+import '../../../../styles/pages/social/amigos.css';
+
+export const prerender = false;
+
+if (!SOCIAL_PHASE.messages) return Astro.redirect('/mislistas/amigos');
+
+const user = Astro.locals.user;
+const id = /^\d{1,15}$/.test(Astro.params.id ?? '') ? Number(Astro.params.id) : 0;
+
+let convs: ConvSummary[] = [];
+let chat: ChatView | null = null;
+let missing: 'none' | 'left' | 'error' | null = null;
+let friends = 0;
+if (user) {
+    try {
+        const [list, h, nf] = await Promise.all([
+            listConversations(user.uid),
+            id ? getHistory(user.uid, id) : Promise.resolve({ ok: false as const, error: 'none' as const }),
+            friendCount(user.uid),
+        ]);
+        convs = list;
+        friends = nf;
+        if (h.ok) chat = h.chat;
+        else missing = h.error;
+    } catch (err) {
+        console.error('[mensajes/[id]]', (err as Error).message);
+        missing = 'error';
+    }
+}
+if (user && !chat) Astro.response.status = missing === 'error' ? 503 : 404;
+
+const back = `<a class="pf-btn sm" href="/mislistas/amigos/mensajes">${icon('chevron-left')}Volver a Mensajes</a>`;
+const missingHtml = missing === 'error'
+    ? emptyHtml({ color: 'red', icon: 'wifi-off', title: 'No se han podido cargar los mensajes', text: 'Revisa tu conexión. Lo que escribiste antes está a salvo.', actions: `<a class="pf-btn pri sm" href="${Astro.url.pathname}">${icon('refresh-cw')}Reintentar</a>` })
+    : missing === 'left'
+    ? emptyHtml({ color: 'slate', icon: 'log-out', title: 'Ya no estás en este grupo', text: 'No puedes ver sus mensajes. Para volver, alguien del grupo tendrá que añadirte.', actions: back })
+    : emptyHtml({ color: 'slate', icon: 'lock', title: 'Esta conversación no está disponible', text: 'Puede que ya no esté en tu lista.', actions: back });
+
+// Lo que necesita la conversación para pintarse igual en el servidor y en el navegador.
+const group = chat?.kind === 'group';
+const other = chat && !group ? otherOf(chat) : GONE;
+const faces = chat && group ? groupFaces(chat) : [];
+const to = chat ? (group ? chat.title : firstName(other.name)) : '';
+// Grupo recién creado (solo mensajes de sistema): «Escribe el primer mensaje».
+const placeholder = !chat ? '' : group
+    ? (chat.messages.some((m) => m.kind === 'text') ? `Escribe en ${to}` : 'Escribe el primer mensaje')
+    : `Escribe a ${to}`;
+const logInitial = chat ? logHtml(chat.messages, {
+    me: chat.me.id, group, people: chat.people, newAfter: newAnchor(chat.messages, chat.me.id, chat.me.lastReadId),
+    seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {},
+}) : '';
+// JSON para el script, sin poder cerrar la etiqueta (`<` escapado).
+const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
+---
+<Layout title={chat ? `${chat.title} · Mensajes · YourFavs` : 'Mensajes · YourFavs'} robots="noindex, nofollow">
+    <div class="am">
+        <div class="am-nav"><PersonalNav currentPage="/mislistas/amigos" /></div>
+
+        {!user ? (
+            <div class="so-emp am-guest">
+                <Stamp color="pink" icon="handshake" />
+                <h2>Entra para ver tus mensajes</h2>
+                <p>Los mensajes son entre amigos: nadie más ve vuestras conversaciones.</p>
+                <button type="button" class="pf-btn pri sm" data-auth-open>Entrar</button>
+            </div>
+        ) : !chat ? (
+            <MessagesShell on="chat" convs={convs} active={id} noInfo canGroup={friends > 0}>
+                <section class="ms-main" slot="main" aria-label="Conversación" set:html={missingHtml} />
+            </MessagesShell>
+        ) : (
+            <>
+            <MessagesShell on="chat" convs={convs} active={chat.id} canGroup={friends > 0}>
+                <section class="ms-main ms-chat" slot="main" aria-label={`Conversación con ${chat.title}`} data-ms-chat>
+                    <header class="ms-h">
+                        <a class="pf-btn ico ms-back" href="/mislistas/amigos/mensajes" aria-label="Volver a Mensajes"><Icon name="lucide:chevron-left" /></a>
+                        <Fragment set:html={group ? gavHtml(faces, 36) : avatarHtml(other, 36)} />
+                        <div class="tx"><b data-ms-title>{chat.title}</b><span data-ms-sub>{chatSubtitle(chat)}</span></div>
+                        <div class="acts">
+                            <span class="cv-mute" title="Silenciada" data-ms-muted-ico hidden={!chat.me.muted}><Icon name="lucide:bell-off" /></span>
+                            <button type="button" class="pf-btn ico ms-info-d" aria-label="Información" aria-pressed="true" aria-controls="ms-info" data-ms-info-toggle><Icon name="lucide:panel-right" /></button>
+                            <button type="button" class="pf-btn ico ms-info-m" aria-label="Información" aria-haspopup="dialog" data-ms-info-open><Icon name="lucide:info" /></button>
+                        </div>
+                    </header>
+
+                    <div class="ms-log" id="ms-log" role="log" aria-label="Mensajes" tabindex="0" data-ms-log-scroll>
+                        <div class="ms-older" data-ms-older hidden>Cargando mensajes anteriores…</div>
+                        <div class="ms-log-in" data-ms-log set:html={logInitial} />
+                    </div>
+                    {/* Los nuevos de otras personas se anuncian aquí («Ana: …»): el registro se repinta entero. */}
+                    <div class="sr-only" aria-live="polite" data-ms-live></div>
+
+                    {chat.readOnly ? (
+                        <div class="ms-c">
+                            <div class="ms-ro" role="status"><Icon name="lucide:lock" /><div><b>Ya no sois amigos.</b><span>Podéis leer la conversación, pero no escribir. Si volvéis a ser amigos, se reabre.</span></div></div>
+                        </div>
+                    ) : (
+                        <form class="ms-c" data-ms-form>
+                            <div class="ms-cb">
+                                <button type="button" class="ms-plus" aria-disabled="true" aria-label="Más opciones: pronto" aria-describedby="ms-tip">
+                                    <Icon name="lucide:plus" /><span class="ms-tip" id="ms-tip" role="tooltip">Pronto: compartir títulos, recomendar y más</span>
+                                </button>
+                                <textarea class="ms-ta" rows="1" maxlength="2000" enterkeyhint="enter" data-ms-input
+                                          aria-label={`Mensaje para ${to}`} placeholder={placeholder}></textarea>
+                                <button type="submit" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled data-ms-send><Icon name="lucide:send" /></button>
+                            </div>
+                            <div class="ms-cf"><span class="ms-hint">Enter para enviar · Mayús + Enter para otra línea</span><b data-ms-count hidden></b></div>
+                            <span class="sr-only" aria-live="polite" data-ms-count-live></span>
+                        </form>
+                    )}
+                    <div class="pf-menu ms-mmenu" role="menu" aria-label="Acciones del mensaje" hidden data-ms-menu></div>
+                </section>
+                <aside class="ms-info" id="ms-info" slot="info" aria-label="Información de la conversación" set:html={infoHtml(chat)} />
+            </MessagesShell>
+
+            <dialog class="ms-sheet" id="ms-info-sheet" aria-label="Información de la conversación">
+                <div class="hd" aria-hidden="true"></div>
+                <div class="ms-info-in" set:html={infoHtml(chat)} />
+            </dialog>
+            <dialog class="ms-sheet" id="ms-act-sheet" aria-label="Acciones del mensaje">
+                <div class="hd" aria-hidden="true"></div>
+                <div data-ms-act-body></div>
+            </dialog>
+
+            <dialog id="ms-report" class="so-dlg" aria-labelledby="ms-rp-t">
+                <form method="dialog" data-ms-report-form>
+                    <span class="so-dlg-st" style="--sb: var(--stamp-amber); --si: var(--stamp-amber-ink)"><Icon name="lucide:flag" /></span>
+                    <h3 id="ms-rp-t">Reportar mensaje</h3>
+                    <p>Lo revisará el equipo de YourFavs. <span data-rp-name></span> no sabrá quién lo ha reportado.</p>
+                    <div class="rp-q"><small data-rp-meta></small><span data-rp-body></span></div>
+                    <fieldset class="rp-o">
+                        <legend>Motivo</legend>
+                        <label><input type="radio" name="reason" value="spam" checked /><span>Spam <small>· publicidad o enlaces raros</small></span></label>
+                        <label><input type="radio" name="reason" value="harassment" /><span>Acoso <small>· insultos o amenazas</small></span></label>
+                        <label><input type="radio" name="reason" value="other" /><span>Otro</span></label>
+                    </fieldset>
+                    <label class="sr-only" for="ms-rp-note">Cuéntanos algo más (opcional)</label>
+                    <textarea id="ms-rp-note" class="rp-ta" maxlength="200" rows="2" placeholder="Cuéntanos algo más (opcional)" data-rp-note></textarea>
+                    <div class="rp-c"><span>Una frase basta</span><b data-rp-count>0/200</b></div>
+                    <div class="so-dlg-f">
+                        <button type="button" class="pf-btn ghost" data-rp-cancel>Cancelar</button>
+                        <button type="submit" class="pf-btn pri" data-rp-send><Icon name="lucide:flag" />Enviar reporte</button>
+                    </div>
+                </form>
+            </dialog>
+
+            {/* Quitar a alguien y Salir del grupo: sin Deshacer, por eso confirman (handoff §4.10). Lo rellena chat.ts. */}
+            {group && (
+                <dialog id="ms-confirm" class="so-dlg" role="alertdialog" aria-labelledby="ms-cf-t" aria-describedby="ms-cf-d">
+                    <span class="so-dlg-st" style="--sb: var(--stamp-red); --si: var(--stamp-red-ink)" data-cf-ico></span>
+                    <h3 id="ms-cf-t" data-cf-title></h3>
+                    <p id="ms-cf-d" data-cf-text></p>
+                    <div class="so-cons" data-cf-cons hidden></div>
+                    <div class="so-dlg-f">
+                        <button type="button" class="pf-btn ghost" data-cf-cancel>Cancelar</button>
+                        <button type="button" class="pf-btn pri" data-cf-ok></button>
+                    </div>
+                </dialog>
+            )}
+
+            <script type="application/json" id="ms-data" is:inline set:html={data}></script>
+            </>
+        )}
+    </div>
+</Layout>
+
+<script>
+    import '../../../../scripts/social/messages/chat';
+</script>

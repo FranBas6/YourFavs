@@ -10,6 +10,9 @@
  *     `.js-pending-badge` (solicitudes de amistad sin responder, F3). Un solo endpoint
  *     (`/api/notifications/counts`) al cargar la página, sin sondeo. Un caché de 60 s en
  *     localStorage evita repetirlo al navegar rápido; leer, leer todo y actuar lo actualizan.
+ *   · Mensajes (M1): `.js-msg-badge` (contador `.mcnt` con número en `.js-msg-n`) y `.js-msg-dot`
+ *     (globo sin número de la barra móvil). Llegan en la misma petición; en las páginas de mensajes
+ *     el sondeo de 30 s los actualiza con el evento `yf:msg-total`.
  *   · Desplegable (≥1024 px): se piden los avisos CADA vez que se abre, con el estado actual de
  *     cada relación. En móvil la campana lleva a la página.
  */
@@ -28,7 +31,7 @@ declare global {
 const KEY = 'yf_counts';
 const TTL = 60 * 1000;
 
-interface Counts { unread: number; pending: number; ts: number }
+interface Counts { unread: number; pending: number; messages: number; ts: number }
 
 function readCache(): Counts | null {
     try {
@@ -60,22 +63,43 @@ function paint(selector: string, n: number, label: (n: number) => string) {
     }
 }
 
-let counts = { unread: 0, pending: 0 };
-function setCounts(c: { unread: number; pending: number }, save = true) {
-    counts = { unread: Math.max(0, c.unread | 0), pending: Math.max(0, c.pending | 0) };
+/** Contador de mensajes: número con su icono (no se toca el icono) y globo sin número. */
+function paintMessages(n: number) {
+    const label = n === 1 ? '1 mensaje sin leer' : `${n} mensajes sin leer`;
+    document.querySelectorAll<HTMLElement>('.js-msg-badge').forEach((b) => {
+        b.hidden = n <= 0;
+        if (n <= 0) return;
+        const num = b.querySelector('.js-msg-n');
+        if (num) num.textContent = n > 99 ? '99+' : String(n);
+        b.setAttribute('aria-label', label);
+    });
+    document.querySelectorAll<HTMLElement>('.js-msg-dot').forEach((d) => {
+        d.hidden = n <= 0;
+        if (n > 0) d.setAttribute('aria-label', label);
+    });
+}
+
+let counts = { unread: 0, pending: 0, messages: 0 };
+function setCounts(c: { unread: number; pending: number; messages?: number }, save = true) {
+    counts = {
+        unread: Math.max(0, c.unread | 0),
+        pending: Math.max(0, c.pending | 0),
+        messages: Math.max(0, (c.messages ?? 0) | 0),
+    };
     paint('.js-notif-badge', counts.unread, (n) => (n === 1 ? '1 notificación sin leer' : `${n} notificaciones sin leer`));
     paint('.js-pending-badge', counts.pending, (n) => (n === 1 ? '1 solicitud' : `${n} solicitudes`));
+    paintMessages(counts.messages);
     if (save) writeCache(counts);
 }
 
 function fetchCounts() {
     fetch('/api/notifications/counts', { headers: { Accept: 'application/json' } })
         .then((r) => (r.ok ? r.json() : null))
-        .then((d) => { if (d) setCounts({ unread: d.unread, pending: d.pendingFriends }); })
+        .then((d) => { if (d) setCounts({ unread: d.unread, pending: d.pendingFriends, messages: d.messages }); })
         .catch(() => {});
 }
 
-const hasBadges = document.querySelector('.js-notif-badge, .js-pending-badge');
+const hasBadges = document.querySelector('.js-notif-badge, .js-pending-badge, .js-msg-badge, .js-msg-dot');
 if (hasBadges) {
     const c = readCache();
     if (c && Date.now() - c.ts < TTL) setCounts(c, false);
@@ -84,6 +108,11 @@ if (hasBadges) {
 
 // Actuar desde un aviso (relations.ts) o abrirlo lo da por leído.
 document.addEventListener('yf:notif-read', () => setCounts({ ...counts, unread: counts.unread - 1 }));
+// Mensajes: el sondeo de las páginas de mensajes o leer una conversación traen el total nuevo.
+document.addEventListener('yf:msg-total', (e) => {
+    const total = (e as CustomEvent<{ total: number }>).detail?.total;
+    if (typeof total === 'number') setCounts({ ...counts, messages: total });
+});
 // Aceptar o rechazar una solicitud (desde donde sea) baja el número rojo.
 document.addEventListener('yf:pending-delta', (e) => {
     const delta = (e as CustomEvent<{ delta: number }>).detail?.delta ?? 0;

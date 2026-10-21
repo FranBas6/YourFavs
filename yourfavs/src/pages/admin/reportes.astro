@@ -1,0 +1,100 @@
+---
+/**
+ * Reportes de mensajes · /admin/reportes (plan de mensajes, «Reportar»). Solo quien está en
+ * `ADMIN_UIDS`; a cualquier otra persona, el 404 de siempre (la página no existe para nadie más).
+ *
+ * Cada reporte: motivo, nota, quién lo reporta, de quién es el mensaje y la copia del texto al
+ * reportarlo. Acciones: «Revisado» (todos los reportes de ese mensaje) y «Borrar mensaje» (sale
+ * «Mensaje eliminado» para todos). `?vistos=1` enseña los ya revisados.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { isAdmin } from '../../lib/admin';
+import { listReports } from '../../services/BD/social/reports';
+import { relTime } from '../../lib/social/ui';
+
+export const prerender = false;
+
+if (!isAdmin(Astro.locals.user?.uid)) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+const resolved = Astro.url.searchParams.get('vistos') === '1';
+const reports = await listReports({ resolved });
+const REASON = { spam: 'Spam', harassment: 'Acoso', other: 'Otro' } as const;
+const now = Date.now();
+---
+<Layout title="Reportes · YourFavs" robots="noindex, nofollow">
+    <div class="ar">
+        <h1>Reportes de mensajes</h1>
+        <p class="ar-sub">
+            {resolved ? 'Revisados (los 100 más recientes).' : 'Sin revisar.'}
+            <a href={resolved ? '/admin/reportes' : '/admin/reportes?vistos=1'}>{resolved ? 'Ver sin revisar' : 'Ver revisados'}</a>
+        </p>
+        {!reports.length ? (
+            <p class="ar-empty">{resolved ? 'Nada revisado todavía.' : 'No hay reportes pendientes.'}</p>
+        ) : (
+            <ul class="ar-list">
+                {reports.map((r) => (
+                    <li class="ar-item" data-report={r.id}>
+                        <div class="ar-head">
+                            <span class:list={['ar-reason', r.reason]}>{REASON[r.reason]}</span>
+                            <span>{r.convKind === 'group' ? 'Grupo' : '1:1'} · mensaje {r.messageId}</span>
+                            <time datetime={new Date(r.at).toISOString()}>{relTime(r.at, now)}</time>
+                        </div>
+                        <blockquote class="ar-body">{r.body ?? '(sin texto)'}</blockquote>
+                        <p class="ar-who">
+                            De <b>{r.author ? `${r.author.name}${r.author.handle ? ` (@${r.author.handle})` : ''}` : 'Cuenta eliminada'}</b>
+                            · lo reporta <b>{r.reporter ? `${r.reporter.name}${r.reporter.handle ? ` (@${r.reporter.handle})` : ''}` : '—'}</b>
+                            {r.messageDeleted && <span class="ar-del">· el mensaje ya está borrado</span>}
+                        </p>
+                        {r.note && <p class="ar-note">«{r.note}»</p>}
+                        {!resolved && (
+                            <div class="ar-acts">
+                                <button type="button" class="pf-btn sm" data-ar="resolve">Revisado</button>
+                                {!r.messageDeleted && <button type="button" class="pf-btn sm dgr" data-ar="delete">Borrar mensaje</button>}
+                            </div>
+                        )}
+                    </li>
+                ))}
+            </ul>
+        )}
+    </div>
+</Layout>
+
+<style>
+    .ar { max-width: 760px; margin: 0 auto; padding-bottom: 48px; }
+    .ar h1 { font: 700 24px var(--font); color: var(--text); margin: 0; }
+    .ar-sub { margin: 4px 0 18px; font-size: 13px; color: var(--text-2); }
+    .ar-sub a { color: var(--primary); margin-left: 6px; }
+    .ar-empty { padding: 24px; text-align: center; color: var(--text-2); background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+    .ar-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    .ar-item { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px 18px; }
+    .ar-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); }
+    .ar-head time { margin-left: auto; font-family: var(--font-mono); }
+    .ar-reason { padding: 2px 8px; border-radius: var(--r-full); font-weight: 600; background: var(--stamp-slate); color: var(--stamp-slate-ink); }
+    .ar-reason.spam { background: var(--stamp-amber); color: var(--stamp-amber-ink); }
+    .ar-reason.harassment { background: var(--stamp-red); color: var(--stamp-red-ink); }
+    .ar-body { margin: 12px 0 8px; padding: 10px 12px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); font-size: 14px; line-height: 1.5; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+    .ar-who, .ar-note { margin: 0; font-size: 12.5px; color: var(--text-2); }
+    .ar-who b { color: var(--text); font-weight: 600; }
+    .ar-note { margin-top: 4px; font-style: italic; }
+    .ar-acts { display: flex; gap: 8px; margin-top: 12px; }
+</style>
+
+<script>
+    import { showToast } from '../../scripts/social/toast';
+    document.addEventListener('click', async (e) => {
+        const b = (e.target as Element).closest<HTMLButtonElement>('[data-ar]');
+        const item = b?.closest<HTMLElement>('[data-report]');
+        if (!b || !item) return;
+        const action = b.dataset.ar;
+        if (action === 'delete' && !confirm('¿Borrar este mensaje para todos? Saldrá «Mensaje eliminado».')) return;
+        b.disabled = true;
+        const r = await fetch(`/api/admin/reports/${item.dataset.report}`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+        }).catch(() => null);
+        if (r?.ok) { item.remove(); showToast(action === 'delete' ? 'Mensaje borrado' : 'Revisado'); }
+        else { b.disabled = false; showToast('No se ha podido. Inténtalo otra vez.', 'error'); }
+    });
+</script>

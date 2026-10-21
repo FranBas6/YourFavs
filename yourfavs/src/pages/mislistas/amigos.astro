@@ -18,9 +18,12 @@ import Stamp from '../../components/Stamp.astro';
 import { Icon } from 'astro-icon/components';
 import { listTab, tabCounts } from '../../services/BD/social/graph';
 import { listReceived, listSent } from '../../services/BD/social/recommendations';
+import { listConversations } from '../../services/BD/social/messages';
+import MessagesShell from '../../components/social/messages/MessagesShell.astro';
+import MsgSegment from '../../components/social/messages/MsgSegment.astro';
 import { panelHtml, tabsFor, TAB_LABEL } from '../../lib/social/amigosView';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
-import type { FriendsTab } from '../../lib/social/types';
+import type { ConvSummary, FriendsTab } from '../../lib/social/types';
 import '../../styles/pages/social/amigos.css';
 
 export const prerender = false;
@@ -33,16 +36,20 @@ const myHandle = user?.publicHandle && user.publicVisibility && user.publicVisib
 let counts: Partial<Record<FriendsTab, number>> = {};
 let tab: FriendsTab = asked && tabs.includes(asked) ? asked : tabs[0];
 let initial = '';
+// Mensajes (M1): la lista de conversaciones de la columna izquierda del panel.
+let convs: ConvSummary[] = [];
 if (user) {
     counts = await tabCounts(user.uid);
     // Sin pestaña pedida: Pendientes si hay algo que responder; si no, tus amigos (F3).
     if (!(asked && tabs.includes(asked)) && SOCIAL_PHASE.friends && !counts.pendientes) tab = 'amigos';
     const withRecs = tab === 'pendientes' && SOCIAL_PHASE.recommend;
-    const [page, recsReceived, recsSent] = await Promise.all([
+    const [page, recsReceived, recsSent, convList] = await Promise.all([
         listTab(user.uid, tab),
         withRecs ? listReceived(user.uid) : Promise.resolve(undefined),
         withRecs ? listSent(user.uid) : Promise.resolve(undefined),
+        SOCIAL_PHASE.messages ? listConversations(user.uid) : Promise.resolve([]),
     ]);
+    convs = convList;
     initial = panelHtml(tab, page.items, { phase: SOCIAL_PHASE, myHandle, hasMore: page.hasMore, sent: page.sent, recsReceived, recsSent });
 }
 const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
@@ -59,10 +66,11 @@ const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
                 <button type="button" class="pf-btn pri sm" data-auth-open>Entrar</button>
             </div>
         ) : (
-            <div class="am-grid">
-                <div class="am-main">
+            <MessagesShell on="home" convs={convs} canGroup={(counts.amigos ?? 0) > 0}>
+                <div class:list={['am-main', { 'ms-main is-home': SOCIAL_PHASE.messages }]} slot="main">
                     <h1 class="am-h1">Amigos</h1>
                     <p class="am-sub">Busca a gente que conozcas, responde solicitudes y decide a quién sigues.</p>
+                    <MsgSegment on="people" />
 
                     {!myHandle && (
                         <div class="so-emp is-amber am-noprof">
@@ -106,7 +114,7 @@ const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
                     </div>
                 </div>
 
-                <aside class="am-side">
+                <aside class:list={['am-side', { 'ms-info is-side': SOCIAL_PHASE.messages }]} slot="info">
                     <div class="am-card">
                         <h3><Icon name="lucide:link" />Tu enlace</h3>
                         {myHandle ? (
@@ -138,7 +146,7 @@ const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
                         <p class="am-note"><Icon name="lucide:eye-off" />{SOCIAL_PHASE.friends ? 'Rechazar o bloquear no avisa a nadie.' : 'Bloquear no avisa a nadie.'}</p>
                     </div>
                 </aside>
-            </div>
+            </MessagesShell>
         )}
     </div>
 </Layout>

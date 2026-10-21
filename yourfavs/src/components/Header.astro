@@ -4,6 +4,7 @@ import { Icon } from 'astro-icon/components';
 import Stamp from './Stamp.astro';
 import { SUPPORTED_COUNTRIES } from '../services/API/shared/tmdbInfoService';
 import { withMode } from '../utils/catalogUrl';
+import { SOCIAL_PHASE } from '../utils/constants/social';
 
 const currentPath = Astro.url.pathname;
 
@@ -142,6 +143,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                                         <span class="hd-s">{it.desc}</span>
                                     </span>
                                     {it.pendingBadge && <span class="header-pending-badge js-pending-badge" hidden></span>}
+                                    {it.pendingBadge && SOCIAL_PHASE.messages && <span class="mcnt js-msg-badge header-msg-badge" hidden><Icon name="lucide:message-circle" /><span class="js-msg-n"></span></span>}
                                 </a>
                             ))}
                         </div>

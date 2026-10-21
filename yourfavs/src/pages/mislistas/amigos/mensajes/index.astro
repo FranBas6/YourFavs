@@ -1,0 +1,89 @@
+---
+/**
+ * Mensajes · /mislistas/amigos/mensajes (handoff de mensajes §3, §5 y §9).
+ *
+ *   · Móvil: el H1 «Amigos», el segmentado en «Mensajes» y la lista de conversaciones.
+ *   · Escritorio: lleva a la conversación más reciente; sin ninguna, el vacío de D17 en el centro.
+ *
+ * Sin la fase de mensajes encendida, al centro «Amigos».
+ */
+import Layout from '../../../../layouts/Layout.astro';
+import PersonalNav from '../../../../components/personal/PersonalNav.astro';
+import Stamp from '../../../../components/Stamp.astro';
+import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
+import MsgSegment from '../../../../components/social/messages/MsgSegment.astro';
+import { Icon } from 'astro-icon/components';
+import { listConversations } from '../../../../services/BD/social/messages';
+import { tabCounts } from '../../../../services/BD/social/graph';
+import { chatHref, emptyHtml } from '../../../../lib/social/chatView';
+import { icon } from '../../../../lib/social/ui';
+import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import type { ConvSummary } from '../../../../lib/social/types';
+import '../../../../styles/pages/social/amigos.css';
+
+export const prerender = false;
+
+if (!SOCIAL_PHASE.messages) return Astro.redirect('/mislistas/amigos');
+
+const user = Astro.locals.user;
+let convs: ConvSummary[] = [];
+let friends = 0;
+if (user) {
+    const [list, counts] = await Promise.all([listConversations(user.uid), tabCounts(user.uid)]);
+    convs = list;
+    friends = counts.amigos ?? 0;
+}
+const first = convs[0] ? chatHref(convs[0].id) : '';
+
+// Vacíos de D17: sin amigos, o con amigos pero sin conversaciones.
+const empty = friends === 0
+    ? emptyHtml({
+        color: 'pink', icon: 'handshake', title: 'Los mensajes son entre amigos',
+        text: 'Cuando aceptes una solicitud o te acepten la tuya, podréis escribiros aquí.',
+        actions: `<a class="pf-btn pri sm" href="/mislistas/amigos#am-q">${icon('search')}Buscar personas</a>`,
+    })
+    : emptyHtml({
+        color: 'blue', icon: 'message-circle', title: 'Aún no hay conversaciones',
+        text: 'Escribe a un amigo desde su fila o su perfil, o crea un grupo para quedar a ver algo.',
+        actions: (SOCIAL_PHASE.groups ? `<button type="button" class="pf-btn pri sm" data-ms-newgroup aria-haspopup="dialog">${icon('users')}Nuevo grupo</button>` : '')
+            + `<a class="pf-btn sm" href="/mislistas/amigos?tab=amigos">${icon('users')}Ver amigos</a>`,
+    });
+// Móvil: «Nuevo grupo» encima de la lista (en escritorio va en el rótulo de la columna).
+const canGroup = SOCIAL_PHASE.groups && friends > 0;
+---
+<Layout title="Mensajes · YourFavs" robots="noindex, nofollow">
+    {first && (
+        // Escritorio: directo a la conversación más reciente (en móvil esta página ES la lista).
+        <script is:inline define:vars={{ first }}>
+            if (window.matchMedia('(min-width: 1024px)').matches) location.replace(first);
+        </script>
+    )}
+    <div class="am">
+        <div class="am-nav"><PersonalNav currentPage="/mislistas/amigos" /></div>
+
+        {!user ? (
+            <div class="so-emp am-guest">
+                <Stamp color="pink" icon="handshake" />
+                <h2>Entra para ver tus mensajes</h2>
+                <p>Los mensajes son entre amigos: nadie más ve vuestras conversaciones.</p>
+                <button type="button" class="pf-btn pri sm" data-auth-open>Entrar</button>
+            </div>
+        ) : (
+            <>
+                <div class="ms-mhead">
+                    <h1 class="am-h1">Amigos</h1>
+                    <MsgSegment on="messages" />
+                </div>
+                {canGroup && convs.length > 0 && (
+                    <div class="ms-mtop"><button type="button" class="pf-btn sm" data-ms-newgroup aria-haspopup="dialog"><Icon name="lucide:plus" />Nuevo grupo</button></div>
+                )}
+                <MessagesShell on="list" convs={convs} noInfo empty={!convs.length} canGroup={canGroup}>
+                    <section class="ms-main" slot="main" aria-label="Mensajes" set:html={empty} />
+                </MessagesShell>
+                {convs.length > 0 && (
+                    <p class="ms-mfoot"><Icon name="lucide:lock" />Solo entre amigos. Nadie más ve tus conversaciones.</p>
+                )}
+            </>
+        )}
+    </div>
+</Layout>

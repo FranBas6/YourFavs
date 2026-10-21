@@ -1,0 +1,167 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO (handoff de mensajes, hoja de componentes CS): la lista, los
+ * mensajes y el panel en todos sus estados, con datos inventados, para revisarlos en claro, oscuro
+ * y móvil. Es estática: nada se envía. En producción: 404.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { Icon } from 'astro-icon/components';
+import {
+    emptyHtml, infoDirectHtml, infoGroupHtml, logHtml, railListHtml,
+} from '../../lib/social/chatView';
+import { initialsOf, stampFor } from '../../lib/social/ui';
+import type { ChatMessage, ChatView, ConvSummary, MsgSys, PersonCard } from '../../lib/social/types';
+import '../../styles/pages/social/mensajes.css';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+let n = 0;
+const P = (name: string, handle: string, arch: [string, string] | null = null): PersonCard => {
+    const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+    return { id, handle, name, avatar: null, archetype: arch ? { name: arch[0], icon: arch[1] } : null, color: stampFor(id), initials: initialsOf(name) };
+};
+const ME = P('Fran Bas', 'franbas');
+const ANA = P('Ana Ruiz', 'ana_ve', ['El Cinéfilo de Autor', 'clapperboard']);
+const LUCIA = P('Lucía Prado', 'luciap');
+const CARLA = P('Carla Méndez', 'carlam');
+const PEPE = P('Pepe Martín', 'pepemartin');
+const MARCOS = P('Marcos Gil', 'marcos');
+const people = Object.fromEntries([ME, ANA, LUCIA, CARLA, PEPE, MARCOS].map((p) => [p.id, p]));
+
+const now = Date.now();
+const H = 3600_000;
+const today = (h: number, m: number) => { const d = new Date(now); d.setHours(h, m, 0, 0); return d.getTime() > now ? d.getTime() - 24 * H : d.getTime(); };
+
+const convs: ConvSummary[] = [
+    { id: 1, kind: 'direct', title: ANA.name, faces: [ANA], count: 2, preview: 'Tú: Me apunto. Y te invito a la cerveza de después', lastAt: today(21, 4), unread: 0, muted: false, readOnly: false },
+    { id: 2, kind: 'group', title: 'Viernes de pelis', faces: [LUCIA, PEPE], count: 5, preview: 'Ana: Hecho. En mi casa a las 21:30', lastAt: today(19, 41), unread: 3, muted: false, readOnly: false },
+    { id: 3, kind: 'direct', title: CARLA.name, faces: [CARLA], count: 2, preview: '¿Has visto ya el final de Severance?', lastAt: now - 26 * H, unread: 1, muted: false, readOnly: false },
+    { id: 4, kind: 'group', title: 'Club Ghibli', faces: [PEPE, ANA], count: 4, preview: 'Pepe: Mañana toca Porco Rosso', lastAt: now - 30 * H, unread: 12, muted: true, readOnly: false },
+    { id: 5, kind: 'direct', title: MARCOS.name, faces: [MARCOS], count: 2, preview: 'Marcos: jajaja vale', lastAt: now - 40 * 24 * H, unread: 0, muted: false, readOnly: true },
+];
+
+let mid = 100;
+const T = (author: PersonCard | null, body: string, at: number, o: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ id: ++mid, author: author?.id ?? null, kind: 'text', body, sys: null, at, deleted: false, folded: false, clientId: null, ...o });
+const S = (sys: MsgSys, at: number): ChatMessage => ({ id: ++mid, author: null, kind: 'system', body: null, sys, at, deleted: false, folded: false, clientId: null });
+
+const t0 = today(20, 50);
+const direct: ChatMessage[] = [
+    T(ANA, '¿Vemos Dune 2 el viernes? Sale en Max', t0 - 26 * H),
+    T(ME, 'Venga, sí', t0 - 26 * H + 60_000),
+    T(ANA, 'Mira el tráiler: https://www.youtube.com/watch?v=Way9Dexny3w', t0),
+    T(ANA, 'Y la crítica en elpais.com/cultura que me pasaste', t0 + 60_000),
+    T(ME, 'Lo había borrado sin querer', t0 + 120_000, { deleted: true, body: null }),
+    T(ME, 'Me apunto. Y te invito a la cerveza de después', t0 + 14 * 60_000),
+    T(ANA, '¡Trato! 🍻', t0 + 15 * 60_000),
+];
+const directChat: ChatView = {
+    id: 1, kind: 'direct', title: ANA.name, me: { id: ME.id, role: 'member', muted: false, lastReadId: direct[2].id - 1 },
+    members: [{ person: ME, role: 'member', joinedAt: 0, blockedByMe: false }, { person: ANA, role: 'member', joinedAt: 0, blockedByMe: false }],
+    messages: direct, people, hasMore: false, deletedIds: [], seenId: direct[5].id, seenAt: t0 + 16 * 60_000, readOnly: false,
+    friendsSince: new Date(now - 150 * 24 * H).toISOString(),
+};
+
+const g0 = today(19, 0);
+const groupMsgs: ChatMessage[] = [
+    S({ type: 'created', actor: ANA.id, targets: [], name: 'Pelis del viernes' }, g0),
+    S({ type: 'added', actor: ANA.id, targets: [LUCIA.id, CARLA.id, ME.id] }, g0),
+    S({ type: 'renamed', actor: ANA.id, targets: [], name: 'Viernes de pelis' }, g0 + 60_000),
+    T(LUCIA, '¿Qué toca esta semana?', g0 + 2 * 60_000),
+    T(CARLA, 'Si no, Anatomía de una caída', g0 + 10 * 60_000, { folded: true, body: null }),
+    S({ type: 'added', actor: ME.id, targets: [PEPE.id] }, g0 + 20 * 60_000),
+    S({ type: 'admin', actor: ANA.id, targets: [PEPE.id] }, g0 + 21 * 60_000),
+    T(PEPE, 'Yo voto por Perfect Days', g0 + 30 * 60_000),
+    T(ANA, 'Hecho. En mi casa a las 21:30', g0 + 41 * 60_000),
+    S({ type: 'left', actor: MARCOS.id, targets: [] }, g0 + 45 * 60_000),
+    S({ type: 'admin', actor: null, targets: [PEPE.id], inherited: true }, g0 + 46 * 60_000),
+];
+const groupChat: ChatView = {
+    id: 2, kind: 'group', title: 'Viernes de pelis', me: { id: ME.id, role: 'admin', muted: true, lastReadId: groupMsgs[6].id },
+    members: [
+        { person: ANA, role: 'admin', joinedAt: 0, blockedByMe: false },
+        { person: ME, role: 'admin', joinedAt: 0, blockedByMe: false },
+        { person: LUCIA, role: 'member', joinedAt: 0, blockedByMe: false },
+        { person: CARLA, role: 'member', joinedAt: 0, blockedByMe: true },
+        { person: PEPE, role: 'admin', joinedAt: 0, blockedByMe: false },
+    ],
+    messages: groupMsgs, people, hasMore: false, deletedIds: [], seenId: null, seenAt: null, readOnly: false, friendsSince: null,
+};
+
+const log1 = logHtml(directChat.messages, {
+    me: ME.id, group: false, people, newAfter: directChat.me.lastReadId, seenId: directChat.seenId, seenAt: directChat.seenAt,
+    pending: [
+        { clientId: 'a', body: 'Esto se está enviando…', at: now - 30_000, failed: false },
+        { clientId: 'b', body: 'Y esto no ha salido', at: now - 20_000, failed: true },
+    ],
+    revealed: {},
+});
+const log2 = logHtml(groupChat.messages, { me: ME.id, group: true, people, newAfter: groupChat.me.lastReadId, seenId: null, seenAt: null, pending: [], revealed: {} });
+
+const empties = [
+    emptyHtml({ color: 'blue', icon: 'message-circle', title: 'Aún no hay conversaciones', text: 'Escribe a un amigo desde su fila o su perfil, o crea un grupo para quedar a ver algo.', actions: '<button class="pf-btn sm">Ver amigos</button>' }),
+    emptyHtml({ color: 'pink', icon: 'handshake', title: 'Los mensajes son entre amigos', text: 'Cuando aceptes una solicitud o te acepten la tuya, podréis escribiros aquí.', actions: '<button class="pf-btn pri sm">Buscar personas</button>' }),
+    emptyHtml({ color: 'slate', icon: 'log-out', title: 'Ya no estás en este grupo', text: 'No puedes ver sus mensajes. Para volver, alguien del grupo tendrá que añadirte.', actions: '<button class="pf-btn sm">Volver a Mensajes</button>' }),
+    emptyHtml({ color: 'red', icon: 'wifi-off', title: 'No se han podido cargar los mensajes', text: 'Revisa tu conexión. Lo que escribiste antes está a salvo.', actions: '<button class="pf-btn pri sm">Reintentar</button>' }),
+];
+---
+<Layout title="Dev · Mensajes" robots="noindex, nofollow">
+    <div class="dv">
+        <h1>Mensajes · estados (solo desarrollo)</h1>
+        <p class="dv-sub">Datos inventados y estáticos. Cambia de tema y estrecha la ventana para ver oscuro y móvil.</p>
+
+        <h2>Lista (abierta · sin leer · silenciada · solo lectura · grupos)</h2>
+        <div class="dv-box dv-rail"><ul class="ms-l" set:html={railListHtml(convs, { active: 1, now })}></ul></div>
+
+        <h2>1:1 — «Nuevos», agrupado, enlaces, eliminado, «Visto», enviándose y no enviado</h2>
+        <div class="dv-chat">
+            <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log1} /></div>
+                <div class="ms-c"><div class="ms-cb"><button type="button" class="ms-plus" aria-disabled="true" aria-label="Más opciones: pronto"><Icon name="lucide:plus" /><span class="ms-tip" role="tooltip">Pronto: compartir títulos, recomendar y más</span></button>
+                    <textarea class="ms-ta" rows="1" aria-label="Mensaje para Ana" placeholder="Escribe a Ana"></textarea>
+                    <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled><Icon name="lucide:send" /></button></div>
+                    <div class="ms-cf"><span class="ms-hint">Enter para enviar · Mayús + Enter para otra línea</span><b>Quedan 54 · 1.946/2.000</b></div></div>
+            </section>
+            <aside class="ms-info dv-box dv-info" set:html={infoDirectHtml(directChat)} />
+        </div>
+
+        <h2>Grupo — mensajes de sistema, plegado (bloqueaste a Carla), herencia de admin</h2>
+        <div class="dv-chat">
+            <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log2} /></div>
+                <div class="ms-c"><div class="ms-cb"><button type="button" class="ms-plus" aria-disabled="true" aria-label="Más opciones: pronto"><Icon name="lucide:plus" /></button>
+                    <textarea class="ms-ta" rows="1" aria-label="Mensaje para Viernes de pelis">{'x'.repeat(40)}</textarea>
+                    <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar"><Icon name="lucide:send" /></button></div>
+                    <div class="ms-cf"><span class="ms-hint">Enter para enviar · Mayús + Enter para otra línea</span><b class="lim">2.000/2.000 · no caben más</b></div></div>
+            </section>
+            <aside class="ms-info dv-box dv-info" set:html={infoGroupHtml(groupChat)} />
+        </div>
+
+        <h2>Solo lectura (idéntico tras dejar de ser amigos o un bloqueo)</h2>
+        <div class="dv-box ms-c"><div class="ms-ro" role="status"><Icon name="lucide:lock" /><div><b>Ya no sois amigos.</b><span>Podéis leer la conversación, pero no escribir. Si volvéis a ser amigos, se reabre.</span></div></div></div>
+        <div class="dv-box ms-c" style="margin-top: 10px"><div class="ms-ro" role="status"><Icon name="lucide:clock" /><div><b>Esperando a la conversación</b><span>Podrás escribir cuando cargue.</span></div></div></div>
+
+        <h2>Vacíos y errores</h2>
+        <div class="dv-grid">{empties.map((e) => <div class="dv-box dv-emp" set:html={e} />)}</div>
+    </div>
+</Layout>
+
+<style>
+    .dv { max-width: 1100px; margin: 0 auto; padding-bottom: 60px; }
+    .dv h1 { font: 700 22px var(--font); color: var(--text); margin: 0; }
+    .dv-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 8px; }
+    .dv h2 { font: 600 14px var(--font); color: var(--text-2); margin: 28px 0 10px; }
+    .dv-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+    .dv-rail { background: var(--bg-tint); max-width: 300px; --gr: var(--bg-tint); }
+    .dv-rail .ms-l { overflow: visible; padding: 10px; }
+    .dv-chat { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+    @media (min-width: 1024px) { .dv-chat { grid-template-columns: minmax(0, 1fr) 300px; } }
+    .dv-chat .ms-main { overflow: hidden; }
+    .dv-chat .ms-log { overflow: visible; }
+    .dv-info { display: flex !important; flex-direction: column; gap: 16px; padding: 22px 20px; border-left: 1px solid var(--border); }
+    .dv-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+    .dv-emp { display: flex; }
+</style>

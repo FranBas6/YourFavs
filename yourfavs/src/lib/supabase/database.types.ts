@@ -75,6 +75,38 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"conversation_members": {
+                  Row: {
+                    "conv_id": number,"joined_at": string,"last_read_at": string | null,"last_read_id": number | null,"left_at": string | null,"muted": boolean,"role": string,"user_id": string
+                  }
+                  Insert: {
+                    "conv_id": number,"joined_at"?: string,"last_read_at"?: string | null,"last_read_id"?: number | null,"left_at"?: string | null,"muted"?: boolean,"role"?: string,"user_id": string
+                  }
+                  Update: {
+                    "conv_id"?: number,"joined_at"?: string,"last_read_at"?: string | null,"last_read_id"?: number | null,"left_at"?: string | null,"muted"?: boolean,"role"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "conversation_members_conv_id_fkey"
+      columns: ["conv_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"conversations": {
+                  Row: {
+                    "created_at": string,"created_by": string | null,"id": number,"kind": Database["public"]['Enums']["conv_kind"],"last_msg_at": string,"name": string | null,"pair_key": string | null
+                  }
+                  Insert: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: never,"kind": Database["public"]['Enums']["conv_kind"],"last_msg_at"?: string,"name"?: string | null,"pair_key"?: string | null
+                  }
+                  Update: {
+                    "created_at"?: string,"created_by"?: string | null,"id"?: never,"kind"?: Database["public"]['Enums']["conv_kind"],"last_msg_at"?: string,"name"?: string | null,"pair_key"?: string | null
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"custom_list_items": {
                   Row: {
                     "added_at": string,"list_id": string,"media_type": Database["public"]['Enums']["media_type"],"position": number | null,"poster_path": string | null,"title": string | null,"tmdb_id": number,"user_id": string
@@ -184,6 +216,44 @@ isOneToOne: false
                   }
                   Relationships: [
                     
+                  ]
+                },"message_reports": {
+                  Row: {
+                    "body": string | null,"created_at": string,"id": number,"message_id": number,"note": string | null,"reason": string,"reporter_id": string,"resolved_at": string | null
+                  }
+                  Insert: {
+                    "body"?: string | null,"created_at"?: string,"id"?: never,"message_id": number,"note"?: string | null,"reason": string,"reporter_id": string,"resolved_at"?: string | null
+                  }
+                  Update: {
+                    "body"?: string | null,"created_at"?: string,"id"?: never,"message_id"?: number,"note"?: string | null,"reason"?: string,"reporter_id"?: string,"resolved_at"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "message_reports_message_id_fkey"
+      columns: ["message_id"]
+isOneToOne: false
+      referencedRelation: "messages"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"messages": {
+                  Row: {
+                    "author_id": string | null,"body": string | null,"client_id": string | null,"conv_id": number,"created_at": string,"deleted_at": string | null,"id": number,"kind": string,"sys": Json | null,"undo_md5": string | null
+                  }
+                  Insert: {
+                    "author_id"?: string | null,"body"?: string | null,"client_id"?: string | null,"conv_id": number,"created_at"?: string,"deleted_at"?: string | null,"id"?: never,"kind"?: string,"sys"?: Json | null,"undo_md5"?: string | null
+                  }
+                  Update: {
+                    "author_id"?: string | null,"body"?: string | null,"client_id"?: string | null,"conv_id"?: number,"created_at"?: string,"deleted_at"?: string | null,"id"?: never,"kind"?: string,"sys"?: Json | null,"undo_md5"?: string | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "messages_conv_id_fkey"
+      columns: ["conv_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    }
                   ]
                 },"notification_subs": {
                   Row: {
@@ -343,6 +413,93 @@ isOneToOne: false
             "claim_app_state":
 { Args: { "p_key": string,"p_ttl_ms": number }; Returns: Json
                            },
+"msg_add_members":
+{ Args: { "p_conv": number,"p_ids": (string)[],"p_me": string }; Returns: Json
+                           },
+"msg_blocked_between":
+{ Args: { "p_x": string,"p_y": string }; Returns: boolean
+                           },
+"msg_can_reach":
+{ Args: { "p_me": string,"p_them": string }; Returns: boolean
+                           },
+"msg_clean_name":
+{ Args: { "p_name": string }; Returns: string
+                           },
+"msg_create_group":
+{ Args: { "p_ids": (string)[],"p_me": string,"p_name": string }; Returns: Json
+                           },
+"msg_delete":
+{ Args: { "p_me": string,"p_msg": number }; Returns: string
+                           },
+"msg_direct_read_only":
+{ Args: { "p_conv": number,"p_me": string }; Returns: boolean
+                           },
+"msg_fix_group":
+{ Args: { "p_conv": number }; Returns: undefined
+                           },
+"msg_folded_body":
+{ Args: { "p_me": string,"p_msg": number }; Returns: string
+                           },
+"msg_group_count":
+{ Args: { "p_user": string }; Returns: number
+                           },
+"msg_history":
+{ Args: { "p_after"?: number,"p_before"?: number,"p_conv": number,"p_from"?: number,"p_limit"?: number,"p_me": string }; Returns: Json
+                           },
+"msg_leave":
+{ Args: { "p_conv": number,"p_me": string }; Returns: string
+                           },
+"msg_list":
+{ Args: { "p_me": string }; Returns: Json
+                           },
+"msg_make_admin":
+{ Args: { "p_conv": number,"p_me": string,"p_them": string }; Returns: string
+                           },
+"msg_mute":
+{ Args: { "p_conv": number,"p_me": string,"p_muted": boolean }; Returns: string
+                           },
+"msg_open_direct":
+{ Args: { "p_me": string,"p_them": string }; Returns: Json
+                           },
+"msg_pair_key":
+{ Args: { "p_x": string,"p_y": string }; Returns: string
+                           },
+"msg_read":
+{ Args: { "p_conv": number,"p_last": number,"p_me": string }; Returns: undefined
+                           },
+"msg_remove_member":
+{ Args: { "p_conv": number,"p_me": string,"p_them": string }; Returns: string
+                           },
+"msg_rename":
+{ Args: { "p_conv": number,"p_me": string,"p_name": string }; Returns: string
+                           },
+"msg_report":
+{ Args: { "p_me": string,"p_msg": number,"p_note": string,"p_reason": string }; Returns: string
+                           },
+"msg_restore":
+{ Args: { "p_body": string,"p_me": string,"p_msg": number }; Returns: string
+                           },
+"msg_sees":
+{ Args: { "p_kind": string,"p_me": string,"p_sys": Json }; Returns: boolean
+                           },
+"msg_send":
+{ Args: { "p_body": string,"p_client": string,"p_conv": number,"p_me": string }; Returns: Json
+                           },
+"msg_sys":
+{ Args: { "p_actor": string,"p_conv": number,"p_extra": Json,"p_targets": (string)[],"p_type": string }; Returns: undefined
+                           },
+"msg_unread":
+{ Args: { "p_conv": number,"p_group": boolean,"p_joined": string,"p_last": number,"p_me": string }; Returns: number
+                           },
+"msg_unread_total":
+{ Args: { "p_me": string }; Returns: number
+                           },
+"msg_view":
+{ Args: { "m": Database["public"]['Tables']["messages"]['Row'],"p_group": boolean,"p_me": string }; Returns: Json
+                           },
+"msg_visible_kind":
+{ Args: { "p_me": string,"p_msg": number }; Returns: Database["public"]['Enums']["conv_kind"]
+                           },
 "renumber_actor_favs":
 { Args: Record<PropertyKey, never>; Returns: undefined
                            },
@@ -451,7 +608,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "media_type": "movie"|"tv"
+            "conv_kind": "direct"|"group","media_type": "movie"|"tv"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -571,7 +728,7 @@ export const Constants = {
           }
         },"public": {
           Enums: {
-            "media_type": ["movie", "tv"]
+            "conv_kind": ["direct", "group"],"media_type": ["movie", "tv"]
           }
         }
 } as const

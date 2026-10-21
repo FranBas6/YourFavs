@@ -1,0 +1,440 @@
+/* =====================================================================================
+   Mensajes M1/M2 (handoff docs/Mensajes/design_handoff_mensajes, medidas de msg.css).
+   Panel de 3 columnas en escritorio (≥ 1024): lista | centro o conversación | información.
+   En móvil: lista a pantalla normal y conversación a pantalla completa, sin barra inferior.
+   Solo tokens; la única regla oscura es la de siempre (texto rojo → --stamp-red-ink).
+   Avatares, botones, menús y diálogos: social-ui.css. Contador .mcnt: social-ui.css.
+   ===================================================================================== */
+
+/* ---- Panel ------------------------------------------------------------------------- */
+.ms-shell { --gr: var(--bg-elev); }
+@media (min-width: 1024px) {
+    .ms-shell {
+        display: grid; grid-template-columns: 280px minmax(0, 1fr) 300px;
+        height: var(--ms-h, calc(100dvh - 220px)); min-height: 560px;
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden;
+    }
+    .ms-shell.noinfo { grid-template-columns: 280px minmax(0, 1fr); }
+    .ms-shell.noinfo > .ms-info { display: none; }
+}
+
+/* ---- Columna izquierda: «Amigos» + lista ------------------------------------------ */
+.ms-rail { display: none; }
+@media (min-width: 1024px) {
+    .ms-rail {
+        display: flex; flex-direction: column; min-height: 0;
+        background: var(--bg-tint); border-right: 1px solid var(--border); --gr: var(--bg-tint);
+    }
+}
+.ms-home {
+    display: flex; align-items: center; gap: 10px; height: 44px; margin: 12px 10px 2px; padding: 0 12px;
+    border-radius: 10px; font: 600 14px var(--font); color: var(--text); text-decoration: none;
+}
+.ms-home:hover { background: var(--bg-elev); }
+.ms-home svg { width: 18px; height: 18px; color: var(--text-2); }
+.ms-home[aria-current="page"] { background: var(--bg-elev); box-shadow: var(--sh-sm); }
+.ms-home .rn { margin-left: auto; }
+.rn {
+    min-width: 19px; height: 19px; padding: 0 5px; border-radius: var(--r-full);
+    background: var(--accent-dark); color: #fff; font: 700 10.5px/19px var(--font-mono); text-align: center; flex-shrink: 0;
+}
+.rn[hidden] { display: none; }
+.ms-sec {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 10px 6px 22px;
+    font: 600 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-2);
+}
+.ms-sec .pf-btn.sm { height: 30px; padding: 0 10px; font-size: 12px; letter-spacing: 0; text-transform: none; }
+.ms-l { flex: 1; min-height: 0; overflow-y: auto; list-style: none; margin: 0; padding: 2px 10px 10px; display: flex; flex-direction: column; gap: 2px; }
+.ms-none { padding: 6px 12px; font-size: 12.5px; line-height: 1.5; color: var(--text-2); }
+
+/* Fila de conversación */
+.cv {
+    display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: 10px; min-height: 58px;
+    position: relative; text-decoration: none; color: inherit;
+}
+.cv:hover { background: color-mix(in srgb, var(--bg-elev) 60%, transparent); }
+.cv.on { background: var(--bg-elev); box-shadow: var(--sh-sm); --gr: var(--bg-elev); }
+.cv:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.cv-b { flex: 1; min-width: 0; display: block; }
+.cv-t { display: flex; align-items: baseline; gap: 8px; }
+.cv-t b { flex: 1; min-width: 0; font: 500 13.5px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv-t time { font: 500 11px var(--font-mono); color: var(--text-2); flex-shrink: 0; }
+.cv-p { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12.5px; color: var(--text-2); }
+.cv-p .tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cv.un .cv-t b { font-weight: 700; }
+.cv.un .cv-p .tx { color: var(--text); font-weight: 500; }
+.cv.un .cv-t time { color: var(--text); font-weight: 700; }
+.cv-n {
+    flex-shrink: 0; min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full);
+    background: var(--text); color: var(--bg-elev); font: 700 11px/20px var(--font-mono); text-align: center;
+}
+.cv-mute { flex-shrink: 0; display: inline-flex; color: var(--text-2); }
+.cv-mute svg { width: 15px; height: 15px; }
+.cv-ro {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 7px;
+    border-radius: var(--r-full); border: 1px solid var(--border-strong); font: 600 10.5px var(--font); color: var(--text-2);
+}
+.cv-ro svg { width: 11px; height: 11px; }
+
+/* Avatar de grupo: dos caras en diagonal; la segunda con un anillo del color del fondo. */
+.gav { position: relative; flex-shrink: 0; display: block; }
+.gav .so-av { position: absolute; }
+.gav .so-av:first-child { left: 0; top: 0; }
+.gav .so-av:last-child { right: 0; bottom: 0; box-shadow: 0 0 0 2px var(--gr, var(--bg-elev)); }
+.ms-gav-empty svg { width: 45%; height: 45%; }
+
+/* ---- Columna central ---------------------------------------------------------------- */
+.ms-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; --gr: var(--bg-elev); }
+@media (min-width: 1024px) {
+    .ms-main.is-home { overflow-y: auto; padding: 26px 28px; display: block; }
+}
+
+/* Cabecera de la conversación */
+.ms-h {
+    display: flex; align-items: center; gap: 12px; height: 62px; padding: 0 14px 0 20px; flex-shrink: 0;
+    border-bottom: 1px solid var(--border); background: var(--bg-elev);
+}
+.ms-h .tx { flex: 1; min-width: 0; }
+.ms-h .tx b { display: block; font: 600 15px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-h .tx span { display: block; font-size: 12px; color: var(--text-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms-h .acts { display: flex; align-items: center; gap: 6px; }
+.ms-h .pf-btn.ico { width: 36px; height: 36px; }
+.ms-h .ms-back, .ms-h .ms-info-m { display: none; }
+
+/* El registro de mensajes: desplazamiento propio, anclado abajo. */
+.ms-log { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 10px 0 6px; display: flex; flex-direction: column; }
+.ms-log:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.ms-log-in { margin-top: auto; }
+.ms-older { display: flex; justify-content: center; padding: 8px 0 4px; font-size: 12px; color: var(--text-2); }
+.ms-older[hidden] { display: none; }
+
+.ms-day { display: flex; align-items: center; gap: 12px; margin: 14px 20px 6px; font: 600 11.5px var(--font); color: var(--text-2); }
+.ms-day::before, .ms-day::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.ms-new { display: flex; align-items: center; gap: 10px; margin: 10px 20px 4px; }
+.ms-new::before { content: ''; flex: 1; height: 1px; background: var(--accent-dark); }
+.ms-new span {
+    font: 700 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: #fff;
+    background: var(--accent-dark); padding: 2px 8px; border-radius: var(--r-full);
+}
+
+.mg { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; padding: 6px 20px 2px; margin-top: 6px; }
+/* Por encima de la banda gris de la primera línea al pasar el ratón. */
+.mg > .so-av { margin-top: 2px; position: relative; z-index: 1; }
+.mg-b { min-width: 0; }
+.mg-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mg-h b { font: 600 14px var(--font); color: var(--text); }
+.mg-h .me { font: 500 11.5px var(--font); color: var(--text-2); }
+.mg-h time { font: 500 11px var(--font-mono); color: var(--text-2); }
+
+.mm { position: relative; font-size: 14px; line-height: 1.5; color: var(--text); padding: 1px 0; overflow-wrap: anywhere; }
+.mm-t { white-space: pre-wrap; }
+.mm a { color: var(--primary); text-decoration: underline; text-underline-offset: 2px; }
+.mm .gt { display: none; }
+.mm:focus { outline: none; }
+.mm:focus-visible { box-shadow: inset 2px 0 0 var(--primary); }
+.mm-act {
+    display: none; position: absolute; right: -6px; top: -17px; z-index: 2; gap: 2px; padding: 3px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--sh-md);
+}
+.mm-act button {
+    width: 30px; height: 30px; border-radius: 7px; display: grid; place-items: center;
+    border: 0; background: none; color: var(--text-2); cursor: pointer;
+}
+.mm-act button:hover, .mm-act button[aria-expanded="true"] { background: var(--bg-tint); color: var(--text); }
+.mm-act svg { width: 15px; height: 15px; }
+/* Hover o foco (solo con ratón/teclado de verdad): la línea de lado a lado, su hora y la barra. */
+@media (hover: hover) and (min-width: 1024px) {
+    .mm:not(.del):not(.sending):hover, .mm:not(.del):focus-within, .mm.is-menu {
+        background: var(--bg-tint); margin: 0 -20px 0 -72px; padding: 1px 20px 1px 72px;
+    }
+    .mm:hover .gt, .mm:focus-within .gt, .mm.is-menu .gt {
+        display: block; position: absolute; left: 20px; top: 5px; width: 40px; text-align: right;
+        font: 500 10px var(--font-mono); color: var(--text-2);
+    }
+    .mm:not(.del):hover .mm-act, .mm:focus-within .mm-act, .mm.is-menu .mm-act { display: flex; right: 14px; }
+    /* En la primera línea la hora ya está en la cabecera (y en ese hueco va el avatar). */
+    .mg-h + .mm .gt { display: none !important; }
+}
+.mm.sending { color: var(--text-2); }
+.mm-st { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; font: 500 11.5px var(--font); color: var(--text-2); }
+.mm-st svg { width: 13px; height: 13px; }
+.mm-st.err { color: var(--accent-dark); }
+[data-theme="dark"] .mm-st.err { color: var(--stamp-red-ink); }
+.mm-st .pf-btn.sm { height: 28px; padding: 0 10px; font-size: 12px; }
+.mm.del { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-style: italic; font-size: 13.5px; }
+.mm.del svg { width: 14px; height: 14px; }
+
+.ms-sys { display: grid; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; padding: 3px 20px; align-items: start; }
+.ms-sys > svg { justify-self: center; width: 15px; height: 15px; color: var(--text-3); margin-top: 3px; }
+.ms-sys p { margin: 0; font-size: 13px; color: var(--text-2); line-height: 1.45; }
+.ms-sys b { color: var(--text); font-weight: 600; }
+.ms-sys time { font: 500 11px var(--font-mono); color: var(--text-2); margin-left: 8px; white-space: nowrap; }
+.ms-fold {
+    display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; column-gap: 12px; align-items: center;
+    margin: 6px 20px; padding: 6px 8px 6px 0; border: 1px dashed var(--border-strong); border-radius: 10px;
+}
+.ms-fold > svg { justify-self: center; width: 15px; height: 15px; color: var(--text-3); }
+.ms-fold p { margin: 0; font-size: 13px; color: var(--text-2); }
+.lk { border: 0; background: none; font: 600 12.5px var(--font); color: var(--primary); text-decoration: underline; text-underline-offset: 2px; padding: 6px 8px; cursor: pointer; }
+.ms-seen { display: flex; align-items: center; gap: 5px; padding: 2px 0 4px; font: 500 11.5px var(--font); color: var(--text-2); }
+.ms-seen svg { width: 13px; height: 13px; }
+
+/* ---- Compositor --------------------------------------------------------------------- */
+.ms-c { padding: 10px 20px 14px; flex-shrink: 0; background: var(--bg-elev); }
+.ms-cb {
+    display: flex; align-items: flex-end; gap: 6px; padding: 6px;
+    border-radius: 12px; border: 1px solid var(--border-strong); background: var(--bg);
+}
+.ms-cb:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ms-plus {
+    position: relative; width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+    border: 1px dashed var(--border-strong); background: none; color: var(--text-3);
+    display: grid; place-items: center; cursor: not-allowed;
+}
+.ms-plus svg { width: 17px; height: 17px; }
+.ms-tip {
+    display: none; position: absolute; bottom: 44px; left: 0; z-index: 3; white-space: nowrap;
+    background: var(--text); color: var(--bg-elev); font: 600 11.5px var(--font); padding: 6px 10px;
+    border-radius: 7px; box-shadow: var(--sh-md);
+}
+.ms-plus:hover .ms-tip, .ms-plus:focus-visible .ms-tip { display: block; }
+.ms-ta {
+    flex: 1; min-width: 0; min-height: 36px; max-height: calc(6 * 1.45em + 16px); resize: none; overflow-y: auto;
+    padding: 8px 4px; border: 0; outline: 0; background: none;
+    font: 400 14px/1.45 var(--font); color: var(--text);
+}
+.ms-ta::placeholder { color: var(--text-3); }
+.pf-btn.ms-send { width: 36px; height: 36px; padding: 0; flex-shrink: 0; }
+.pf-btn.ms-send svg { width: 17px; height: 17px; }
+.ms-cf { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; font-size: 11px; color: var(--text-2); }
+.ms-cf b { font: 600 11px var(--font-mono); color: var(--text); }
+.ms-cf b.lim { color: var(--accent-dark); }
+[data-theme="dark"] .ms-cf b.lim { color: var(--stamp-red-ink); }
+.ms-ro { display: flex; align-items: flex-start; gap: 10px; padding: 13px 14px; border-radius: 12px; background: var(--bg-tint); border: 1px solid var(--border); }
+.ms-ro > svg { width: 16px; height: 16px; color: var(--text-2); margin-top: 2px; flex-shrink: 0; }
+.ms-ro b { display: block; font: 600 13px var(--font); color: var(--text); }
+.ms-ro span { display: block; font-size: 12.5px; color: var(--text-2); margin-top: 2px; line-height: 1.45; }
+
+/* ---- Panel de información ----------------------------------------------------------- */
+.ms-info { display: none; }
+@media (min-width: 1024px) {
+    .ms-info {
+        display: flex; flex-direction: column; gap: 16px; min-width: 0; overflow-y: auto;
+        border-left: 1px solid var(--border); padding: 22px 20px; --gr: var(--bg-elev);
+    }
+    /* El centro «Amigos» usa esta columna para su lateral de siempre. */
+    .ms-info.is-side { gap: 0; }
+}
+.ms-id { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 5px; }
+.ms-id > b, .ms-id .gname { font: 700 17px var(--font); color: var(--text); margin-top: 6px; }
+.ms-id .h { font: 500 12px var(--font-mono); color: var(--text-2); }
+.ms-id .s { font-size: 12px; color: var(--text-2); }
+.ms-id-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 8px; }
+.ms-blk { border-top: 1px solid var(--border); padding-top: 14px; }
+.ms-blk h5 {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 6px;
+    font: 600 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-2);
+}
+.ms-blk h5 span { font: 400 11.5px var(--font); letter-spacing: 0; text-transform: none; }
+.ms-tg { display: flex; align-items: center; gap: 10px; min-height: 44px; font: 500 13.5px var(--font); color: var(--text); }
+.ms-tg > svg { width: 16px; height: 16px; color: var(--text-2); flex-shrink: 0; }
+.ms-tg .t { flex: 1; min-width: 0; text-align: left; }
+.ms-tg small { display: block; font-size: 11.5px; color: var(--text-2); font-weight: 400; margin-top: 1px; }
+.ms-sw {
+    width: 38px; height: 22px; border-radius: var(--r-full); background: var(--border-strong); position: relative;
+    flex-shrink: 0; border: 0; padding: 0; cursor: pointer;
+}
+.ms-sw::after {
+    content: ''; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .25); transition: left .15s;
+}
+.ms-sw[aria-checked="true"] { background: var(--accent-dark); }
+.ms-sw[aria-checked="true"]::after { left: 19px; }
+.ms-sw:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ms-priv { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 12px; color: var(--text-2); }
+.ms-priv svg { width: 14px; height: 14px; flex-shrink: 0; }
+.mbl { display: flex; flex-direction: column; }
+.mb { display: flex; align-items: center; gap: 10px; min-height: 46px; position: relative; }
+.mb .tx { flex: 1; min-width: 0; text-align: left; }
+.mb .tx b { display: block; font: 600 13px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mb .tx span { display: block; font: 500 11px var(--font-mono); color: var(--text-2); }
+.mb .tags { display: flex; gap: 4px; flex-shrink: 0; }
+.ms-role {
+    display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--r-full);
+    background: var(--stamp-blue); color: var(--stamp-blue-ink); font: 600 11px var(--font); white-space: nowrap;
+}
+.ms-role svg { width: 11px; height: 11px; }
+.ms-role.n { background: var(--bg-tint); border: 1px solid var(--border-strong); color: var(--text-2); }
+
+/* ---- Vacíos y errores (handoff §5) -------------------------------------------------- */
+.ms-emp { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 24px; max-width: 420px; margin: auto; }
+.ms-emp-st { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 6px; background: var(--sb); color: var(--si); }
+.ms-emp-st svg { width: 21px; height: 21px; }
+.ms-emp h2 { margin: 0; font: 600 15px var(--font); color: var(--text); }
+.ms-emp p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; color: var(--text-2); }
+.ms-emp-a { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+
+/* ---- Menú de un mensaje (escritorio) ------------------------------------------------ */
+/* Fijo junto a su «···»: sin el `right: 0` del .pf-menu de siempre, que lo estiraría hasta el borde. */
+.ms-mmenu { position: fixed; z-index: 140; right: auto; width: max-content; min-width: 200px; }
+
+/* ---- Reportar ------------------------------------------------------------------------ */
+.rp-q { margin: 14px 0 4px; padding: 10px 12px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); font-size: 13px; line-height: 1.45; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 120px; overflow-y: auto; }
+.rp-q small { display: block; font: 500 11px var(--font-mono); color: var(--text-2); margin-bottom: 3px; white-space: normal; }
+.rp-o { display: flex; flex-direction: column; margin: 12px 0 0; padding: 0; border: 0; }
+.rp-o legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.rp-o label { display: flex; align-items: center; gap: 10px; min-height: 42px; font: 500 13.5px var(--font); color: var(--text); cursor: pointer; }
+.rp-o input { width: 18px; height: 18px; accent-color: var(--accent-dark); margin: 0; flex-shrink: 0; }
+.rp-o small { font-size: 12px; color: var(--text-2); font-weight: 400; }
+.rp-ta {
+    display: block; width: 100%; margin-top: 8px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--bg);
+    padding: 9px 11px; min-height: 56px; resize: vertical; font: 400 13px/1.45 var(--font); color: var(--text);
+}
+.rp-ta:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rp-c { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--text-2); margin-top: 5px; }
+.rp-c b { font: 500 11px var(--font-mono); }
+
+/* ---- Hojas inferiores (móvil): información y acciones de un mensaje ----------------- */
+.ms-sheet {
+    margin: auto 0 0; width: 100%; max-width: 100%; max-height: 88dvh; overflow-y: auto; border: 0;
+    border-radius: 20px 20px 0 0; background: var(--bg-elev); color: var(--text);
+    padding: 8px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 32px rgba(0, 0, 0, .28); --gr: var(--bg-elev);
+}
+.ms-sheet::backdrop { background: rgba(11, 17, 32, .5); }
+.ms-sheet .hd { width: 36px; height: 4px; border-radius: 9px; background: var(--border-strong); margin: 0 auto 12px; }
+.ms-sheet .ms-info-in { display: flex; flex-direction: column; gap: 16px; }
+.ms-sheet .mb { min-height: 56px; }
+.ms-sheet .ms-tg { min-height: 52px; }
+.ms-sheet .ms-id-acts .pf-btn { flex: 1; }
+.msh-k { font: 500 11.5px var(--font-mono); color: var(--text-2); padding: 0 0 6px; }
+.msh-card { margin: 0 -4px 10px; padding: 6px 0 8px; border-radius: 14px; background: var(--bg-elev); box-shadow: var(--sh-lg); }
+.msh-card .mg { padding: 6px 14px 2px; grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; margin: 0; }
+.msh-card .mm-act { display: none !important; }
+.msa {
+    display: flex; align-items: center; gap: 14px; width: 100%; min-height: 54px; padding: 0; border: 0; background: none;
+    font: 500 15px var(--font); color: var(--text); text-align: left; cursor: pointer;
+}
+.msa svg { width: 19px; height: 19px; color: var(--text-2); }
+.msa + .msa { border-top: 1px solid var(--border); }
+.msa.dg { color: var(--accent-dark); }
+.msa.dg svg { color: inherit; }
+[data-theme="dark"] .msa.dg { color: var(--stamp-red-ink); }
+
+/* ---- Móvil -------------------------------------------------------------------------- */
+/* Segmentado Personas · Mensajes bajo el H1 «Amigos». */
+.ms-seg {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin: 14px 0 18px;
+    border-radius: var(--r-full); background: var(--bg-tint); border: 1px solid var(--border);
+}
+.ms-seg a {
+    height: 40px; border-radius: var(--r-full); display: flex; align-items: center; justify-content: center; gap: 7px;
+    font: 600 13.5px var(--font); color: var(--text-2); text-decoration: none;
+}
+.ms-seg a svg { width: 16px; height: 16px; }
+.ms-seg a[aria-current="page"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm); }
+@media (min-width: 1024px) { .ms-seg { display: none; } }
+
+/* Lista de Mensajes en móvil: la misma lista, como tarjeta con filas de 70 px. */
+@media (max-width: 1023.98px) {
+    .ms-shell[data-on="list"] .ms-rail { display: block; }
+    .ms-shell[data-on="list"] .ms-home, .ms-shell[data-on="list"] .ms-sec { display: none; }
+    .ms-shell[data-on="list"] .ms-l {
+        padding: 0; gap: 0; overflow: visible;
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
+    }
+    .ms-shell[data-on="list"] .cv { min-height: 70px; padding: 10px 14px; border-radius: 0; }
+    .ms-shell[data-on="list"] li + li .cv { border-top: 1px solid var(--border); }
+    .ms-shell[data-on="list"] .cv.on { box-shadow: none; }
+    .ms-shell[data-on="list"] .ms-none { padding: 18px; }
+    .ms-mtop { display: flex; justify-content: flex-end; margin: -6px 0 10px; }
+}
+@media (min-width: 1024px) { .ms-mtop, .ms-mfoot { display: none; } }
+.ms-mfoot { display: flex; align-items: center; gap: 7px; margin: 12px 2px 0; font-size: 12px; color: var(--text-2); }
+.ms-mfoot svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+/* Conversación a pantalla completa, por encima de la cabecera y sin barra inferior. La altura la
+   ajusta el script con visualViewport (--ms-vvh) para que el compositor quede pegado al teclado. */
+@media (max-width: 1023.98px) {
+    .ms-chat {
+        position: fixed; left: 0; right: 0; top: 0; z-index: 120;
+        height: var(--ms-vvh, 100dvh); background: var(--bg);
+    }
+    .ms-chat .ms-h { height: 56px; padding: 0 6px; gap: 6px; padding-top: env(safe-area-inset-top); box-sizing: content-box; }
+    .ms-chat .ms-h .pf-btn.ico { width: 44px; height: 44px; border-color: transparent; background: none; }
+    .ms-chat .ms-h .ms-back, .ms-chat .ms-h .ms-info-m { display: inline-flex; }
+    .ms-chat .ms-h .ms-info-d { display: none; }
+    .ms-chat .ms-log { background: var(--bg); }
+    .ms-chat .mg { padding: 5px 14px 2px; grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; }
+    .ms-chat .mg-h b { font-size: 13.5px; }
+    .ms-chat .mm { font-size: 14.5px; -webkit-touch-callout: none; }
+    .ms-chat .ms-day { margin: 12px 14px 6px; }
+    .ms-chat .ms-new { margin: 10px 14px 4px; }
+    .ms-chat .ms-sys { padding: 3px 14px; grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; }
+    .ms-chat .ms-fold { margin: 6px 14px; grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 10px; }
+    .ms-chat .ms-c { padding: 8px 8px calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid var(--border); }
+    .ms-chat .ms-plus, .ms-chat .pf-btn.ms-send { width: 44px; height: 44px; }
+    .ms-chat .ms-ta { min-height: 44px; padding: 11px 4px; font-size: 16px; }
+    .ms-chat .ms-cf { padding: 0 4px; }
+    .ms-chat .ms-cf .ms-hint { display: none; }
+    .ms-chat .mm-st .pf-btn.sm { height: 36px; }
+    .ms-chat .mm.is-lift { background: var(--bg-tint); }
+}
+
+/* Página de Mensajes: en móvil, la lista (o su vacío); el H1 y el segmentado solo en móvil. */
+@media (min-width: 1024px) { .ms-mhead { display: none; } }
+@media (max-width: 1023.98px) {
+    .ms-shell[data-on="list"]:not([data-empty]) > .ms-main { display: none; }
+    .ms-shell[data-on="list"][data-empty] .ms-rail { display: none; }
+    .ms-shell[data-on="list"][data-empty] > .ms-main {
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
+    }
+}
+/* Con la conversación a pantalla completa, la página de detrás no se desplaza. */
+@media (max-width: 1023.98px) { html.ms-lock, html.ms-lock body { overflow: hidden; } }
+
+/* ---- Grupos (M2): panel de admin -------------------------------------------------------- */
+.gname { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; max-width: 100%; }
+.gname > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gname .pf-btn.ico { width: 30px; height: 30px; flex-shrink: 0; }
+.gname .pf-btn.ico svg { width: 15px; height: 15px; }
+.ms-ren { width: 100%; margin-top: 6px; text-align: left; }
+.ms-ren .rk-in { height: 40px; }
+.ms-ren .rk-in input { font-weight: 600; }
+.ms-ren-r { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--text-2); }
+.ms-ren-r div { display: flex; gap: 6px; }
+.ms-ren-r .pf-btn.sm { height: 32px; }
+.gp-l { display: block; font: 600 12px var(--font); color: var(--text-2); margin-bottom: 6px; }
+.gp-c { margin-left: auto; font: 500 11px var(--font-mono); color: var(--text-2); flex-shrink: 0; }
+.mb .pf-menu-wrap { flex-shrink: 0; }
+.mb .pf-btn.ms-mb-more { width: 30px; height: 30px; border-color: transparent; background: none; }
+.mb .pf-btn.ms-mb-more[aria-expanded="true"] { background: var(--bg-tint); border-color: var(--border-strong); }
+.mb .pf-menu { top: 36px; }
+.ms-sheet .mb .pf-btn.ms-mb-more { width: 44px; height: 44px; }
+.ms-dgr {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0; border: 0; background: none;
+    font: 600 13.5px var(--font); color: var(--accent-dark); cursor: pointer; text-align: left;
+}
+.ms-dgr svg { width: 16px; height: 16px; }
+[data-theme="dark"] .ms-dgr { color: var(--stamp-red-ink); }
+.ms-sheet .ms-dgr { min-height: 52px; }
+.ms-sheet .ms-id-acts .pf-btn { flex: 1; }
+
+/* ---- Grupos (M2): selector «Nuevo grupo» / «Añadir personas» sobre el .rk de F4 ------- */
+.ms-gp .rk-h .rk-st { width: 34px; height: 34px; border-radius: 9px; background: var(--stamp-blue); color: var(--stamp-blue-ink); flex-shrink: 0; }
+.ms-gp .rk-h .rk-st svg { width: 17px; height: 17px; }
+.ms-gp .rk-s.is-name { padding-bottom: 0; }
+.ms-gp .rk-s.is-name + .rk-s { padding-top: 8px; }
+.meter { display: flex; align-items: center; gap: 10px; font: 600 12px var(--font); color: var(--text); }
+.meter .bar { display: flex; gap: 3px; flex: 1; }
+.meter .bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--border-strong); }
+.meter .bar i.me { background: var(--text-3); }
+.meter .bar i.on { background: var(--accent-dark); }
+.meter span { white-space: nowrap; }
+.meter small { font-size: 11.5px; font-weight: 400; color: var(--text-2); }
+.rk-note2 {
+    display: flex; gap: 8px; margin: 4px 14px 0; padding: 10px 12px; border-radius: var(--r-md);
+    background: var(--bg-tint); border: 1px solid var(--border); font-size: 12.5px; line-height: 1.45; color: var(--text-2);
+}
+.rk-note2 svg { width: 15px; height: 15px; margin-top: 2px; flex-shrink: 0; }
+.rk-note2 b { color: var(--text); font-weight: 600; }
+.ms-sec .pf-btn.sm svg { width: 14px; height: 14px; }
