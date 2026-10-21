@@ -6,6 +6,8 @@
  *     con multiselección (hasta 10), buscador en el cliente y «Recientes».
  *   · «elegir título»: estás en el perfil de un amigo (`data-to`) y eliges QUÉ, con la búsqueda
  *     de siempre (`/api/search/multi`). Las productoras se recomiendan desde su página.
+ *   · Desde el ＋ de un grupo (Mensajes M4b, `data-friends`: tus amigos de dentro): primero QUÉ y,
+ *     con «Siguiente», A QUIÉN, solo entre esos amigos. `data-anchor` ancla el selector al ＋.
  *
  * Se abre con cualquier `[data-recommend]` (data-target-type, data-target-id, data-title,
  * data-image o data-to). Desplegable anclado en escritorio y hoja inferior en móvil, como «Guardar
@@ -57,6 +59,10 @@ let st: {
     q: string;
     tab: 'all' | 'movie' | 'tv' | 'person';
     hits: TitleHit[];
+    /** Desde el ＋ de un grupo: solo se puede elegir entre estos amigos. */
+    restrict: Set<string> | null;
+    /** El mensaje escrito (se conserva al pasar de «qué» a «a quién»). */
+    draft: string;
     loading: boolean;
     error: boolean;
     sending: boolean;
@@ -72,6 +78,9 @@ function headHtml(): string {
     const close = `<button type="button" class="rk-x" data-rk-close aria-label="Cerrar">${icon('x')}</button>`;
     const back = st.inSaveTo ? `<button type="button" class="rk-back" data-rk-back>${icon('chevron-left')}Volver a Guardar en…</button>` : '';
     const handle = st.sheet ? '<div class="rk-hd" aria-hidden="true"></div>' : '';
+    if (st.mode === 'title' && st.restrict) {
+        return `${handle}<div class="rk-h"><div class="rk-h-b"><div class="rk-k">Recomendar</div><b>Primero, elige qué</b></div>${close}</div>`;
+    }
     if (st.mode === 'title') {
         // Hasta que llega el amigo (se pide al abrir), la cabecera va sin él.
         const to = st.to
@@ -153,6 +162,9 @@ function footHtml(): string {
     const s = st!;
     const one = s.mode === 'title';
     const n = s.selected.length;
+    if (one && s.restrict) {
+        return `<button type="button" class="pf-btn pri" data-rk-next${s.target ? '' : ' disabled'}>${icon('chevron-right')}Siguiente: elegir a quién</button>`;
+    }
     const ready = one ? Boolean(s.target && s.to) : n > 0;
     const label = s.error ? 'Reintentar' : one ? `Enviar a ${firstName(s.to?.name ?? '')}` : n ? `Enviar a ${n}` : 'Enviar';
     const err = s.error ? `<div class="rk-err" role="alert">${icon('wifi-off')}<span><b>No se ha podido enviar.</b> Tu mensaje sigue aquí; vuelve a intentarlo.</span></div>` : '';
@@ -171,7 +183,7 @@ function renderAll(focusSearch = true) {
     const s = st!;
     const h = s.host;
     // Aún cargando: los amigos (modo «elegir amigo») o el amigo (modo «elegir título»).
-    if ((s.loading && !s.friends.length && s.mode === 'friend') || (s.mode === 'title' && !s.to)) {
+    if ((s.loading && !s.friends.length && s.mode === 'friend') || (s.mode === 'title' && !s.to && !s.restrict)) {
         h.innerHTML = headHtml() + '<p class="rk-note">Cargando…</p>';
         return;
     }
@@ -188,8 +200,8 @@ function renderAll(focusSearch = true) {
         + `<div class="rk-s"><label class="rk-in">${icon('search')}<input type="search" data-rk-q placeholder="${placeholder}" autocomplete="off" spellcheck="false" aria-label="${placeholder}" value="${esc(s.q)}"></label>${tabs}</div>`
         + `<div class="rk-l" data-rk-list ${s.mode === 'title' ? 'role="radiogroup" aria-label="Resultados"' : 'role="group" aria-label="Tus amigos"'}>${s.mode === 'title' ? titleListHtml() : friendListHtml()}</div>`
         + `<div data-rk-chips>${chipsHtml()}</div>`
-        + `<div class="rk-msg"><textarea data-rk-msg rows="2" maxlength="${MSG_MAX}" placeholder="Añade un mensaje (opcional)" aria-label="Mensaje opcional" aria-describedby="rk-cnt"></textarea>`
-        + `<div class="rk-cnt"><span>Va igual a ${s.mode === 'title' ? esc(firstName(s.to?.name ?? '')) : 'todos'}</span><b id="rk-cnt">0/${MSG_MAX}</b><span class="sr-only" data-rk-cnt-live aria-live="polite"></span></div></div>`
+        + `<div class="rk-msg"><textarea data-rk-msg rows="2" maxlength="${MSG_MAX}" placeholder="Añade un mensaje (opcional)" aria-label="Mensaje opcional" aria-describedby="rk-cnt">${esc(s.draft)}</textarea>`
+        + `<div class="rk-cnt"><span>Va igual a ${s.mode === 'title' ? (s.to ? esc(firstName(s.to.name)) : 'quien elijas') : 'todos'}</span><b id="rk-cnt">${s.draft.length}/${MSG_MAX}</b><span class="sr-only" data-rk-cnt-live aria-live="polite"></span></div></div>`
         + `<div class="rk-f" data-rk-foot>${footHtml()}</div>`;
     if (focusSearch) h.querySelector<HTMLInputElement>('[data-rk-q]')?.focus();
 }
@@ -205,18 +217,24 @@ const repaintFoot = () => part('[data-rk-foot]', footHtml());
 function place(opener: HTMLElement | null) {
     if (!shell || !st || st.inSaveTo) return;
     if (st.sheet || !opener) {
-        shell.style.left = ''; shell.style.top = '';
+        shell.style.left = ''; shell.style.top = ''; shell.style.maxHeight = '';
         return;
     }
     const r = opener.getBoundingClientRect();
-    const w = shell.offsetWidth, h = shell.offsetHeight;
+    const w = shell.offsetWidth;
     const left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8);
-    let top = r.bottom + 10;
-    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 10);
+    // Debajo del botón, salvo que ahí no quepa (el ＋ del chat está abajo del todo): entonces encima,
+    // anclado por abajo. La altura máxima es el hueco que hay, así que al llegar los resultados crece
+    // hacia el lado libre y «Enviar» nunca se sale de la pantalla.
+    const below = window.innerHeight - r.bottom - 18;
+    const above = r.top - 18;
+    const up = below < 420 && above > below;
     shell.style.left = `${left}px`;
-    shell.style.top = `${top}px`;
+    shell.style.maxHeight = `${Math.min(560, up ? above : below)}px`;
+    if (up) { shell.style.top = 'auto'; shell.style.bottom = `${window.innerHeight - r.top + 10}px`; }
+    else { shell.style.bottom = ''; shell.style.top = `${r.bottom + 10}px`; }
     shell.style.setProperty('--rk-arrow', `${Math.min(Math.max(16, r.left + r.width / 2 - left - 6), w - 28)}px`);
-    shell.classList.toggle('arrow-up', top > r.bottom);
+    shell.classList.toggle('arrow-up', !up);
 }
 
 async function loadFriends() {
@@ -227,7 +245,10 @@ async function loadFriends() {
         const d = await res.json();
         if (st !== s) return;
         if (!res.ok || !d.ok) throw new Error();
-        s.friends = d.friends; s.recent = d.recent; s.already = new Set(d.alreadySent);
+        const ok = (id: string) => !s.restrict || s.restrict.has(id);
+        s.friends = (d.friends as PersonCard[]).filter((f) => ok(f.id));
+        s.recent = (d.recent as string[]).filter(ok);
+        s.already = new Set(d.alreadySent);
     } catch {
         if (st !== s) return;
         s.friends = [];
@@ -255,7 +276,7 @@ function fresh(o: Partial<NonNullable<typeof st>> & Pick<NonNullable<typeof st>,
     return {
         inSaveTo: false, sheet: !isDesktop(), back: null, opener: null, target: null, to: null,
         friends: [], recent: [], already: new Set(), sentTargets: new Set(), selected: [], q: '', tab: 'all',
-        hits: [], loading: true, error: false, sending: false, ...o,
+        hits: [], restrict: null, draft: '', loading: true, error: false, sending: false, ...o,
     };
 }
 
@@ -267,9 +288,11 @@ function openFrom(source: HTMLElement, anchor: HTMLElement = source) {
         return;
     }
     const to = opener.dataset.to;
+    const restrict = opener.dataset.friends ? new Set(opener.dataset.friends.split(',').filter(Boolean)) : null;
     const type = opener.dataset.targetType as RecTarget | undefined;
-    st = fresh({ mode: to ? 'title' : 'friend', host: shell, opener: anchor });
-    if (!to) {
+    st = fresh({ mode: to || restrict ? 'title' : 'friend', host: shell, opener: anchor, restrict });
+    if (restrict) st.loading = false;
+    else if (!to) {
         if (!type || !opener.dataset.targetId) { st = null; return; }
         st.target = { type, id: Number(opener.dataset.targetId), title: opener.dataset.title || '', image: tmdbPath(opener.dataset.image) };
     }
@@ -277,11 +300,22 @@ function openFrom(source: HTMLElement, anchor: HTMLElement = source) {
     shell.hidden = false;
     if (backdrop) backdrop.hidden = false;
     if (st.sheet) document.body.style.overflow = 'hidden';
-    shell.setAttribute('aria-label', to ? 'Recomendar a un amigo' : `Recomendar ${st.target!.title}`);
+    shell.setAttribute('aria-label', to || restrict ? 'Recomendar a un amigo' : `Recomendar ${st.target!.title}`);
     anchor.setAttribute('aria-expanded', 'true');
     renderAll(false);
     place(anchor);
-    if (to) loadFriend(to); else loadFriends();
+    if (to) loadFriend(to); else if (!restrict) loadFriends();
+}
+
+/** Grupo (M4b): con el título elegido, a elegir a quién entre tus amigos del grupo. */
+function toFriends() {
+    const s = st!;
+    if (!s.target) return;
+    s.draft = s.host.querySelector<HTMLTextAreaElement>('[data-rk-msg]')?.value ?? s.draft;
+    s.mode = 'friend'; s.q = ''; s.loading = true; s.friends = [];
+    shell?.setAttribute('aria-label', `Recomendar ${s.target.title}`);
+    renderAll(false);
+    loadFriends();
 }
 
 function close() {
@@ -289,7 +323,10 @@ function close() {
     const s = st;
     st = null;
     if (s.inSaveTo) { s.back?.(); return; }
-    if (shell) { shell.hidden = true; shell.innerHTML = ''; shell.classList.remove('is-typing'); }
+    if (shell) {
+        shell.hidden = true; shell.innerHTML = ''; shell.classList.remove('is-typing');
+        shell.style.bottom = ''; shell.style.maxHeight = '';
+    }
     if (backdrop) backdrop.hidden = true;
     document.body.style.overflow = '';
     s.opener?.setAttribute('aria-expanded', 'false');
@@ -382,10 +419,14 @@ async function send() {
     const extra = skipped.length ? ` ${skipped.join(', ')} ya la ${skipped.length > 1 ? 'tenían' : 'tenía'} pendiente de ti.` : '';
     const recId = d.recId as number;
     close();
+    // Mensajes M4b: la recomendación también es una tarjeta en vuestro 1:1; si está abierto, que salga ya.
+    const chatRefresh = () => document.dispatchEvent(new CustomEvent('yf:ms-chat-refresh'));
+    chatRefresh();
     showToast(`${verb} ${who}.${extra}`, 'success', async () => {
         try {
             const r = await fetch(`/api/social/recommendations/${recId}`, { method: 'DELETE' });
             const x = await r.json();
+            chatRefresh();
             if (r.ok && x.ok) showToast('Recomendación retirada');
             else if (x.error === 'answered') showToast(`${names[0]} ya la ha respondido. No se puede retirar.`, 'error');
             else showToast('No se ha podido retirar.', 'error');
@@ -435,6 +476,9 @@ document.addEventListener('click', (e) => {
         e.preventDefault();
         if (st && st.opener === opener) { close(); return; }
         if (st) close();
+        // Desde el ＋ del chat: se ancla (y devuelve el foco) al ＋, no a la fila de su menú.
+        const anchor = opener.dataset.anchor ? document.querySelector<HTMLElement>(opener.dataset.anchor) : null;
+        if (anchor) { openFrom(opener, anchor); return; }
         // Desde un menú («Amigos ▾»): se cierra, y el selector se ancla (y devuelve el foco) a su botón.
         const menu = opener.closest<HTMLElement>('.pf-menu');
         const toggle = menu?.parentElement?.querySelector<HTMLElement>('[data-menu-toggle]');
@@ -471,6 +515,7 @@ document.addEventListener('click', (e) => {
     }
     const row = t.closest<HTMLElement>('.rk-r');
     if (row) { st.mode === 'title' ? pickTitle(row) : toggleFriend(row); return; }
+    if (t.closest('[data-rk-next]')) { toFriends(); return; }
     if (t.closest('[data-rk-send]')) send();
 });
 
@@ -484,6 +529,7 @@ document.addEventListener('input', (e) => {
         const ta = t as HTMLTextAreaElement;
         // Una línea de texto plano: sin saltos.
         if (/\n/.test(ta.value)) ta.value = ta.value.replace(/\n+/g, ' ');
+        st.draft = ta.value;
         const n = ta.value.length;
         const cnt = st.host.querySelector('#rk-cnt');
         if (cnt) cnt.textContent = `${n}/${MSG_MAX}`;

@@ -12,8 +12,10 @@
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { getPeople, getRelations } from './graph';
 import { previewOf } from '../../../lib/social/messagesText';
+import { resolveCards } from './chatCards';
+import type { Json } from '../../../lib/supabase/database.types';
 import type {
-    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard,
+    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, SpoilerRef, TitleCardRef, WtwCardRef,
 } from '../../../lib/social/types';
 
 export const MSG_MAX = 2000;
@@ -37,6 +39,8 @@ function unwrap<T>(r: { data: unknown; error: { message: string } | null }): T {
 interface RawMsg {
     id: number; author: string | null; kind: 'text' | 'system'; body: string | null; sys: MsgSys | null;
     created_at: string; deleted: boolean; folded: boolean; client_id: string | null;
+    card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: WtwCardRef } | null;
+    spoiler?: SpoilerRef | null; locked?: boolean; lines?: number[] | null; spoiler_seen?: boolean;
 }
 interface RawConv {
     id: number; kind: ConvKind; name: string | null; role: ConvRole; muted: boolean; last_msg_at: string;
@@ -55,10 +59,16 @@ interface RawHistory {
     read_only: boolean;
 }
 
-export function toMessage(r: RawMsg): ChatMessage {
+export function toMessage(r: RawMsg, me: string): ChatMessage {
     return {
         id: r.id, author: r.author, kind: r.kind, body: r.body, sys: r.sys, at: ms(r.created_at),
         deleted: r.deleted, folded: r.folded, clientId: r.client_id,
+        // Solo con la copia guardada: el estado de cada cual lo pone `resolveCards` al pintar.
+        card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] }
+            : r.card?.type === 'rec' ? { type: 'rec', ref: r.card.ref, dir: r.author === me ? 'out' : 'in', state: r.author === me ? 'sent' : 'pending' }
+            : r.card?.type === 'wtw' ? { type: 'wtw', ref: r.card.ref, viewer: null }
+            : null,
+        spoiler: r.spoiler ?? null, locked: Boolean(r.locked), lines: r.lines ?? null, spoilerSeen: Boolean(r.spoiler_seen),
     };
 }
 
@@ -70,6 +80,8 @@ function idsOf(m: RawMsg | null): string[] {
         if (m.sys.actor) out.push(m.sys.actor);
         out.push(...(m.sys.targets ?? []));
     }
+    // «¿Qué vemos?»: las caras de quienes la tienen pendiente (aunque ya no estén en el grupo).
+    if (m.card?.type === 'wtw') out.push(...(m.card.ref.have ?? []));
     return out;
 }
 
@@ -90,7 +102,7 @@ export async function listConversations(me: string): Promise<ConvSummary[]> {
             title: group ? c.name ?? '' : faces[0]?.name ?? 'Cuenta eliminada',
             faces,
             count: c.count,
-            preview: previewOf(c.last ? toMessage(c.last) : null, me, group, people),
+            preview: previewOf(c.last ? toMessage(c.last, me) : null, me, group, people),
             lastAt: ms(c.last_msg_at),
             unread: c.unread,
             muted: c.muted,
@@ -130,16 +142,22 @@ export async function getHistory(
     const memberIds = h.members.map((m) => m.id);
     const ids = [me, ...memberIds, ...h.messages.flatMap(idsOf)];
     const others = memberIds.filter((id) => id !== me);
+    const messages = h.messages.map((m) => toMessage(m, me));
     const [people, rels] = await Promise.all([
         getPeople(ids),
         // «Has bloqueado» (grupos) y «Amigos desde» (1:1): la relación de quien mira con los demás.
         others.length ? getRelations(me, others) : Promise.resolve(new Map()),
+        resolveCards(me, conv, messages, others),
     ]);
     const members: ChatMember[] = h.members
         .map((m) => {
             const person = people.get(m.id);
             if (!person) return null;
-            return { person, role: m.role, joinedAt: ms(m.joined_at), blockedByMe: group && Boolean(rels.get(m.id)?.blockedByMe) };
+            const rel = rels.get(m.id);
+            return {
+                person, role: m.role, joinedAt: ms(m.joined_at), blockedByMe: group && Boolean(rel?.blockedByMe),
+                friend: Boolean(rel?.friends && !rel.blockedByMe),
+            };
         })
         .filter((m): m is ChatMember => Boolean(m));
     const other = group ? null : people.get(others[0] ?? '');
@@ -151,7 +169,7 @@ export async function getHistory(
             title: group ? h.conv.name ?? '' : other?.name ?? 'Cuenta eliminada',
             me: { id: me, role: h.me.role, muted: h.me.muted, lastReadId: h.me.last_read_id },
             members,
-            messages: h.messages.map(toMessage),
+            messages,
             people: Object.fromEntries(people),
             hasMore: h.has_more,
             deletedIds: h.deleted_ids ?? [],
@@ -161,6 +179,12 @@ export async function getHistory(
             friendsSince: !group && !h.read_only ? rels.get(others[0] ?? '')?.friendsSince ?? null : null,
         },
     };
+}
+
+/** «Mostrar igualmente» un spoiler (M4c): su texto, si ves ese mensaje. No guarda nada. */
+export async function spoilerBody(me: string, conv: number, msg: number): Promise<string | null> {
+    if (!(await belongsTo(msg, conv))) return null;
+    return unwrap<string | null>(await db().rpc('msg_spoiler_body', { p_me: me, p_msg: msg }));
 }
 
 /** Texto de un mensaje plegado («Mostrar»): solo si es de un grupo y su autor lo bloqueaste tú. */
@@ -191,14 +215,27 @@ export async function openDirect(me: string, them: string): Promise<OpenDirectRe
 // -------------------------------------------------------------------------------------
 // Mensajes
 // -------------------------------------------------------------------------------------
-export type SendError = 'none' | 'read_only' | 'empty' | 'too_long' | 'rate';
+export type SendError = 'none' | 'read_only' | 'empty' | 'too_long' | 'rate' | 'card' | 'spoiler';
 export type SendResult = { ok: true; message: ChatMessage } | { ok: false; error: SendError };
+/** Código HTTP de cada error al enviar (`read_only` nunca dice por qué). */
+export const SEND_STATUS: Record<SendError, number> = { none: 404, read_only: 403, empty: 400, too_long: 400, rate: 429, card: 400, spoiler: 400 };
 
-export async function sendMessage(me: string, conv: number, body: string, clientId: string): Promise<SendResult> {
+/**
+ * Un mensaje: texto, o tarjeta de título (`card`, la copia de TMDB) con el texto como comentario.
+ * `spoiler` marca el texto como spoiler de una película, un episodio o una serie (M4c).
+ */
+export async function sendMessage(
+    me: string, conv: number, body: string, clientId: string, card: TitleCardRef | null = null, spoiler: SpoilerRef | null = null,
+): Promise<SendResult> {
     const r = unwrap<{ ok: boolean; error?: SendError; message?: RawMsg }>(await db().rpc('msg_send', {
         p_me: me, p_conv: conv, p_body: body, p_client: clientId,
+        ...(card ? { p_card_type: 'title', p_card_ref: card as unknown as Json } : {}),
+        ...(spoiler ? { p_spoiler: spoiler as unknown as Json } : {}),
     }));
-    return r.ok && r.message ? { ok: true, message: toMessage(r.message) } : { ok: false, error: r.error ?? 'none' };
+    if (!r.ok || !r.message) return { ok: false, error: r.error ?? 'none' };
+    const message = toMessage(r.message, me);
+    await resolveCards(me, conv, [message]);
+    return { ok: true, message };
 }
 
 /** Borra uno tuyo de la conversación `conv`. */
@@ -325,4 +362,20 @@ export async function friendCount(me: string): Promise<number> {
     if (x.error) throw new Error(x.error.message);
     if (y.error) throw new Error(y.error.message);
     return (x.count ?? 0) + (y.count ?? 0);
+}
+
+// -------------------------------------------------------------------------------------
+// «Enviar a…» (M4, handoff M4 §3.5)
+// -------------------------------------------------------------------------------------
+
+/**
+ * A dónde se puede mandar algo: tus conversaciones en las que puedes escribir (la más reciente
+ * primero; las de solo lectura no salen) y tus amigos con los que aún no tienes un 1:1.
+ */
+export async function sendTargets(me: string): Promise<{ convs: ConvSummary[]; friends: PersonCard[] }> {
+    const [convs, cands] = await Promise.all([listConversations(me), groupCandidates(me, null)]);
+    const open = convs.filter((c) => !c.readOnly);
+    const withDirect = new Set(convs.filter((c) => c.kind === 'direct').flatMap((c) => c.faces.map((f) => f.id)));
+    const friends = cands.map((c) => c.person).filter((p) => !withDirect.has(p.id) && p.handle);
+    return { convs: open, friends };
 }

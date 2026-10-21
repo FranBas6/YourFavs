@@ -26,6 +26,10 @@ export interface TitleSummary {
     year: string | null;
     /** Solo series: nº de temporadas (sin especiales). */
     seasons: number | null;
+    /** Solo películas: duración en minutos. */
+    runtime: number | null;
+    /** Solo series: episodios de cada temporada (sin especiales), para «Vas por T2 E3». */
+    seasonEpisodes: Record<number, number> | null;
 }
 
 const TTL_MS = 12 * 60 * 60 * 1000;
@@ -42,10 +46,18 @@ async function fetchOne(ref: TitleRef, lang: string): Promise<TitleSummary | nul
         const raw = await tmdbFetch<any>(`/${ref.media_type}/${ref.tmdb_id}`);
         const item = toItem(raw, ref.media_type);
         if (item) {
-            const seasons = ref.media_type === 'tv' && Array.isArray(raw?.seasons)
-                ? raw.seasons.filter((s: any) => (s?.season_number ?? 0) > 0).length || (raw.number_of_seasons ?? null)
+            const real = ref.media_type === 'tv' && Array.isArray(raw?.seasons)
+                ? raw.seasons.filter((s: any) => (s?.season_number ?? 0) > 0)
                 : null;
-            data = { media_type: ref.media_type, tmdb_id: ref.tmdb_id, title: item.title, poster_path: item.poster_path, year: item.year, seasons };
+            const seasons = real ? real.length || (raw.number_of_seasons ?? null) : null;
+            const seasonEpisodes = real
+                ? Object.fromEntries(real.map((s: any) => [s.season_number, Number(s.episode_count) || 0]))
+                : null;
+            const runtime = ref.media_type === 'movie' && Number(raw?.runtime) > 0 ? Number(raw.runtime) : null;
+            data = {
+                media_type: ref.media_type, tmdb_id: ref.tmdb_id, title: item.title, poster_path: item.poster_path, year: item.year,
+                seasons, runtime, seasonEpisodes,
+            };
         }
     } catch {
         // TMDB caído o título borrado: no se cachea el fallo mucho tiempo, que vuelva a intentarlo.

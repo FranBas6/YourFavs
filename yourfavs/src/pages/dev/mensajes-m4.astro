@@ -1,0 +1,166 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO de Mensajes M4 (handoff M4 §5): las tarjetas, el ＋ y sus
+ * estados con datos inventados, para revisarlos en claro, oscuro y móvil. Es estática: nada se
+ * envía. En producción: 404. Crece con cada fase de M4.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { Icon } from 'astro-icon/components';
+import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
+import { initialsOf, stampFor } from '../../lib/social/ui';
+import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, RecCard, RecCardRef, SpoilerRef, TitleCardRef, WtwCard } from '../../lib/social/types';
+import '../../styles/pages/social/mensajes.css';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+let n = 0;
+const P = (name: string, handle: string): PersonCard => {
+    const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+    return { id, handle, name, avatar: null, archetype: null, color: stampFor(id), initials: initialsOf(name) };
+};
+const ME = P('Fran Bas', 'franbas');
+const ANA = P('Ana Ruiz', 'ana_ve');
+const CARLA = P('Carla Méndez', 'carlam');
+const IVAN = P('Iván Soler', 'ivansoler');
+const LUCIA = P('Lucía Prado', 'luciap');
+const people = Object.fromEntries([ME, ANA, CARLA, IVAN, LUCIA].map((p) => [p.id, p]));
+
+const PERFECT: TitleCardRef = { mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days', poster: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', year: '2023', runtime: 124 };
+const SEV: TitleCardRef = { mediaType: 'tv', tmdbId: 95396, title: 'Severance', year: '2022', seasons: 2 };
+const card = (ref: TitleCardRef, viewer: CardViewer | null, ppl: CardPerson[] = []): ChatCard => ({ type: 'title', ref, viewer, people: ppl });
+const seen = (p: PersonCard, score: number | null = null): CardPerson => ({ id: p.id, state: 'seen', score });
+
+// Tarjeta de título por quien mira (§5).
+const states: [string, ChatCard][] = [
+    ['No la tienes · amigos con nota', card(PERFECT, null, [seen(ANA, 9), seen(CARLA, 7.5)])],
+    ['Pendiente · y 2 más', card(PERFECT, { state: 'pending' }, [seen(ANA, 9), seen(CARLA, 7.5), { id: IVAN.id, state: 'watching', score: null }, { id: LUCIA.id, state: 'pending', score: null }])],
+    ['Vista con nota', card(PERFECT, { state: 'seen', score: 8.5 }, [seen(ANA)])],
+    ['En progreso (serie)', card(SEV, { state: 'progress', season: 2, episode: 4, upToDate: false }, [{ id: ANA.id, state: 'watching', score: null }])],
+    ['Al día', card(SEV, { state: 'progress', season: 2, episode: 10, upToDate: true })],
+    ['Ningún amigo con estado · sin póster', card(SEV, null)],
+];
+
+// Recomendación de F4 en el 1:1 (§5): quien la recibe · quien la envía.
+const DUNE: RecCardRef = { recId: 1, targetType: 'movie', targetId: 693134, title: 'Dune: Parte dos', image: '/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg' };
+const rec = (state: RecCard['state'], dir: RecCard['dir'] = 'in', ref: RecCardRef = DUNE): RecCard => ({ type: 'rec', ref, dir, state });
+const recStates: [string, RecCard][] = [
+    ['Recibida · pendiente', rec('pending')],
+    ['Recibida · añadida', rec('added')],
+    ['Recibida · descartada', rec('discarded')],
+    ['Recibida · ya la tenías', rec('had')],
+    ['Recibida · ya la viste', rec('seen')],
+    ['Recibida · persona', rec('pending', 'in', { recId: 2, targetType: 'person', targetId: 1, title: 'Greta Gerwig' })],
+    ['Enviada (también si la descartó o la abrió)', rec('sent', 'out')],
+    ['Enviada · la añadió', rec('added', 'out')],
+];
+
+// «¿Qué vemos?» (§5): de los N · de N−1.
+const wtw = (have: PersonCard[], of: number, viewer: CardViewer | null, roller = CARLA): WtwCard =>
+    ({ type: 'wtw', ref: { ...PERFECT, of, have: have.map((p) => p.id), roller: roller.id }, viewer });
+const wtwStates: [string, WtwCard][] = [
+    ['De los 4 · la tienes pendiente', wtw([CARLA, ME, ANA, IVAN], 4, { state: 'pending' })],
+    ['3 de 4 · no había ninguna de los 4', wtw([CARLA, ANA, IVAN], 4, null)],
+    ['1:1 · tirada por ti', wtw([ME, ANA], 2, { state: 'pending' }, ME)],
+];
+
+const now = Date.now();
+let mid = 100;
+const M = (author: PersonCard, body: string, at: number, c: ChatCard | null = null, o: Partial<ChatMessage> = {}): ChatMessage =>
+    ({ id: ++mid, author: author.id, kind: 'text', body, sys: null, at, deleted: false, folded: false, clientId: null, card: c,
+       spoiler: null, locked: false, lines: null, spoilerSeen: false, ...o });
+const log = logHtml([
+    M(ANA, 'Ayer vi esta y me acordé de ti', now - 30 * 60_000),
+    M(ANA, '', now - 29 * 60_000, card(PERFECT, null, [seen(ANA, 9)])),
+    M(ME, '¡Me la apunto!', now - 20 * 60_000),
+    M(ME, 'Y esta, que la estoy viendo', now - 19 * 60_000, card(SEV, { state: 'progress', season: 2, episode: 4, upToDate: false })),
+    M(ANA, 'La vi el finde. Ojo, que dura casi 3 h', now - 10 * 60_000, rec('pending')),
+], { me: ME.id, group: false, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now, other: ANA });
+
+// Escudo de spoilers (§3.4): el mismo grupo visto de tres maneras + una tarjeta con el comentario marcado.
+const SP: SpoilerRef = { mediaType: 'tv', tmdbId: 95396, title: 'Severance', season: 2, episode: 5 };
+const SPM: SpoilerRef = { mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days' };
+const spText = 'No me puedo creer lo de Mark en el ascensor. Y la escena final con Helly, sin palabras.';
+const lockedMsgs = (): ChatMessage[] => [
+    M(ANA, 'Acabo de ver el 5', now - 9 * 60_000),
+    M(ANA, '', now - 8 * 60_000, null, { spoiler: SP, locked: true, lines: [100, 30], spoilerViewer: { state: 'progress', season: 2, episode: 3, upToDate: false } }),
+    M(CARLA, '', now - 6 * 60_000, card(PERFECT, null, [seen(ANA, 9)]), { spoiler: SPM, locked: true, lines: [60] }),
+];
+const ctx = (me: string, revealed: Record<number, string> = {}) =>
+    ({ me, group: true, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed, now });
+mid = 300;
+const spLocked = logHtml(lockedMsgs(), ctx(ME.id));
+mid = 300;
+const spShown = logHtml(lockedMsgs(), ctx(ME.id, { 302: spText }));
+mid = 300;
+const spSeen = logHtml([
+    M(ANA, 'Acabo de ver el 5', now - 9 * 60_000),
+    M(ANA, spText, now - 8 * 60_000, null, { spoiler: SP, spoilerSeen: true }),
+], ctx(ME.id));
+mid = 300;
+const spOwn = logHtml([M(ANA, 'Acabo de ver el 5', now - 9 * 60_000), M(ANA, spText, now - 8 * 60_000, null, { spoiler: SP })], ctx(ANA.id));
+---
+<Layout title="Dev · Mensajes M4" robots="noindex, nofollow">
+    <div class="dv">
+        <h1>Mensajes M4 · estados (solo desarrollo)</h1>
+        <p class="dv-sub">Datos inventados y estáticos. Cambia de tema y estrecha la ventana para ver oscuro y móvil.</p>
+
+        <h2>Conversación — la tarjeta va dentro del grupo de su autor; el comentario, encima</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log} /></div>
+            <div class="ms-c"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: false, title: ANA.name, to: ANA.handle })} />
+                <div class="ms-cb"><button type="button" class="ms-plus on open" aria-label="Añadir al mensaje" aria-expanded="true"><Icon name="lucide:plus" class="i-plus" /><Icon name="lucide:x" class="i-x" /></button>
+                <textarea class="ms-ta" rows="1" aria-label="Mensaje para Ana" placeholder="Escribe a Ana"></textarea>
+                <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled><Icon name="lucide:send" /></button></div></div>
+        </section>
+
+        <h2>Tarjeta de título por quien mira</h2>
+        <div class="dv-grid">{states.map(([label, c]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people)} /></div>
+        ))}</div>
+
+        <h2>Recomendación de F4 en el 1:1 (sin caras ni el estado de quien la recibe)</h2>
+        <div class="dv-grid">{recStates.map(([label, c]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people, { other: ANA, at: now - 3600_000, now })} /></div>
+        ))}</div>
+
+        <h2>«¿Qué vemos?» — la tirada enviada (cada envío, una tarjeta nueva)</h2>
+        <div class="dv-grid">{wtwStates.map(([label, c]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people, { me: ME.id, now })} /></div>
+        ))}</div>
+
+        <h2>Spoiler — bloqueado (texto fuera del navegador) · tarjeta con el comentario oculto</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={spLocked} /></div></section>
+        <h2>Spoiler — «Mostrar igualmente» pulsado (solo esta sesión)</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={spShown} /></div></section>
+        <h2>Spoiler — ya lo has visto · y visto por quien lo escribió</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={spSeen} /></div></section>
+        <section class="ms-main dv-box" style="margin-top: 10px"><div class="ms-log"><div class="ms-log-in" set:html={spOwn} /></div></section>
+        <h2>Compositor con la marca de spoiler</h2>
+        <section class="ms-main dv-box"><div class="ms-c" style="margin-top: 0"><div class="ctag-row"><span class="ctag"><Icon name="lucide:shield" /><span>Spoiler de <b>Severance T2 E5</b></span><button type="button" aria-label="Quitar la marca de spoiler"><Icon name="lucide:x" /></button></span></div>
+            <div class="ms-cb"><button type="button" class="ms-plus on" aria-label="Añadir al mensaje"><Icon name="lucide:plus" class="i-plus" /><Icon name="lucide:x" class="i-x" /></button>
+            <textarea class="ms-ta" rows="1" aria-label="Mensaje para Viernes de pelis, marcado como spoiler de Severance T2 E5">Lo del final 😱</textarea>
+            <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar"><Icon name="lucide:send" /></button></div></div></section>
+
+        <h2>Menú del ＋ en móvil (hoja)</h2>
+        <div class="dv-box ms-sheet-like"><div class="pm m" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 2, group: true, title: 'Viernes de pelis', friends: [ANA.id] })} /></div>
+    </div>
+</Layout>
+
+<style>
+    .dv { max-width: 1100px; margin: 0 auto; padding-bottom: 60px; }
+    .dv h1 { font: 700 22px var(--font); color: var(--text); margin: 0; }
+    .dv-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 8px; }
+    .dv h2 { font: 600 14px var(--font); color: var(--text-2); margin: 28px 0 10px; }
+    .dv-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+    .dv .ms-main { overflow: visible; }
+    .dv .ms-log { overflow: visible; }
+    .dv .ms-c { margin-top: 240px; }
+    .dv-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .dv-card { padding: 12px; }
+    .dv-card small { display: block; font: 600 11px var(--font-mono); color: var(--text-2); margin-bottom: 4px; }
+    .ms-sheet-like { max-width: 420px; padding: 8px 16px; }
+</style>

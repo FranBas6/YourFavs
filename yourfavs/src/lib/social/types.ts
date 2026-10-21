@@ -144,7 +144,69 @@ export interface ChatMessage {
     folded: boolean;
     /** Solo en los tuyos: casa el envío optimista con el mensaje guardado. */
     clientId: string | null;
+    /** Tarjeta (M4), ya resuelta para quien pide. null en los de texto, los borrados y los plegados. */
+    card: ChatCard | null;
+    /** Marcado como spoiler (M4c). null si no, o si está borrado o plegado. */
+    spoiler: SpoilerRef | null;
+    /** Spoiler al que no has llegado: `body` no viene (el servidor no lo manda), solo `lines`. */
+    locked: boolean;
+    /** Anchos (%) de las barras que sustituyen al texto bloqueado. */
+    lines: number[] | null;
+    /** Ya has llegado a lo que destripa («✓ Ya lo has visto»). */
+    spoilerSeen: boolean;
+    /** Bloqueado: tu estado con ese título, para el pie del escudo («Vas por T2 E3»). */
+    spoilerViewer?: CardViewer | null;
 }
+
+/** De qué es un spoiler: una película, un episodio o una serie entera (sin `season`/`episode`). */
+export interface SpoilerRef { mediaType: 'movie' | 'tv'; tmdbId: number; title: string; season?: number; episode?: number }
+
+// Tarjetas del chat (M4; docs/Mensajes/design_handoff_m4 §2–§3)
+/** Copia de TMDB guardada con el mensaje (para pintar sin pedir nada). */
+export interface TitleCardRef {
+    mediaType: 'movie' | 'tv';
+    tmdbId: number;
+    title: string;
+    poster?: string;
+    year?: string;
+    /** Películas: minutos. */
+    runtime?: number;
+    /** Series: temporadas. */
+    seasons?: number;
+}
+/** Tu estado con el título, calculado al pintar (nunca se guarda). */
+export type CardViewer =
+    | { state: 'pending' }
+    | { state: 'seen'; score: number | null }
+    /** Serie empezada: el SIGUIENTE episodio por ver; `upToDate` si ya viste todo lo emitido. Sin episodio: «La estás viendo». */
+    | { state: 'progress'; season: number | null; episode: number | null; upToDate: boolean };
+/** Un amigo de la conversación con algo que ver con el título (mismo filtro que «Amigos que la han visto»). */
+export interface CardPerson { id: string; state: 'seen' | 'watching' | 'pending'; score: number | null }
+export interface TitleCard {
+    type: 'title';
+    ref: TitleCardRef;
+    viewer: CardViewer | null;
+    /** Ordenadas: vistas con nota, vistas, viéndola, pendientes. El cliente pinta 2 + «y N más». */
+    people: CardPerson[];
+}
+/** Copia de lo recomendado en F4, guardada con la tarjeta del 1:1 (M4b). */
+export interface RecCardRef { recId: number; targetType: RecTarget; targetId: number; title: string; image?: string }
+/**
+ * Recomendación de F4 en el 1:1 (M4b), con el estado de F4 para quien mira:
+ *   · `in` (la recibes): pending · added · alerts · opened · discarded · had · seen;
+ *   · `out` (la enviaste): solo `sent` · `added` · `alerts` (descartar o abrir se ve como «Enviada»).
+ * Nunca lleva caras ni el estado de quien la recibe más allá de eso.
+ */
+export interface RecCard {
+    type: 'rec';
+    ref: RecCardRef;
+    dir: 'in' | 'out';
+    state: RecShown | 'sent';
+}
+/** Tirada de «¿Qué vemos?» enviada al chat (M4d): quién la tiene pendiente (`have`) de cuántos (`of`). */
+export interface WtwCardRef extends TitleCardRef { of: number; have: string[]; roller: string }
+export interface WtwCard { type: 'wtw'; ref: WtwCardRef; viewer: CardViewer | null }
+export type ChatCard = TitleCard | RecCard | WtwCard;
 
 /** Fila de la lista de conversaciones. */
 export interface ConvSummary {
@@ -173,6 +235,8 @@ export interface ChatMember {
     joinedAt: number;
     /** Solo en grupos y solo para quien mira: «Has bloqueado». */
     blockedByMe: boolean;
+    /** Es amigo de quien mira (y sin bloqueo tuyo): a quién puedes recomendar desde el ＋ (M4b). */
+    friend: boolean;
 }
 
 /** Una conversación abierta (o un trozo de ella al sondear o al cargar hacia atrás). */

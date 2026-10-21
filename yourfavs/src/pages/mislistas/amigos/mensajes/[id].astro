@@ -17,7 +17,7 @@ import MessagesShell from '../../../../components/social/messages/MessagesShell.
 import { Icon } from 'astro-icon/components';
 import { friendCount, getHistory, listConversations } from '../../../../services/BD/social/messages';
 import {
-    GONE, chatSubtitle, emptyHtml, gavHtml, groupFaces, infoHtml, logHtml, newAnchor, otherOf,
+    GONE, chatSubtitle, emptyHtml, gavHtml, groupFaces, infoHtml, logHtml, newAnchor, otherOf, plusMenuHtml,
 } from '../../../../lib/social/chatView';
 import { avatarHtml, firstName, icon } from '../../../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
@@ -69,9 +69,15 @@ const to = chat ? (group ? chat.title : firstName(other.name)) : '';
 const placeholder = !chat ? '' : group
     ? (chat.messages.some((m) => m.kind === 'text') ? `Escribe en ${to}` : 'Escribe el primer mensaje')
     : `Escribe a ${to}`;
+// ＋ del compositor (M4): lo que se puede añadir a un mensaje.
+const plusHtml = chat ? plusMenuHtml({
+    id: chat.id, group, title: group ? chat.title : other.name, to: group ? null : other.handle,
+    friends: group ? chat.members.filter((m) => m.friend && m.person.id !== chat!.me.id).map((m) => m.person.id) : [],
+}) : '';
+const plusLabel = 'Añadir al mensaje: compartir un título, recomendar, ¿qué vemos? o marcar como spoiler';
 const logInitial = chat ? logHtml(chat.messages, {
     me: chat.me.id, group, people: chat.people, newAfter: newAnchor(chat.messages, chat.me.id, chat.me.lastReadId),
-    seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {},
+    seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {}, other: group ? null : other,
 }) : '';
 // JSON para el script, sin poder cerrar la etiqueta (`<` escapado).
 const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
@@ -119,14 +125,18 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                         </div>
                     ) : (
                         <form class="ms-c" data-ms-form>
+                            {/* «Spoiler de Severance T2 E5 ✕» (M4c): lo pinta chat.ts al marcar desde el ＋. */}
+                            <div class="ctag-row" data-ms-ctag hidden></div>
                             <div class="ms-cb">
-                                <button type="button" class="ms-plus" aria-disabled="true" aria-label="Más opciones: pronto" aria-describedby="ms-tip">
-                                    <Icon name="lucide:plus" /><span class="ms-tip" id="ms-tip" role="tooltip">Pronto: compartir títulos, recomendar y más</span>
+                                <button type="button" class="ms-plus on" aria-label={plusLabel} aria-haspopup="menu" aria-expanded="false" aria-controls="ms-pm" data-ms-plus>
+                                    <Icon name="lucide:plus" class="i-plus" /><Icon name="lucide:x" class="i-x" />
                                 </button>
                                 <textarea class="ms-ta" rows="1" maxlength="2000" enterkeyhint="enter" data-ms-input
                                           aria-label={`Mensaje para ${to}`} placeholder={placeholder}></textarea>
                                 <button type="submit" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled data-ms-send><Icon name="lucide:send" /></button>
                             </div>
+                            {/* Menú del ＋ (M4): anclado encima del compositor en escritorio; en móvil, la hoja #ms-pm-sheet. */}
+                            <div class="pm" id="ms-pm" role="menu" aria-label="Añadir al mensaje" hidden set:html={plusHtml} />
                             <div class="ms-cf"><span class="ms-hint">Enter para enviar · Mayús + Enter para otra línea</span><b data-ms-count hidden></b></div>
                             <span class="sr-only" aria-live="polite" data-ms-count-live></span>
                         </form>
@@ -140,6 +150,14 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                 <div class="hd" aria-hidden="true"></div>
                 <div class="ms-info-in" set:html={infoHtml(chat)} />
             </dialog>
+            {/* «¿Qué vemos?» (M4d): lo rellena scripts/social/messages/wtw.ts al abrirlo. */}
+            {!chat.readOnly && <dialog class="wv" id="ms-wtw" aria-labelledby="ms-wtw-t"></dialog>}
+            {!chat.readOnly && (
+                <dialog class="ms-sheet" id="ms-pm-sheet" aria-label="Añadir al mensaje">
+                    <div class="hd" aria-hidden="true"></div>
+                    <div class="pm m" role="menu" aria-label="Añadir al mensaje" set:html={plusHtml} />
+                </dialog>
+            )}
             <dialog class="ms-sheet" id="ms-act-sheet" aria-label="Acciones del mensaje">
                 <div class="hd" aria-hidden="true"></div>
                 <div data-ms-act-body></div>

@@ -8,10 +8,12 @@
  * Madrid (`APP_TZ`) en los dos lados, para que lo pintado en el servidor no cambie al repintar.
  * Todo lo que escribe el usuario pasa por `esc()`.
  */
-import { avatarHtml, esc, firstName, icon } from './ui';
+import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../../utils/appTime';
-import type { ChatMessage, ChatView, ConvSummary, PersonCard, SysType } from './types';
+import { formatScore } from '../../utils/constants/helpers/media-helpers';
+import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef, WtwCard } from './types';
+import { recHref, recLeadHtml } from './recUi';
 
 export const MSG_MAX = 2000;
 /** Mismo autor con 5 min o menos entre mensajes → mismo grupo (handoff §4.4). */
@@ -146,7 +148,7 @@ export function linkify(text: string): string {
 // La conversación (handoff §4.4)
 // -------------------------------------------------------------------------------------
 /** Un mensaje tuyo que aún no ha llegado al servidor (o que falló). */
-export interface PendingMsg { clientId: string; body: string; at: number; failed: boolean }
+export interface PendingMsg { clientId: string; body: string; at: number; failed: boolean; spoiler?: SpoilerRef | null }
 
 export interface LogCtx {
     me: string;
@@ -162,6 +164,8 @@ export interface LogCtx {
     now?: number;
     /** Móvil: avatares de 32. */
     compact?: boolean;
+    /** 1:1: la otra persona (las recomendaciones que le enviaste la nombran). */
+    other?: PersonCard | null;
 }
 
 /**
@@ -186,10 +190,280 @@ function actionsHtml(): string {
         + `</span>`;
 }
 
-function lineHtml(m: ChatMessage, body: string | null, own: boolean): string {
+// -------------------------------------------------------------------------------------
+// Tarjetas (M4, handoff M4 §3.1–§3.2 y §4): un bloque dentro del grupo de su autor, debajo de la
+// línea del comentario. Mismo marco para los tres tipos; los distingue el sello y el texto.
+// -------------------------------------------------------------------------------------
+const POSTER = (path: string) => `https://image.tmdb.org/t/p/w185${path}`;
+
+/** Ficha del título. */
+export const titleHref = (r: Pick<TitleCardRef, 'mediaType' | 'tmdbId'>) => `/${r.mediaType === 'movie' ? 'movie' : 'serie'}/${r.tmdbId}`;
+
+/** «Película · 2023 · 2 h 4 min» / «Serie · 2022 · 2 temporadas». */
+export function titleMeta(r: TitleCardRef): string {
+    const parts = [r.mediaType === 'movie' ? 'Película' : 'Serie'];
+    if (r.year) parts.push(r.year);
+    if (r.mediaType === 'movie' && r.runtime) {
+        const h = Math.floor(r.runtime / 60), m = r.runtime % 60;
+        parts.push(h ? `${h} h${m ? ` ${m} min` : ''}` : `${m} min`);
+    }
+    if (r.mediaType === 'tv' && r.seasons) parts.push(r.seasons === 1 ? '1 temporada' : `${r.seasons} temporadas`);
+    return parts.join(' · ');
+}
+
+const ratingHtml = (score: number) => `<span class="rt">${icon('star', 'str')}${esc(formatScore(score))}</span>`;
+const stampMini = (color: string, name: string) =>
+    `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
+
+/** Tu píldora: «La tienes pendiente» · «La viste · ★ 8,5» · «Vas por T2 E3». */
+function viewerHtml(v: TitleCard['viewer']): { html: string; sr: string } {
+    if (!v) return { html: '', sr: 'No la tienes' };
+    if (v.state === 'pending') return { html: `<span class="tc-me">${icon('clock')}La tienes pendiente</span>`, sr: 'La tienes pendiente' };
+    if (v.state === 'seen') {
+        return {
+            html: `<span class="tc-me ok">${icon('circle-check')}La viste${v.score != null ? ` · ${ratingHtml(v.score)}` : ''}</span>`,
+            sr: `La viste${v.score != null ? `, tu nota ${formatScore(v.score)}` : ''}`,
+        };
+    }
+    const ep = v.season != null && v.episode != null ? `T${v.season} E${v.episode}` : '';
+    const text = !ep ? 'La estás viendo' : v.upToDate ? `Al día · ${ep}` : `Vas por ${ep}`;
+    return { html: `<span class="tc-me">${icon('play')}${text}</span>`, sr: text };
+}
+
+const PERSON_STATE: Record<CardPerson['state'], string> = { seen: 'la vio', watching: 'la está viendo', pending: 'pendiente' };
+
+/** Lo de una persona: su nota (si la vio y puntuó) o el estado. */
+function personBit(p: CardPerson, name: string, html: boolean): string {
+    if (p.state === 'seen' && p.score != null) return html ? `<b>${esc(name)}</b>${ratingHtml(p.score)}` : `${name}: nota ${formatScore(p.score)}`;
+    return html ? `<b>${esc(name)}</b><span>${PERSON_STATE[p.state]}</span>` : `${name}: ${PERSON_STATE[p.state]}`;
+}
+
+/** Línea de caras: como mucho 2 y «y N más» (que despliega la lista entera). */
+function peopleHtml(list: CardPerson[], people: Record<string, PersonCard>): string {
+    const known = list.filter((p) => people[p.id]);
+    if (!known.length) return '';
+    const bit = (p: CardPerson) => `<span class="f">${avatarHtml(people[p.id], 20)}${personBit(p, firstName(people[p.id].name), true)}</span>`;
+    const shown = known.slice(0, 2).map(bit).join('<span class="dot" aria-hidden="true">·</span>');
+    const rest = known.length - 2;
+    const more = rest > 0
+        ? `<details class="tc-more"><summary>y ${rest} más</summary><div class="pf-menu tc-more-l" role="list">`
+            + known.map((p) => `<div role="listitem">${avatarHtml(people[p.id], 22)}${personBit(p, people[p.id].name, true)}</div>`).join('')
+            + `</div></details>`
+        : '';
+    return `<div class="tc-fr">${shown}${more}</div>`;
+}
+
+/** Ficha de lo que enseña una tarjeta. */
+export function cardHref(card: ChatCard): string {
+    return card.type === 'rec' ? recHref(card.ref) : titleHref(card.ref);
+}
+
+/**
+ * Una tarjeta, con el estado de quien mira. `o.other`: la otra persona de un 1:1 (las
+ * recomendaciones la nombran); `o.at`: cuándo se envió.
+ */
+export function cardHtml(
+    card: ChatCard, people: Record<string, PersonCard>,
+    o: { other?: PersonCard | null; at?: number; now?: number; me?: string } = {},
+): string {
+    const now = o.now ?? Date.now();
+    if (card.type === 'wtw') return wtwCardHtml(card, people, o.me ?? '');
+    return card.type === 'title' ? titleCardHtml(card, people) : recCardHtml(card, o.other ?? null, o.at ?? now, now);
+}
+
+/** «Pendiente de los 4» · «Pendiente de 3 de 4». */
+export const wtwCount = (have: number, of: number) => (have >= of ? (of === 2 ? 'Pendiente de los dos' : `Pendiente de los ${of}`) : `Pendiente de ${have} de ${of}`);
+
+/**
+ * Tarjeta de «¿Qué vemos?» (M4d, handoff M4 §3.6): la tirada que alguien envió. Tu píldora, quiénes
+ * la tienen pendiente (todas las personas de la tirada, amigas tuyas o no: eligieron estar en ella) y
+ * «Tirar otra vez», que abre tu propio panel (cada envío es una tarjeta nueva).
+ */
+function wtwCardHtml(card: WtwCard, people: Record<string, PersonCard>, me: string): string {
+    const r = card.ref;
+    const href = titleHref(r);
+    const you = viewerHtml(card.viewer);
+    const roller = r.roller === me ? 'tirada por ti' : `tirada por ${firstName(people[r.roller]?.name ?? DELETED_ACCOUNT)}`;
+    const faces = (r.have ?? []).filter((id) => people[id]).slice(0, 5).map((id) => avatarHtml(people[id], 20)).join('');
+    const count = wtwCount(r.have?.length ?? 0, r.of);
+    const fell = (r.have?.length ?? 0) < r.of ? ` <small>· no había ninguna de los ${r.of}</small>` : '';
+    const poster = r.poster
+        ? `<img src="${POSTER(esc(r.poster))}" alt="" loading="lazy" decoding="async">`
+        : icon(r.mediaType === 'movie' ? 'film' : 'tv');
+    const acts = (card.viewer ? '' : btn('Añadir a Pendientes', {
+        kind: 'pri', icon: 'bookmark-plus', size: 'sm', attrs: `data-tc-add data-mt="${r.mediaType}" data-tmdb="${r.tmdbId}"`,
+    })) + `<a class="pf-btn sm ghost" href="${href}">${icon('arrow-up-right')}Ver ficha</a>`
+        + btn('Tirar otra vez', { kind: 'ghost', icon: 'dice-5', size: 'sm', attrs: 'data-wtw-open-chat' });
+    const sr = `Resultado de ¿Qué vemos?: ${r.title}, ${count.toLowerCase()}. ${you.sr}`;
+    return `<div class="tc tc-wtw" role="article" aria-label="${esc(sr)}">`
+        + `<div class="tc-k">${stampMini('purple', 'dice-5')}<span>¿Qué vemos?</span><em>${esc(roller)}</em></div>`
+        + `<a class="tc-po" href="${href}" tabindex="-1" aria-hidden="true">${poster}</a>`
+        + `<div class="tc-b"><a class="tc-t" href="${href}">${esc(r.title)}</a><div class="tc-m">${esc(titleMeta(r))}</div>`
+        + you.html
+        + `<div class="tc-cnt"><span class="fcs" aria-hidden="true">${faces}</span><span>${esc(count)}${fell}</span></div>`
+        + `<div class="tc-a">${acts}</div></div></div>`;
+}
+
+/** Tarjeta de título. */
+function titleCardHtml(card: TitleCard, people: Record<string, PersonCard>): string {
+    const r = card.ref;
+    const href = titleHref(r);
+    const me = viewerHtml(card.viewer);
+    const poster = r.poster
+        ? `<img src="${POSTER(esc(r.poster))}" alt="" loading="lazy" decoding="async">`
+        : icon(r.mediaType === 'movie' ? 'film' : 'tv');
+    const acts = (card.viewer ? '' : btn('Añadir a Pendientes', {
+        kind: 'pri', icon: 'bookmark-plus', size: 'sm',
+        attrs: `data-tc-add data-mt="${r.mediaType}" data-tmdb="${r.tmdbId}"`,
+    })) + `<a class="pf-btn sm ghost" href="${href}">${icon('arrow-up-right')}Ver ficha</a>`;
+    const known = card.people.filter((p) => people[p.id]);
+    const sr = [`Título: ${r.title}`, me.sr, ...known.map((p) => personBit(p, firstName(people[p.id].name), false))].join('. ');
+    return `<div class="tc" role="article" aria-label="${esc(sr)}">`
+        + `<div class="tc-k">${stampMini('slate', 'clapperboard')}<span>Título</span></div>`
+        + `<a class="tc-po" href="${href}" tabindex="-1" aria-hidden="true">${poster}</a>`
+        + `<div class="tc-b"><a class="tc-t" href="${href}">${esc(r.title)}</a><div class="tc-m">${esc(titleMeta(r))}</div>`
+        + me.html + peopleHtml(card.people, people)
+        + `<div class="tc-a">${acts}</div></div></div>`;
+}
+
+// Recomendación de F4 en el 1:1 (M4b; handoff M4 §4 «Zona de recomendación»). Respeta F4 al 100 %:
+// quien la envía solo ve «Enviada» o «La añadió…», y nunca hay caras ni más estado de quien la recibe.
+const REC_KIND: Record<RecCard['ref']['targetType'], string> = { movie: 'Película', tv: 'Serie', person: 'Persona', company: 'Productora' };
+const REC_SR: Record<RecCard['state'], string> = {
+    pending: 'pendiente', added: 'añadida a Pendientes', alerts: 'avisos activados', opened: 'abierta',
+    discarded: 'descartada', had: 'ya la tenías', seen: 'ya la viste', sent: 'enviada',
+};
+
+function recZoneHtml(card: RecCard, first: string): string {
+    const z = (cls: string, ico: string, text: string, small = '') =>
+        `<div class="tc-z ${cls}">${icon(ico)}<span>${esc(text)}</span>${small ? `<small>${esc(small)}</small>` : ''}</div>`;
+    const person = card.ref.targetType === 'person';
+    if (card.dir === 'out') {
+        if (card.state === 'added') return z('ok', 'check', `${first} la añadió a Pendientes`);
+        if (card.state === 'alerts') return z('ok', 'check', `${first} activó los avisos de sus estrenos`);
+        return z('nt', 'send', 'Enviada');
+    }
+    switch (card.state) {
+        case 'added': return z('ok', 'check', 'Añadida a Pendientes');
+        case 'alerts': return z('ok', 'check', 'Avisos de sus estrenos activados');
+        case 'opened': return z('ok', 'check', 'Abierta');
+        case 'discarded': return z('nt', 'x', 'Descartada', `${first} no lo sabrá.`);
+        case 'had': return z('nt', 'info', person ? 'Ya tenías activados sus avisos' : 'Ya la tenías en tus listas');
+        case 'seen': return z('nt', 'eye', 'Ya la viste');
+        default: return '';
+    }
+}
+
+/** Tarjeta de recomendación. `other`: la otra persona del 1:1 (quien la envía o quien la recibe). */
+function recCardHtml(card: RecCard, other: PersonCard | null, at: number, now: number): string {
+    const r = card.ref;
+    const href = recHref(r);
+    const first = firstName(other?.name ?? DELETED_ACCOUNT);
+    const isTitle = r.targetType === 'movie' || r.targetType === 'tv';
+    const lead = isTitle
+        ? `<a class="tc-po" href="${esc(href)}" tabindex="-1" aria-hidden="true">${r.image ? `<img src="${POSTER(esc(r.image))}" alt="" loading="lazy" decoding="async">` : icon(r.targetType === 'movie' ? 'film' : 'tv')}</a>`
+        : `<a class="tc-lead" href="${esc(href)}" tabindex="-1" aria-hidden="true">${recLeadHtml({ targetType: r.targetType, title: r.title, image: r.image ?? null }, 64)}</a>`;
+    const open = card.dir === 'in' && card.state === 'pending';
+    const attrs = (a: string) => `data-tc-ra="${a}" data-rec-id="${r.recId}"`;
+    const main = r.targetType === 'person'
+        ? btn('Activar avisos de sus estrenos', { kind: 'pri', icon: 'bell', size: 'sm', attrs: attrs('alerts') })
+        : r.targetType === 'company'
+            ? btn('Ver productora', { icon: 'building', size: 'sm', attrs: `${attrs('open')} data-href="${esc(href)}"` })
+            : btn('Añadir a Pendientes', { kind: 'pri', icon: 'bookmark-plus', size: 'sm', attrs: attrs('add') });
+    const acts = open
+        ? main + btn('Descartar', { kind: 'ghost', size: 'sm', attrs: attrs('discard') })
+        : `<a class="pf-btn sm ghost" href="${esc(href)}">${icon('arrow-up-right')}${r.targetType === 'company' ? 'Ver productora' : 'Ver ficha'}</a>`;
+    const kicker = card.dir === 'in' ? `Recomendación · de ${first}` : `Recomendación · para ${first}`;
+    const sr = `Recomendación ${card.dir === 'in' ? 'de' : 'para'} ${first}: ${r.title}, ${REC_SR[card.state]}`;
+    return `<div class="tc tc-rec" role="article" aria-label="${esc(sr)}" data-tc-rec="${r.recId}">`
+        + `<div class="tc-k">${stampMini('amber', 'send')}<span>${esc(kicker)}</span><em>${esc(relTime(at, now))}</em></div>`
+        + lead
+        + `<div class="tc-b"><a class="tc-t" href="${esc(href)}">${esc(r.title)}</a><div class="tc-m">${REC_KIND[r.targetType]}</div>`
+        + `<div aria-live="polite">${recZoneHtml(card, first)}</div>`
+        + `<div class="tc-a">${acts}</div></div></div>`;
+}
+
+/**
+ * Menú del ＋ (handoff M4 §4): Compartir un título · Recomendar · ¿Qué vemos? · Marcar como spoiler.
+ * Las acciones abren su selector con los `data-*` de cada fila (los atiende `SocialLayer`).
+ */
+export function plusMenuHtml(conv: { id: number; group: boolean; title: string; to?: string | null; friends?: string[] }): string {
+    const stamp = (color: string, name: string) =>
+        `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
+    const item = (attrs: string, color: string, ico: string, title: string, text: string) =>
+        `<button type="button" class="pm-i" role="menuitem" ${attrs}>${stamp(color, ico)}<span><b>${esc(title)}</b><small>${esc(text)}</small></span></button>`;
+    const share = `data-share-title data-conv="${conv.id}" data-conv-title="${esc(conv.title)}"${conv.group ? ' data-group' : ''} data-anchor="[data-ms-plus]"`;
+    let html = item(share, 'slate', 'clapperboard', 'Compartir un título', 'Película o serie, con lo que lleva cada cual');
+    // Recomendar (F4, la de siempre): en un 1:1, a esa persona; en un grupo, a tus amigos de dentro.
+    // La tarjeta sale en vuestro 1:1, nunca en el grupo.
+    if (!conv.group && conv.to) {
+        html += item(`data-recommend data-to="${esc(conv.to)}" data-anchor="[data-ms-plus]"`, 'amber', 'send', 'Recomendar',
+            `A ${firstName(conv.title)}, como en Amigos`);
+    } else if (conv.group && conv.friends?.length) {
+        html += item(`data-recommend data-friends="${esc(conv.friends.join(','))}" data-anchor="[data-ms-plus]"`, 'amber', 'send', 'Recomendar',
+            'A alguien del grupo, como en Amigos');
+    }
+    // ¿Qué vemos? (M4d): la ruleta con lo que tenéis pendiente; solo llega al chat la tirada que envíes.
+    html += item('data-wtw-open-chat', 'purple', 'dice-5', '¿Qué vemos?',
+        conv.group ? 'Con lo que tenéis pendiente todas las personas' : 'Con lo que tenéis pendiente los dos');
+    // Marcar como spoiler (M4c): lo que escribas a continuación sale oculto para quien no haya llegado.
+    html += item(`data-spoil-pick data-conv="${conv.id}" data-anchor="[data-ms-plus]"`, 'blue', 'shield', 'Marcar como spoiler',
+        'De una película o de un episodio');
+    return html;
+}
+
+// -------------------------------------------------------------------------------------
+// Spoilers (M4c; handoff M4 §3.4): el escudo para quien no ha llegado (barras en lugar del texto,
+// que no ha llegado al navegador) y la etiqueta para los demás.
+// -------------------------------------------------------------------------------------
+/** «T2 E5», o nada si es de la serie entera o de una película. */
+export const spoilerEp = (sp: SpoilerRef) => (sp.season && sp.episode ? `T${sp.season} E${sp.episode}` : '');
+/** «Severance T2 E5» · «Perfect Days». */
+export const spoilerLabel = (sp: SpoilerRef) => [sp.title, spoilerEp(sp)].filter(Boolean).join(' ');
+const spoilerLong = (sp: SpoilerRef) => `${sp.title}${sp.season && sp.episode ? `, temporada ${sp.season}, episodio ${sp.episode}` : ''}`;
+
+/** Tu estado con el título, al pie del escudo: «Vas por T2 E3» · «La tienes pendiente»… */
+function shieldYou(m: ChatMessage): string {
+    const v = m.spoilerViewer;
+    if (!v) return m.spoiler?.mediaType === 'movie' ? 'No la has visto' : 'No la has empezado';
+    if (v.state === 'pending') return 'La tienes pendiente';
+    if (v.state === 'seen') return 'Aún no has llegado';
+    if (v.season != null && v.episode != null) return `Vas por T${v.season} E${v.episode}`;
+    return 'La estás viendo';
+}
+
+function shieldHtml(m: ChatMessage): string {
+    const sp = m.spoiler!;
+    const ep = spoilerEp(sp);
+    const bars = (m.lines?.length ? m.lines : [90]).map((w) => `<i style="width:${Math.max(20, Math.min(100, Number(w) || 100))}%"></i>`).join('');
+    return `<div class="shd" role="group" aria-label="${esc(`Spoiler de ${spoilerLong(sp)}. Mensaje oculto`)}">`
+        + `<div class="shd-h">${icon('shield')}<span>Spoiler de <b>${esc(sp.title)}</b>${ep ? ` · ${ep}` : ''}</span></div>`
+        + `<div class="shd-bars" aria-hidden="true">${bars}</div>`
+        + `<div class="shd-f"><span>${esc(shieldYou(m))}</span>`
+        + btn('Mostrar igualmente', { size: 'sm', icon: 'eye', attrs: `data-spoil-show="${m.id}"` }) + `</div></div>`;
+}
+
+/** Etiqueta encima del texto: tuyo («Spoiler»), ya lo has visto, o mostrado en esta sesión (+ «Ocultar»). */
+function spoilerTagHtml(m: ChatMessage, own: boolean, shown: boolean): string {
+    const sp = m.spoiler!;
+    const [cls, ico, text] = own ? ['own', 'shield', 'Spoiler'] : shown ? ['shown', 'eye', 'Mostrado'] : ['seen', 'circle-check', 'Ya lo has visto'];
+    return `<div class="sp-r"><span class="sptag ${cls}">${icon(ico)}${text} · ${esc(spoilerLabel(sp))}</span>`
+        + (shown && !own ? `<button type="button" class="lk" data-spoil-hide="${m.id}">Ocultar</button>` : '') + `</div>`;
+}
+
+function lineHtml(m: ChatMessage, body: string | null, own: boolean, ctx: LogCtx, now: number): string {
     const t = `<span class="gt" aria-hidden="true">${hm(m.at)}</span>`;
     if (m.deleted) return `<div class="mm del" data-mid="${m.id}">${t}${icon('trash-2')}${DELETED_TEXT}</div>`;
-    return `<div class="mm" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}<span class="mm-t">${linkify(body ?? '')}</span>${actionsHtml()}</div>`;
+    // Spoiler: bloqueado → escudo (la tarjeta, si la hay, se ve igual debajo); si no, la etiqueta encima.
+    const shown = m.id in ctx.revealed && m.locked;
+    let text = body ? `<span class="mm-t">${linkify(body)}</span>` : '';
+    if (m.spoiler && m.locked && !shown) text = shieldHtml(m);
+    else if (m.spoiler && (body || shown)) text = spoilerTagHtml(m, own, shown) + `<span class="mm-t" tabindex="-1" data-sp-text>${linkify(shown ? ctx.revealed[m.id] : body ?? '')}</span>`;
+    // En una recomendación, «la otra persona»: quien la envía (si no eres tú) o a quien se la enviaste.
+    const other = m.card?.type === 'rec' ? (m.author === ctx.me ? ctx.other ?? null : ctx.people[m.author ?? ''] ?? null) : null;
+    const card = m.card ? cardHtml(m.card, ctx.people, { other, at: m.at, now, me: ctx.me }) : '';
+    const cls = `${card ? ' has-card' : ''}${m.spoiler ? ' sp' : ''}`;
+    return `<div class="mm${cls}" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}${text}${card}${actionsHtml()}</div>`;
 }
 
 function pendingLineHtml(p: PendingMsg): string {
@@ -198,7 +472,8 @@ function pendingLineHtml(p: PendingMsg): string {
             + `<button type="button" class="pf-btn sm" data-retry="${esc(p.clientId)}">${icon('refresh-cw')}Reintentar</button>`
             + `<button type="button" class="pf-btn sm ghost" data-discard="${esc(p.clientId)}">Borrar</button></span>`
         : `<span class="mm-st">${icon('clock')}Enviando…</span>`;
-    return `<div class="mm${p.failed ? '' : ' sending'}" data-cid="${esc(p.clientId)}"><span class="mm-t">${linkify(p.body)}</span>${st}</div>`;
+    const tag = p.spoiler ? `<div class="sp-r"><span class="sptag own">${icon('shield')}Spoiler · ${esc(spoilerLabel(p.spoiler))}</span></div>` : '';
+    return `<div class="mm${p.failed ? '' : ' sending'}${p.spoiler ? ' sp' : ''}" data-cid="${esc(p.clientId)}">${tag}<span class="mm-t">${linkify(p.body)}</span>${st}</div>`;
 }
 
 interface Item { m: ChatMessage | null; p: PendingMsg | null; at: number; author: string | null }
@@ -255,7 +530,7 @@ export function logHtml(msgs: ChatMessage[], ctx: LogCtx): string {
             continue;
         }
         const own = it.author === ctx.me;
-        const line = m ? lineHtml(m, m.folded ? ctx.revealed[m.id] : m.body, own) : pendingLineHtml(it.p!);
+        const line = m ? lineHtml(m, m.folded ? ctx.revealed[m.id] : m.body, own, ctx, now) : pendingLineHtml(it.p!);
         if (cur && cur.author !== null && cur.author === it.author && it.at - cur.at <= GROUP_GAP_MS) {
             cur.lines += line;
             cur.at = it.at;
