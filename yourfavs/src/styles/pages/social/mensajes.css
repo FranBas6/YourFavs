@@ -530,6 +530,86 @@
 .ctag button { width: 24px; height: 24px; border-radius: 50%; border: 0; background: none; display: grid; place-items: center; color: var(--text-2); cursor: pointer; }
 .ctag button:hover { background: var(--bg-elev); color: var(--text); }
 .ctag button svg { width: 13px; height: 13px; }
+/* «¿Qué vemos?» (M4d): la línea de la tarjeta y el panel (aspecto de la ruleta, solo tokens). */
+.tc-cnt { display: flex; align-items: center; gap: 8px; margin-top: 9px; font: 600 12px var(--font); color: var(--text); }
+.tc-cnt small { font-weight: 400; color: var(--text-2); }
+.tc-cnt .fcs, .wv-k .fcs { display: flex; }
+.tc-cnt .fcs .so-av { box-shadow: 0 0 0 2px var(--bg-tint); }
+.tc-cnt .fcs .so-av + .so-av, .wv-k .fcs .so-av + .so-av { margin-left: -6px; }
+.wv-k .fcs .so-av { box-shadow: 0 0 0 2px var(--bg-elev); }
+
+dialog.wv {
+    width: 480px; max-width: calc(100vw - 32px); max-height: min(720px, 90vh); padding: 0; overflow: auto;
+    background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-xl); box-shadow: var(--sh-lg);
+}
+dialog.wv::backdrop { background: rgba(11, 17, 32, .5); }
+.wv-hd { display: none; }
+.wv-h { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.wv-st { border-radius: 10px; }
+.wv-st svg { width: 20px; height: 20px; }
+.wv-h .tx { flex: 1; min-width: 0; }
+.wv-h h3 { margin: 0; font: 700 17px var(--font); color: var(--text); }
+.wv-h p { margin: 1px 0 0; font-size: 12.5px; color: var(--text-2); }
+.wv-h .x {
+    width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); background: var(--bg-tint);
+    display: grid; place-items: center; color: var(--text-2); cursor: pointer; flex-shrink: 0;
+}
+.wv-h .x svg { width: 15px; height: 15px; }
+.wv-f { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 12px; }
+.wv-f .lb { font: 600 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-2); margin-bottom: 7px; }
+.wv-ch { display: flex; flex-wrap: wrap; gap: 6px; }
+.wv-ch button {
+    display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: var(--r-full);
+    border: 1px solid var(--border); background: none; font: 600 12.5px var(--font); color: var(--text-2); cursor: pointer;
+}
+.wv-ch button.p { padding-left: 4px; }
+.wv-ch button.on { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+.wv-ch button.on .so-av { box-shadow: 0 0 0 1.5px var(--bg-elev); }
+.wv-ch button[aria-disabled="true"] { cursor: default; }
+.wv-ch button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.wv-b { padding: 18px 20px 20px; }
+.wv-k {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    font: 600 10px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text);
+}
+.wv-k > svg { width: 14px; height: 14px; }
+.wv-note { display: flex; gap: 7px; margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
+.wv-note svg { width: 15px; height: 15px; margin-top: 2px; flex-shrink: 0; }
+.wv-c { display: flex; gap: 16px; padding: 14px; border-radius: 14px; background: var(--bg-tint); border: 1px solid var(--border); }
+.wv-c .po {
+    display: grid; place-items: center; width: 84px; aspect-ratio: 2 / 3; flex-shrink: 0; align-self: flex-start;
+    overflow: hidden; border-radius: 8px; background: var(--border); color: var(--text-3);
+}
+.wv-c .po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wv-cb { min-width: 0; }
+.wv-c .t { font: 700 17px var(--font); color: var(--text); }
+.wv-c .m { font: 500 11px var(--font-mono); color: var(--text-2); margin: 3px 0 12px; }
+.wv-c .a { display: flex; flex-wrap: wrap; gap: 6px; }
+.wv-c.roll .po { background: var(--border-strong); }
+.wv-c.roll .t, .wv-c.roll .m { color: transparent; background: var(--border); border-radius: 5px; }
+.wv-c.roll .t { width: 180px; }
+.wv-c.roll .m { width: 120px; }
+@media (prefers-reduced-motion: no-preference) {
+    .wv-c.roll { animation: wvPulse 0.9s ease-in-out infinite alternate; }
+    @keyframes wvPulse { from { opacity: 1; } to { opacity: .55; } }
+}
+.wv-c.fade { animation: wvFade 120ms ease-out; }
+@keyframes wvFade { from { opacity: 0; } to { opacity: 1; } }
+.wv-pv { display: flex; align-items: center; gap: 6px; margin: 12px 0 0; font-size: 11.5px; color: var(--text-2); }
+.wv-pv svg { width: 13px; height: 13px; flex-shrink: 0; }
+.wv-emp { padding: 6px 0 2px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.wv-emp h4 { margin: 4px 0 0; font: 700 15px var(--font); color: var(--text); }
+.wv-emp p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text-2); max-width: 360px; }
+.wv-ea { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 6px; }
+@media (max-width: 1023.98px) {
+    dialog.wv {
+        width: 100%; max-width: none; max-height: 88vh; margin: auto 0 0; border-radius: 20px 20px 0 0; border-bottom: 0;
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    .wv-hd { display: block; width: 36px; height: 4px; border-radius: 9px; background: var(--border-strong); margin: 8px auto 0; }
+    .wv-ch button { height: 40px; }
+    .wv-c .a .pf-btn { height: 44px; }
+}
 @media (max-width: 1023.98px) {
     .ms-chat .pm { left: 8px; right: 8px; width: auto; }
     .ms-chat .tc { grid-template-columns: 56px minmax(0, 1fr); column-gap: 12px; max-width: none; }

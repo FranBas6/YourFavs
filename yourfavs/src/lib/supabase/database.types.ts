@@ -496,6 +496,9 @@ isOneToOne: false
 "msg_send":
 { Args: { "p_body": string,"p_card_ref"?: Json,"p_card_type"?: string,"p_client": string,"p_conv": number,"p_me": string,"p_spoiler"?: Json }; Returns: Json
                            },
+"msg_send_wtw":
+{ Args: { "p_conv": number,"p_me": string,"p_ref": Json }; Returns: Json
+                           },
 "msg_spoiler_body":
 { Args: { "p_me": string,"p_msg": number }; Returns: string
                            },
@@ -519,6 +522,11 @@ isOneToOne: false
                            },
 "msg_visible_kind":
 { Args: { "p_me": string,"p_msg": number }; Returns: Database["public"]['Enums']["conv_kind"]
+                           },
+"msg_wtw_pool":
+{ Args: { "p_conv": number,"p_me": string,"p_who": (string)[] }; Returns: {
+              "have": (string)[],"media_type": Database["public"]['Enums']["media_type"],"of": number,"tmdb_id": number
+            }[]
                            },
 "renumber_actor_favs":
 { Args: Record<PropertyKey, never>; Returns: undefined

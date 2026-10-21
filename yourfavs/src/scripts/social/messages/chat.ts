@@ -22,6 +22,7 @@ import { DELETED_ACCOUNT, FOLDED_TEXT } from '../../../lib/social/messagesText';
 import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { msgApi } from './api';
 import { createPoller } from './poller';
+import { initWtw } from './wtw';
 import { showToast } from '../toast';
 import type { ChatMessage, ChatView, RecShown, SpoilerRef } from '../../../lib/social/types';
 
@@ -327,6 +328,14 @@ function init(root: HTMLElement, chat: ChatView) {
         const path = e.composedPath();
         if (plusMenu && !plusMenu.hidden && !path.includes(plusMenu) && !(plusBtn && path.includes(plusBtn))) closePlus();
     });
+
+    // «¿Qué vemos?» (M4d): la tirada enviada entra como un mensaje más.
+    if (!chat.readOnly) {
+        initWtw({
+            conv, chat,
+            onSent: (m) => { merge([m]); readSent = Math.max(readSent, m.id); render('bottom'); refreshList(); },
+        });
+    }
 
     // Tarjeta enviada desde el selector («Compartir un título»): entra como un mensaje más.
     document.addEventListener('yf:ms-card-sent', (e) => {

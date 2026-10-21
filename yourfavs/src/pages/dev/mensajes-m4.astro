@@ -8,7 +8,7 @@ import Layout from '../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
 import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
 import { initialsOf, stampFor } from '../../lib/social/ui';
-import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, RecCard, RecCardRef, SpoilerRef, TitleCardRef } from '../../lib/social/types';
+import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, RecCard, RecCardRef, SpoilerRef, TitleCardRef, WtwCard } from '../../lib/social/types';
 import '../../styles/pages/social/mensajes.css';
 
 export const prerender = false;
@@ -57,6 +57,15 @@ const recStates: [string, RecCard][] = [
     ['Recibida · persona', rec('pending', 'in', { recId: 2, targetType: 'person', targetId: 1, title: 'Greta Gerwig' })],
     ['Enviada (también si la descartó o la abrió)', rec('sent', 'out')],
     ['Enviada · la añadió', rec('added', 'out')],
+];
+
+// «¿Qué vemos?» (§5): de los N · de N−1.
+const wtw = (have: PersonCard[], of: number, viewer: CardViewer | null, roller = CARLA): WtwCard =>
+    ({ type: 'wtw', ref: { ...PERFECT, of, have: have.map((p) => p.id), roller: roller.id }, viewer });
+const wtwStates: [string, WtwCard][] = [
+    ['De los 4 · la tienes pendiente', wtw([CARLA, ME, ANA, IVAN], 4, { state: 'pending' })],
+    ['3 de 4 · no había ninguna de los 4', wtw([CARLA, ANA, IVAN], 4, null)],
+    ['1:1 · tirada por ti', wtw([ME, ANA], 2, { state: 'pending' }, ME)],
 ];
 
 const now = Date.now();
@@ -116,6 +125,11 @@ const spOwn = logHtml([M(ANA, 'Acabo de ver el 5', now - 9 * 60_000), M(ANA, spT
         <h2>Recomendación de F4 en el 1:1 (sin caras ni el estado de quien la recibe)</h2>
         <div class="dv-grid">{recStates.map(([label, c]) => (
             <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people, { other: ANA, at: now - 3600_000, now })} /></div>
+        ))}</div>
+
+        <h2>«¿Qué vemos?» — la tirada enviada (cada envío, una tarjeta nueva)</h2>
+        <div class="dv-grid">{wtwStates.map(([label, c]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people, { me: ME.id, now })} /></div>
         ))}</div>
 
         <h2>Spoiler — bloqueado (texto fuera del navegador) · tarjeta con el comentario oculto</h2>

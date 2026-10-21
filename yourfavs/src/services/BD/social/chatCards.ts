@@ -12,7 +12,7 @@
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { getTitleSummaries, titleKey } from '../../API/shared/titleSummaries';
 import { recViewsForNotifs } from './recommendations';
-import type { CardPerson, CardViewer, ChatMessage, RecCard, SpoilerRef, TitleCard, TitleCardRef } from '../../../lib/social/types';
+import type { CardPerson, CardViewer, ChatMessage, RecCard, SpoilerRef, TitleCard, TitleCardRef, WtwCard } from '../../../lib/social/types';
 
 /** La copia de TMDB para una tarjeta nueva. null si TMDB no conoce el título. */
 export async function titleCardRef(mediaType: 'movie' | 'tv', tmdbId: number): Promise<TitleCardRef | null> {
@@ -94,7 +94,8 @@ async function resolveRecCards(me: string, msgs: ChatMessage[], others: string[]
 }
 
 async function resolveTitleCards(me: string, conv: number, msgs: ChatMessage[]): Promise<void> {
-    const titled = msgs.filter((m): m is ChatMessage & { card: TitleCard } => m.card?.type === 'title');
+    // Tarjetas de título y de «¿Qué vemos?» (M4d): tu píldora; las caras, solo en las de título.
+    const titled = msgs.filter((m): m is ChatMessage & { card: TitleCard | WtwCard } => m.card?.type === 'title' || m.card?.type === 'wtw');
     // Spoilers bloqueados (M4c): tu estado con ese título, para el pie del escudo.
     const locked = msgs.filter((m) => m.locked && m.spoiler);
     if (!titled.length && !locked.length) return;
@@ -133,6 +134,7 @@ async function resolveTitleCards(me: string, conv: number, msgs: ChatMessage[]):
     for (const m of titled) {
         const ref = m.card.ref;
         const k = `${ref.mediaType}:${ref.tmdbId}`;
+        if (m.card.type === 'wtw') { m.card.viewer = viewerOf(mine.get(k)); continue; }
         const list = [...(people.get(k) ?? [])].sort((a, b) =>
             RANK[b.state] - RANK[a.state] || (b.score ?? -1) - (a.score ?? -1));
         m.card = { type: 'title', ref, viewer: viewerOf(mine.get(k)), people: list };

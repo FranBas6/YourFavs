@@ -203,7 +203,10 @@ export interface RecCard {
     dir: 'in' | 'out';
     state: RecShown | 'sent';
 }
-export type ChatCard = TitleCard | RecCard;
+/** Tirada de «¿Qué vemos?» enviada al chat (M4d): quién la tiene pendiente (`have`) de cuántos (`of`). */
+export interface WtwCardRef extends TitleCardRef { of: number; have: string[]; roller: string }
+export interface WtwCard { type: 'wtw'; ref: WtwCardRef; viewer: CardViewer | null }
+export type ChatCard = TitleCard | RecCard | WtwCard;
 
 /** Fila de la lista de conversaciones. */
 export interface ConvSummary {

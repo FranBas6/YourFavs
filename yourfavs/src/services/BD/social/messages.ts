@@ -15,7 +15,7 @@ import { previewOf } from '../../../lib/social/messagesText';
 import { resolveCards } from './chatCards';
 import type { Json } from '../../../lib/supabase/database.types';
 import type {
-    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, SpoilerRef, TitleCardRef,
+    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, SpoilerRef, TitleCardRef, WtwCardRef,
 } from '../../../lib/social/types';
 
 export const MSG_MAX = 2000;
@@ -39,7 +39,7 @@ function unwrap<T>(r: { data: unknown; error: { message: string } | null }): T {
 interface RawMsg {
     id: number; author: string | null; kind: 'text' | 'system'; body: string | null; sys: MsgSys | null;
     created_at: string; deleted: boolean; folded: boolean; client_id: string | null;
-    card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: unknown } | null;
+    card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: WtwCardRef } | null;
     spoiler?: SpoilerRef | null; locked?: boolean; lines?: number[] | null; spoiler_seen?: boolean;
 }
 interface RawConv {
@@ -66,6 +66,7 @@ export function toMessage(r: RawMsg, me: string): ChatMessage {
         // Solo con la copia guardada: el estado de cada cual lo pone `resolveCards` al pintar.
         card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] }
             : r.card?.type === 'rec' ? { type: 'rec', ref: r.card.ref, dir: r.author === me ? 'out' : 'in', state: r.author === me ? 'sent' : 'pending' }
+            : r.card?.type === 'wtw' ? { type: 'wtw', ref: r.card.ref, viewer: null }
             : null,
         spoiler: r.spoiler ?? null, locked: Boolean(r.locked), lines: r.lines ?? null, spoilerSeen: Boolean(r.spoiler_seen),
     };
@@ -79,6 +80,8 @@ function idsOf(m: RawMsg | null): string[] {
         if (m.sys.actor) out.push(m.sys.actor);
         out.push(...(m.sys.targets ?? []));
     }
+    // «¿Qué vemos?»: las caras de quienes la tienen pendiente (aunque ya no estén en el grupo).
+    if (m.card?.type === 'wtw') out.push(...(m.card.ref.have ?? []));
     return out;
 }
 

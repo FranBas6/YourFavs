@@ -12,7 +12,7 @@ import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../../utils/appTime';
 import { formatScore } from '../../utils/constants/helpers/media-helpers';
-import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef } from './types';
+import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef, WtwCard } from './types';
 import { recHref, recLeadHtml } from './recUi';
 
 export const MSG_MAX = 2000;
@@ -255,7 +255,7 @@ function peopleHtml(list: CardPerson[], people: Record<string, PersonCard>): str
 
 /** Ficha de lo que enseña una tarjeta. */
 export function cardHref(card: ChatCard): string {
-    return card.type === 'title' ? titleHref(card.ref) : recHref(card.ref);
+    return card.type === 'rec' ? recHref(card.ref) : titleHref(card.ref);
 }
 
 /**
@@ -263,10 +263,45 @@ export function cardHref(card: ChatCard): string {
  * recomendaciones la nombran); `o.at`: cuándo se envió.
  */
 export function cardHtml(
-    card: ChatCard, people: Record<string, PersonCard>, o: { other?: PersonCard | null; at?: number; now?: number } = {},
+    card: ChatCard, people: Record<string, PersonCard>,
+    o: { other?: PersonCard | null; at?: number; now?: number; me?: string } = {},
 ): string {
     const now = o.now ?? Date.now();
+    if (card.type === 'wtw') return wtwCardHtml(card, people, o.me ?? '');
     return card.type === 'title' ? titleCardHtml(card, people) : recCardHtml(card, o.other ?? null, o.at ?? now, now);
+}
+
+/** «Pendiente de los 4» · «Pendiente de 3 de 4». */
+export const wtwCount = (have: number, of: number) => (have >= of ? (of === 2 ? 'Pendiente de los dos' : `Pendiente de los ${of}`) : `Pendiente de ${have} de ${of}`);
+
+/**
+ * Tarjeta de «¿Qué vemos?» (M4d, handoff M4 §3.6): la tirada que alguien envió. Tu píldora, quiénes
+ * la tienen pendiente (todas las personas de la tirada, amigas tuyas o no: eligieron estar en ella) y
+ * «Tirar otra vez», que abre tu propio panel (cada envío es una tarjeta nueva).
+ */
+function wtwCardHtml(card: WtwCard, people: Record<string, PersonCard>, me: string): string {
+    const r = card.ref;
+    const href = titleHref(r);
+    const you = viewerHtml(card.viewer);
+    const roller = r.roller === me ? 'tirada por ti' : `tirada por ${firstName(people[r.roller]?.name ?? DELETED_ACCOUNT)}`;
+    const faces = (r.have ?? []).filter((id) => people[id]).slice(0, 5).map((id) => avatarHtml(people[id], 20)).join('');
+    const count = wtwCount(r.have?.length ?? 0, r.of);
+    const fell = (r.have?.length ?? 0) < r.of ? ` <small>· no había ninguna de los ${r.of}</small>` : '';
+    const poster = r.poster
+        ? `<img src="${POSTER(esc(r.poster))}" alt="" loading="lazy" decoding="async">`
+        : icon(r.mediaType === 'movie' ? 'film' : 'tv');
+    const acts = (card.viewer ? '' : btn('Añadir a Pendientes', {
+        kind: 'pri', icon: 'bookmark-plus', size: 'sm', attrs: `data-tc-add data-mt="${r.mediaType}" data-tmdb="${r.tmdbId}"`,
+    })) + `<a class="pf-btn sm ghost" href="${href}">${icon('arrow-up-right')}Ver ficha</a>`
+        + btn('Tirar otra vez', { kind: 'ghost', icon: 'dice-5', size: 'sm', attrs: 'data-wtw-open-chat' });
+    const sr = `Resultado de ¿Qué vemos?: ${r.title}, ${count.toLowerCase()}. ${you.sr}`;
+    return `<div class="tc tc-wtw" role="article" aria-label="${esc(sr)}">`
+        + `<div class="tc-k">${stampMini('purple', 'dice-5')}<span>¿Qué vemos?</span><em>${esc(roller)}</em></div>`
+        + `<a class="tc-po" href="${href}" tabindex="-1" aria-hidden="true">${poster}</a>`
+        + `<div class="tc-b"><a class="tc-t" href="${href}">${esc(r.title)}</a><div class="tc-m">${esc(titleMeta(r))}</div>`
+        + you.html
+        + `<div class="tc-cnt"><span class="fcs" aria-hidden="true">${faces}</span><span>${esc(count)}${fell}</span></div>`
+        + `<div class="tc-a">${acts}</div></div></div>`;
 }
 
 /** Tarjeta de título. */
@@ -368,6 +403,9 @@ export function plusMenuHtml(conv: { id: number; group: boolean; title: string; 
         html += item(`data-recommend data-friends="${esc(conv.friends.join(','))}" data-anchor="[data-ms-plus]"`, 'amber', 'send', 'Recomendar',
             'A alguien del grupo, como en Amigos');
     }
+    // ¿Qué vemos? (M4d): la ruleta con lo que tenéis pendiente; solo llega al chat la tirada que envíes.
+    html += item('data-wtw-open-chat', 'purple', 'dice-5', '¿Qué vemos?',
+        conv.group ? 'Con lo que tenéis pendiente todas las personas' : 'Con lo que tenéis pendiente los dos');
     // Marcar como spoiler (M4c): lo que escribas a continuación sale oculto para quien no haya llegado.
     html += item(`data-spoil-pick data-conv="${conv.id}" data-anchor="[data-ms-plus]"`, 'blue', 'shield', 'Marcar como spoiler',
         'De una película o de un episodio');
@@ -423,7 +461,7 @@ function lineHtml(m: ChatMessage, body: string | null, own: boolean, ctx: LogCtx
     else if (m.spoiler && (body || shown)) text = spoilerTagHtml(m, own, shown) + `<span class="mm-t" tabindex="-1" data-sp-text>${linkify(shown ? ctx.revealed[m.id] : body ?? '')}</span>`;
     // En una recomendación, «la otra persona»: quien la envía (si no eres tú) o a quien se la enviaste.
     const other = m.card?.type === 'rec' ? (m.author === ctx.me ? ctx.other ?? null : ctx.people[m.author ?? ''] ?? null) : null;
-    const card = m.card ? cardHtml(m.card, ctx.people, { other, at: m.at, now }) : '';
+    const card = m.card ? cardHtml(m.card, ctx.people, { other, at: m.at, now, me: ctx.me }) : '';
     const cls = `${card ? ' has-card' : ''}${m.spoiler ? ' sp' : ''}`;
     return `<div class="mm${cls}" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}${text}${card}${actionsHtml()}</div>`;
 }

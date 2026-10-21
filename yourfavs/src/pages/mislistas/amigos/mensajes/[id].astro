@@ -74,7 +74,7 @@ const plusHtml = chat ? plusMenuHtml({
     id: chat.id, group, title: group ? chat.title : other.name, to: group ? null : other.handle,
     friends: group ? chat.members.filter((m) => m.friend && m.person.id !== chat!.me.id).map((m) => m.person.id) : [],
 }) : '';
-const plusLabel = 'Añadir al mensaje: compartir un título, recomendar o marcar como spoiler';
+const plusLabel = 'Añadir al mensaje: compartir un título, recomendar, ¿qué vemos? o marcar como spoiler';
 const logInitial = chat ? logHtml(chat.messages, {
     me: chat.me.id, group, people: chat.people, newAfter: newAnchor(chat.messages, chat.me.id, chat.me.lastReadId),
     seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {}, other: group ? null : other,
@@ -150,6 +150,8 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                 <div class="hd" aria-hidden="true"></div>
                 <div class="ms-info-in" set:html={infoHtml(chat)} />
             </dialog>
+            {/* «¿Qué vemos?» (M4d): lo rellena scripts/social/messages/wtw.ts al abrirlo. */}
+            {!chat.readOnly && <dialog class="wv" id="ms-wtw" aria-labelledby="ms-wtw-t"></dialog>}
             {!chat.readOnly && (
                 <dialog class="ms-sheet" id="ms-pm-sheet" aria-label="Añadir al mensaje">
                     <div class="hd" aria-hidden="true"></div>
