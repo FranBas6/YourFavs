@@ -6,6 +6,8 @@
  *     marcado del servidor y se avisa del total a los contadores (`yf:msg-total`, bell.ts).
  *   · La conversación abierta pide un repintado en el acto con `yf:ms-list-refresh` (al enviar,
  *     al leer, al silenciar).
+ *   · Tiempo real (M3): un aviso de cualquier conversación repinta la lista al momento; con el
+ *     canal conectado el sondeo pasa a 2 min (de respaldo).
  *   · Avisos que vienen de otra página (`yf:ms-flash` en sessionStorage): «Has salido de «X»» o
  *     quién se quedó fuera al crear un grupo.
  */
@@ -51,4 +53,8 @@ function init(shell: HTMLElement) {
     }, 30_000);
     poller.start();
     document.addEventListener('yf:ms-list-refresh', () => poller.now());
+    document.addEventListener('yf:live-msg', () => poller.now());
+    const onLive = (up: boolean) => poller.setBase(up ? 120_000 : 30_000);
+    document.addEventListener('yf:live-status', (e) => onLive(Boolean((e as CustomEvent<{ up: boolean }>).detail?.up)));
+    onLive(Boolean(window.yfLive?.up));
 }

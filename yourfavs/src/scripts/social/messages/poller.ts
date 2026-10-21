@@ -5,12 +5,15 @@
  *   · Nunca solapa: la siguiente vuelta se programa cuando acaba la anterior.
  *   · Pestaña oculta → en pausa. Al volver → una vuelta en el acto y sigue el ritmo.
  *   · Sin indicador de «actualizando»: si falla, se reintenta con más calma (`nextDelay`).
+ *   · Con el tiempo real conectado (M3) el ritmo baja (`setBase`): el sondeo queda de respaldo.
  */
 export interface Poller {
     start(): void;
     stop(): void;
     /** Una vuelta ya (p. ej. justo después de enviar), sin esperar al intervalo. */
     now(): void;
+    /** Cambia el ritmo normal (lo usa el tiempo real: con él conectado, más despacio). */
+    setBase(ms: number): void;
 }
 
 /** Tope de espera entre vueltas cuando fallan seguidas. */
@@ -65,5 +68,10 @@ export function createPoller(task: () => Promise<boolean>, baseMs: number): Poll
             document.removeEventListener('visibilitychange', onVisibility);
         },
         now() { clear(); void tick(); },
+        setBase(ms: number) {
+            if (ms === baseMs) return;
+            baseMs = ms;
+            if (running && timer) schedule();
+        },
     };
 }
