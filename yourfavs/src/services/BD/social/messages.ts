@@ -15,7 +15,7 @@ import { previewOf } from '../../../lib/social/messagesText';
 import { resolveCards } from './chatCards';
 import type { Json } from '../../../lib/supabase/database.types';
 import type {
-    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, TitleCardRef,
+    ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, TitleCardRef,
 } from '../../../lib/social/types';
 
 export const MSG_MAX = 2000;
@@ -39,7 +39,7 @@ function unwrap<T>(r: { data: unknown; error: { message: string } | null }): T {
 interface RawMsg {
     id: number; author: string | null; kind: 'text' | 'system'; body: string | null; sys: MsgSys | null;
     created_at: string; deleted: boolean; folded: boolean; client_id: string | null;
-    card?: { type: 'title'; ref: TitleCardRef } | null;
+    card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: unknown } | null;
 }
 interface RawConv {
     id: number; kind: ConvKind; name: string | null; role: ConvRole; muted: boolean; last_msg_at: string;
@@ -58,12 +58,14 @@ interface RawHistory {
     read_only: boolean;
 }
 
-export function toMessage(r: RawMsg): ChatMessage {
+export function toMessage(r: RawMsg, me: string): ChatMessage {
     return {
         id: r.id, author: r.author, kind: r.kind, body: r.body, sys: r.sys, at: ms(r.created_at),
         deleted: r.deleted, folded: r.folded, clientId: r.client_id,
-        // Solo con la copia de TMDB: el estado de cada cual lo pone `resolveCards` al pintar.
-        card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] } : null,
+        // Solo con la copia guardada: el estado de cada cual lo pone `resolveCards` al pintar.
+        card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] }
+            : r.card?.type === 'rec' ? { type: 'rec', ref: r.card.ref, dir: r.author === me ? 'out' : 'in', state: r.author === me ? 'sent' : 'pending' }
+            : null,
     };
 }
 
@@ -95,7 +97,7 @@ export async function listConversations(me: string): Promise<ConvSummary[]> {
             title: group ? c.name ?? '' : faces[0]?.name ?? 'Cuenta eliminada',
             faces,
             count: c.count,
-            preview: previewOf(c.last ? toMessage(c.last) : null, me, group, people),
+            preview: previewOf(c.last ? toMessage(c.last, me) : null, me, group, people),
             lastAt: ms(c.last_msg_at),
             unread: c.unread,
             muted: c.muted,
@@ -135,18 +137,22 @@ export async function getHistory(
     const memberIds = h.members.map((m) => m.id);
     const ids = [me, ...memberIds, ...h.messages.flatMap(idsOf)];
     const others = memberIds.filter((id) => id !== me);
-    const messages = h.messages.map(toMessage);
+    const messages = h.messages.map((m) => toMessage(m, me));
     const [people, rels] = await Promise.all([
         getPeople(ids),
         // «Has bloqueado» (grupos) y «Amigos desde» (1:1): la relación de quien mira con los demás.
         others.length ? getRelations(me, others) : Promise.resolve(new Map()),
-        resolveCards(me, conv, messages),
+        resolveCards(me, conv, messages, others),
     ]);
     const members: ChatMember[] = h.members
         .map((m) => {
             const person = people.get(m.id);
             if (!person) return null;
-            return { person, role: m.role, joinedAt: ms(m.joined_at), blockedByMe: group && Boolean(rels.get(m.id)?.blockedByMe) };
+            const rel = rels.get(m.id);
+            return {
+                person, role: m.role, joinedAt: ms(m.joined_at), blockedByMe: group && Boolean(rel?.blockedByMe),
+                friend: Boolean(rel?.friends && !rel.blockedByMe),
+            };
         })
         .filter((m): m is ChatMember => Boolean(m));
     const other = group ? null : people.get(others[0] ?? '');
@@ -212,7 +218,7 @@ export async function sendMessage(
         ...(card ? { p_card_type: 'title', p_card_ref: card as unknown as Json } : {}),
     }));
     if (!r.ok || !r.message) return { ok: false, error: r.error ?? 'none' };
-    const message = toMessage(r.message);
+    const message = toMessage(r.message, me);
     await resolveCards(me, conv, [message]);
     return { ok: true, message };
 }

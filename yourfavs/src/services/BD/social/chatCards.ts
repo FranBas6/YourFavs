@@ -11,7 +11,8 @@
  */
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { getTitleSummaries, titleKey } from '../../API/shared/titleSummaries';
-import type { CardPerson, CardViewer, ChatCard, ChatMessage, TitleCardRef } from '../../../lib/social/types';
+import { recViewsForNotifs } from './recommendations';
+import type { CardPerson, CardViewer, ChatMessage, RecCard, TitleCard, TitleCardRef } from '../../../lib/social/types';
 
 /** La copia de TMDB para una tarjeta nueva. null si TMDB no conoce el título. */
 export async function titleCardRef(mediaType: 'movie' | 'tv', tmdbId: number): Promise<TitleCardRef | null> {
@@ -54,10 +55,46 @@ function nextEpisode(last: { season: number; episode: number }, eps: Record<numb
 
 /**
  * Rellena el estado de las tarjetas de estos mensajes (llegan de la base solo con `ref`) para `me`.
- * Una sola llamada a la base por tanda; TMDB solo para las series que estás viendo.
+ * `others`: las demás personas de la conversación (en un 1:1, a quién se envió la recomendación).
  */
-export async function resolveCards(me: string, conv: number, msgs: ChatMessage[]): Promise<void> {
-    const titled = msgs.filter((m): m is ChatMessage & { card: ChatCard } => m.card?.type === 'title');
+export async function resolveCards(me: string, conv: number, msgs: ChatMessage[], others: string[] = []): Promise<void> {
+    await Promise.all([resolveTitleCards(me, conv, msgs), resolveRecCards(me, msgs, others)]);
+}
+
+/**
+ * Recomendaciones (M4b): el estado de F4 para quien mira. Quien la recibió, el suyo completo
+ * (también «Ya la tenías» / «Ya la viste»); quien la envió, solo «Enviada» o «La añadió…»
+ * (descartada o abierta se ven «Enviada»). Sin el destinatario en la base: se pinta sin tarjeta.
+ */
+async function resolveRecCards(me: string, msgs: ChatMessage[], others: string[]): Promise<void> {
+    const recs = msgs.filter((m): m is ChatMessage & { card: RecCard } => m.card?.type === 'rec');
+    if (!recs.length) return;
+    const inIds = recs.filter((m) => m.card.dir === 'in').map((m) => m.card.ref.recId);
+    const outIds = recs.filter((m) => m.card.dir === 'out').map((m) => m.card.ref.recId);
+    const [views, sent] = await Promise.all([
+        inIds.length ? recViewsForNotifs(me, inIds, []) : null,
+        outIds.length && others.length
+            ? supabaseAdmin().from('recommendation_recipients').select('rec_id, status').in('rec_id', outIds).in('to_id', others)
+            : null,
+    ]);
+    if (sent?.error) throw new Error(sent.error.message);
+    const outStatus = new Map((sent?.data ?? []).map((r) => [r.rec_id, r.status]));
+    for (const m of recs) {
+        const card = m.card;
+        const msg: ChatMessage = m;
+        if (card.dir === 'in') {
+            const v = views?.received.get(card.ref.recId);
+            if (v) card.state = v.shown; else msg.card = null;
+        } else {
+            const st = outStatus.get(card.ref.recId);
+            if (!st) msg.card = null;
+            else card.state = st === 'added' ? 'added' : st === 'alerts' ? 'alerts' : 'sent';
+        }
+    }
+}
+
+async function resolveTitleCards(me: string, conv: number, msgs: ChatMessage[]): Promise<void> {
+    const titled = msgs.filter((m): m is ChatMessage & { card: TitleCard } => m.card?.type === 'title');
     if (!titled.length) return;
     const refs = titled.map((m) => m.card.ref);
     const { data, error } = await supabaseAdmin().rpc('msg_card_states', {

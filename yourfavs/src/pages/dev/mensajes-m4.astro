@@ -8,7 +8,7 @@ import Layout from '../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
 import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
 import { initialsOf, stampFor } from '../../lib/social/ui';
-import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, TitleCardRef } from '../../lib/social/types';
+import type { CardPerson, CardViewer, ChatCard, ChatMessage, PersonCard, RecCard, RecCardRef, TitleCardRef } from '../../lib/social/types';
 import '../../styles/pages/social/mensajes.css';
 
 export const prerender = false;
@@ -45,6 +45,20 @@ const states: [string, ChatCard][] = [
     ['Ningún amigo con estado · sin póster', card(SEV, null)],
 ];
 
+// Recomendación de F4 en el 1:1 (§5): quien la recibe · quien la envía.
+const DUNE: RecCardRef = { recId: 1, targetType: 'movie', targetId: 693134, title: 'Dune: Parte dos', image: '/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg' };
+const rec = (state: RecCard['state'], dir: RecCard['dir'] = 'in', ref: RecCardRef = DUNE): RecCard => ({ type: 'rec', ref, dir, state });
+const recStates: [string, RecCard][] = [
+    ['Recibida · pendiente', rec('pending')],
+    ['Recibida · añadida', rec('added')],
+    ['Recibida · descartada', rec('discarded')],
+    ['Recibida · ya la tenías', rec('had')],
+    ['Recibida · ya la viste', rec('seen')],
+    ['Recibida · persona', rec('pending', 'in', { recId: 2, targetType: 'person', targetId: 1, title: 'Greta Gerwig' })],
+    ['Enviada (también si la descartó o la abrió)', rec('sent', 'out')],
+    ['Enviada · la añadió', rec('added', 'out')],
+];
+
 const now = Date.now();
 let mid = 100;
 const M = (author: PersonCard, body: string, at: number, c: ChatCard | null = null): ChatMessage =>
@@ -54,7 +68,8 @@ const log = logHtml([
     M(ANA, '', now - 29 * 60_000, card(PERFECT, null, [seen(ANA, 9)])),
     M(ME, '¡Me la apunto!', now - 20 * 60_000),
     M(ME, 'Y esta, que la estoy viendo', now - 19 * 60_000, card(SEV, { state: 'progress', season: 2, episode: 4, upToDate: false })),
-], { me: ME.id, group: false, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now });
+    M(ANA, 'La vi el finde. Ojo, que dura casi 3 h', now - 10 * 60_000, rec('pending')),
+], { me: ME.id, group: false, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now, other: ANA });
 ---
 <Layout title="Dev · Mensajes M4" robots="noindex, nofollow">
     <div class="dv">
@@ -63,7 +78,7 @@ const log = logHtml([
 
         <h2>Conversación — la tarjeta va dentro del grupo de su autor; el comentario, encima</h2>
         <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log} /></div>
-            <div class="ms-c"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: false, title: ANA.name })} />
+            <div class="ms-c"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: false, title: ANA.name, to: ANA.handle })} />
                 <div class="ms-cb"><button type="button" class="ms-plus on open" aria-label="Añadir al mensaje" aria-expanded="true"><Icon name="lucide:x" /></button>
                 <textarea class="ms-ta" rows="1" aria-label="Mensaje para Ana" placeholder="Escribe a Ana"></textarea>
                 <button type="button" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled><Icon name="lucide:send" /></button></div></div>
@@ -74,8 +89,13 @@ const log = logHtml([
             <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people)} /></div>
         ))}</div>
 
+        <h2>Recomendación de F4 en el 1:1 (sin caras ni el estado de quien la recibe)</h2>
+        <div class="dv-grid">{recStates.map(([label, c]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml(c, people, { other: ANA, at: now - 3600_000, now })} /></div>
+        ))}</div>
+
         <h2>Menú del ＋ en móvil (hoja)</h2>
-        <div class="dv-box ms-sheet-like"><div class="pm m" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 2, group: true, title: 'Viernes de pelis' })} /></div>
+        <div class="dv-box ms-sheet-like"><div class="pm m" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 2, group: true, title: 'Viernes de pelis', friends: [ANA.id] })} /></div>
     </div>
 </Layout>
 

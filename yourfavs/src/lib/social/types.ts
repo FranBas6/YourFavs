@@ -169,13 +169,28 @@ export type CardViewer =
     | { state: 'progress'; season: number | null; episode: number | null; upToDate: boolean };
 /** Un amigo de la conversación con algo que ver con el título (mismo filtro que «Amigos que la han visto»). */
 export interface CardPerson { id: string; state: 'seen' | 'watching' | 'pending'; score: number | null }
-export interface ChatCard {
+export interface TitleCard {
     type: 'title';
     ref: TitleCardRef;
     viewer: CardViewer | null;
     /** Ordenadas: vistas con nota, vistas, viéndola, pendientes. El cliente pinta 2 + «y N más». */
     people: CardPerson[];
 }
+/** Copia de lo recomendado en F4, guardada con la tarjeta del 1:1 (M4b). */
+export interface RecCardRef { recId: number; targetType: RecTarget; targetId: number; title: string; image?: string }
+/**
+ * Recomendación de F4 en el 1:1 (M4b), con el estado de F4 para quien mira:
+ *   · `in` (la recibes): pending · added · alerts · opened · discarded · had · seen;
+ *   · `out` (la enviaste): solo `sent` · `added` · `alerts` (descartar o abrir se ve como «Enviada»).
+ * Nunca lleva caras ni el estado de quien la recibe más allá de eso.
+ */
+export interface RecCard {
+    type: 'rec';
+    ref: RecCardRef;
+    dir: 'in' | 'out';
+    state: RecShown | 'sent';
+}
+export type ChatCard = TitleCard | RecCard;
 
 /** Fila de la lista de conversaciones. */
 export interface ConvSummary {
@@ -204,6 +219,8 @@ export interface ChatMember {
     joinedAt: number;
     /** Solo en grupos y solo para quien mira: «Has bloqueado». */
     blockedByMe: boolean;
+    /** Es amigo de quien mira (y sin bloqueo tuyo): a quién puedes recomendar desde el ＋ (M4b). */
+    friend: boolean;
 }
 
 /** Una conversación abierta (o un trozo de ella al sondear o al cargar hacia atrás). */

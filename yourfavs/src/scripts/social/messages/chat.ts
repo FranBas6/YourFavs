@@ -16,14 +16,14 @@
  * entero; por eso los nuevos de otras personas se anuncian en una región aparte (`data-ms-live`).
  */
 import {
-    GROUP_NAME_MAX, MSG_MAX, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, renameHtml, type PendingMsg,
+    GROUP_NAME_MAX, MSG_MAX, cardHref, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, otherOf, renameHtml, type PendingMsg,
 } from '../../../lib/social/chatView';
 import { DELETED_ACCOUNT, FOLDED_TEXT } from '../../../lib/social/messagesText';
 import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { msgApi } from './api';
 import { createPoller } from './poller';
 import { showToast } from '../toast';
-import type { ChatMessage, ChatView } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, RecShown } from '../../../lib/social/types';
 
 /** uuid v4 (crypto.randomUUID solo existe en contextos seguros). */
 function uuid(): string {
@@ -103,6 +103,7 @@ function init(root: HTMLElement, chat: ChatView) {
         const focusedId = focused && logEl.contains(focused) ? focused.dataset.mid : null;
         logEl.innerHTML = logHtml(msgs, {
             me, group, people, newAfter, seenId, seenAt, pending, revealed, compact: mobile.matches,
+            other: group ? null : otherOf(current),
         });
         if (mode === 'bottom' || (mode === 'keep' && atBottom)) scroller.scrollTop = scroller.scrollHeight;
         else if (mode === 'prepend') scroller.scrollTop = scroller.scrollHeight - fromBottom;
@@ -351,10 +352,38 @@ function init(root: HTMLElement, chat: ChatView) {
         } catch { /* sin red */ }
         if (!ok) { btn.disabled = false; showToast('No se ha podido añadir. Inténtalo otra vez.', 'error'); return; }
         for (const m of msgs) {
-            if (m.card && m.card.ref.mediaType === mt && m.card.ref.tmdbId === id && !m.card.viewer) m.card.viewer = { state: 'pending' };
+            if (m.card?.type === 'title' && m.card.ref.mediaType === mt && m.card.ref.tmdbId === id && !m.card.viewer) m.card.viewer = { state: 'pending' };
         }
         render();
         showToast('Añadida a Pendientes');
+    }
+
+    // Recomendación recibida (M4b): lo mismo que en la campana (mismo endpoint de F4). La tarjeta
+    // pasa a su estado final en el sitio; la campana y el centro de Amigos lo verán al pintarse.
+    async function actRec(btn: HTMLButtonElement) {
+        const id = Number(btn.dataset.recId);
+        const action = btn.dataset.tcRa;
+        if (!id || !action || btn.disabled) return;
+        const box = btn.closest<HTMLElement>('.tc');
+        box?.querySelectorAll<HTMLButtonElement>('[data-tc-ra]').forEach((b) => { b.disabled = true; });
+        let rec: { shown: RecShown } | null = null;
+        let error = '';
+        try {
+            const res = await fetch(`/api/social/recommendations/${id}/act`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }),
+            });
+            const d = await res.json().catch(() => ({}));
+            rec = d.rec ?? null;
+            if (!res.ok || !d.ok) error = d.error || 'error';
+        } catch { error = 'error'; }
+        if (rec) {
+            for (const m of msgs) if (m.card?.type === 'rec' && m.card.ref.recId === id) m.card.state = rec.shown;
+            render();
+        } else {
+            box?.querySelectorAll<HTMLButtonElement>('[data-tc-ra]').forEach((b) => { b.disabled = false; });
+        }
+        if (error) { showToast(error === 'gone' ? 'Esa recomendación ya no está pendiente.' : 'No se ha podido. Inténtalo otra vez.', 'error'); return; }
+        if (action === 'open' && btn.dataset.href) location.href = btn.dataset.href;
     }
 
     // ---- Acciones sobre un mensaje ----------------------------------------------------------
@@ -362,8 +391,7 @@ function init(root: HTMLElement, chat: ChatView) {
     const bodyOf = (m: ChatMessage) => {
         const text = m.folded ? revealed[m.id] ?? '' : m.body ?? '';
         if (!m.card) return text;
-        const r = m.card.ref;
-        const link = `${r.title} · ${location.origin}/${r.mediaType === 'movie' ? 'movie' : 'serie'}/${r.tmdbId}`;
+        const link = `${m.card.ref.title} · ${location.origin}${cardHref(m.card)}`;
         return text ? `${text}\n${link}` : link;
     };
 
@@ -527,6 +555,8 @@ function init(root: HTMLElement, chat: ChatView) {
         }
         const add = t.closest<HTMLButtonElement>('[data-tc-add]');
         if (add) { void addPending(add); return; }
+        const ra = t.closest<HTMLButtonElement>('[data-tc-ra]');
+        if (ra) { void actRec(ra); return; }
         const rv = t.closest<HTMLElement>('[data-reveal]');
         if (rv) { void reveal(Number(rv.dataset.reveal)); return; }
         const retry = t.closest<HTMLElement>('[data-retry]');

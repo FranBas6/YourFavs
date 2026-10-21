@@ -62,7 +62,7 @@ const direct: ChatMessage[] = [
 ];
 const directChat: ChatView = {
     id: 1, kind: 'direct', title: ANA.name, me: { id: ME.id, role: 'member', muted: false, lastReadId: direct[2].id - 1 },
-    members: [{ person: ME, role: 'member', joinedAt: 0, blockedByMe: false }, { person: ANA, role: 'member', joinedAt: 0, blockedByMe: false }],
+    members: [{ person: ME, role: 'member', joinedAt: 0, blockedByMe: false, friend: true }, { person: ANA, role: 'member', joinedAt: 0, blockedByMe: false, friend: true }],
     messages: direct, people, hasMore: false, deletedIds: [], seenId: direct[5].id, seenAt: t0 + 16 * 60_000, readOnly: false,
     friendsSince: new Date(now - 150 * 24 * H).toISOString(),
 };
@@ -84,11 +84,11 @@ const groupMsgs: ChatMessage[] = [
 const groupChat: ChatView = {
     id: 2, kind: 'group', title: 'Viernes de pelis', me: { id: ME.id, role: 'admin', muted: true, lastReadId: groupMsgs[6].id },
     members: [
-        { person: ANA, role: 'admin', joinedAt: 0, blockedByMe: false },
-        { person: ME, role: 'admin', joinedAt: 0, blockedByMe: false },
-        { person: LUCIA, role: 'member', joinedAt: 0, blockedByMe: false },
-        { person: CARLA, role: 'member', joinedAt: 0, blockedByMe: true },
-        { person: PEPE, role: 'admin', joinedAt: 0, blockedByMe: false },
+        { person: ANA, role: 'admin', joinedAt: 0, blockedByMe: false, friend: true },
+        { person: ME, role: 'admin', joinedAt: 0, blockedByMe: false, friend: true },
+        { person: LUCIA, role: 'member', joinedAt: 0, blockedByMe: false, friend: true },
+        { person: CARLA, role: 'member', joinedAt: 0, blockedByMe: true, friend: false },
+        { person: PEPE, role: 'admin', joinedAt: 0, blockedByMe: false, friend: true },
     ],
     messages: groupMsgs, people, hasMore: false, deletedIds: [], seenId: null, seenAt: null, readOnly: false, friendsSince: null,
 };

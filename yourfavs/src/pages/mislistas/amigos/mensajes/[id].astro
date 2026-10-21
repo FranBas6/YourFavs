@@ -70,11 +70,14 @@ const placeholder = !chat ? '' : group
     ? (chat.messages.some((m) => m.kind === 'text') ? `Escribe en ${to}` : 'Escribe el primer mensaje')
     : `Escribe a ${to}`;
 // ＋ del compositor (M4): lo que se puede añadir a un mensaje.
-const plusHtml = chat ? plusMenuHtml({ id: chat.id, group, title: group ? chat.title : other.name }) : '';
-const plusLabel = 'Añadir al mensaje: compartir un título';
+const plusHtml = chat ? plusMenuHtml({
+    id: chat.id, group, title: group ? chat.title : other.name, to: group ? null : other.handle,
+    friends: group ? chat.members.filter((m) => m.friend && m.person.id !== chat!.me.id).map((m) => m.person.id) : [],
+}) : '';
+const plusLabel = 'Añadir al mensaje: compartir un título o recomendar';
 const logInitial = chat ? logHtml(chat.messages, {
     me: chat.me.id, group, people: chat.people, newAfter: newAnchor(chat.messages, chat.me.id, chat.me.lastReadId),
-    seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {},
+    seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {}, other: group ? null : other,
 }) : '';
 // JSON para el script, sin poder cerrar la etiqueta (`<` escapado).
 const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';

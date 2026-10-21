@@ -8,11 +8,12 @@
  * Madrid (`APP_TZ`) en los dos lados, para que lo pintado en el servidor no cambie al repintar.
  * Todo lo que escribe el usuario pasa por `esc()`.
  */
-import { avatarHtml, btn, esc, firstName, icon } from './ui';
+import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../../utils/appTime';
 import { formatScore } from '../../utils/constants/helpers/media-helpers';
-import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, SysType, TitleCardRef } from './types';
+import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SysType, TitleCard, TitleCardRef } from './types';
+import { recHref, recLeadHtml } from './recUi';
 
 export const MSG_MAX = 2000;
 /** Mismo autor con 5 min o menos entre mensajes → mismo grupo (handoff §4.4). */
@@ -163,6 +164,8 @@ export interface LogCtx {
     now?: number;
     /** Móvil: avatares de 32. */
     compact?: boolean;
+    /** 1:1: la otra persona (las recomendaciones que le enviaste la nombran). */
+    other?: PersonCard | null;
 }
 
 /**
@@ -213,7 +216,7 @@ const stampMini = (color: string, name: string) =>
     `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
 
 /** Tu píldora: «La tienes pendiente» · «La viste · ★ 8,5» · «Vas por T2 E3». */
-function viewerHtml(v: ChatCard['viewer']): { html: string; sr: string } {
+function viewerHtml(v: TitleCard['viewer']): { html: string; sr: string } {
     if (!v) return { html: '', sr: 'No la tienes' };
     if (v.state === 'pending') return { html: `<span class="tc-me">${icon('clock')}La tienes pendiente</span>`, sr: 'La tienes pendiente' };
     if (v.state === 'seen') {
@@ -250,8 +253,24 @@ function peopleHtml(list: CardPerson[], people: Record<string, PersonCard>): str
     return `<div class="tc-fr">${shown}${more}</div>`;
 }
 
-/** Una tarjeta de título, con el estado de quien mira. */
-export function cardHtml(card: ChatCard, people: Record<string, PersonCard>): string {
+/** Ficha de lo que enseña una tarjeta. */
+export function cardHref(card: ChatCard): string {
+    return card.type === 'title' ? titleHref(card.ref) : recHref(card.ref);
+}
+
+/**
+ * Una tarjeta, con el estado de quien mira. `o.other`: la otra persona de un 1:1 (las
+ * recomendaciones la nombran); `o.at`: cuándo se envió.
+ */
+export function cardHtml(
+    card: ChatCard, people: Record<string, PersonCard>, o: { other?: PersonCard | null; at?: number; now?: number } = {},
+): string {
+    const now = o.now ?? Date.now();
+    return card.type === 'title' ? titleCardHtml(card, people) : recCardHtml(card, o.other ?? null, o.at ?? now, now);
+}
+
+/** Tarjeta de título. */
+function titleCardHtml(card: TitleCard, people: Record<string, PersonCard>): string {
     const r = card.ref;
     const href = titleHref(r);
     const me = viewerHtml(card.viewer);
@@ -272,24 +291,93 @@ export function cardHtml(card: ChatCard, people: Record<string, PersonCard>): st
         + `<div class="tc-a">${acts}</div></div></div>`;
 }
 
+// Recomendación de F4 en el 1:1 (M4b; handoff M4 §4 «Zona de recomendación»). Respeta F4 al 100 %:
+// quien la envía solo ve «Enviada» o «La añadió…», y nunca hay caras ni más estado de quien la recibe.
+const REC_KIND: Record<RecCard['ref']['targetType'], string> = { movie: 'Película', tv: 'Serie', person: 'Persona', company: 'Productora' };
+const REC_SR: Record<RecCard['state'], string> = {
+    pending: 'pendiente', added: 'añadida a Pendientes', alerts: 'avisos activados', opened: 'abierta',
+    discarded: 'descartada', had: 'ya la tenías', seen: 'ya la viste', sent: 'enviada',
+};
+
+function recZoneHtml(card: RecCard, first: string): string {
+    const z = (cls: string, ico: string, text: string, small = '') =>
+        `<div class="tc-z ${cls}">${icon(ico)}<span>${esc(text)}</span>${small ? `<small>${esc(small)}</small>` : ''}</div>`;
+    const person = card.ref.targetType === 'person';
+    if (card.dir === 'out') {
+        if (card.state === 'added') return z('ok', 'check', `${first} la añadió a Pendientes`);
+        if (card.state === 'alerts') return z('ok', 'check', `${first} activó los avisos de sus estrenos`);
+        return z('nt', 'send', 'Enviada');
+    }
+    switch (card.state) {
+        case 'added': return z('ok', 'check', 'Añadida a Pendientes');
+        case 'alerts': return z('ok', 'check', 'Avisos de sus estrenos activados');
+        case 'opened': return z('ok', 'check', 'Abierta');
+        case 'discarded': return z('nt', 'x', 'Descartada', `${first} no lo sabrá.`);
+        case 'had': return z('nt', 'info', person ? 'Ya tenías activados sus avisos' : 'Ya la tenías en tus listas');
+        case 'seen': return z('nt', 'eye', 'Ya la viste');
+        default: return '';
+    }
+}
+
+/** Tarjeta de recomendación. `other`: la otra persona del 1:1 (quien la envía o quien la recibe). */
+function recCardHtml(card: RecCard, other: PersonCard | null, at: number, now: number): string {
+    const r = card.ref;
+    const href = recHref(r);
+    const first = firstName(other?.name ?? DELETED_ACCOUNT);
+    const isTitle = r.targetType === 'movie' || r.targetType === 'tv';
+    const lead = isTitle
+        ? `<a class="tc-po" href="${esc(href)}" tabindex="-1" aria-hidden="true">${r.image ? `<img src="${POSTER(esc(r.image))}" alt="" loading="lazy" decoding="async">` : icon(r.targetType === 'movie' ? 'film' : 'tv')}</a>`
+        : `<a class="tc-lead" href="${esc(href)}" tabindex="-1" aria-hidden="true">${recLeadHtml({ targetType: r.targetType, title: r.title, image: r.image ?? null }, 64)}</a>`;
+    const open = card.dir === 'in' && card.state === 'pending';
+    const attrs = (a: string) => `data-tc-ra="${a}" data-rec-id="${r.recId}"`;
+    const main = r.targetType === 'person'
+        ? btn('Activar avisos de sus estrenos', { kind: 'pri', icon: 'bell', size: 'sm', attrs: attrs('alerts') })
+        : r.targetType === 'company'
+            ? btn('Ver productora', { icon: 'building', size: 'sm', attrs: `${attrs('open')} data-href="${esc(href)}"` })
+            : btn('Añadir a Pendientes', { kind: 'pri', icon: 'bookmark-plus', size: 'sm', attrs: attrs('add') });
+    const acts = open
+        ? main + btn('Descartar', { kind: 'ghost', size: 'sm', attrs: attrs('discard') })
+        : `<a class="pf-btn sm ghost" href="${esc(href)}">${icon('arrow-up-right')}${r.targetType === 'company' ? 'Ver productora' : 'Ver ficha'}</a>`;
+    const kicker = card.dir === 'in' ? `Recomendación · de ${first}` : `Recomendación · para ${first}`;
+    const sr = `Recomendación ${card.dir === 'in' ? 'de' : 'para'} ${first}: ${r.title}, ${REC_SR[card.state]}`;
+    return `<div class="tc tc-rec" role="article" aria-label="${esc(sr)}" data-tc-rec="${r.recId}">`
+        + `<div class="tc-k">${stampMini('amber', 'send')}<span>${esc(kicker)}</span><em>${esc(relTime(at, now))}</em></div>`
+        + lead
+        + `<div class="tc-b"><a class="tc-t" href="${esc(href)}">${esc(r.title)}</a><div class="tc-m">${REC_KIND[r.targetType]}</div>`
+        + `<div aria-live="polite">${recZoneHtml(card, first)}</div>`
+        + `<div class="tc-a">${acts}</div></div></div>`;
+}
+
 /**
  * Menú del ＋ (handoff M4 §4): Compartir un título · Recomendar · ¿Qué vemos? · Marcar como spoiler.
  * Las acciones abren su selector con los `data-*` de cada fila (los atiende `SocialLayer`).
  */
-export function plusMenuHtml(conv: { id: number; group: boolean; title: string }): string {
+export function plusMenuHtml(conv: { id: number; group: boolean; title: string; to?: string | null; friends?: string[] }): string {
     const stamp = (color: string, name: string) =>
         `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
     const item = (attrs: string, color: string, ico: string, title: string, text: string) =>
         `<button type="button" class="pm-i" role="menuitem" ${attrs}>${stamp(color, ico)}<span><b>${esc(title)}</b><small>${esc(text)}</small></span></button>`;
     const share = `data-share-title data-conv="${conv.id}" data-conv-title="${esc(conv.title)}"${conv.group ? ' data-group' : ''} data-anchor="[data-ms-plus]"`;
-    return item(share, 'slate', 'clapperboard', 'Compartir un título', 'Película o serie, con lo que lleva cada cual');
+    let html = item(share, 'slate', 'clapperboard', 'Compartir un título', 'Película o serie, con lo que lleva cada cual');
+    // Recomendar (F4, la de siempre): en un 1:1, a esa persona; en un grupo, a tus amigos de dentro.
+    // La tarjeta sale en vuestro 1:1, nunca en el grupo.
+    if (!conv.group && conv.to) {
+        html += item(`data-recommend data-to="${esc(conv.to)}" data-anchor="[data-ms-plus]"`, 'amber', 'send', 'Recomendar',
+            `A ${firstName(conv.title)}, como en Amigos`);
+    } else if (conv.group && conv.friends?.length) {
+        html += item(`data-recommend data-friends="${esc(conv.friends.join(','))}" data-anchor="[data-ms-plus]"`, 'amber', 'send', 'Recomendar',
+            'A alguien del grupo, como en Amigos');
+    }
+    return html;
 }
 
-function lineHtml(m: ChatMessage, body: string | null, own: boolean, people: Record<string, PersonCard>): string {
+function lineHtml(m: ChatMessage, body: string | null, own: boolean, ctx: LogCtx, now: number): string {
     const t = `<span class="gt" aria-hidden="true">${hm(m.at)}</span>`;
     if (m.deleted) return `<div class="mm del" data-mid="${m.id}">${t}${icon('trash-2')}${DELETED_TEXT}</div>`;
     const text = body ? `<span class="mm-t">${linkify(body)}</span>` : '';
-    const card = m.card ? cardHtml(m.card, people) : '';
+    // En una recomendación, «la otra persona»: quien la envía (si no eres tú) o a quien se la enviaste.
+    const other = m.card?.type === 'rec' ? (m.author === ctx.me ? ctx.other ?? null : ctx.people[m.author ?? ''] ?? null) : null;
+    const card = m.card ? cardHtml(m.card, ctx.people, { other, at: m.at, now }) : '';
     return `<div class="mm${card ? ' has-card' : ''}" tabindex="-1" data-mid="${m.id}"${own ? ' data-own' : ''}>${t}${text}${card}${actionsHtml()}</div>`;
 }
 
@@ -356,7 +444,7 @@ export function logHtml(msgs: ChatMessage[], ctx: LogCtx): string {
             continue;
         }
         const own = it.author === ctx.me;
-        const line = m ? lineHtml(m, m.folded ? ctx.revealed[m.id] : m.body, own, ctx.people) : pendingLineHtml(it.p!);
+        const line = m ? lineHtml(m, m.folded ? ctx.revealed[m.id] : m.body, own, ctx, now) : pendingLineHtml(it.p!);
         if (cur && cur.author !== null && cur.author === it.author && it.at - cur.at <= GROUP_GAP_MS) {
             cur.lines += line;
             cur.at = it.at;
