@@ -53,6 +53,8 @@ export interface SocialPhaseFlags {
     friends: boolean;
     recommend: boolean;
     block: boolean;
+    messages: boolean;
+    groups: boolean;
 }
 
 export type FriendsTab = 'pendientes' | 'amigos' | 'siguiendo' | 'seguidores' | 'bloqueados';
@@ -118,3 +120,78 @@ export interface RecSentRecipient {
 }
 
 export interface RecSent extends Omit<RecView, 'shown' | 'reply'> { recipients: RecSentRecipient[] }
+
+// -------------------------------------------------------------------------------------
+// Mensajes (M1 1:1 · M2 grupos; docs/Mensajes/design_handoff_mensajes §2)
+// -------------------------------------------------------------------------------------
+export type ConvKind = 'direct' | 'group';
+export type ConvRole = 'admin' | 'member';
+export type SysType = 'created' | 'added' | 'left' | 'removed' | 'renamed' | 'admin';
+
+/** Mensaje de sistema de un grupo. `actor` es null en la herencia de admin («Ahora Pablo administra…»). */
+export interface MsgSys { type: SysType; actor: string | null; targets: string[]; name?: string; inherited?: boolean }
+
+export interface ChatMessage {
+    id: number;
+    /** null en los de sistema y si se borró la cuenta («Cuenta eliminada»). */
+    author: string | null;
+    kind: 'text' | 'system';
+    /** null si se borró o si está plegado (grupo + autor bloqueado por ti). */
+    body: string | null;
+    sys: MsgSys | null;
+    at: number;
+    deleted: boolean;
+    folded: boolean;
+    /** Solo en los tuyos: casa el envío optimista con el mensaje guardado. */
+    clientId: string | null;
+}
+
+/** Fila de la lista de conversaciones. */
+export interface ConvSummary {
+    id: number;
+    kind: ConvKind;
+    /** 1:1: el nombre de la otra persona; grupo: su nombre. */
+    title: string;
+    /** 1:1: la otra persona; grupo: las dos entradas más recientes que no eres tú (avatar doble). */
+    faces: PersonCard[];
+    /** Personas dentro (contándote). */
+    count: number;
+    /** «Tú: …», «Ana: …», «Mensaje eliminado» o el texto del de sistema. */
+    preview: string;
+    lastAt: number;
+    unread: number;
+    muted: boolean;
+    /** Solo 1:1. Nunca viene el motivo. */
+    readOnly: boolean;
+}
+
+export interface ChatMember {
+    person: PersonCard;
+    role: ConvRole;
+    joinedAt: number;
+    /** Solo en grupos y solo para quien mira: «Has bloqueado». */
+    blockedByMe: boolean;
+}
+
+/** Una conversación abierta (o un trozo de ella al sondear o al cargar hacia atrás). */
+export interface ChatView {
+    id: number;
+    kind: ConvKind;
+    title: string;
+    me: { id: string; role: ConvRole; muted: boolean; lastReadId: number | null };
+    /** 1:1: los dos; grupo: quien está dentro ahora. */
+    members: ChatMember[];
+    messages: ChatMessage[];
+    /** Autores y nombres de los mensajes de sistema, incluida gente que ya salió. */
+    people: Record<string, PersonCard>;
+    hasMore: boolean;
+    /** Al sondear: los ya cargados que se han borrado desde entonces. */
+    deletedIds: number[];
+    /** Solo 1:1: hasta qué mensaje ha leído la otra persona («Visto»). */
+    seenId: number | null;
+    /** Cuándo leyó hasta ahí («Visto · 21:06»). */
+    seenAt: number | null;
+    readOnly: boolean;
+    /** Solo 1:1 y si no está en solo lectura: «Amigos desde mayo». */
+    friendsSince: string | null;
+}

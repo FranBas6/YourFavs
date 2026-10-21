@@ -22,3 +22,9 @@ export async function readUserId(request: Request): Promise<string | null> {
     const id = body?.userId;
     return isUuid(id) ? id.toLowerCase() : null;
 }
+
+/** Entero positivo de un parámetro de ruta o de consulta; null si no lo es. */
+export function posInt(v: unknown): number | null {
+    const n = typeof v === 'number' ? v : typeof v === 'string' && /^\d{1,15}$/.test(v) ? Number(v) : NaN;
+    return Number.isSafeInteger(n) && n > 0 ? n : null;
+}

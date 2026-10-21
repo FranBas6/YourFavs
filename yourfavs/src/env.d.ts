@@ -65,6 +65,8 @@ interface ImportMetaEnv {
     readonly SUPABASE_URL: string;
     readonly SUPABASE_PUBLISHABLE_KEY: string;
     readonly SUPABASE_SECRET_KEY: string;
+    // Quién ve /admin/reportes (uids separados por comas). Sin ella, nadie.
+    readonly ADMIN_UIDS?: string;
 }
 
 interface ImportMeta {
