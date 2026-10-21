@@ -11,6 +11,8 @@
 --     ve desde `joined_at`; quien sale o es quitado deja de ver el grupo. Si sale el último admin,
 --     hereda quien lleva más tiempo dentro.
 --   · En grupos, los mensajes de alguien que TÚ bloqueaste salen plegados (sin texto) solo para ti.
+--   · Los avisos de admin («Has dado permisos de administración a…», «Ahora administras el grupo») solo
+--     los ven quien da el cargo y quien lo recibe; el resto ve la etiqueta «Admin» en el panel (Fran).
 --   · Solo texto (≤ 2.000). Borrar deja «Mensaje eliminado» al momento; Deshacer en 10 s como mucho.
 --   · Frenos: 30 mensajes por minuto y 200 conversaciones nuevas al día por persona.
 --
@@ -140,8 +142,25 @@ begin
   values (p_conv, null, 'system',
           jsonb_build_object('type', p_type, 'actor', p_actor, 'targets', to_jsonb(coalesce(p_targets, '{}'::uuid[])))
           || coalesce(p_extra, '{}'::jsonb));
-  update public.conversations set last_msg_at = now() where id = p_conv;
+  -- Un aviso de admin solo lo ven dos personas: no sube el grupo en la lista de nadie.
+  if p_type <> 'admin' then
+    update public.conversations set last_msg_at = now() where id = p_conv;
+  end if;
 end;
+$$;
+
+-- ¿Ve `p_me` este mensaje? Todos, salvo los avisos de admin: solo quien da el cargo y quien lo recibe
+-- (en la herencia no hay quien lo da: solo quien hereda).
+create function public.msg_sees(p_kind text, p_sys jsonb, p_me uuid)
+returns boolean
+language sql
+immutable
+set search_path = ''
+as $$
+  select p_kind <> 'system'
+      or coalesce(p_sys ->> 'type', '') <> 'admin'
+      or p_sys ->> 'actor' = p_me::text
+      or coalesce(p_sys -> 'targets', '[]'::jsonb) ? p_me::text;
 $$;
 
 -- Nombre de grupo: espacios y saltos de línea colapsados en uno; null si no cabe (1–40).
@@ -644,7 +663,8 @@ as $$
                 where o.conv_id = c.id and o.left_at is null and o.user_id <> p_me
                 order by o.joined_at desc, o.user_id limit 3) s) end,
       'last', (select public.msg_view(x, p_me, c.kind = 'group') from public.messages x
-               where x.conv_id = c.id and x.created_at >= m.joined_at order by x.id desc limit 1),
+               where x.conv_id = c.id and x.created_at >= m.joined_at and public.msg_sees(x.kind, x.sys, p_me)
+               order by x.id desc limit 1),
       'unread', public.msg_unread(p_me, c.id, m.joined_at, m.last_read_id, c.kind = 'group'),
       'read_only', c.kind = 'direct' and public.msg_direct_read_only(p_me, c.id)) as r
     from public.conversation_members m
@@ -686,15 +706,16 @@ begin
   if p_after is not null then
     select coalesce(jsonb_agg(public.msg_view(x::public.messages, p_me, v_group) order by x.id), '[]'::jsonb) into v_msgs
     from (select * from public.messages
-          where conv_id = p_conv and id > p_after and created_at >= v_m.joined_at
+          where conv_id = p_conv and id > p_after and created_at >= v_m.joined_at and public.msg_sees(kind, sys, p_me)
           order by id limit 200) x;
   else
     select coalesce(jsonb_agg(public.msg_view(x::public.messages, p_me, v_group) order by x.id), '[]'::jsonb) into v_msgs
     from (select * from public.messages
           where conv_id = p_conv and created_at >= v_m.joined_at and (p_before is null or id < p_before)
+            and public.msg_sees(kind, sys, p_me)
           order by id desc limit v_lim) x;
     v_more := exists (select 1 from public.messages
-                      where conv_id = p_conv and created_at >= v_m.joined_at
+                      where conv_id = p_conv and created_at >= v_m.joined_at and public.msg_sees(kind, sys, p_me)
                         and id < coalesce((v_msgs -> 0 ->> 'id')::bigint, p_before, 0));
   end if;
 
@@ -796,6 +817,7 @@ revoke all on function public.msg_group_count(uuid)                             
 revoke all on function public.msg_sys(bigint, uuid, text, uuid[], jsonb)                 from public, anon, authenticated;
 revoke all on function public.msg_clean_name(text)                                       from public, anon, authenticated;
 revoke all on function public.msg_view(public.messages, uuid, boolean)                   from public, anon, authenticated;
+revoke all on function public.msg_sees(text, jsonb, uuid)                                from public, anon, authenticated;
 revoke all on function public.msg_open_direct(uuid, uuid)                                from public, anon, authenticated;
 revoke all on function public.msg_create_group(uuid, text, uuid[])                       from public, anon, authenticated;
 revoke all on function public.msg_add_members(uuid, bigint, uuid[])                      from public, anon, authenticated;

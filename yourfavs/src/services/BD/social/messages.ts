@@ -276,7 +276,15 @@ export async function groupCandidates(
     ]);
     if (x.error) throw new Error(x.error.message);
     if (y.error) throw new Error(y.error.message);
-    const ids = [...(x.data ?? []).map((r) => r.b_id), ...(y.data ?? []).map((r) => r.a_id)];
+    // Nunca alguien con un bloqueo de por medio (no se le podría añadir; la base lo rechaza igual).
+    const [bx, by] = await Promise.all([
+        d.from('blocks').select('blocked_id').eq('blocker_id', me),
+        d.from('blocks').select('blocker_id').eq('blocked_id', me),
+    ]);
+    if (bx.error) throw new Error(bx.error.message);
+    if (by.error) throw new Error(by.error.message);
+    const blocked = new Set([...(bx.data ?? []).map((r) => r.blocked_id), ...(by.data ?? []).map((r) => r.blocker_id)]);
+    const ids = [...(x.data ?? []).map((r) => r.b_id), ...(y.data ?? []).map((r) => r.a_id)].filter((id) => !blocked.has(id));
     if (!ids.length) return [];
     const [people, inGroup, groups] = await Promise.all([
         getPeople(ids),
@@ -296,4 +304,16 @@ export async function groupCandidates(
         .filter((p): p is PersonCard => Boolean(p))
         .sort((a, b) => a.name.localeCompare(b.name, 'es'))
         .map((person) => ({ person, inGroup: inSet.has(person.id), full: (count.get(person.id) ?? 0) >= 20 }));
+}
+
+/** Cuántos amigos tiene `me` (sin amigos no hay «Nuevo grupo», handoff §4.1). */
+export async function friendCount(me: string): Promise<number> {
+    const d = db();
+    const [x, y] = await Promise.all([
+        d.from('friendships').select('b_id', { count: 'exact', head: true }).eq('a_id', me).is('ended_at', null),
+        d.from('friendships').select('a_id', { count: 'exact', head: true }).eq('b_id', me).is('ended_at', null),
+    ]);
+    if (x.error) throw new Error(x.error.message);
+    if (y.error) throw new Error(y.error.message);
+    return (x.count ?? 0) + (y.count ?? 0);
 }

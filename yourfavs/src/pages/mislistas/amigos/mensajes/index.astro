@@ -45,8 +45,11 @@ const empty = friends === 0
     : emptyHtml({
         color: 'blue', icon: 'message-circle', title: 'Aún no hay conversaciones',
         text: 'Escribe a un amigo desde su fila o su perfil, o crea un grupo para quedar a ver algo.',
-        actions: `<a class="pf-btn sm" href="/mislistas/amigos?tab=amigos">${icon('users')}Ver amigos</a>`,
+        actions: (SOCIAL_PHASE.groups ? `<button type="button" class="pf-btn pri sm" data-ms-newgroup aria-haspopup="dialog">${icon('users')}Nuevo grupo</button>` : '')
+            + `<a class="pf-btn sm" href="/mislistas/amigos?tab=amigos">${icon('users')}Ver amigos</a>`,
     });
+// Móvil: «Nuevo grupo» encima de la lista (en escritorio va en el rótulo de la columna).
+const canGroup = SOCIAL_PHASE.groups && friends > 0;
 ---
 <Layout title="Mensajes · YourFavs" robots="noindex, nofollow">
     {first && (
@@ -71,7 +74,10 @@ const empty = friends === 0
                     <h1 class="am-h1">Amigos</h1>
                     <MsgSegment on="messages" />
                 </div>
-                <MessagesShell on="list" convs={convs} noInfo empty={!convs.length}>
+                {canGroup && convs.length > 0 && (
+                    <div class="ms-mtop"><button type="button" class="pf-btn sm" data-ms-newgroup aria-haspopup="dialog"><Icon name="lucide:plus" />Nuevo grupo</button></div>
+                )}
+                <MessagesShell on="list" convs={convs} noInfo empty={!convs.length} canGroup={canGroup}>
                     <section class="ms-main" slot="main" aria-label="Mensajes" set:html={empty} />
                 </MessagesShell>
                 {convs.length > 0 && (

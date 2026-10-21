@@ -15,9 +15,9 @@ import PersonalNav from '../../../../components/personal/PersonalNav.astro';
 import Stamp from '../../../../components/Stamp.astro';
 import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
 import { Icon } from 'astro-icon/components';
-import { getHistory, listConversations } from '../../../../services/BD/social/messages';
+import { friendCount, getHistory, listConversations } from '../../../../services/BD/social/messages';
 import {
-    GONE, chatSubtitle, emptyHtml, gavHtml, infoHtml, logHtml, newAnchor, otherOf,
+    GONE, chatSubtitle, emptyHtml, gavHtml, groupFaces, infoHtml, logHtml, newAnchor, otherOf,
 } from '../../../../lib/social/chatView';
 import { avatarHtml, firstName, icon } from '../../../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
@@ -34,13 +34,16 @@ const id = /^\d{1,15}$/.test(Astro.params.id ?? '') ? Number(Astro.params.id) : 
 let convs: ConvSummary[] = [];
 let chat: ChatView | null = null;
 let missing: 'none' | 'left' | 'error' | null = null;
+let friends = 0;
 if (user) {
     try {
-        const [list, h] = await Promise.all([
+        const [list, h, nf] = await Promise.all([
             listConversations(user.uid),
             id ? getHistory(user.uid, id) : Promise.resolve({ ok: false as const, error: 'none' as const }),
+            friendCount(user.uid),
         ]);
         convs = list;
+        friends = nf;
         if (h.ok) chat = h.chat;
         else missing = h.error;
     } catch (err) {
@@ -60,8 +63,12 @@ const missingHtml = missing === 'error'
 // Lo que necesita la conversación para pintarse igual en el servidor y en el navegador.
 const group = chat?.kind === 'group';
 const other = chat && !group ? otherOf(chat) : GONE;
-const faces = chat && group ? chat.members.filter((m) => m.person.id !== chat!.me.id).slice(-2).map((m) => m.person) : [];
+const faces = chat && group ? groupFaces(chat) : [];
 const to = chat ? (group ? chat.title : firstName(other.name)) : '';
+// Grupo recién creado (solo mensajes de sistema): «Escribe el primer mensaje».
+const placeholder = !chat ? '' : group
+    ? (chat.messages.some((m) => m.kind === 'text') ? `Escribe en ${to}` : 'Escribe el primer mensaje')
+    : `Escribe a ${to}`;
 const logInitial = chat ? logHtml(chat.messages, {
     me: chat.me.id, group, people: chat.people, newAfter: newAnchor(chat.messages, chat.me.id, chat.me.lastReadId),
     seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {},
@@ -81,11 +88,12 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                 <button type="button" class="pf-btn pri sm" data-auth-open>Entrar</button>
             </div>
         ) : !chat ? (
-            <MessagesShell on="chat" convs={convs} active={id} noInfo>
+            <MessagesShell on="chat" convs={convs} active={id} noInfo canGroup={friends > 0}>
                 <section class="ms-main" slot="main" aria-label="Conversación" set:html={missingHtml} />
             </MessagesShell>
         ) : (
-            <MessagesShell on="chat" convs={convs} active={chat.id}>
+            <>
+            <MessagesShell on="chat" convs={convs} active={chat.id} canGroup={friends > 0}>
                 <section class="ms-main ms-chat" slot="main" aria-label={`Conversación con ${chat.title}`} data-ms-chat>
                     <header class="ms-h">
                         <a class="pf-btn ico ms-back" href="/mislistas/amigos/mensajes" aria-label="Volver a Mensajes"><Icon name="lucide:chevron-left" /></a>
@@ -116,7 +124,7 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                                     <Icon name="lucide:plus" /><span class="ms-tip" id="ms-tip" role="tooltip">Pronto: compartir títulos, recomendar y más</span>
                                 </button>
                                 <textarea class="ms-ta" rows="1" maxlength="2000" enterkeyhint="enter" data-ms-input
-                                          aria-label={`Mensaje para ${to}`} placeholder={group ? `Escribe en ${to}` : `Escribe a ${to}`}></textarea>
+                                          aria-label={`Mensaje para ${to}`} placeholder={placeholder}></textarea>
                                 <button type="submit" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled data-ms-send><Icon name="lucide:send" /></button>
                             </div>
                             <div class="ms-cf"><span class="ms-hint">Enter para enviar · Mayús + Enter para otra línea</span><b data-ms-count hidden></b></div>
@@ -159,7 +167,22 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                 </form>
             </dialog>
 
-            <script type="application/json" id="ms-data" set:html={data}></script>
+            {/* Quitar a alguien y Salir del grupo: sin Deshacer, por eso confirman (handoff §4.10). Lo rellena chat.ts. */}
+            {group && (
+                <dialog id="ms-confirm" class="so-dlg" role="alertdialog" aria-labelledby="ms-cf-t" aria-describedby="ms-cf-d">
+                    <span class="so-dlg-st" style="--sb: var(--stamp-red); --si: var(--stamp-red-ink)" data-cf-ico></span>
+                    <h3 id="ms-cf-t" data-cf-title></h3>
+                    <p id="ms-cf-d" data-cf-text></p>
+                    <div class="so-cons" data-cf-cons hidden></div>
+                    <div class="so-dlg-f">
+                        <button type="button" class="pf-btn ghost" data-cf-cancel>Cancelar</button>
+                        <button type="button" class="pf-btn pri" data-cf-ok></button>
+                    </div>
+                </dialog>
+            )}
+
+            <script type="application/json" id="ms-data" is:inline set:html={data}></script>
+            </>
         )}
     </div>
 </Layout>

@@ -323,20 +323,55 @@ export function infoDirectHtml(chat: ChatView): string {
         + `<p class="ms-priv">${icon('lock')}Solo la veis ${esc(firstName(o.name))} y tú.</p>`;
 }
 
-/** Panel de información de un grupo (lo de admin llega con M2). */
+/** Las dos entradas más recientes que no eres tú (avatar de grupo, handoff §4.2). */
+export const groupFaces = (chat: ChatView) =>
+    chat.members.filter((m) => m.person.id !== chat.me.id).slice(-2).map((m) => m.person);
+
+export const GROUP_MAX = 10;
+export const GROUP_NAME_MAX = 40;
+
+/** Nombre del grupo convertido en campo (Renombrar, handoff §4.8): «16/40», Cancelar y Guardar. */
+export function renameHtml(name: string): string {
+    return `<div class="ms-ren" data-gm-ren><label class="gp-l" for="ms-ren-in">Nombre del grupo</label>`
+        + `<span class="rk-in"><input id="ms-ren-in" type="text" maxlength="${GROUP_NAME_MAX}" value="${esc(name)}" autocomplete="off" data-gm-ren-in><b class="gp-c" aria-live="polite" data-gm-ren-n>${name.length}/${GROUP_NAME_MAX}</b></span>`
+        + `<div class="ms-ren-r"><span>Enter para guardar</span><div><button type="button" class="pf-btn sm ghost" data-gm="rename-cancel">Cancelar</button>`
+        + `<button type="button" class="pf-btn sm pri" data-gm="rename-save">Guardar</button></div></div></div>`;
+}
+
+/** Panel de información de un grupo: personas con su papel y, si eres admin, los ajustes. */
 export function infoGroupHtml(chat: ChatView): string {
-    const faces = chat.members.filter((m) => m.person.id !== chat.me.id).slice(-2).map((m) => m.person);
+    const admin = chat.me.role === 'admin';
     const admins = chat.members.filter((m) => m.role === 'admin').length;
+    const full = chat.members.length >= GROUP_MAX;
     const rows = chat.members.map((m) => {
         const me = m.person.id === chat.me.id;
+        const first = firstName(m.person.name);
         const tags = (m.role === 'admin' ? `<span class="ms-role">${icon('shield')}Admin</span>` : '')
             + (me ? '<span class="ms-role n">Tú</span>' : '')
             + (m.blockedByMe ? '<span class="ms-role n">Has bloqueado</span>' : '');
-        return `<div class="mb">${avatarHtml(m.person, 32)}<div class="tx"><b>${esc(m.person.name)}</b>${m.person.handle ? `<span>@${esc(m.person.handle)}</span>` : ''}</div><span class="tags">${tags}</span></div>`;
+        const who = `data-uid="${esc(m.person.id)}" data-name="${esc(m.person.name)}"`;
+        const menu = admin && !me
+            ? `<span class="pf-menu-wrap"><button type="button" class="pf-btn ico ms-mb-more" aria-haspopup="menu" aria-expanded="false" data-menu-toggle aria-label="Opciones para ${esc(first)}">${icon('ellipsis')}</button>`
+                + `<div class="pf-menu" role="menu" hidden>`
+                + (m.person.handle ? `<a role="menuitem" href="/u/${esc(m.person.handle)}">${icon('user')}Ver perfil</a>` : '')
+                + (m.role !== 'admin' ? `<button type="button" role="menuitem" data-gm="admin" ${who}>${icon('shield')}Hacer administrador</button>` : '')
+                + `<hr><button type="button" role="menuitem" class="pf-danger" data-gm="remove" ${who}>${icon('user-minus')}Quitar del grupo</button>`
+                + `</div></span>`
+            : '';
+        return `<div class="mb">${avatarHtml(m.person, 32)}<div class="tx"><b>${esc(m.person.name)}</b>${m.person.handle ? `<span>@${esc(m.person.handle)}</span>` : ''}</div><span class="tags">${tags}</span>${menu}</div>`;
     }).join('');
-    return `<div class="ms-id">${gavHtml(faces, 64)}<div class="gname">${esc(chat.title)}</div><span class="s">${chat.members.length} de 10 personas</span></div>`
-        + `<div class="ms-blk"><h5>Personas<span>${chat.me.role === 'admin' ? 'Eres admin' : admins === 1 ? '1 admin' : `${admins} admins`}</span></h5><div class="mbl">${rows}</div></div>`
-        + `<div class="ms-blk">${muteSwitchHtml(chat.me.muted)}</div>`;
+    const name = `<div class="gname" data-gm-name><span data-gm-title>${esc(chat.title)}</span>`
+        + (admin ? `<button type="button" class="pf-btn ico ghost" data-gm="rename" aria-label="Renombrar" title="Renombrar">${icon('pencil')}</button>` : '')
+        + `</div>`;
+    const add = admin
+        ? `<div class="ms-id-acts"><button type="button" class="pf-btn sm" data-ms-addpeople aria-haspopup="dialog"`
+            + ` data-conv="${chat.id}" data-count="${chat.members.length}" data-title="${esc(chat.title)}" data-faces="${esc(JSON.stringify(groupFaces(chat)))}">`
+            + `${icon('user-plus')}Añadir personas</button></div>`
+        : '';
+    return `<div class="ms-id">${gavHtml(groupFaces(chat), 64)}${name}<span class="s">${chat.members.length} de ${GROUP_MAX} personas${full ? ' · completo' : ''}</span>${add}</div>`
+        + `<div class="ms-blk"><h5>Personas<span>${admin ? 'Eres admin' : admins === 1 ? '1 admin' : `${admins} admins`}</span></h5><div class="mbl">${rows}</div></div>`
+        + `<div class="ms-blk">${muteSwitchHtml(chat.me.muted)}`
+        + `<button type="button" class="ms-dgr" data-gm="leave">${icon('log-out')}Salir del grupo</button></div>`;
 }
 
 export const infoHtml = (chat: ChatView) => (chat.kind === 'group' ? infoGroupHtml(chat) : infoDirectHtml(chat));

@@ -9,6 +9,9 @@
  *
  * La lista la pinta el servidor con `lib/social/chatView.ts` y la refresca cada 30 s
  * `scripts/social/messages/rail.ts` con el mismo marcado.
+ *
+ * Grupos (M2, `SOCIAL_PHASE.groups`): «＋ Nuevo grupo» en el rótulo «MENSAJES» (oculto sin amigos) y
+ * el selector de grupo (`#ms-gp`, sobre el `.rk` de F4), que también abre «Añadir personas».
  */
 import { Icon } from 'astro-icon/components';
 import { railListHtml } from '../../../lib/social/chatView';
@@ -25,9 +28,12 @@ interface Props {
     noInfo?: boolean;
     /** Página de Mensajes vacía: en móvil se ve el vacío en vez de la lista. */
     empty?: boolean;
+    /** Tiene amigos: sin ellos no hay «Nuevo grupo». */
+    canGroup?: boolean;
 }
-const { on, convs, active = null, noInfo = false, empty = false } = Astro.props;
+const { on, convs, active = null, noInfo = false, empty = false, canGroup = false } = Astro.props;
 const enabled = SOCIAL_PHASE.messages;
+const groups = enabled && SOCIAL_PHASE.groups;
 ---
 {enabled ? (
     <div class:list={['ms-shell', { noinfo: noInfo }]} data-ms-shell data-on={on} data-active={active ?? ''} data-empty={empty ? '' : undefined}>
@@ -36,7 +42,11 @@ const enabled = SOCIAL_PHASE.messages;
                 <Icon name="lucide:users" /><span>Amigos</span>
                 <span class="rn js-pending-badge" hidden></span>
             </a>
-            <div class="ms-sec"><span id="ms-sec-l">Mensajes</span></div>
+            <div class="ms-sec"><span id="ms-sec-l">Mensajes</span>
+                {groups && canGroup && (
+                    <button type="button" class="pf-btn sm" data-ms-newgroup aria-haspopup="dialog"><Icon name="lucide:plus" />Nuevo grupo</button>
+                )}
+            </div>
             <ul class="ms-l" aria-labelledby="ms-sec-l" data-ms-list set:html={railListHtml(convs, { active })}></ul>
         </aside>
         <slot name="main" />
@@ -49,15 +59,24 @@ const enabled = SOCIAL_PHASE.messages;
     </div>
 )}
 
+{/* La columna de información recordada (yf:chat-info) antes de pintar, sin salto. */}
 {enabled && on === 'chat' && (
-    // La columna de información recordada (yf:chat-info) antes de pintar, sin salto.
     <script is:inline>
         try { if (localStorage.getItem('yf:chat-info') === '0') document.querySelector('[data-ms-shell]')?.classList.add('noinfo'); } catch (e) {}
     </script>
 )}
 
+{groups && (
+    <>
+        <div id="ms-gp-bd" class="rk-backdrop" hidden></div>
+        <div id="ms-gp" class="rk ms-gp" role="dialog" aria-modal="true" aria-label="Nuevo grupo" hidden></div>
+    </>
+)}
+
 {enabled && (
     <script>
         import '../../../scripts/social/messages/rail';
+        import { SOCIAL_PHASE } from '../../../utils/constants/social';
+        if (SOCIAL_PHASE.groups) import('../../../scripts/social/messages/groupPicker');
     </script>
 )}

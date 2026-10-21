@@ -479,6 +479,9 @@ isOneToOne: false
 "msg_restore":
 { Args: { "p_body": string,"p_me": string,"p_msg": number }; Returns: string
                            },
+"msg_sees":
+{ Args: { "p_kind": string,"p_me": string,"p_sys": Json }; Returns: boolean
+                           },
 "msg_send":
 { Args: { "p_body": string,"p_client": string,"p_conv": number,"p_me": string }; Returns: Json
                            },

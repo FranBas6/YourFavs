@@ -170,6 +170,16 @@ select is(public.msg_make_admin(pg_temp.u('a'), pg_temp.v('g'), pg_temp.u('z')),
 select is(public.msg_make_admin(pg_temp.u('a'), pg_temp.v('g'), pg_temp.u('c')), 'ok', 'make_admin: admin hace admin a c');
 select is((select role from conversation_members where conv_id = pg_temp.v('g') and user_id = pg_temp.u('c')), 'admin', 'make_admin: c es admin');
 select is(public.msg_make_admin(pg_temp.u('c'), pg_temp.v('g'), pg_temp.u('b')), 'ok', 'make_admin: un admin nuevo también puede');
+
+-- Avisos de admin: solo quien da el cargo y quien lo recibe (a→c y c→b).
+create function pg_temp.admin_seen(p text, p_conv bigint) returns int language sql as $$
+  select count(*)::int from jsonb_array_elements(pg_temp.hist(p, p_conv) -> 'messages') m where m #>> '{sys,type}' = 'admin' $$;
+select is(pg_temp.admin_seen('a', pg_temp.v('g')), 1, 'aviso de admin: quien da el cargo lo ve (a→c)');
+select is(pg_temp.admin_seen('c', pg_temp.v('g')), 2, 'aviso de admin: c ve el que recibió y el que dio');
+select is(pg_temp.admin_seen('b', pg_temp.v('g')), 1, 'aviso de admin: quien lo recibe lo ve (c→b)');
+select is(pg_temp.admin_seen('e', pg_temp.v('g')), 0, 'aviso de admin: el resto no ve ninguno');
+select isnt((select c ->> 'last' from jsonb_array_elements(public.msg_list(pg_temp.u('e'))) c where (c ->> 'id')::bigint = pg_temp.v('g'))::jsonb #>> '{sys,type}',
+            'admin', 'aviso de admin: tampoco sale en la vista previa del resto');
 select is(public.msg_rename(pg_temp.u('e'), pg_temp.v('g'), 'Otro'), 'not_admin', 'rename: solo admins');
 select is(public.msg_rename(pg_temp.u('a'), pg_temp.v('g'), ''), 'name', 'rename: vacío → name');
 select is(public.msg_rename(pg_temp.u('a'), pg_temp.v('g'), 'Viernes de pelis'), 'ok', 'rename: ok');
@@ -187,6 +197,8 @@ select is((select role from conversation_members where conv_id = pg_temp.v('h') 
 select is((select array_agg(sys ->> 'type' order by id) from (select * from messages where conv_id = pg_temp.v('h') order by id desc limit 2) x),
           array['left', 'admin'], 'herencia: «ha salido» y luego «Ahora e administra»');
 select is((select sys ->> 'inherited' from messages where conv_id = pg_temp.v('h') order by id desc limit 1), 'true', 'herencia: marcado como heredado');
+select is(pg_temp.admin_seen('e', pg_temp.v('h')), 1, 'herencia: quien hereda ve «Ahora administras el grupo»');
+select is(pg_temp.admin_seen('f', pg_temp.v('h')), 0, 'herencia: el resto no lo ve (sí ve «a ha salido»)');
 select '· ' || (public.msg_leave(pg_temp.u('e'), pg_temp.v('h')))::text;
 select '· ' || (public.msg_leave(pg_temp.u('f'), pg_temp.v('h')))::text;
 select ok(not exists (select 1 from conversations where id = pg_temp.v('h')), 'leave: si no queda nadie, el grupo se borra');

@@ -6,16 +6,24 @@
  *     marcado del servidor y se avisa del total a los contadores (`yf:msg-total`, bell.ts).
  *   · La conversación abierta pide un repintado en el acto con `yf:ms-list-refresh` (al enviar,
  *     al leer, al silenciar).
+ *   · Avisos que vienen de otra página (`yf:ms-flash` en sessionStorage): «Has salido de «X»» o
+ *     quién se quedó fuera al crear un grupo.
  */
 import { railListHtml, unreadOf } from '../../../lib/social/chatView';
 import { msgApi } from './api';
 import { createPoller } from './poller';
+import { showToast } from '../toast';
 
 const shell = document.querySelector<HTMLElement>('[data-ms-shell]');
 if (shell) init(shell);
 
 function init(shell: HTMLElement) {
     const list = shell.querySelector<HTMLElement>('[data-ms-list]');
+
+    try {
+        const flash = sessionStorage.getItem('yf:ms-flash');
+        if (flash) { sessionStorage.removeItem('yf:ms-flash'); showToast(flash); }
+    } catch { /* sin almacenamiento */ }
     const active = Number(shell.dataset.active) || null;
 
     // ---- Altura del panel (escritorio) -------------------------------------------------

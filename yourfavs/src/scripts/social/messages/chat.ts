@@ -15,7 +15,9 @@
  * Todo el marcado sale de `lib/social/chatView.ts` (el mismo del servidor). El registro se repinta
  * entero; por eso los nuevos de otras personas se anuncian en una región aparte (`data-ms-live`).
  */
-import { MSG_MAX, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, type PendingMsg } from '../../../lib/social/chatView';
+import {
+    GROUP_NAME_MAX, MSG_MAX, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, renameHtml, type PendingMsg,
+} from '../../../lib/social/chatView';
 import { DELETED_ACCOUNT, FOLDED_TEXT } from '../../../lib/social/messagesText';
 import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { msgApi } from './api';
@@ -65,6 +67,8 @@ function init(root: HTMLElement, chat: ChatView) {
     let seenAt = chat.seenAt;
     let hasMore = chat.hasMore;
     let muted = chat.me.muted;
+    let current: ChatView = chat;
+    let renaming = false;
     // «Nuevos»: encima del primero sin leer AL ABRIR (si lo había) y hasta salir.
     const newAfter = newAnchor(msgs, me, chat.me.lastReadId);
     let readSent = chat.me.lastReadId ?? 0;
@@ -140,6 +144,11 @@ function init(root: HTMLElement, chat: ChatView) {
         if (r.status === 404) { location.reload(); return true; }
         if (!r.ok) return false;
         const c = r.data.chat;
+        // Personas y papeles: los avisos de admin no llegan a todo el mundo, así que el panel se
+        // repinta al cambiar esto, no solo con un mensaje de sistema.
+        const sig = (v: ChatView) => `${v.title}|${v.me.role}|${v.members.map((m) => `${m.person.id}:${m.role}:${m.blockedByMe ? 1 : 0}`).join(',')}`;
+        const metaChanged = sig(c) !== sig(current);
+        current = { ...c, me: { ...c.me, muted } };
         Object.assign(people, c.people);
         const fresh = merge(c.messages);
         let changed = fresh.length > 0;
@@ -151,7 +160,7 @@ function init(root: HTMLElement, chat: ChatView) {
         // Se ha abierto o cerrado la escritura (amistad): la página pinta el compositor que toca.
         if (c.readOnly !== chat.readOnly) { location.reload(); return true; }
         // Cambios del grupo (nombre, personas): cabecera y panel.
-        if (fresh.some((m) => m.kind === 'system')) repaintMeta(c);
+        if (metaChanged || fresh.some((m) => m.kind === 'system')) repaintMeta(c);
         if (changed) render();
         announce(fresh);
         if (fresh.some((m) => m.author !== me)) void markRead();
@@ -163,6 +172,8 @@ function init(root: HTMLElement, chat: ChatView) {
         const s = root.querySelector('[data-ms-sub]');
         if (t) t.textContent = c.title;
         if (s) s.textContent = chatSubtitle(c);
+        // Renombrando: no se pisa el campo; se repinta al terminar.
+        if (renaming) return;
         const html = infoHtml({ ...c, me: { ...c.me, muted } });
         const aside = document.getElementById('ms-info');
         if (aside) aside.innerHTML = html;
@@ -526,7 +537,8 @@ function init(root: HTMLElement, chat: ChatView) {
     infoSheet?.addEventListener('click', (e) => {
         const t = e.target as Element;
         // «Recomendar algo» abre el selector de F4, que no vive en la capa superior: fuera la hoja.
-        if (e.target === infoSheet || t.closest('[data-recommend], a[href]')) infoSheet.close();
+        // Lo mismo con «Añadir personas» (el selector de grupo).
+        if (e.target === infoSheet || t.closest('[data-recommend], [data-ms-addpeople], a[href]')) infoSheet.close();
     });
 
     async function setMuted(next: boolean) {
@@ -567,7 +579,154 @@ function init(root: HTMLElement, chat: ChatView) {
     mobile.addEventListener('change', () => { fitViewport(); render(); });
     fitViewport();
 
+    // ---- Grupo (M2): renombrar, hacer admin, quitar y salir (handoff §4.8 y §4.10) -----------------
+    // `current`: nombre, personas y papeles al día (el sondeo lo actualiza).
+    document.addEventListener('yf:ms-chat-refresh', () => poller.now());
+    const confirmDlg = document.getElementById('ms-confirm') as HTMLDialogElement | null;
+
+    function closeMemberMenus() {
+        document.querySelectorAll<HTMLElement>('.ms-info [data-menu-toggle][aria-expanded="true"], .ms-info-in [data-menu-toggle][aria-expanded="true"]').forEach((t) => {
+            t.setAttribute('aria-expanded', 'false');
+            const m = t.parentElement?.querySelector<HTMLElement>('.pf-menu');
+            if (m) m.hidden = true;
+        });
+    }
+
+    /** Confirmación sin Deshacer (`role="alertdialog"`). Resuelve true con el botón principal. */
+    function ask(o: { icon: string; title: string; text: string; cons?: string; ok: string }): Promise<boolean> {
+        if (!confirmDlg) return Promise.resolve(false);
+        confirmDlg.querySelector('[data-cf-ico]')!.innerHTML = icon(o.icon);
+        confirmDlg.querySelector('[data-cf-title]')!.textContent = o.title;
+        confirmDlg.querySelector('[data-cf-text]')!.textContent = o.text;
+        const cons = confirmDlg.querySelector<HTMLElement>('[data-cf-cons]')!;
+        cons.hidden = !o.cons;
+        cons.innerHTML = o.cons ? `<div>${icon('shield')}<span>${o.cons}</span></div>` : '';
+        const okBtn = confirmDlg.querySelector<HTMLButtonElement>('[data-cf-ok]')!;
+        okBtn.innerHTML = `${icon(o.icon)}${esc(o.ok)}`;
+        return new Promise((resolve) => {
+            let result = false;
+            const done = () => { confirmDlg.removeEventListener('close', done); resolve(result); };
+            confirmDlg.addEventListener('close', done);
+            okBtn.onclick = () => { result = true; confirmDlg.close(); };
+            confirmDlg.querySelector<HTMLButtonElement>('[data-cf-cancel]')!.onclick = () => confirmDlg.close();
+            confirmDlg.showModal();
+            confirmDlg.querySelector<HTMLElement>('[data-cf-cancel]')?.focus();
+        });
+    }
+
+    // Renombrar en el propio panel: Enter guarda, Esc cancela.
+    function startRename(box: HTMLElement) {
+        const name = box.querySelector<HTMLElement>('[data-gm-name]');
+        if (!name) return;
+        renaming = true;
+        name.outerHTML = renameHtml(current.title);
+        const input = box.querySelector<HTMLInputElement>('[data-gm-ren-in]');
+        input?.focus();
+        input?.select();
+    }
+    function stopRename() {
+        renaming = false;
+        repaintMeta(current);
+    }
+    async function saveRename(box: HTMLElement) {
+        const input = box.querySelector<HTMLInputElement>('[data-gm-ren-in]');
+        const v = (input?.value ?? '').replace(/\s+/g, ' ').trim();
+        if (!v || v.length > GROUP_NAME_MAX) { showToast('El nombre tiene que tener de 1 a 40 caracteres.', 'error'); input?.focus(); return; }
+        if (v === current.title) { stopRename(); return; }
+        const r = await msgApi.patch(conv, { name: v });
+        if (!r.ok) { showToast(r.status === 403 ? 'Ya no administras este grupo.' : 'No se ha podido cambiar el nombre.', 'error'); return; }
+        current = { ...current, title: v };
+        stopRename();
+        showToast('Nombre cambiado');
+        poller.now();
+        refreshList();
+    }
+
+    async function makeAdmin(uid: string, name: string) {
+        const r = await msgApi.makeAdmin(conv, uid);
+        if (!r.ok) { showToast(r.status === 403 ? 'Ya no administras este grupo.' : 'No se ha podido. Inténtalo otra vez.', 'error'); return; }
+        showToast(`Ahora ${firstName(name)} es admin`);
+        poller.now();
+    }
+
+    async function removeMember(uid: string, name: string) {
+        const first = firstName(name);
+        const mine = firstName(people[me]?.name ?? 'Tú');
+        const ok = await ask({
+            icon: 'user-minus', title: `¿Quitar a ${first} del grupo?`, ok: 'Quitar',
+            text: `${first} dejará de ver «${current.title}» y sus mensajes. En el chat saldrá «${mine} ha quitado a ${first}».`,
+        });
+        if (!ok) return;
+        const r = await msgApi.removeMember(conv, uid);
+        if (!r.ok) { showToast(r.status === 403 ? 'Ya no administras este grupo.' : 'No se ha podido quitar. Inténtalo otra vez.', 'error'); return; }
+        showToast(`${first} ya no está en el grupo`);
+        poller.now();
+        refreshList();
+    }
+
+    /** «A», «A y B», «A, B y C». */
+    const joinNames = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] ?? '');
+
+    async function leave() {
+        const others = current.members.filter((m) => m.person.id !== me);
+        let cons = '';
+        if (!others.length) {
+            cons = '<b>Eres la última persona del grupo.</b> Al salir, el grupo se borra.';
+        } else if (current.me.role === 'admin') {
+            const admins = others.filter((m) => m.role === 'admin').map((m) => esc(firstName(m.person.name)));
+            if (admins.length) {
+                cons = `<b>Eres admin, igual que ${joinNames(admins)}.</b> ${joinNames(admins)} ${admins.length > 1 ? 'seguirán' : 'seguirá'} administrando el grupo.`;
+            } else {
+                // Hereda quien lleva más tiempo (su última entrada), como en la base.
+                const heir = [...others].sort((a, b) => a.joinedAt - b.joinedAt || a.person.id.localeCompare(b.person.id))[0];
+                cons = `<b>Eres la única persona admin.</b> El cargo pasará a ${esc(firstName(heir.person.name))}, que lleva más tiempo en el grupo.`;
+            }
+        }
+        const ok = await ask({
+            icon: 'log-out', title: `¿Salir de «${current.title}»?`, ok: 'Salir del grupo', cons,
+            text: 'Dejarás de ver el grupo y sus mensajes. Para volver, alguien tendrá que añadirte.',
+        });
+        if (!ok) return;
+        const r = await msgApi.removeMember(conv, me);
+        if (!r.ok) { showToast('No se ha podido salir. Inténtalo otra vez.', 'error'); return; }
+        poller.stop();
+        store.set(sessionStorage, 'yf:ms-flash', `Has salido de «${current.title}»`);
+        location.href = '/mislistas/amigos/mensajes';
+    }
+
+    document.addEventListener('click', (e) => {
+        const b = (e.target as Element).closest?.<HTMLElement>('[data-gm]');
+        if (!b) return;
+        const box = b.closest<HTMLElement>('.ms-info, .ms-info-in');
+        if (!box) return;
+        const uid = b.dataset.uid ?? '';
+        const name = b.dataset.name ?? '';
+        switch (b.dataset.gm) {
+            case 'rename': startRename(box); break;
+            case 'rename-cancel': stopRename(); break;
+            case 'rename-save': void saveRename(box); break;
+            case 'admin': closeMemberMenus(); void makeAdmin(uid, name); break;
+            case 'remove': closeMemberMenus(); void removeMember(uid, name); break;
+            case 'leave': void leave(); break;
+        }
+    });
+    document.addEventListener('input', (e) => {
+        const t = e.target as HTMLElement;
+        if (!t.matches?.('[data-gm-ren-in]')) return;
+        const n = t.closest('[data-gm-ren]')?.querySelector('[data-gm-ren-n]');
+        if (n) n.textContent = `${(t as HTMLInputElement).value.length}/${GROUP_NAME_MAX}`;
+    });
+    document.addEventListener('keydown', (e) => {
+        const t = e.target as HTMLElement;
+        if (!t.matches?.('[data-gm-ren-in]')) return;
+        const box = t.closest<HTMLElement>('.ms-info, .ms-info-in');
+        if (e.key === 'Enter') { e.preventDefault(); if (box) void saveRename(box); }
+        else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); stopRename(); }
+    });
+
     // ---- Arranque --------------------------------------------------------------------------------
+    // Recién creado el grupo: foco en el compositor (groupPicker.ts).
+    if (store.get(sessionStorage, 'yf:ms-focus')) { store.set(sessionStorage, 'yf:ms-focus', null); input?.focus(); }
     // El servidor ya pintó todo; con mensajes sin enviar de antes, o en móvil (avatares de 32), se repinta.
     if (pending.length || mobile.matches) render('bottom');
     else scroller.scrollTop = scroller.scrollHeight;
