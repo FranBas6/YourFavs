@@ -26,6 +26,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<Ap
 export const msgApi = {
     list: () => call<{ convs: ConvSummary[] }>('GET', ''),
     unread: () => call<{ total: number }>('GET', '/unread'),
+    clear: () => call('POST', '/clear'),
     openDirect: (who: { handle: string } | { userId: string }) => call<{ id: number }>('POST', '/direct', who),
     createGroup: (name: string, ids: string[]) => call<{ id: number; skipped: string[] }>('POST', '/groups', { name, ids }),
     candidates: (conv?: number) =>

@@ -77,13 +77,13 @@ export type Database = {
                   ]
                 },"conversation_members": {
                   Row: {
-                    "conv_id": number,"joined_at": string,"last_read_at": string | null,"last_read_id": number | null,"left_at": string | null,"muted": boolean,"role": string,"user_id": string
+                    "cleared_id": number | null,"conv_id": number,"joined_at": string,"last_read_at": string | null,"last_read_id": number | null,"left_at": string | null,"muted": boolean,"role": string,"user_id": string
                   }
                   Insert: {
-                    "conv_id": number,"joined_at"?: string,"last_read_at"?: string | null,"last_read_id"?: number | null,"left_at"?: string | null,"muted"?: boolean,"role"?: string,"user_id": string
+                    "cleared_id"?: number | null,"conv_id": number,"joined_at"?: string,"last_read_at"?: string | null,"last_read_id"?: number | null,"left_at"?: string | null,"muted"?: boolean,"role"?: string,"user_id": string
                   }
                   Update: {
-                    "conv_id"?: number,"joined_at"?: string,"last_read_at"?: string | null,"last_read_id"?: number | null,"left_at"?: string | null,"muted"?: boolean,"role"?: string,"user_id"?: string
+                    "cleared_id"?: number | null,"conv_id"?: number,"joined_at"?: string,"last_read_at"?: string | null,"last_read_id"?: number | null,"left_at"?: string | null,"muted"?: boolean,"role"?: string,"user_id"?: string
                   }
                   Relationships: [
                     {
@@ -425,6 +425,9 @@ isOneToOne: false
 "msg_clean_name":
 { Args: { "p_name": string }; Returns: string
                            },
+"msg_clear_inbox":
+{ Args: { "p_me": string }; Returns: undefined
+                           },
 "msg_create_group":
 { Args: { "p_ids": (string)[],"p_me": string,"p_name": string }; Returns: Json
                            },
@@ -478,6 +481,9 @@ isOneToOne: false
                            },
 "msg_restore":
 { Args: { "p_body": string,"p_me": string,"p_msg": number }; Returns: string
+                           },
+"msg_seen_upto":
+{ Args: { "p_cleared": number,"p_last_read": number }; Returns: number
                            },
 "msg_sees":
 { Args: { "p_kind": string,"p_me": string,"p_sys": Json }; Returns: boolean
