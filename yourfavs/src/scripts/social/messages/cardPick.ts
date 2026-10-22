@@ -22,6 +22,7 @@ import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { MSG_MAX, gavHtml } from '../../../lib/social/chatView';
 import { showToast } from '../toast';
 import type { ChatMessage, ConvSummary, PersonCard, SpoilerRef } from '../../../lib/social/types';
+import { intoMiniLayer } from './miniLayer';
 
 interface Title { type: 'movie' | 'tv'; id: number; title: string; sub: string; image: string | null }
 /** Destino de «Enviar a…»: una conversación o un amigo sin ella. */
@@ -61,6 +62,8 @@ interface State {
 const shell = document.getElementById('ck');
 const backdrop = document.getElementById('ck-bd');
 let st: State | null = null;
+/** Abierto desde el mini-chat (M6): va como capa dentro de la ventanita; esto lo devuelve a su sitio. */
+let unlayer: (() => void) | null = null;
 
 const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
 const POSTER = (p: string) => `https://image.tmdb.org/t/p/w92${p}`;
@@ -242,7 +245,7 @@ const repaint = (s: State) => {
 
 // ---- Abrir, colocar y cerrar ------------------------------------------------------------------
 function place() {
-    if (!shell || !st) return;
+    if (!shell || !st || unlayer) return;
     if (st.sheet) { shell.style.left = ''; shell.style.top = ''; shell.style.maxHeight = ''; return; }
     const r = st.anchor.getBoundingClientRect();
     const w = shell.offsetWidth;
@@ -284,7 +287,8 @@ export function openPick(opener: HTMLElement) {
     shell.setAttribute('aria-label', mode === 'share' ? `Compartir un título en ${s.convTitle}`
         : mode === 'spoiler' ? 'Marcar como spoiler' : mode === 'plan' ? `Plan para verla en ${s.convTitle}` : `Enviar ${target!.title} a una conversación`);
     shell.hidden = false;
-    if (backdrop) backdrop.hidden = false;
+    unlayer = intoMiniLayer(shell, s.anchor, () => close());
+    if (backdrop && !unlayer) backdrop.hidden = false;
     if (s.sheet) document.body.style.overflow = 'hidden';
     opener.setAttribute('aria-expanded', 'true');
     renderAll(s);
@@ -358,6 +362,8 @@ function close(restoreFocus = true) {
     shell.hidden = true;
     shell.innerHTML = '';
     shell.style.left = shell.style.top = shell.style.bottom = shell.style.maxHeight = '';
+    unlayer?.();
+    unlayer = null;
     if (backdrop) backdrop.hidden = true;
     document.body.style.overflow = '';
     s.opener.setAttribute('aria-expanded', 'false');

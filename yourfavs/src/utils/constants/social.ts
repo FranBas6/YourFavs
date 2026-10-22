@@ -21,4 +21,6 @@ export const SOCIAL_PHASE = {
     messages: true,
     /** M2 · grupos de mensajes. Necesita `messages`. */
     groups: true,
+    /** M6 · el mini-chat de escritorio (abajo a la derecha, sin cambiar de página). Necesita `messages`. */
+    minichat: true,
 } as const;

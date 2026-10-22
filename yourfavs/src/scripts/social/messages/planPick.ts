@@ -16,6 +16,7 @@
 import { esc, icon } from '../../../lib/social/ui';
 import { planLong, planShort } from '../../../lib/social/chatView';
 import type { ChatMessage, PlanView } from '../../../lib/social/types';
+import { intoMiniLayer } from './miniLayer';
 
 export interface PlanPickOpen {
     conv: number;
@@ -35,6 +36,8 @@ const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 
 
 const shell = document.getElementById('pk');
 const backdrop = document.getElementById('pk-bd');
+/** Abierto desde el mini-chat (M6): va como capa dentro de la ventanita; esto lo devuelve a su sitio. */
+let unlayer: (() => void) | null = null;
 const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
 
 // ---- Fechas en Madrid ----------------------------------------------------------------------------
@@ -165,7 +168,7 @@ function selectorOf(el: HTMLElement): string | null {
 
 // ---- Abrir, colocar y cerrar ------------------------------------------------------------------
 function place() {
-    if (!shell || !st) return;
+    if (!shell || !st || unlayer) return;
     if (st.sheet || !st.o.anchor) { shell.style.left = ''; shell.style.top = ''; shell.style.bottom = ''; shell.style.maxHeight = ''; return; }
     const r = st.o.anchor.getBoundingClientRect();
     const w = shell.offsetWidth;
@@ -191,7 +194,8 @@ export function openPlanPick(o: PlanPickOpen) {
     shell.classList.toggle('is-sheet', st.sheet);
     shell.setAttribute('aria-label', `${e ? 'Cambiar el plan de' : 'Plan para ver'} ${o.title.title}`);
     shell.hidden = false;
-    if (backdrop) backdrop.hidden = false;
+    unlayer = intoMiniLayer(shell, o.anchor, () => close());
+    if (backdrop && !unlayer) backdrop.hidden = false;
     if (st.sheet) document.body.style.overflow = 'hidden';
     render(st, o.focusNote ? '[data-pk-note]' : '.chps.dd2 .chp.on');
     place();
@@ -204,6 +208,8 @@ function close(restoreFocus = true) {
     shell.hidden = true;
     shell.innerHTML = '';
     shell.style.left = shell.style.top = shell.style.bottom = shell.style.maxHeight = '';
+    unlayer?.();
+    unlayer = null;
     if (backdrop) backdrop.hidden = true;
     document.body.style.overflow = '';
     if (restoreFocus && s.o.anchor?.isConnected) s.o.anchor.focus();
