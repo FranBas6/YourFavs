@@ -363,6 +363,27 @@
         background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
     }
 }
+/* «Volver a donde estabas» (solo móvil; MsFrom.astro + msgOrigin.ts): píldora encima de la lista y
+   tira bajo la cabecera de la conversación. */
+.ms-from { display: none; }
+@media (max-width: 1023.98px) {
+    .ms-from:not([hidden]) {
+        display: inline-flex; align-items: center; gap: 7px; max-width: 100%; min-width: 0;
+        font: 600 13px var(--font); color: var(--primary); text-decoration: none;
+    }
+    .ms-from svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .ms-from span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ms-from:not(.bar) {
+        height: 36px; padding: 0 14px 0 11px; margin: 0 0 12px; box-sizing: border-box;
+        border: 1px solid var(--border); border-radius: var(--r-full); background: var(--bg-elev);
+    }
+    .ms-from.bar:not([hidden]) {
+        display: flex; height: 38px; padding: 0 16px; flex-shrink: 0;
+        border-bottom: 1px solid var(--border); background: var(--bg-tint);
+    }
+    .ms-from:active { opacity: .7; }
+}
+
 /* Con la conversación a pantalla completa, la página de detrás no se desplaza. */
 @media (max-width: 1023.98px) { html.ms-lock, html.ms-lock body { overflow: hidden; } }
 

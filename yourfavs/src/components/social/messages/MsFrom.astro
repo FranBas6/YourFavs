@@ -1,0 +1,50 @@
+---
+/**
+ * «Volver a donde estabas» en Mensajes, solo en móvil (idea de Fran; ver `msgOrigin.ts`).
+ *
+ * Nace oculto y lo rellena el script de abajo antes del primer pintado: si vienes de una página de
+ * fuera de Mensajes, esa es el origen y se guarda (`yf:ms-from`) para las siguientes páginas de
+ * Mensajes; entre ellas se conserva; si entras sin venir de ninguna (dirección escrita, un enlace de
+ * fuera), no hay botón. El título sale de lo que anotó la página al irse (`yf:ms-last`).
+ *
+ * `bar`: la tira bajo la cabecera de la conversación; sin él, la píldora encima de la lista.
+ */
+import { icon } from '../../../lib/social/ui';
+
+interface Props { bar?: boolean }
+const { bar = false } = Astro.props;
+---
+<a class:list={['ms-from', { bar }]} href="/" hidden data-ms-from><Fragment set:html={icon('undo-2')} /><span>Volver a <b></b></span></a>
+<script is:inline>
+    (function () {
+        var el = document.currentScript && document.currentScript.previousElementSibling;
+        if (!el) return;
+        var MS = /^\/mislistas\/amigos\/mensajes(\/|$)/;
+        try {
+            var ss = sessionStorage;
+            var get = function (k) { try { return JSON.parse(ss.getItem(k) || 'null'); } catch (e) { return null; } };
+            var ref = '';
+            try { var r = new URL(document.referrer); if (r.origin === location.origin) ref = r.pathname + r.search; } catch (e) {}
+            var nav = (performance.getEntriesByType('navigation')[0] || {}).type;
+            var from = get('yf:ms-from');
+            if (ref && !MS.test(ref.split('?')[0])) {
+                // Vienes de fuera de Mensajes: esa página es el origen (con su título si lo anotó al irse).
+                if (!from || from.url !== ref) {
+                    var last = get('yf:ms-last');
+                    from = last && last.url === ref ? last : { url: ref, title: '' };
+                    ss.setItem('yf:ms-from', JSON.stringify(from));
+                }
+            } else if (!ref && nav === 'navigate') {
+                from = null;
+                ss.removeItem('yf:ms-from');
+            }
+            if (!from || !from.url) return;
+            var t = String(from.title || '').replace(/\s*[·|–—-]\s*YourFavs\s*$/, '').trim();
+            if (!t || t === 'YourFavs') t = from.url === '/' ? 'Inicio' : '';
+            el.href = from.url;
+            if (t) { el.querySelector('b').textContent = t; el.setAttribute('aria-label', 'Volver a ' + t); }
+            else { el.querySelector('span').textContent = 'Volver a donde estabas'; }
+            el.hidden = false;
+        } catch (e) {}
+    })();
+</script>

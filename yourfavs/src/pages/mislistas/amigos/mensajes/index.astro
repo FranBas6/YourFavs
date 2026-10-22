@@ -12,6 +12,7 @@ import PersonalNav from '../../../../components/personal/PersonalNav.astro';
 import Stamp from '../../../../components/Stamp.astro';
 import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
 import MsgSegment from '../../../../components/social/messages/MsgSegment.astro';
+import MsFrom from '../../../../components/social/messages/MsFrom.astro';
 import { Icon } from 'astro-icon/components';
 import { listConversations } from '../../../../services/BD/social/messages';
 import { tabCounts } from '../../../../services/BD/social/graph';
@@ -70,6 +71,8 @@ const canGroup = SOCIAL_PHASE.groups && friends > 0;
             </div>
         ) : (
             <>
+                {/* Móvil: «Volver a donde estabas» si entraste a Mensajes desde otra página. */}
+                <MsFrom />
                 <div class="ms-mhead">
                     <h1 class="am-h1">Amigos</h1>
                     <MsgSegment on="messages" />

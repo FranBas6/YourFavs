@@ -15,6 +15,7 @@ import PersonalNav from '../../../../components/personal/PersonalNav.astro';
 import Stamp from '../../../../components/Stamp.astro';
 import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
 import ChatDialogs from '../../../../components/social/messages/ChatDialogs.astro';
+import MsFrom from '../../../../components/social/messages/MsFrom.astro';
 import { Icon } from 'astro-icon/components';
 import { friendCount, getHistory, listConversations } from '../../../../services/BD/social/messages';
 import {
@@ -103,6 +104,8 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                             <button type="button" class="pf-btn ico ms-info-m" aria-label="Información" aria-haspopup="dialog" data-ms-info-open><Icon name="lucide:info" /></button>
                         </div>
                     </header>
+                    {/* Móvil: «Volver a donde estabas» si entraste a Mensajes desde otra página. */}
+                    <MsFrom bar />
 
                     <div class="ms-log" id="ms-log" role="log" aria-label="Mensajes" tabindex="0" data-ms-log-scroll>
                         <div class="ms-older" data-ms-older hidden>Cargando mensajes anteriores…</div>

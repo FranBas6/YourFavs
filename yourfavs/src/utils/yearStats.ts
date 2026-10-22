@@ -12,6 +12,15 @@ import {
 const TTL_MS = 60 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
 
+/**
+ * Duración media de un episodio según la ficha de la serie en TMDB. Viene vacía en muchas series
+ * recientes (de ahí los 45 min de reserva); el mes a mes no depende de ella: pide la duración de cada
+ * episodio (ver «Horas del mes a mes»).
+ */
+function episodeRuntimeOf(d: any): number {
+    return (Array.isArray(d?.episode_run_time) && d.episode_run_time[0]) || FALLBACK_EPISODE_RUNTIME;
+}
+
 export interface ItemShowcase {
     id: string;
     kind: 'movie' | 'tv';
@@ -70,6 +79,12 @@ export interface MonthTimeline {
     series: number;
     movies: number;
     episodes: number;
+    /**
+     * Minutos ESTIMADOS de lo visto ese mes: cada pase de película por su duración y cada episodio
+     * por la duración media de los de su serie (TMDB). Se rellena en `calculateYearStats`, cuando ya
+     * se conocen las duraciones; `buildTimeline` lo deja a 0.
+     */
+    minutes: number;
 }
 
 /** Ámbito del cálculo: un año concreto o 'all' (acumulado de por vida). */
@@ -382,6 +397,7 @@ function buildTimeline(
                 series: list.filter((e) => e.kind === 'tv').length,
                 movies: list.filter((e) => e.kind === 'movie').length,
                 episodes: list.reduce((s, e) => s + e.episodes, 0),
+                minutes: 0,
             };
         });
 }
@@ -439,8 +455,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
                 const d: any = await tmdbFetch<any>(path, { append_to_response: 'credits' });
                 const releaseStr = item.kind === 'movie' ? d?.release_date : d?.first_air_date;
                 const releaseYear = releaseStr ? Number(releaseStr.slice(0, 4)) : 0;
-                const epRuntime = Array.isArray(d?.episode_run_time) && d.episode_run_time.length > 0
-                    ? d.episode_run_time[0] : FALLBACK_EPISODE_RUNTIME;
+                const epRuntime = item.kind === 'tv' ? episodeRuntimeOf(d) : FALLBACK_EPISODE_RUNTIME;
                 // Pelis: crew con job "Director". Series: created_by (el campo fiable para TV).
                 const directors = item.kind === 'movie'
                     ? ((d?.credits?.crew || []) as any[])
@@ -537,7 +552,6 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const seriesEpsCount = new Map<string, number>();
     let episodesWatched = 0;
     let episodesPrev = 0;
-    let hoursFromEpisodes = 0;
     let watches: EpisodeWatch[] = [];
     let logRows: WatchLogRow[] = [];
     try {
@@ -611,49 +625,122 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     }
     if (activeWeekday && activeWeekday.count === 0) activeWeekday = null;
 
-    // Horas: runtime de movies del año + (eps × episode_runtime medio por serie del año)
-    let hoursFromMovies = 0;
     const enrichedById = new Map<string, typeof enriched[number]>();
+    for (const e of enriched) enrichedById.set(e.raw.id, e);
+    // Duración por título (`movie:id` → minutos de la película; `tv:id` → minutos por episodio).
+    const runtimeOf = new Map<string, number>();
     for (const e of enriched) {
-        enrichedById.set(e.raw.id, e);
-        if (e.raw.kind === 'movie' && e.runtime > 0) hoursFromMovies += e.runtime;
+        runtimeOf.set(`${e.raw.kind}:${e.raw.id}`, e.raw.kind === 'movie' ? e.runtime : e.episode_runtime);
     }
-    // Residuo del mes a mes: lo que viste y ya no está en NINGUNA lista no tiene título ni
-    // póster en el snapshot. Primero se busca entre los detalles que ya tenemos y solo lo que
-    // siga huérfano va a TMDB — en una biblioteca normal, nada.
-    const orphans = new Map<string, TimelineEntry[]>();
+    /**
+     * Series del mes a mes: lo que dura CADA episodio. TMDB deja vacío `episode_run_time` en muchas
+     * series recientes y el último episodio suele ser un final de temporada más largo, así que se piden
+     * las temporadas vistas junto a la serie (`append_to_response=season/1,season/2…`, hasta 20 por
+     * petición): una petición por serie, que de paso trae el título y el póster si faltaban.
+     */
+    const seasonsBySerie = new Map<string, Set<number>>();
+    const tvEntries = new Map<string, TimelineEntry[]>();
+    const movieMissing = new Map<string, TimelineEntry[]>();
     for (const m of timeline) {
         for (const e of m.entries) {
-            if (e.title) continue;
-            const known = enrichedById.get(e.id);
-            if (known?.title) { e.title = known.title; e.poster_path = known.poster_path; continue; }
-            const k = `${e.kind}:${e.id}`;
-            const arr = orphans.get(k);
-            if (arr) arr.push(e); else orphans.set(k, [e]);
+            if (!e.title) {
+                const known = enrichedById.get(e.id);
+                if (known?.raw.kind === e.kind && known.title) { e.title = known.title; e.poster_path = known.poster_path; }
+            }
+            if (e.kind === 'tv') {
+                let seasons = seasonsBySerie.get(e.id);
+                if (!seasons) { seasons = new Set(); seasonsBySerie.set(e.id, seasons); }
+                for (const r of e.seasonRanges ?? []) seasons.add(r.season);
+                const arr = tvEntries.get(e.id);
+                if (arr) arr.push(e); else tvEntries.set(e.id, [e]);
+                continue;
+            }
+            const k = `movie:${e.id}`;
+            if (e.title && runtimeOf.has(k)) continue;
+            const arr = movieMissing.get(k);
+            if (arr) arr.push(e); else movieMissing.set(k, [e]);
         }
     }
-    if (orphans.size > 0) {
-        await processBatch(Array.from(orphans.keys()), async (k: string) => {
-            const sep = k.indexOf(':');
-            const kind = k.slice(0, sep);
-            const id = k.slice(sep + 1);
+    // Residuo de películas: lo que viste y ya no está en ninguna lista no tiene título ni póster, y lo
+    // que guardaste otro año no tiene duración. Una petición por película, solo de lo que falte.
+    if (movieMissing.size > 0) {
+        await processBatch(Array.from(movieMissing.keys()), async (k: string) => {
             try {
-                const d: any = await tmdbFetch<any>(kind === 'movie' ? `/movie/${id}` : `/tv/${id}`);
-                const title = (kind === 'movie' ? d?.title : d?.name) || '';
-                const poster = d?.poster_path || '';
-                for (const e of orphans.get(k) || []) { e.title = title; e.poster_path = poster; }
+                const d: any = await tmdbFetch<any>(`/movie/${k.slice(6)}`);
+                runtimeOf.set(k, d?.runtime || 0);
+                for (const e of movieMissing.get(k) || []) {
+                    if (!e.title) { e.title = d?.title || ''; e.poster_path = d?.poster_path || ''; }
+                }
             } catch { /* sin título: la tarjeta sigue enlazando a su ficha */ }
             return null;
         }, 10);
     }
-
-    // Para series, usamos eps vistos en el año × runtime medio (de los detalles que ya tenemos)
-    for (const [serieId, eps] of seriesEpsCount.entries()) {
-        const detail = enrichedById.get(serieId);
-        const runtime = detail?.episode_runtime || FALLBACK_EPISODE_RUNTIME;
-        hoursFromEpisodes += eps * runtime;
+    /** `serieId` → minutos de cada episodio (`T-E`) y la media de la serie para los que no lo digan. */
+    const episodeMinutes = new Map<string, { eps: Map<string, number>; avg: number }>();
+    if (seasonsBySerie.size > 0) {
+        await processBatch(Array.from(seasonsBySerie.entries()), async ([id, seasons]: [string, Set<number>]) => {
+            const list = Array.from(seasons).sort((a, b) => a - b);
+            const chunks: number[][] = [];
+            for (let i = 0; i < list.length; i += 20) chunks.push(list.slice(i, i + 20));
+            if (!chunks.length) chunks.push([]);
+            const eps = new Map<string, number>();
+            let base: any = null;
+            for (const chunk of chunks) {
+                try {
+                    const d: any = await tmdbFetch<any>(`/tv/${id}`, chunk.length ? { append_to_response: chunk.map((n) => `season/${n}`).join(',') } : {});
+                    base ??= d;
+                    for (const n of chunk) {
+                        for (const ep of d?.[`season/${n}`]?.episodes ?? []) {
+                            if (ep?.runtime > 0) eps.set(`${n}-${ep.episode_number}`, ep.runtime);
+                        }
+                    }
+                } catch { /* esa tanda se queda con la media */ }
+            }
+            const known = Array.from(eps.values());
+            const avg = known.length
+                ? Math.round(known.reduce((a, b) => a + b, 0) / known.length)
+                : runtimeOf.get(`tv:${id}`) || (base ? episodeRuntimeOf(base) : FALLBACK_EPISODE_RUNTIME);
+            episodeMinutes.set(id, { eps, avg });
+            for (const e of tvEntries.get(id) || []) {
+                if (!e.title && base) { e.title = base.name || ''; e.poster_path = base.poster_path || ''; }
+            }
+            return null;
+        }, 10);
     }
-    const totalHours = Math.round((hoursFromMovies + hoursFromEpisodes) / 60);
+
+    /**
+     * Horas del mes a mes: cada pase de película por su duración y cada episodio visto por lo que dura
+     * (o la media de su serie). Es lo que VISTE, así que de un año concreto el total sale de aquí y
+     * cuadra con la suma de los meses (antes sumaba las películas GUARDADAS ese año, Pendientes incluidas).
+     */
+    if (year !== 'all') {
+        const byMonth = new Map<number, number>();
+        const add = (month: number, min: number) => byMonth.set(month, (byMonth.get(month) || 0) + min);
+        for (const m of timeline) {
+            for (const e of m.entries) if (e.kind === 'movie') add(m.month, runtimeOf.get(`movie:${e.id}`) || 0);
+        }
+        for (const w of watches) {
+            const p = appDateParts(w.ts);
+            if (p.year !== year) continue;
+            const info = episodeMinutes.get(w.serieId);
+            add(p.month, info?.eps.get(`${w.season}-${w.episode}`) ?? info?.avg ?? FALLBACK_EPISODE_RUNTIME);
+        }
+        for (const m of timeline) m.minutes = byMonth.get(m.month) || 0;
+    }
+
+    // De por vida (sin mes a mes): runtime de las películas guardadas + episodios × runtime medio.
+    let totalMinutes = 0;
+    if (year === 'all') {
+        for (const e of enriched) {
+            if (e.raw.kind === 'movie' && e.runtime > 0) totalMinutes += e.runtime;
+        }
+        for (const [serieId, eps] of seriesEpsCount.entries()) {
+            totalMinutes += eps * (runtimeOf.get(`tv:${serieId}`) || FALLBACK_EPISODE_RUNTIME);
+        }
+    } else {
+        totalMinutes = timeline.reduce((sum, m) => sum + m.minutes, 0);
+    }
+    const totalHours = Math.round(totalMinutes / 60);
 
     // Top series por eps vistos en el año (top 5)
     const topSeriesRaw = Array.from(seriesEpsCount.entries())
