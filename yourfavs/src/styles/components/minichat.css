@@ -64,7 +64,8 @@
 .mw .ms-sys p { font-size: 12.5px; }
 .mw .ms-seen { padding-left: 54px; }
 .mw .tc { max-width: none; padding: 10px; column-gap: 10px; grid-template-columns: 52px minmax(0, 1fr); }
-.mw .tc > .po { width: 52px; }
+/* El póster de las tarjetas (título, recomendación, «¿Qué vemos?») a la medida de la columna. */
+.mw .tc-po { width: 52px; }
 .mw .dtile { width: 52px; }
 .mw .dtile .dd { font-size: 21px; padding-top: 5px; }
 .mw .dtile .mo { height: 18px; line-height: 18px; }
@@ -102,6 +103,33 @@ html.mw-resizing, html.mw-resizing * { cursor: nwse-resize !important; user-sele
 /* Menú «···» de la cabecera. */
 .mw .mw-menu { position: absolute; right: 8px; left: auto; top: 52px; bottom: auto; z-index: 6; min-width: 220px; }
 .mw .mw-menu[hidden] { display: none; }
+
+/* ---- Capas dentro: los selectores del ＋ y la información (handoff M6 §2.1, §2.4) ---------- */
+.mw-layer { position: absolute; left: 0; right: 0; top: 56px; bottom: 0; z-index: 8; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-elev); }
+.mw-back {
+    display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px; flex-shrink: 0; width: 100%;
+    border: 0; border-bottom: 1px solid var(--border); background: none; cursor: pointer;
+    font: 600 12.5px var(--font); color: var(--text-2); text-align: left;
+}
+.mw-back:hover { color: var(--text); background: var(--bg-tint); }
+.mw-back:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.mw-back svg { width: 15px; height: 15px; }
+/* El selector de siempre (#ck, #pk), sin flecha ni sombra, ocupando la capa. */
+.mw-layer .rk.in-layer {
+    position: relative; inset: auto; width: auto; max-width: none; max-height: none; flex: 1; min-height: 0;
+    display: flex; flex-direction: column; border: 0; border-radius: 0; box-shadow: none; transform: none;
+}
+.mw-layer .rk.in-layer::before, .mw-layer .rk.in-layer::after { display: none; }
+.mw-layer .rk.in-layer .rk-h, .mw-layer .rk.in-layer .rk-f { flex-shrink: 0; }
+.mw-layer .rk.in-layer .rk-s, .mw-layer .rk.in-layer .rk-l { flex: 1 1 auto; min-height: 0; overflow: auto; }
+/* La información: el panel de la página, sin la gestión del grupo (va en grande). */
+.mw-layer .mw-info { flex: 1; min-height: 0; overflow: auto; padding: 14px 14px 16px; border: 0; display: flex; flex-direction: column; gap: 10px; }
+.mw-layer .mw-info .ms-id > b, .mw-layer .mw-info .gname { font-size: 15px; }
+.mw-layer .mw-info .mb { min-height: 38px; }
+.mw-layer .mw-info .ms-mb-more, .mw-layer .mw-info [data-gm="rename"], .mw-layer .mw-info [data-ms-addpeople] { display: none; }
+.mw-more { display: flex; align-items: center; gap: 8px; padding: 10px 14px 14px; flex-shrink: 0; font: 600 12.5px var(--font); color: var(--primary); text-decoration: none; }
+.mw-more:hover { text-decoration: underline; }
+.mw-more svg { width: 14px; height: 14px; }
 
 /* Cargando sin nada guardado. */
 .sk { display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; flex: 1; padding: 14px 12px; }

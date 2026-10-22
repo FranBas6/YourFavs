@@ -56,6 +56,8 @@ export interface MountOpts {
     onLeft?: (title: string) => void;
     /** Llegaron mensajes de otras personas. */
     onIncoming?: (n: number) => void;
+    /** ¿Se anuncian al lector de pantalla? (el mini-chat, solo con el foco dentro). */
+    announce?: () => boolean;
 }
 
 export interface MountedChat {
@@ -67,6 +69,8 @@ export interface MountedChat {
     isMuted(): boolean;
     setMuted(v: boolean): Promise<void>;
     leave(): Promise<void>;
+    /** La conversación al día (nombre, personas, papeles). */
+    view(): ChatView;
 }
 
 export function mountChat(root: HTMLElement, chat: ChatView, opts: MountOpts = {}): MountedChat {
@@ -148,6 +152,7 @@ export function mountChat(root: HTMLElement, chat: ChatView, opts: MountOpts = {
     }
 
     function announce(fresh: ChatMessage[]) {
+        if (opts.announce && !opts.announce()) return;
         const lines = fresh
             .filter((m) => m.author !== me && m.kind === 'text' && !m.deleted)
             .map((m) => `${nameOf(m.author)}: ${m.folded ? FOLDED_TEXT : m.locked && m.spoiler ? `spoiler de ${spoilerLabel(m.spoiler)}, oculto` : m.body || (m.card ? `ha compartido ${m.card.ref.title}` : '')}`);
@@ -1092,6 +1097,7 @@ export function mountChat(root: HTMLElement, chat: ChatView, opts: MountOpts = {
         isMuted: () => muted,
         setMuted,
         leave,
+        view: () => ({ ...current, me: { ...current.me, muted } }),
     };
 }
 

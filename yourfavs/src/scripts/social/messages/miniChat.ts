@@ -18,6 +18,9 @@ import { mountChat, type MountedChat } from './chat';
 import { msgApi } from './api';
 import { createPoller } from './poller';
 import { showToast } from '../toast';
+import { intoMiniLayer } from './miniLayer';
+import { infoHtml } from '../../../lib/social/chatView';
+import { icon } from '../../../lib/social/ui';
 import {
     headOfChat, headOfConv, miniBarHtml, miniGoneHtml, miniLoadingHtml, miniMenuHtml, miniWindowHtml, type MiniHead,
 } from '../../../lib/social/miniChatView';
@@ -86,7 +89,10 @@ function init(root: HTMLElement) {
         document.body.classList.toggle('has-mw', !root.hidden && s === 'open');
         document.body.classList.toggle('has-mw-min', !root.hidden && s === 'min');
     };
-    const unmount = () => { mounted?.destroy(); mounted = null; };
+    // Antes de repintar o desmontar: cerrar lo que vaya como capa (los selectores son de la página y
+    // vuelven a su sitio; si no, se irían con el innerHTML).
+    const dropLayers = () => root.querySelectorAll<HTMLElement>('[data-mw-back]').forEach((b) => b.click());
+    const unmount = () => { dropLayers(); mounted?.destroy(); mounted = null; };
     const win = () => root.querySelector<HTMLElement>('[data-mw-win]');
     // Sin nada guardado ni fila de la lista: cabecera vacía hasta que llegue la conversación.
     const placeholderHead = (id: number): MiniHead => ({ id, group: false, title: '', sub: '', faces: [], muted: false });
@@ -132,12 +138,15 @@ function init(root: HTMLElement) {
         root.innerHTML = miniWindowHtml(chat);
         const w = win()!;
         if (animate) w.classList.add('is-enter');
+        paintOffline();
         mounted = mountChat(w, chat, {
             compact: true,
             canRead: () => st?.state === 'open' && desktop.matches && !root.hidden,
             onGone: (why) => gone(why),
             onRemount: () => void open(id, { focus: false, animate: false }),
             onLeft: (title) => { close(false); showToast(`Has salido de «${title}»`); },
+            // Solo se anuncia lo que llega si el foco está en la ventanita (si no, sube el contador).
+            announce: () => root.contains(document.activeElement),
         });
         unread = 0;
         if (o.focus || typing) mounted.focusInput();
@@ -200,6 +209,45 @@ function init(root: HTMLElement) {
         const ids = (e as CustomEvent<{ convs: number[] }>).detail?.convs ?? [];
         if (st?.state === 'min' && (!ids.length || ids.includes(st.convId))) void refreshUnread();
     });
+
+    // ---- Información, como capa (handoff M6 §2.1) ----------------------------------------------
+    // Personas, Silenciar y Salir del grupo. Renombrar, añadir, quitar y hacer admin: en grande.
+    let undoInfo: (() => void) | null = null;
+    function openInfo() {
+        const w = win();
+        if (!mounted || !w || undoInfo) return;
+        const chat = mounted.view();
+        const box = document.createElement('div');
+        // `id="ms-info"`: chat.ts lo repinta al cambiar el grupo (como el panel de la página).
+        box.id = 'ms-info';
+        box.className = 'ms-info mw-info';
+        box.setAttribute('role', 'group');
+        box.setAttribute('aria-label', chat.kind === 'group' ? 'Información del grupo' : 'Información');
+        box.innerHTML = infoHtml(chat);
+        undoInfo = intoMiniLayer(box, w, () => closeInfo(true));
+        if (chat.kind === 'group' && chat.me.role === 'admin') {
+            box.insertAdjacentHTML('afterend', `<a class="mw-more" href="/mislistas/amigos/mensajes/${chat.id}" data-mw-big>${icon('maximize-2')}Renombrar, añadir o quitar gente: en grande</a>`);
+        }
+        root.querySelector<HTMLElement>('[data-mw-back]')?.focus();
+    }
+    function closeInfo(focus: boolean) {
+        if (!undoInfo) return;
+        const undo = undoInfo;
+        undoInfo = null;
+        root.querySelector('.mw-more')?.remove();
+        undo();
+        if (focus) moreBtn()?.focus();
+    }
+
+    // ---- Sin conexión: una banda bajo la cabecera; se puede seguir escribiendo -----------------
+    function paintOffline() {
+        const w = win();
+        const ban = w?.querySelector('.mw-ban');
+        if (navigator.onLine) { ban?.remove(); return; }
+        if (w && !ban) w.querySelector('.mw-h')?.insertAdjacentHTML('afterend', `<div class="mw-ban" role="status">${icon('wifi-off')}<span><b>Sin conexión.</b> Reintentando…</span></div>`);
+    }
+    window.addEventListener('offline', paintOffline);
+    window.addEventListener('online', () => { paintOffline(); mounted?.refresh(); });
 
     // ---- Menú «···» -------------------------------------------------------------------------------
     const menuEl = () => root.querySelector<HTMLElement>('[data-mw-menu]');
@@ -295,6 +343,7 @@ function init(root: HTMLElement) {
             if (mounted && head) { const next = !mounted.isMuted(); void mounted.setMuted(next).then(() => { if (head) head.muted = mounted?.isMuted() ?? next; }); }
             return;
         }
+        if (t.closest('[data-mw-info]')) { closeMenu(); openInfo(); return; }
         if (t.closest('[data-mw-leave]')) { closeMenu(); void mounted?.leave(); }
     });
     document.addEventListener('click', (e) => {
@@ -318,8 +367,11 @@ function init(root: HTMLElement) {
             else if (e.key === 'Tab') closeMenu();
             return;
         }
-        // Escape: si nada está abierto (el ＋ y el menú de un mensaje lo atienden ellos), minimiza.
+        // Escape: cierra lo que haya abierto (la información; los selectores se cierran solos) y, si
+        // no hay nada, minimiza. El ＋ y el menú de un mensaje lo atienden ellos.
         if (e.key !== 'Escape' || e.defaultPrevented || st?.state !== 'open') return;
+        if (undoInfo) { e.preventDefault(); closeInfo(true); return; }
+        if (root.querySelector('[data-mw-layer]')) return;
         if ((e.target as Element).closest('.mm[tabindex]')) return; // en una línea: vuelve al registro
         e.preventDefault();
         minimize(true);

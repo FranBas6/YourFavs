@@ -54,7 +54,8 @@ function headHtml(h: MiniHead): string {
 export function miniMenuHtml(h: MiniHead, muted: boolean): string {
     const item = (name: string, label: string, attrs: string, cls = '') =>
         `<button type="button" role="menuitem"${cls ? ` class="${cls}"` : ''} ${attrs}>${icon(name)}${esc(label)}</button>`;
-    return item('bell-off', muted ? 'Quitar silencio' : 'Silenciar', 'data-mw-mute')
+    return item('info', h.group ? 'Información y personas' : 'Información', 'data-mw-info')
+        + item('bell-off', muted ? 'Quitar silencio' : 'Silenciar', 'data-mw-mute')
         + `<a role="menuitem" href="${bigHref(h.id)}" data-mw-big>${icon('maximize-2')}Abrir en grande</a>`
         + (h.group ? `<hr>${item('log-out', 'Salir del grupo', 'data-mw-leave', 'pf-danger')}` : '');
 }

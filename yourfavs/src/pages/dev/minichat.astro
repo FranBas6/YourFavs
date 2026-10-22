@@ -1,0 +1,119 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO del mini-chat (Mensajes M6; handoff M6 §8, marco CS6): la
+ * ventanita abierta (1:1 y grupo), cargando, sin conexión, solo lectura, «ya no estás», «no
+ * disponible», la barra minimizada y la información como capa, con datos inventados y estáticos
+ * (nada se envía), para revisarlos en claro y oscuro. En producción: 404.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { infoHtml } from '../../lib/social/chatView';
+import { headOfChat, miniBarHtml, miniGoneHtml, miniLoadingHtml, miniWindowHtml } from '../../lib/social/miniChatView';
+import { icon, initialsOf, stampFor } from '../../lib/social/ui';
+import type { ChatMessage, ChatView, PersonCard, PlanView } from '../../lib/social/types';
+import '../../styles/pages/social/mensajes.css';
+import '../../styles/components/minichat.css';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+let n = 0;
+const P = (name: string, handle: string): PersonCard => {
+    const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+    return { id, handle, name, avatar: null, archetype: null, color: stampFor(id), initials: initialsOf(name) };
+};
+const ME = P('Fran Bas', 'franbas');
+const ANA = P('Ana Ruiz', 'ana_ve');
+const CARLA = P('Carla Méndez', 'carlam');
+const IVAN = P('Iván Soler', 'ivansoler');
+const people = Object.fromEntries([ME, ANA, CARLA, IVAN].map((p) => [p.id, p]));
+
+const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
+const today = fmt.format(new Date());
+const tomorrow = (() => { const [y, m, d] = today.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10); })();
+const now = Date.now();
+
+const plan: PlanView = {
+    id: 1, convId: 1, createdBy: ANA.id, mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days',
+    poster: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', date: tomorrow, time: '21:30', note: 'en mi casa', source: 'plus',
+    wtwOf: null, wtwHave: null, prevDate: null, prevTime: null, changed: false, today, phase: 'live', cancelledAt: null,
+    me: 'none', seen: false, yes: [ANA.id], no: [], wait: [ME.id], myState: null,
+};
+let mid = 100;
+const M = (author: PersonCard, at: number, body: string, o: Partial<ChatMessage> = {}): ChatMessage => ({
+    id: ++mid, author: author.id, kind: 'text', body, sys: null, at, deleted: false, folded: false, clientId: null,
+    card: null, spoiler: null, locked: false, lines: null, spoilerSeen: false, ...o,
+});
+const member = (p: PersonCard, role: 'admin' | 'member' = 'member') => ({ person: p, role, joinedAt: now - 9e8, blockedByMe: false, friend: true });
+
+const direct: ChatView = {
+    id: 1, kind: 'direct', title: ANA.name, me: { id: ME.id, role: 'member', muted: false, lastReadId: null },
+    members: [member(ME), member(ANA)], people, hasMore: false, deletedIds: [], seenId: null, seenAt: null,
+    readOnly: false, friendsSince: '2026-05-02',
+    messages: [
+        M(ANA, now - 50 * 60_000, '¿Has visto lo nuevo de Wenders?'),
+        M(ME, now - 48 * 60_000, 'No, ¿merece la pena?'),
+        M(ANA, now - 45 * 60_000, '', { card: { type: 'plan', ref: { planId: 1, title: 'Perfect Days' }, plan } }),
+        M(ANA, now - 44 * 60_000, 'Si te apuntas, la vemos mañana 🙂'),
+    ],
+};
+const group: ChatView = {
+    ...direct, id: 2, kind: 'group', title: 'Viernes de pelis', me: { ...direct.me, role: 'admin', muted: true },
+    members: [member(ME, 'admin'), member(ANA), member(CARLA, 'admin'), member(IVAN)], friendsSince: null,
+    messages: [M(CARLA, now - 3 * 3600_000, '¿Qué vemos este viernes?'), M(IVAN, now - 2 * 3600_000, 'Yo voto por algo de terror')],
+};
+const readOnly: ChatView = { ...direct, id: 3, readOnly: true, friendsSince: null };
+const h1 = headOfChat(direct);
+const hg = headOfChat(group);
+const offline = miniWindowHtml(direct).replace('</header>', `</header><div class="mw-ban" role="status">${icon('wifi-off')}<span><b>Sin conexión.</b> Reintentando…</span></div>`);
+const withInfo = miniWindowHtml(group).replace('</section>', `<div class="mw-layer"><button type="button" class="mw-back">${icon('chevron-left')}Volver al chat</button><div class="ms-info mw-info">${infoHtml(group)}</div><a class="mw-more" href="#">${icon('maximize-2')}Renombrar, añadir o quitar gente: en grande</a></div></section>`);
+
+const frames: [string, string][] = [
+    ['Abierta · 1:1 con una tarjeta de plan', miniWindowHtml(direct)],
+    ['Abierta · grupo silenciado', miniWindowHtml(group)],
+    ['Información del grupo (capa)', withInfo],
+    ['Cargando sin caché', miniLoadingHtml(h1)],
+    ['Sin conexión', offline],
+    ['Solo lectura (ya no sois amigos)', miniWindowHtml(readOnly)],
+    ['Ya no estás en el grupo', miniGoneHtml(hg, 'left')],
+    ['La conversación ya no existe', miniGoneHtml(h1, 'none')],
+];
+const bars: [string, string][] = [
+    ['Minimizada', miniBarHtml(h1, 0)],
+    ['Minimizada · 1 nuevo', miniBarHtml(h1, 1)],
+    ['Minimizada · 3 nuevos', miniBarHtml(h1, 3)],
+    ['Minimizada · grupo silenciado (sin número)', miniBarHtml(hg, 5)],
+];
+---
+<Layout title="Dev · Mini-chat" robots="noindex, nofollow">
+    <div class="dv">
+        <h1>Mensajes M6 · Mini-chat (solo desarrollo)</h1>
+        <p class="dv-sub">Datos inventados y estáticos: los botones no hacen nada. Cambia de tema para ver el oscuro.</p>
+
+        <h2>La ventanita</h2>
+        <div class="dv-grid">{frames.map(([label, html]) => (
+            <div class="dv-cell"><small>{label}</small><div class="dv-mw" set:html={html} /></div>
+        ))}</div>
+
+        <h2>Minimizada</h2>
+        <div class="dv-bars">{bars.map(([label, html]) => (
+            <div class="dv-cell"><small>{label}</small><div class="dv-mwm" set:html={html} /></div>
+        ))}</div>
+    </div>
+</Layout>
+
+<style>
+    .dv { max-width: 1400px; margin: 0 auto; padding-bottom: 60px; }
+    .dv h1 { font: 700 22px var(--font); color: var(--text); margin: 0; }
+    .dv-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 8px; }
+    .dv h2 { font: 600 14px var(--font); color: var(--text-2); margin: 28px 0 10px; }
+    .dv-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
+    .dv-bars { display: flex; flex-wrap: wrap; gap: 20px; }
+    .dv-cell small { display: block; font: 600 11px var(--font-mono); color: var(--text-2); margin-bottom: 6px; }
+    /* En la página de pruebas, en su sitio y no fijas abajo a la derecha. */
+    .dv-mw :global(.mw) { position: relative; right: auto; bottom: auto; width: 420px; height: 620px; border-bottom: 1px solid var(--border); border-radius: 14px; }
+    .dv-mwm :global(.mwm) { position: relative; right: auto; bottom: auto; border-bottom: 1px solid var(--border); border-radius: 12px; }
+</style>
