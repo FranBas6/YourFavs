@@ -10,6 +10,8 @@
  */
 import type { APIRoute } from 'astro';
 import { syncNotifications } from '../../../services/API/notifications/generator';
+import { syncPlanToday } from '../../../services/BD/social/plans';
+import { SOCIAL_PHASE } from '../../../utils/constants/social';
 import { listNotifications, unreadCount, markRead, markAllRead } from '../../../services/BD/notifications/notifications';
 import { withSocialState } from '../../../services/BD/social/notifState';
 
@@ -23,6 +25,8 @@ export const GET: APIRoute = async ({ locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
         await syncNotifications(locals.user.platforms ?? []);
+        // El aviso «Hoy» de los planes (M5b): no espera al día siguiente como el resto.
+        if (SOCIAL_PHASE.messages) await syncPlanToday(locals.user.uid, true).catch(() => {});
         const [docs, unread] = await Promise.all([listNotifications(30), unreadCount()]);
         const items = await withSocialState(locals.user.uid, docs);
         return json({ ok: true, items, unread });

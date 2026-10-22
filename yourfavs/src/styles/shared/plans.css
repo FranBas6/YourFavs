@@ -1,0 +1,95 @@
+/* =====================================================================================
+   Planes para verla fuera del chat (Mensajes M5; medidas de docs/Mensajes/design_handoff_m5/m5.css).
+   El bloque de fecha (.dtile) lo comparten la tarjeta del chat, Ver pronto y el calendario.
+   Solo tokens: el oscuro sale solo.
+   ===================================================================================== */
+.dtile {
+    width: 64px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-elev);
+    overflow: hidden; text-align: center; align-self: start;
+}
+.dtile .mo { display: block; height: 20px; font: 700 10px/20px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; background: var(--text); color: var(--bg-elev); }
+.dtile .dd { display: block; font: 700 26px/1 var(--font-mono); color: var(--text); padding-top: 7px; }
+.dtile .wd { display: block; font: 600 11px var(--font); color: var(--text-2); padding: 3px 0 7px; }
+.dtile.today .mo { background: var(--accent-dark); color: #fff; }
+.dtile.off { border-style: dashed; }
+.dtile.off .mo { background: var(--border-strong); color: var(--text-2); }
+.dtile.off .dd { color: var(--text-3); text-decoration: line-through; text-decoration-thickness: 2px; }
+.dtile.sm { width: 48px; border-radius: 8px; }
+.dtile.sm .mo { height: 16px; font-size: 9px; line-height: 16px; }
+.dtile.sm .dd { font-size: 19px; padding-top: 5px; }
+.dtile.sm .wd { font-size: 10px; padding: 2px 0 5px; }
+/* ---- Ver pronto: bloque «Planes» (§3.4) -------------------------------------------- */
+.vp-sh { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+.vp-sh h2 { font: 600 19px var(--font); color: var(--text); margin: 0; }
+.vp-sh .c { font-size: 13px; font-weight: 400; color: var(--text-3); }
+.vp-sh p { font-size: 12.5px; color: var(--text-2); margin: 0 0 0 auto; }
+.vp-pls { display: flex; flex-direction: column; gap: 10px; margin: 0 0 34px; padding: 0; list-style: none; }
+.vpl {
+    display: grid; grid-template-columns: auto 44px minmax(0, 1fr) auto; gap: 14px; align-items: center;
+    padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg-elev);
+}
+.vpl.past { background: var(--bg-tint); }
+.vpl-po { display: block; width: 44px; aspect-ratio: 2 / 3; border-radius: 6px; overflow: hidden; background: var(--bg-tint); }
+.vpl-po img { width: 100%; height: 100%; object-fit: cover; }
+.vpl-t { color: inherit; text-decoration: none; }
+.vpl-t:hover { text-decoration: underline; }
+.vpl b { display: block; font: 600 15px var(--font); color: var(--text); }
+.vpl .m { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 12.5px; color: var(--text-2); }
+.vpl .m span { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.vpl .m svg { width: 13px; height: 13px; flex-shrink: 0; }
+.vpl .m .yes svg { color: var(--ok-ink); }
+.vpl .m .q { font-weight: 600; color: var(--text); }
+.vpl .a { display: flex; gap: 6px; }
+.vpl .a .ok { display: inline-flex; align-items: center; gap: 5px; font: 600 12.5px var(--font); color: var(--ok-ink); }
+.vpl .a .ok svg { width: 14px; height: 14px; }
+.vp-hint {
+    display: flex; align-items: center; gap: 8px; margin: 0 0 28px; padding: 10px 14px;
+    border: 1px dashed var(--border-strong); border-radius: var(--r-md); font-size: 12.5px; color: var(--text-2);
+}
+.vp-hint svg { width: 15px; height: 15px; flex-shrink: 0; }
+.vp-hint b { color: var(--text); font-weight: 600; }
+@media (max-width: 1023.98px) {
+    .vp-sh { flex-wrap: wrap; }
+    .vp-sh p { flex-basis: 100%; margin: 0; }
+    .vpl { grid-template-columns: auto 40px minmax(0, 1fr); gap: 12px; padding: 12px; }
+    .vpl-po { width: 40px; }
+    .vpl .a { grid-column: 1 / -1; }
+    .vpl .a .pf-btn { flex: 1; height: 44px; }
+}
+
+/* ---- Calendario (§3.5): estrenos con tokens y el plan con borde, icono y hora ------- */
+.cal-k-movie  { --sb: var(--stamp-red);    --si: var(--stamp-red-ink); }
+.cal-k-ep     { --sb: var(--stamp-blue);   --si: var(--stamp-blue-ink); }
+.cal-k-season { --sb: var(--stamp-purple); --si: var(--stamp-purple-ink); }
+.cal-k-person { --sb: var(--stamp-pink);   --si: var(--stamp-pink-ink); }
+.cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--si); }
+.cal-dot.pl { display: inline-flex; width: auto; height: auto; border-radius: 0; background: none; color: var(--text); }
+.cal-dot.pl svg { width: 10px; height: 10px; }
+@media (min-width: 640px) { .cal-dot { width: 8px; height: 8px; } }
+.cal-ce { background: var(--sb); color: var(--si); }
+.cal-tx { color: var(--si); }
+.cal-row { background: var(--sb); border-color: var(--sb); }
+.cal-bd { border-color: var(--sb); }
+.cal-ce.pl {
+    display: flex; align-items: center; gap: 3px; background: var(--bg-elev); color: var(--text);
+    box-shadow: inset 0 0 0 1px var(--text); font-weight: 600;
+}
+.cal-ce.pl svg { width: 11px; height: 11px; flex-shrink: 0; }
+.cal-ce.pl time { font: 700 10px var(--font-mono); }
+.cal-ce.pl span { overflow: hidden; text-overflow: ellipsis; }
+.cal-lg-pl svg { width: 13px; height: 13px; }
+/* Fila de plan en el detalle del día y en la vista lista. */
+.cal-plr {
+    display: flex; align-items: center; gap: 12px; padding: 10px; border: 1px solid var(--text);
+    border-radius: var(--r-lg); background: var(--bg-elev);
+}
+.cal-plr .po { width: 40px; aspect-ratio: 2 / 3; flex-shrink: 0; border-radius: 6px; overflow: hidden; background: var(--bg-tint); }
+.cal-plr .po img { width: 100%; height: 100%; object-fit: cover; }
+.cal-plr .tx { flex: 1; min-width: 0; }
+.cal-plr b { display: block; font: 600 14px var(--font); color: var(--text); }
+.cal-plr .tx > span { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12px; color: var(--text-2); }
+.cal-plr .tx > span svg { width: 13px; height: 13px; flex-shrink: 0; }
+@media (max-width: 639.98px) {
+    .cal-plr { flex-wrap: wrap; }
+    .cal-plr .pf-btn { width: 100%; }
+}

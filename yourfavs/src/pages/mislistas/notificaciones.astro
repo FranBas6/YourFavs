@@ -11,6 +11,7 @@ import Layout from '../../layouts/Layout.astro';
 import { syncNotifications } from '../../services/API/notifications/generator';
 import { listNotifications } from '../../services/BD/notifications/notifications';
 import { withSocialState } from '../../services/BD/social/notifState';
+import { syncPlanToday } from '../../services/BD/social/plans';
 import { notifGroups, notifItemHtml } from '../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
 import type { NotifView } from '../../lib/social/types';
@@ -19,6 +20,7 @@ const user = Astro.locals.user;
 let items: NotifView[] = [];
 if (user) {
     await syncNotifications(user.platforms ?? []);
+    if (SOCIAL_PHASE.messages) await syncPlanToday(user.uid, true).catch(() => {});
     items = await withSocialState(user.uid, await listNotifications(100));
 }
 const now = Date.now();

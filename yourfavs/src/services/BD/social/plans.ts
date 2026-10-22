@@ -54,6 +54,8 @@ export async function proposePlan(me: string, conv: number, i: ProposeInput): Pr
         if (r.error === 'exists') return { ok: false, error: 'exists', planId: r.plan_id!, date: r.date!, time: r.time ? r.time.slice(0, 5) : null };
         return { ok: false, error: (r.error ?? 'none') as 'none' | 'read_only' | 'past_date' | 'note' | 'title' | 'rate' };
     }
+    // Quien lo propone, va: también a su Ver pronto (un extra; si falla, el plan ya está).
+    try { await ensureVerPronto(i.mediaType, i.tmdbId, me); } catch { /* sin Ver pronto */ }
     const message = toMessage(r.message!, me);
     await resolveCards(me, conv, [message]);
     return { ok: true, planId: r.plan_id!, message };
@@ -113,6 +115,57 @@ export async function cancelPlan(me: string, plan: number): Promise<{ ok: true; 
     if (data !== 'ok') return { ok: false, error: data as PlanError };
     const v = await planView(me, plan);
     return v ? { ok: true, plan: v } : { ok: false, error: 'none' };
+}
+
+/** Un plan tuyo con «Voy», fuera del chat (Ver pronto y calendario; handoff §3.4–§3.5). */
+export interface MyPlan {
+    id: number;
+    convId: number;
+    kind: 'direct' | 'group';
+    /** El nombre del grupo o, en un 1:1, el de la otra persona. */
+    with: string | null;
+    mediaType: 'movie' | 'tv';
+    tmdbId: number;
+    title: string;
+    poster: string | null;
+    date: string;
+    time: string | null;
+    note: string | null;
+    /** Cuántas personas van (contigo). */
+    yes: number;
+    /** «¿La visteis?» ya contestado. */
+    seen: boolean;
+    past: boolean;
+}
+
+/** «Van 3» · «Vais los dos» · «De momento, solo tú». Solo el número: los nombres, en el chat. */
+export const planGoers = (p: MyPlan) => p.yes <= 1 ? 'De momento, solo tú' : p.kind === 'direct' && p.yes === 2 ? 'Vais los dos' : `Van ${p.yes}`;
+/** «Viernes de pelis» (grupo) · «Con Ana» (1:1). */
+export const planWith = (p: MyPlan) => p.kind === 'group' ? (p.with ?? 'Grupo') : `Con ${p.with ?? 'otra persona'}`;
+
+/**
+ * Tus planes con «Voy» de `from` a `to` (fechas YYYY-MM-DD de Madrid; sin `to`, sin límite), por
+ * fecha y hora. `convs`: si tienes alguna conversación (para la pista de Ver pronto sin planes).
+ */
+export async function myPlans(me: string, from: string, to?: string): Promise<{ plans: MyPlan[]; convs: boolean }> {
+    const { data, error } = await db().rpc('plan_mine', { p_me: me, p_from: from, p_to: (to ?? null) as string });
+    if (error) throw new Error(error.message);
+    const r = data as unknown as { plans: MyPlan[]; convs: boolean };
+    return { plans: r.plans ?? [], convs: !!r.convs };
+}
+
+/**
+ * El aviso «Hoy» de la campana (handoff §3.6): se crea al abrirla o al cambiar de página, sin
+ * cron. La BD lo hace idempotente; aquí solo se evita preguntar más de una vez por minuto desde el
+ * contador (cada cambio de página). Al abrir la campana (`force`), siempre.
+ */
+const todaySynced = new Map<string, number>();
+export async function syncPlanToday(me: string, force = false): Promise<void> {
+    const now = Date.now();
+    if (!force && now - (todaySynced.get(me) ?? 0) < 60_000) return;
+    todaySynced.set(me, now);
+    const { error } = await db().rpc('plan_today_sync', { p_me: me });
+    if (error) throw new Error(error.message);
 }
 
 /**

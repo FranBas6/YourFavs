@@ -3,11 +3,15 @@
  * Página de prueba SOLO DE DESARROLLO de Mensajes M5 (handoff M5 §3.1): la tarjeta de plan en todos
  * sus estados, el ＋ con la quinta acción y las líneas de sistema, con datos inventados, para
  * revisarlos en claro, oscuro y móvil. Es estática: nada se envía. En producción: 404.
+ * M5b: los avisos de la campana (§3.6), el bloque «Planes» de Ver pronto (§3.4) y la pista sin planes.
  */
 import Layout from '../../layouts/Layout.astro';
 import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
-import { initialsOf, stampFor } from '../../lib/social/ui';
-import type { ChatMessage, PersonCard, PlanView } from '../../lib/social/types';
+import { initialsOf, notifItemHtml, stampFor } from '../../lib/social/ui';
+import type { ChatMessage, NotifView, PersonCard, PlanView } from '../../lib/social/types';
+import PlansBlock from '../../components/personal/PlansBlock.astro';
+import type { MyPlan } from '../../services/BD/social/plans';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
 import '../../styles/pages/social/mensajes.css';
 
 export const prerender = false;
@@ -73,6 +77,23 @@ const log = logHtml([
     S({ type: 'plan_changed', actor: CARLA.id, targets: [], title: 'Perfect Days', when: 'sáb 24 oct · 21:30' }, now - 2 * 3600_000),
     S({ type: 'plan_cancelled', actor: ANA.id, targets: [], title: 'Anatomía de una caída' }, now - 3600_000),
 ], { me: ME.id, group: true, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now });
+
+// M5b · campana (§3.6): el texto lo escribe la BD; aquí, como llegaría.
+const N = (o: Partial<NotifView>): NotifView => ({ id: `n${++mid}`, type: 'plan_today', title: '', subtitle: '', href: '/mislistas/amigos/mensajes/1', poster_path: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', created_at: now - 600_000, read: false, ...o });
+const notifs = [
+    N({ title: 'Hoy: Perfect Days a las 21:30 con Viernes de pelis', subtitle: 'Plan · van 3 · en casa de Ana' }),
+    N({ type: 'plan_changed', title: 'Carla Méndez ha cambiado el plan de Perfect Days: ahora el sáb 24 oct · 21:30', subtitle: 'Viernes de pelis · sigues en el plan', created_at: now - 20 * 60_000 }),
+    N({ type: 'plan_cancelled', title: 'Ana Ruiz ha cancelado el plan de Anatomía de una caída del dom 25 oct', subtitle: 'Viernes de pelis', created_at: now - 26 * 3600_000, read: true }),
+];
+
+// M5b · Ver pronto (§3.4).
+const MP = (o: Partial<MyPlan>): MyPlan => ({ id: ++pid, convId: 1, kind: 'group', with: 'Viernes de pelis', mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days', poster: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', date: day(1), time: '21:30', note: 'en casa de Ana', yes: 3, seen: false, past: false, ...o });
+const myPlans = [
+    MP({ date: day(-1), past: true, title: 'Anatomía de una caída', note: null, yes: 2, kind: 'direct', with: 'Ana Ruiz' }),
+    MP({ date: today, time: null, note: null }),
+    MP({}),
+    MP({ date: day(5), mediaType: 'tv', tmdbId: 1399, title: 'The Bear', kind: 'direct', with: 'Carla Méndez', yes: 2, note: null }),
+];
 ---
 <Layout title="Dev · Mensajes M5" robots="noindex, nofollow">
     <div class="dv">
@@ -86,6 +107,15 @@ const log = logHtml([
         <div class="dv-grid">{states.map(([label, p]) => (
             <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml({ type: 'plan', ref: { planId: p.id, title: p.title }, plan: p }, people, { me: ME.id, at: now - 7200_000, now })} /></div>
         ))}</div>
+
+        <h2>M5b · Campana: hoy, cambiado y cancelado</h2>
+        <div class="dv-box dv-nt" set:html={notifs.map((it) => notifItemHtml(it, { phase: SOCIAL_PHASE, now })).join('')} />
+
+        <h2>M5b · Ver pronto: el bloque «Planes» (pasado, hoy, mañana y una serie)</h2>
+        <div class="dv-box dv-vp"><PlansBlock plans={myPlans} today={today} convs={true} /></div>
+
+        <h2>M5b · Ver pronto sin planes (con conversaciones)</h2>
+        <div class="dv-box dv-vp"><PlansBlock plans={[]} today={today} convs={true} /></div>
 
         <h2>El ＋ con la quinta acción</h2>
         <div class="dv-box dv-pm"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: true, title: 'Viernes de pelis', friends: [ANA.id] })} /></div>
@@ -104,4 +134,7 @@ const log = logHtml([
     .dv-card small { display: block; font: 600 11px var(--font-mono); color: var(--text-2); margin-bottom: 4px; }
     .dv-pm { padding: 8px; max-width: 340px; }
     .dv-pm .pm { position: static; }
+    .dv-nt { max-width: 400px; padding: 6px; }
+    .dv-vp { padding: 16px; }
+    .dv-vp :global(.vp-pls), .dv-vp :global(.vp-hint) { margin-bottom: 0; }
 </style>

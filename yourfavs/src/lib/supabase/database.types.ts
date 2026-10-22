@@ -584,6 +584,9 @@ isOneToOne: true
 "plan_clean_note":
 { Args: { "p_note": string }; Returns: string
                            },
+"plan_conv_label":
+{ Args: { "p_conv": number,"p_me": string }; Returns: string
+                           },
 "plan_get":
 { Args: { "p_me": string,"p_plan": number }; Returns: {
               "cancelled_at": string | null,
@@ -615,6 +618,9 @@ isOneToOne: true
 "plan_label":
 { Args: { "p_date": string,"p_time": string }; Returns: string
                            },
+"plan_mine":
+{ Args: { "p_from": string,"p_me": string,"p_to"?: string }; Returns: Json
+                           },
 "plan_notify_yes":
 { Args: { "p_actor": string,"p_plan": Database["public"]['Tables']["watch_plans"]['Row'],"p_sub": string,"p_title": string,"p_type": string }; Returns: undefined
                            },
@@ -629,6 +635,9 @@ isOneToOne: true
                            },
 "plan_today":
 { Args: Record<PropertyKey, never>; Returns: string
+                           },
+"plan_today_sync":
+{ Args: { "p_me": string }; Returns: number
                            },
 "plan_when_ok":
 { Args: { "p_date": string,"p_time": string }; Returns: boolean

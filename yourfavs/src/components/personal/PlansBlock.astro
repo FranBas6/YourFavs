@@ -1,0 +1,88 @@
+---
+/**
+ * Bloque «Planes» de Ver pronto (Mensajes M5b; handoff M5 §3.4).
+ *
+ * Tus planes con «Voy», por fecha y hora, LEÍDOS de los planes (ninguna lista guarda la fecha):
+ * «No puedo», cancelar o salir del grupo los quitan solos. Los pasados se quedan 3 días con
+ * «¿La visteis?». Sin planes, el bloque no sale; si tienes alguna conversación, una pista.
+ * Solo el número de quienes van: los nombres se ven en el chat.
+ */
+import { Icon } from 'astro-icon/components';
+import Stamp from '../Stamp.astro';
+import { dtileHtml, planLong } from '../../lib/social/chatView';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import { planGoers, planWith, type MyPlan } from '../../services/BD/social/plans';
+
+interface Props {
+    plans: MyPlan[];
+    /** Hoy en Madrid (YYYY-MM-DD). */
+    today: string;
+    /** ¿Tienes alguna conversación? (para la pista sin planes). */
+    convs: boolean;
+}
+const { plans, today, convs } = Astro.props;
+---
+{plans.length > 0 ? (
+    <section class="vp-plans" aria-labelledby="vp-plans-h">
+        <div class="vp-sh">
+            <Stamp color="green" icon="calendar-check" size={30} />
+            <h2 id="vp-plans-h">Planes <span class="c">({plans.length})</span></h2>
+            <p>Por fecha · salen de tus chats</p>
+        </div>
+        <ul class="vp-pls">
+            {plans.map((p) => {
+                const href = p.mediaType === 'movie' ? `/movie/${p.tmdbId}` : `/serie/${p.tmdbId}`;
+                const ask = p.past && !p.seen;
+                return (
+                    <li class:list={['vpl', { past: p.past }]} data-vp-plan={p.id}>
+                        <Fragment set:html={dtileHtml(p.date, { today: p.date === today, sm: true })} />
+                        <a class="vpl-po" href={href} tabindex="-1" aria-hidden="true">
+                            {p.poster && <img src={posterUrl(p.poster, 'w92')} alt="" loading="lazy" decoding="async" />}
+                        </a>
+                        <div>
+                            <a class="vpl-t" href={href}><b>{p.title}</b></a>
+                            <div class="m">
+                                <span class="sr-only">{planLong(p.date, today)}.</span>
+                                <span><Icon name={p.kind === 'group' ? 'lucide:users' : 'lucide:message-circle'} aria-hidden="true" />{planWith(p)}</span>
+                                <span><Icon name="lucide:clock" aria-hidden="true" />{p.time ?? 'sin hora'}</span>
+                                {p.note && <span><Icon name="lucide:sticky-note" aria-hidden="true" />{p.note}</span>}
+                                <span class="yes"><Icon name="lucide:check" aria-hidden="true" />{planGoers(p)}</span>
+                                {ask && <span class="q" data-vp-q><Icon name="lucide:eye" aria-hidden="true" />¿La visteis?</span>}
+                            </div>
+                        </div>
+                        <div class="a" aria-live="polite">
+                            {ask && p.mediaType === 'movie' && (
+                                <button type="button" class="pf-btn sm" data-vp-seen={p.id}><Icon name="lucide:check" aria-hidden="true" />Marcar como vista</button>
+                            )}
+                            {ask && p.mediaType === 'tv' && (
+                                <a class="pf-btn sm" href={href}><Icon name="lucide:tv" aria-hidden="true" />Marcar episodios</a>
+                            )}
+                            <a class="pf-btn sm" href={`/mislistas/amigos/mensajes/${p.convId}`}><Icon name="lucide:message-circle" aria-hidden="true" />Abrir chat</a>
+                        </div>
+                    </li>
+                );
+            })}
+        </ul>
+    </section>
+) : convs && (
+    <p class="vp-hint"><Icon name="lucide:calendar-plus" aria-hidden="true" /><span><b>Sin planes por ahora.</b> En un chat, ＋ → «Plan para verla».</span></p>
+)}
+
+<script>
+    // «Marcar como vista» de un plan pasado: el mismo gesto que en la ficha (Vistas + diario).
+    document.addEventListener('click', async (e) => {
+        const b = (e.target as Element).closest<HTMLButtonElement>('[data-vp-seen]');
+        if (!b || b.disabled) return;
+        b.disabled = true;
+        try {
+            const r = await fetch(`/api/social/messages/plans/${b.dataset.vpSeen}/seen`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+            });
+            if (!r.ok) throw new Error(String(r.status));
+            b.closest('[data-vp-plan]')?.querySelector('[data-vp-q]')?.remove();
+            b.outerHTML = '<span class="ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 6L9 17l-5-5"/></svg>Vista</span>';
+        } catch {
+            b.disabled = false;
+        }
+    });
+</script>

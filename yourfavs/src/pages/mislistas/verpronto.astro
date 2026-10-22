@@ -16,7 +16,12 @@ import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
 import type {Movie} from "../../types/ApiMovie";
 import type {SeriesInterface} from "../../types/DbSerie";
+import PlansBlock from "../../components/personal/PlansBlock.astro";
+import {myPlans, type MyPlan} from "../../services/BD/social/plans";
+import {appDateParts} from "../../utils/appTime";
+import {SOCIAL_PHASE} from "../../utils/constants/social";
 import '../../styles/pages/personal/personal.css';
+import '../../styles/shared/plans.css';
 
 let clearedType = null;
 let errorMessage = "";
@@ -54,11 +59,32 @@ try {
     errorMessage = error instanceof Error ? error.message : "Error desconocido al cargar datos";
 }
 
-const watchedMap = await getWatchedProgressBatch(seriesVerPronto.map((s: any) => String(s.id)));
-
 const filter = Astro.url.searchParams.get("filter") || "todos";
 const showSeries = filter === "series" || filter === "todos";
 const showMovies = filter === "peliculas" || filter === "todos";
+
+// Planes para verla (Mensajes M5b): tus «Voy» desde hace 3 días, leídos de los planes. Un título con
+// plan sale solo en «Planes», no en la rejilla. Si fallan, la página sigue sin el bloque.
+const todayKey = appDateParts(Date.now()).key;
+let plans: MyPlan[] = [];
+let hasConvs = false;
+const uid = Astro.locals.user?.uid;
+if (uid && SOCIAL_PHASE.messages) {
+    try {
+        const [y, m, d] = todayKey.split('-').map(Number);
+        const r = await myPlans(uid, new Date(Date.UTC(y, m - 1, d - 3)).toISOString().slice(0, 10));
+        plans = r.plans.filter((p) => p.mediaType === 'tv' ? showSeries : showMovies);
+        hasConvs = r.convs;
+    } catch (error) {
+        console.error("Error al cargar los planes:", error);
+    }
+}
+const planned = new Set(plans.map((p) => `${p.mediaType}:${p.tmdbId}`));
+seriesVerPronto = seriesVerPronto.filter((s) => !planned.has(`tv:${s.id}`));
+peliculasVerPronto = peliculasVerPronto.filter((m) => !planned.has(`movie:${m.id}`));
+
+const watchedMap = await getWatchedProgressBatch(seriesVerPronto.map((s: any) => String(s.id)));
+
 const showAll = filter === "todos";
 const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
 const hasSeries = seriesVerPronto.length > 0;
@@ -90,6 +116,8 @@ const hasContent = hasSeries || hasMovies;
         <div class="mb-4">
             <PersonalNav currentPage="/mislistas/verpronto" />
         </div>
+
+        <PlansBlock plans={plans} today={todayKey} convs={hasConvs} />
 
         <!-- Botones de borrado masivo -->
         {hasContent && (

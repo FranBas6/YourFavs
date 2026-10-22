@@ -3,6 +3,11 @@ import Layout from "../../layouts/Layout.astro";
 import { getCalendarData, hideEpisodeTitlesFor } from "../../services/API/Calendar/calendarService";
 import type { CalendarEvent } from "../../services/API/Calendar/calendarService";
 import EmptyState from "../../components/EmptyState.astro";
+import { Icon } from "astro-icon/components";
+import { myPlans, planGoers, planWith, type MyPlan } from "../../services/BD/social/plans";
+import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { SOCIAL_PHASE } from "../../utils/constants/social";
+import "../../styles/shared/plans.css";
 
 const now = new Date();
 const year = parseInt(Astro.url.searchParams.get("year") || String(now.getFullYear()));
@@ -50,6 +55,35 @@ for (let d = 1; d <= daysInMonth; d++) {
         events: eventsMap.get(dateStr) || [],
     });
 }
+
+// Planes para verla (Mensajes M5b): tus «Voy» del mes, leídos de los planes. Van siempre los
+// primeros del día. Si fallan, el calendario sigue sin ellos.
+const plansByDate = new Map<string, MyPlan[]>();
+const uid = Astro.locals.user?.uid;
+if (uid && SOCIAL_PHASE.messages) {
+    try {
+        const mm = String(month).padStart(2, '0');
+        const r = await myPlans(uid, `${year}-${mm}-01`, `${year}-${mm}-${String(daysInMonth).padStart(2, '0')}`);
+        for (const p of r.plans) {
+            if (!plansByDate.has(p.date)) plansByDate.set(p.date, []);
+            plansByDate.get(p.date)!.push(p);
+        }
+    } catch (error) {
+        console.error("Error al cargar los planes del calendario:", error);
+    }
+}
+const fichaOf = (p: MyPlan) => p.mediaType === 'movie' ? `/movie/${p.tmdbId}` : `/serie/${p.tmdbId}`;
+const chatOf = (p: MyPlan) => `/mislistas/amigos/mensajes/${p.convId}`;
+/** «Plan · 21:30 · Viernes de pelis · van 3». */
+const planLine = (p: MyPlan) => `Plan · ${p.time ?? 'sin hora'} · ${p.kind === 'group' ? planWith(p) : `con ${p.with ?? 'otra persona'}`} · ${planGoers(p).toLowerCase()}`;
+/** Lo que necesita el detalle del día (se pinta en el navegador). */
+const planData = (p: MyPlan) => ({ title: p.title, poster: posterUrl(p.poster, 'w92'), href: fichaOf(p), chat: chatOf(p), line: planLine(p) });
+// Color de cada estreno, con los tokens --stamp-* (antes hex fijos).
+const kindOf = (e: CalendarEvent) => e.event_type === 'person_release' ? 'cal-k-person' : e.media_type === 'movie' ? 'cal-k-movie' : e.event_type === 'season_premiere' ? 'cal-k-season' : 'cal-k-ep';
+
+// Vista lista: los días con estrenos o con planes.
+const listDays = [...new Set([...(calendarData?.days ?? []).map((d) => d.date), ...plansByDate.keys()])].sort()
+    .map((date) => ({ date, events: eventsMap.get(date) ?? [], plans: plansByDate.get(date) ?? [] }));
 
 // Navegación meses
 const prevMonth = month === 1 ? 12 : month - 1;
@@ -158,14 +192,18 @@ const notificationGroups = Array.from(groupsMap.entries())
                     const hasMovies = cell.events.some(e => e.media_type === 'movie' && e.event_type !== 'person_release');
                     const hasSeries = cell.events.some(e => e.media_type === 'tv' && e.event_type !== 'person_release');
                     const hasSeasonPremiere = cell.events.some(e => e.event_type === 'season_premiere');
+                    const cellPlans = plansByDate.get(cell.date) ?? [];
+                    const hasPlan = cellPlans.length > 0;
+                    const shown = 2 - Math.min(2, cellPlans.length);
 
                     return (
                         <div class={`calendar-cell min-h-[3rem] sm:min-h-[5rem] lg:min-h-[6rem] border-b border-r border-gray-50 p-1 sm:p-2 relative
                             ${!cell.day ? 'bg-gray-50/50' : ''}
                             ${isToday ? 'bg-blue-50/50 ring-2 ring-inset ring-blue-500' : ''}
-                            ${hasEvents && cell.day ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
+                            ${(hasEvents || hasPlan) && cell.day ? 'cursor-pointer hover:bg-gray-50 transition-colors' : ''}`}
                             data-date={cell.date}
-                            data-events={hasEvents ? JSON.stringify(cell.events) : undefined}>
+                            data-events={hasEvents || hasPlan ? JSON.stringify(cell.events) : undefined}
+                            data-plans={hasPlan ? JSON.stringify(cellPlans.map(planData)) : undefined}>
                             {cell.day && (
                                 <>
                                     <span class={`cal-num text-xs sm:text-sm font-medium ${isToday ? 'text-blue-600 font-bold' : 'text-gray-700'}`}>
@@ -173,28 +211,30 @@ const notificationGroups = Array.from(groupsMap.entries())
                                     </span>
 
                                     {/* Dots indicadores */}
-                                    {hasEvents && (
-                                        <div class="flex gap-0.5 mt-0.5 sm:mt-1 flex-wrap">
-                                            {hasMovies && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#E63946]" title="Película"></span>}
-                                            {hasSeries && !hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#3B82F6]" title="Episodio"></span>}
-                                            {hasSeasonPremiere && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#8B5CF6]" title="Temporada completa"></span>}
-                                            {hasPersonRelease && <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-[#EC4899]" title="De quien sigues"></span>}
+                                    {(hasEvents || hasPlan) && (
+                                        <div class="flex items-center gap-0.5 mt-0.5 sm:mt-1 flex-wrap">
+                                            {hasPlan && <span class="cal-dot pl" title="Plan"><Icon name="lucide:users" aria-hidden="true" /></span>}
+                                            {hasMovies && <span class="cal-dot cal-k-movie" title="Película"></span>}
+                                            {hasSeries && !hasSeasonPremiere && <span class="cal-dot cal-k-ep" title="Episodio"></span>}
+                                            {hasSeasonPremiere && <span class="cal-dot cal-k-season" title="Temporada completa"></span>}
+                                            {hasPersonRelease && <span class="cal-dot cal-k-person" title="De quien sigues"></span>}
                                         </div>
                                     )}
 
                                     {/* Títulos en desktop */}
                                     <div class="hidden lg:block mt-1 space-y-0.5 overflow-hidden">
-                                        {cell.events.slice(0, 2).map(event => (
-                                            <div class={`text-[10px] leading-tight truncate px-1 py-0.5 rounded
-                                                ${event.event_type === 'person_release' ? 'bg-pink-50 text-pink-700' : ''}
-                                                ${event.media_type === 'movie' && event.event_type !== 'person_release' ? 'bg-red-50 text-red-700' : ''}
-                                                ${event.event_type === 'season_premiere' ? 'bg-purple-50 text-purple-700' : ''}
-                                                ${event.event_type === 'episode' ? 'bg-blue-50 text-blue-700' : ''}`}>
+                                        {cellPlans.slice(0, 2).map(p => (
+                                            <div class="cal-ce pl text-[10px] leading-tight px-1 py-0.5 rounded">
+                                                <Icon name="lucide:users" aria-hidden="true" />{p.time && <time>{p.time}</time>}<span>{p.title}</span>
+                                            </div>
+                                        ))}
+                                        {cell.events.slice(0, shown).map(event => (
+                                            <div class={`cal-ce ${kindOf(event)} text-[10px] leading-tight truncate px-1 py-0.5 rounded`}>
                                                 {event.title}
                                             </div>
                                         ))}
-                                        {cell.events.length > 2 && (
-                                            <span class="text-[10px] text-gray-400">+{cell.events.length - 2} más</span>
+                                        {cellPlans.length + cell.events.length > 2 && (
+                                            <span class="text-[10px] text-gray-400">+{cellPlans.length + cell.events.length - 2} más</span>
                                         )}
                                     </div>
                                 </>
@@ -205,18 +245,23 @@ const notificationGroups = Array.from(groupsMap.entries())
             </div>
 
             <!-- Leyenda -->
-            <div class="flex items-center justify-center gap-4 px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
+            <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
+                {uid && SOCIAL_PHASE.messages && (
+                    <span class="cal-lg-pl flex items-center gap-1.5">
+                        <Icon name="lucide:users" aria-hidden="true" /> Planes
+                    </span>
+                )}
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-[#E63946]"></span> Películas
+                    <span class="cal-dot cal-k-movie"></span> Películas
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-[#3B82F6]"></span> Episodios
+                    <span class="cal-dot cal-k-ep"></span> Episodios
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-[#8B5CF6]"></span> Temporada completa
+                    <span class="cal-dot cal-k-season"></span> Temporada completa
                 </span>
                 <span class="flex items-center gap-1.5">
-                    <span class="w-2 h-2 rounded-full bg-[#EC4899]"></span> De quien sigues
+                    <span class="cal-dot cal-k-person"></span> De quien sigues
                 </span>
             </div>
         </div>
@@ -240,14 +285,14 @@ const notificationGroups = Array.from(groupsMap.entries())
                         </svg>
                     </a>
                 </div>
-                {calendarData?.days?.length === 0 && (
+                {listDays.length === 0 && (
                     <div class="px-4 py-8">
                         <EmptyState size="sm" title="Sin estrenos este mes" description="No hay estrenos ni episodios programados." />
                     </div>
                 )}
-                {calendarData?.days && calendarData.days.length > 0 && (
+                {listDays.length > 0 && (
                     <div class="divide-y divide-gray-100">
-                        {calendarData.days.map(day => {
+                        {listDays.map(day => {
                             const isToday = day.date === today;
                             const dt = new Date(day.date + 'T12:00:00');
                             const weekday = dt.toLocaleDateString('es-ES', { weekday: 'long' });
@@ -259,15 +304,23 @@ const notificationGroups = Array.from(groupsMap.entries())
                                             {isToday ? 'Hoy' : weekday}
                                         </span>
                                         <span class="text-xs text-gray-500">{datePretty}</span>
-                                        <span class="text-xs text-gray-400">· {day.events.length} {day.events.length === 1 ? 'evento' : 'eventos'}</span>
+                                        <span class="text-xs text-gray-400">· {day.events.length + day.plans.length} {day.events.length + day.plans.length === 1 ? 'evento' : 'eventos'}</span>
                                     </div>
                                     <div class="space-y-2">
+                                        {day.plans.map(p => (
+                                            <div class="cal-plr">
+                                                <a class="po" href={fichaOf(p)} tabindex="-1" aria-hidden="true">{p.poster && <img src={posterUrl(p.poster, 'w92')} alt="" loading="lazy" />}</a>
+                                                <div class="tx">
+                                                    <a href={fichaOf(p)}><b>{p.title}</b></a>
+                                                    <span><Icon name="lucide:users" aria-hidden="true" />{planLine(p)}</span>
+                                                </div>
+                                                <a class="pf-btn sm" href={chatOf(p)}><Icon name="lucide:message-circle" aria-hidden="true" />Abrir chat</a>
+                                            </div>
+                                        ))}
                                         {day.events.map(ev => {
                                             const link = ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`;
-                                            const colorClass = ev.event_type === 'person_release' ? 'text-[#EC4899]' : ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-blue-600');
-                                            const bgClass = ev.event_type === 'person_release' ? 'bg-pink-50 border-pink-100' : ev.media_type === 'movie' ? 'bg-red-50 border-red-100' : (ev.event_type === 'season_premiere' ? 'bg-purple-50 border-purple-100' : 'bg-blue-50 border-blue-100');
                                             return (
-                                                <a href={link} class={`flex items-center gap-3 p-2.5 rounded-xl border ${bgClass} hover:shadow-md transition`}>
+                                                <a href={link} class={`cal-row ${kindOf(ev)} flex items-center gap-3 p-2.5 rounded-xl border hover:shadow-md transition`}>
                                                     {ev.poster_path ? (
                                                         <img src={ev.poster_path} alt={ev.title} class="w-10 h-14 object-cover rounded-lg flex-shrink-0" loading="lazy"/>
                                                     ) : (
@@ -275,7 +328,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                                                     )}
                                                     <div class="min-w-0 flex-1">
                                                         <p class="text-sm font-semibold text-gray-800 truncate">{ev.title}</p>
-                                                        <span class={`text-xs ${colorClass}`}>{ev.label}</span>
+                                                        <span class="text-xs cal-tx">{ev.label}</span>
                                                     </div>
                                                     {ev.is_subscribed && (
                                                         <span class="text-amber-500 flex-shrink-0" title="Suscrito">
@@ -362,11 +415,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                                     {group.events.map(ev => (
                                         <li>
                                             <a href={detailLink} class="flex items-center justify-between gap-3 px-3 py-2 hover:bg-gray-50 transition-colors min-w-0">
-                                                <span class={`text-xs font-medium truncate min-w-0 flex-1
-                                                    ${ev.event_type === 'person_release' ? 'text-[#EC4899]' : ''}
-                                                    ${ev.media_type === 'movie' && ev.event_type !== 'person_release' ? 'text-[#E63946]' : ''}
-                                                    ${ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : ''}
-                                                    ${ev.event_type === 'episode' ? 'text-[#3B82F6]' : ''}`}>
+                                                <span class={`cal-tx ${kindOf(ev)} text-xs font-medium truncate min-w-0 flex-1`}>
                                                     {ev.label}
                                                 </span>
                                                 <span class="text-xs text-gray-400 whitespace-nowrap flex-shrink-0">
@@ -397,6 +446,10 @@ const notificationGroups = Array.from(groupsMap.entries())
     if (!panel || !title || !list || !closeBtn) return;
 
     var selectedCell = null;
+    var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); };
+    var svg = function (d) { return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + d + '"/></svg>'; };
+    var USERS = svg('M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 3a4 4 0 1 0 0 8a4 4 0 0 0 0-8m13 18v-2a4 4 0 0 0-3-3.87m-3-12a4 4 0 0 1 0 7.75');
+    var CHAT = svg('M7.9 20A9 9 0 1 0 4 16.1L2 22Z');
 
     closeBtn.addEventListener('click', function () {
         panel.style.display = 'none';
@@ -406,7 +459,8 @@ const notificationGroups = Array.from(groupsMap.entries())
         cell.addEventListener('click', function () {
             var date = cell.getAttribute('data-date');
             var events = JSON.parse(cell.getAttribute('data-events') || '[]');
-            if (!events.length) return;
+            var plans = JSON.parse(cell.getAttribute('data-plans') || '[]');
+            if (!events.length && !plans.length) return;
 
             if (selectedCell && selectedCell !== cell) {
                 selectedCell.removeAttribute('data-selected');
@@ -418,11 +472,17 @@ const notificationGroups = Array.from(groupsMap.entries())
             title.textContent = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
             var html = '';
+            // Planes (M5b): los primeros, con borde, «Plan · 21:30 · Viernes de pelis · van 3» y «Abrir chat».
+            plans.forEach(function (p) {
+                html += '<div class="cal-plr">'
+                    + '<a class="po" href="' + esc(p.href) + '" tabindex="-1" aria-hidden="true">' + (p.poster ? '<img src="' + esc(p.poster) + '" alt="" loading="lazy">' : '') + '</a>'
+                    + '<div class="tx"><a href="' + esc(p.href) + '"><b>' + esc(p.title) + '</b></a><span>' + USERS + esc(p.line) + '</span></div>'
+                    + '<a class="pf-btn sm" href="' + esc(p.chat) + '">' + CHAT + 'Abrir chat</a></div>';
+            });
             events.forEach(function (ev) {
                 var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
-                var colorClass = ev.event_type === 'person_release' ? 'text-[#EC4899]' : ev.media_type === 'movie' ? 'text-[#E63946]' : (ev.event_type === 'season_premiere' ? 'text-[#8B5CF6]' : 'text-[#3B82F6]');
-                var borderClass = ev.event_type === 'person_release' ? 'border-pink-100' : ev.media_type === 'movie' ? 'border-red-100' : (ev.event_type === 'season_premiere' ? 'border-purple-100' : 'border-blue-100');
-                html += '<a href="' + link + '" class="flex items-center gap-3 p-3 bg-white rounded-xl border ' + borderClass + ' shadow-sm hover:shadow-md transition-all">';
+                var kind = ev.event_type === 'person_release' ? 'cal-k-person' : ev.media_type === 'movie' ? 'cal-k-movie' : (ev.event_type === 'season_premiere' ? 'cal-k-season' : 'cal-k-ep');
+                html += '<a href="' + link + '" class="cal-bd ' + kind + ' flex items-center gap-3 p-3 bg-white rounded-xl border shadow-sm hover:shadow-md transition-all">';
                 if (ev.poster_path) {
                     html += '<img src="' + ev.poster_path + '" alt="" class="w-12 h-16 object-cover rounded-lg flex-shrink-0" loading="lazy"/>';
                 } else {
@@ -430,7 +490,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                 }
                 html += '<div class="min-w-0 flex-1">';
                 html += '<p class="text-sm font-semibold text-gray-800">' + ev.title + '</p>';
-                html += '<span class="text-xs ' + colorClass + '">' + ev.label + '</span>';
+                html += '<span class="text-xs cal-tx">' + ev.label + '</span>';
                 html += '</div></a>';
             });
             list.innerHTML = html;
