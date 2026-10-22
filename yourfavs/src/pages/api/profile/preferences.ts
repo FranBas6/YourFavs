@@ -70,6 +70,11 @@ function buildPatch(body: Record<string, unknown>): { patch: Partial<UserProfile
         patch.platformsFilterDefault = body.platformsFilterDefault;
     }
 
+    // Mensajes M5c: «Incluir mis planes» en el calendario .ics.
+    if (typeof body.icsPlans === 'boolean') {
+        patch.icsPlans = body.icsPlans;
+    }
+
     if (body.notifPrefs && typeof body.notifPrefs === 'object' && !Array.isArray(body.notifPrefs)) {
         const src = body.notifPrefs as Record<string, unknown>;
         const prefs: Record<string, boolean> = {};

@@ -6,6 +6,7 @@ import EmptyState from "../../components/EmptyState.astro";
 import { Icon } from "astro-icon/components";
 import { myPlans, planGoers, planWith, type MyPlan } from "../../services/BD/social/plans";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { getIcsToken, icsPath } from "../../services/BD/profile/icsToken";
 import { SOCIAL_PHASE } from "../../utils/constants/social";
 import "../../styles/shared/plans.css";
 
@@ -70,6 +71,16 @@ if (uid && SOCIAL_PHASE.messages) {
         }
     } catch (error) {
         console.error("Error al cargar los planes del calendario:", error);
+    }
+}
+// Botón «Suscribir»: tu dirección privada del .ics (M5c). Sin ella, el botón lleva a Ajustes.
+let icsUrl: string | null = null;
+if (uid) {
+    try {
+        const token = await getIcsToken(uid);
+        if (token) icsUrl = `${Astro.url.origin}${icsPath(token)}`;
+    } catch (error) {
+        console.error("Error al leer la dirección del calendario:", error);
     }
 }
 const fichaOf = (p: MyPlan) => p.mediaType === 'movie' ? `/movie/${p.tmdbId}` : `/serie/${p.tmdbId}`;
@@ -145,7 +156,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                     Lista
                 </a>
             </div>
-            <button id="ics-subscribe-btn"
+            <button id="ics-subscribe-btn" data-ics-url={icsUrl ?? undefined}
                     class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition self-start">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 Suscribir en Google/Apple Calendar
@@ -506,8 +517,9 @@ const notificationGroups = Array.from(groupsMap.entries())
     var btn = document.getElementById('ics-subscribe-btn');
     if (!btn) return;
     btn.addEventListener('click', function () {
-        var origin = window.location.origin;
-        var httpUrl = origin + '/api/calendar/subscribe.ics';
+        // Tu dirección privada (M5c). Si no se pudo leer, a Ajustes → Calendario, donde se crea.
+        var httpUrl = btn.getAttribute('data-ics-url');
+        if (!httpUrl) { window.location.href = '/perfil/calendario'; return; }
         var webcalUrl = httpUrl.replace(/^https?:\/\//, 'webcal://');
         var copy = function () {
             if (navigator.clipboard && navigator.clipboard.writeText) {

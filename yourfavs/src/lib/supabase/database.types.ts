@@ -296,13 +296,13 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"referral_suggestion_dismissed": boolean,"referred_by": string | null,"region": string | null,"rt_key": string,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
+                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"ics_plans": boolean,"ics_token": string | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"referral_suggestion_dismissed": boolean,"referred_by": string | null,"region": string | null,"rt_key": string,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
                   }
                   Insert: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"ics_plans"?: boolean,"ics_token"?: string | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"ics_plans"?: boolean,"ics_token"?: string | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -456,6 +456,20 @@ isOneToOne: true
           Functions: {
             "claim_app_state":
 { Args: { "p_key": string,"p_ttl_ms": number }; Returns: Json
+                           },
+"ics_new_token":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"ics_owner":
+{ Args: { "p_token": string }; Returns: {
+              "plans": boolean,"user_id": string
+            }[]
+                           },
+"ics_token_get":
+{ Args: { "p_me": string }; Returns: string
+                           },
+"ics_token_rotate":
+{ Args: { "p_me": string }; Returns: string
                            },
 "msg_add_members":
 { Args: { "p_conv": number,"p_ids": (string)[],"p_me": string }; Returns: Json
