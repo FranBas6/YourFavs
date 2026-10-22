@@ -21,7 +21,7 @@ const TIMES = [['60', '< 1 h'], ['150', '~2 h'], ['any', 'El que sea']] as const
 
 type Roll = { empty: true; of: number } | { empty: false; roll: WtwCardRef; tier: 'all' | 'minus'; restart: boolean };
 
-export function initWtw(o: { conv: number; chat: ChatView; onSent: (m: ChatMessage) => void }) {
+export function initWtw(o: { conv: number; chat: ChatView; onSent: (m: ChatMessage) => void; signal?: AbortSignal }) {
     const dlg = document.getElementById('ms-wtw') as HTMLDialogElement | null;
     if (!dlg) return;
     const me = o.chat.me.id;
@@ -163,11 +163,13 @@ export function initWtw(o: { conv: number; chat: ChatView; onSent: (m: ChatMessa
     }
 
     // ---- Eventos -----------------------------------------------------------------------------------
+    // Con `signal` (mini-chat, M6) se quitan al cambiar de conversación: el diálogo sigue en la página.
+    const on = { signal: o.signal };
     document.addEventListener('click', (e) => {
         const t = e.target as Element;
         const from = t.closest<HTMLElement>('[data-wtw-open-chat]');
         if (from && !dlg.contains(from)) { e.preventDefault(); open(document.querySelector<HTMLElement>('[data-ms-plus]') ?? from); }
-    });
+    }, on);
     dlg.addEventListener('click', (e) => {
         const t = e.target as Element;
         if (t === dlg) { dlg.close(); return; } // el fondo
@@ -217,9 +219,9 @@ export function initWtw(o: { conv: number; chat: ChatView; onSent: (m: ChatMessa
             dlg.close();
             document.querySelector<HTMLElement>('#ms-pm [data-share-title]')?.click();
         }
-    });
+    }, on);
     dlg.addEventListener('close', () => {
         dlg.innerHTML = '';
         if (opener?.isConnected) opener.focus();
-    });
+    }, on);
 }

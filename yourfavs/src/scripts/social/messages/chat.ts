@@ -42,7 +42,42 @@ const store = {
     set(s: Storage, k: string, v: string | null) { try { if (v === null) s.removeItem(k); else s.setItem(k, v); } catch { /* sin almacenamiento */ } },
 };
 
-function init(root: HTMLElement, chat: ChatView) {
+/** Lo que cambia en el mini-chat (M6); sin opciones, la conversación de la página, como siempre. */
+export interface MountOpts {
+    /** Talla compacta (avatares de 32), sin lo de móvil (teclado, pantalla completa). */
+    compact?: boolean;
+    /** ¿Se puede marcar como leído ahora? (el mini-chat minimizado, no). */
+    canRead?: () => boolean;
+    /** La conversación ya no está (te quitaron, o dejó de estar en tu lista). Sin esto, recarga. */
+    onGone?: (why: 'left' | 'none') => void;
+    /** Se abrió o cerró la escritura (amistad): hay que volver a montarla. Sin esto, recarga. */
+    onRemount?: () => void;
+    /** Has salido del grupo. Sin esto, a Mensajes. */
+    onLeft?: (title: string) => void;
+    /** Llegaron mensajes de otras personas. */
+    onIncoming?: (n: number) => void;
+}
+
+export interface MountedChat {
+    /** Quita todo lo que escucha (oyentes de página, sondeo) para montar otra. */
+    destroy(): void;
+    focusInput(): void;
+    /** Una vuelta del sondeo ya (y marcar como leído si toca). */
+    refresh(): void;
+    isMuted(): boolean;
+    setMuted(v: boolean): Promise<void>;
+    leave(): Promise<void>;
+}
+
+export function mountChat(root: HTMLElement, chat: ChatView, opts: MountOpts = {}): MountedChat {
+    // Todo lo que se escucha fuera de `root` (la página, los diálogos) va con esta señal: al
+    // desmontar (el mini-chat cambia de conversación sin recargar) se quita de golpe.
+    const ac = new AbortController();
+    const scope = <T extends EventTarget>(t: T): T['addEventListener'] =>
+        ((type: string, fn: EventListenerOrEventListenerObject, o?: boolean | AddEventListenerOptions) =>
+            t.addEventListener(type, fn, { ...(typeof o === 'object' ? o : {}), signal: ac.signal })) as T['addEventListener'];
+    const docOn = scope(document);
+    const winOn = scope(window);
     const conv = chat.id;
     const me = chat.me.id;
     const group = chat.kind === 'group';
@@ -104,7 +139,7 @@ function init(root: HTMLElement, chat: ChatView) {
         const focused = (document.activeElement as HTMLElement | null)?.closest?.<HTMLElement>('[data-mid]');
         const focusedId = focused && logEl.contains(focused) ? focused.dataset.mid : null;
         logEl.innerHTML = logHtml(msgs, {
-            me, group, people, newAfter, seenId, seenAt, pending, revealed, compact: mobile.matches,
+            me, group, people, newAfter, seenId, seenAt, pending, revealed, compact: opts.compact || mobile.matches,
             other: group ? null : otherOf(current),
         });
         if (mode === 'bottom' || (mode === 'keep' && atBottom)) scroller.scrollTop = scroller.scrollHeight;
@@ -133,7 +168,7 @@ function init(root: HTMLElement, chat: ChatView) {
     // ---- Leído -----------------------------------------------------------------------------
     async function markRead() {
         const last = lastId();
-        if (!last || last <= readSent || document.visibilityState !== 'visible') return;
+        if (!last || last <= readSent || document.visibilityState !== 'visible' || opts.canRead?.() === false) return;
         readSent = last;
         const r = await msgApi.read(conv, last);
         if (r.ok) refreshList();
@@ -145,7 +180,11 @@ function init(root: HTMLElement, chat: ChatView) {
         const last = lastId();
         const r = await msgApi.chat(conv, last ? { after: last, from: firstId() } : {});
         // Ya no estás (te quitaron, o el 1:1 dejó de estar en tu lista): la página lo explica.
-        if (r.status === 404) { location.reload(); return true; }
+        if (r.status === 404) {
+            if (opts.onGone) { poller.stop(); opts.onGone((r.data as { error?: string })?.error === 'left' ? 'left' : 'none'); }
+            else location.reload();
+            return true;
+        }
         if (!r.ok) return false;
         const c = r.data.chat;
         // Personas y papeles: los avisos de admin no llegan a todo el mundo, así que el panel se
@@ -162,12 +201,14 @@ function init(root: HTMLElement, chat: ChatView) {
         }
         if (c.seenId !== seenId || c.seenAt !== seenAt) { seenId = c.seenId; seenAt = c.seenAt; changed = true; }
         // Se ha abierto o cerrado la escritura (amistad): la página pinta el compositor que toca.
-        if (c.readOnly !== chat.readOnly) { location.reload(); return true; }
+        if (c.readOnly !== chat.readOnly) { if (opts.onRemount) opts.onRemount(); else location.reload(); return true; }
         // Cambios del grupo (nombre, personas): cabecera y panel.
         if (metaChanged || fresh.some((m) => m.kind === 'system')) repaintMeta(c);
         if (await refreshPlans()) changed = true;
         if (changed) render();
         announce(fresh);
+        const incoming = fresh.filter((m) => m.author !== me && m.kind !== 'system').length;
+        if (incoming) opts.onIncoming?.(incoming);
         if (fresh.some((m) => m.author !== me)) void markRead();
         return true;
     }, BASE_POLL);
@@ -223,7 +264,7 @@ function init(root: HTMLElement, chat: ChatView) {
         if (r.data.error === 'read_only' || r.status === 404) {
             pending = pending.filter((x) => x !== p);
             saveFailed();
-            location.reload();
+            if (opts.onRemount) opts.onRemount(); else location.reload();
             return;
         }
         p.failed = true;
@@ -312,8 +353,8 @@ function init(root: HTMLElement, chat: ChatView) {
         plusMenu.hidden = false;
         plusMenu.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
     });
-    plusSheet?.addEventListener('close', () => setPlus(false));
-    plusSheet?.addEventListener('click', (e) => {
+    if (plusSheet) scope(plusSheet)('close', () => setPlus(false));
+    if (plusSheet) scope(plusSheet)('click', (e) => {
         // Tocar fuera de la hoja (el fondo) o elegir una acción la cierra.
         if (e.target === plusSheet || (e.target as Element).closest('[role="menuitem"]')) plusSheet.close();
     });
@@ -326,7 +367,7 @@ function init(root: HTMLElement, chat: ChatView) {
         else if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length]?.focus(); }
         else if (e.key === 'Tab') closePlus();
     });
-    document.addEventListener('click', (e) => {
+    docOn('click', (e) => {
         const path = e.composedPath();
         if (plusMenu && !plusMenu.hidden && !path.includes(plusMenu) && !(plusBtn && path.includes(plusBtn))) closePlus();
     });
@@ -334,13 +375,13 @@ function init(root: HTMLElement, chat: ChatView) {
     // «¿Qué vemos?» (M4d): la tirada enviada entra como un mensaje más.
     if (!chat.readOnly) {
         initWtw({
-            conv, chat,
+            conv, chat, signal: ac.signal,
             onSent: (m) => { merge([m]); readSent = Math.max(readSent, m.id); render('bottom'); refreshList(); },
         });
     }
 
     // Tarjeta enviada desde el selector («Compartir un título»): entra como un mensaje más.
-    document.addEventListener('yf:ms-card-sent', (e) => {
+    docOn('yf:ms-card-sent', (e) => {
         const d = (e as CustomEvent<{ conv: number; message: ChatMessage }>).detail;
         if (!d || d.conv !== conv) return;
         merge([d.message]);
@@ -427,7 +468,7 @@ function init(root: HTMLElement, chat: ChatView) {
     const planOf = (id: number) => msgs.find((m) => m.card?.type === 'plan' && m.card.ref.planId === id)?.card as
         { type: 'plan'; plan: PlanView | null } | undefined;
     // Un cambio guardado desde el selector («Cambiar fecha»).
-    document.addEventListener('yf:ms-plan', (e) => {
+    docOn('yf:ms-plan', (e) => {
         const v = (e as CustomEvent<PlanView>).detail;
         if (v && v.convId === conv && applyPlan(v)) render();
         poller.now(); // la línea de sistema del cambio
@@ -550,7 +591,7 @@ function init(root: HTMLElement, chat: ChatView) {
         setSpoiler(null);
         input?.focus();
     });
-    document.addEventListener('yf:ms-spoiler-set', (e) => {
+    docOn('yf:ms-spoiler-set', (e) => {
         const d = (e as CustomEvent<{ conv: number; spoiler: SpoilerRef }>).detail;
         if (!d || d.conv !== conv) return;
         setSpoiler(d.spoiler);
@@ -599,9 +640,10 @@ function init(root: HTMLElement, chat: ChatView) {
         const form = reportDlg.querySelector<HTMLFormElement>('[data-ms-report-form]')!;
         const note = reportDlg.querySelector<HTMLTextAreaElement>('[data-rp-note]')!;
         const count = reportDlg.querySelector<HTMLElement>('[data-rp-count]')!;
-        note.addEventListener('input', () => { count.textContent = `${note.value.length}/200`; });
-        reportDlg.querySelector('[data-rp-cancel]')?.addEventListener('click', () => reportDlg.close());
-        form.addEventListener('submit', async (e) => {
+        scope(note)('input', () => { count.textContent = `${note.value.length}/200`; });
+        const rpCancel = reportDlg.querySelector('[data-rp-cancel]');
+        if (rpCancel) scope(rpCancel)('click', () => reportDlg.close());
+        scope(form)('submit', async (e) => {
             e.preventDefault();
             if (reportFor === null) return;
             const reason = (new FormData(form).get('reason') as 'spam' | 'harassment' | 'other' | null) ?? 'other';
@@ -687,10 +729,10 @@ function init(root: HTMLElement, chat: ChatView) {
         } else if (e.key === 'Escape') { e.preventDefault(); closeMenu(); }
         else if (e.key === 'Tab') closeMenu(false);
     });
-    document.addEventListener('click', (e) => {
+    docOn('click', (e) => {
         if (menuFor !== null && !menu.contains(e.target as Node) && !(e.target as Element).closest?.('[data-mact="menu"]')) closeMenu(false);
     });
-    window.addEventListener('resize', () => closeMenu(false));
+    winOn('resize', () => closeMenu(false));
     scroller.addEventListener('scroll', () => closeMenu(false), { passive: true });
 
     logEl.addEventListener('click', (e) => {
@@ -811,7 +853,7 @@ function init(root: HTMLElement, chat: ChatView) {
             if (e.target === actSheet) actSheet.close();
         };
     }
-    actSheet?.addEventListener('close', () => { lifted?.classList.remove('is-lift'); lifted = null; });
+    if (actSheet) scope(actSheet)('close', () => { lifted?.classList.remove('is-lift'); lifted = null; });
 
     // ---- Información y Silenciar ---------------------------------------------------------------
     const infoToggle = root.querySelector<HTMLButtonElement>('[data-ms-info-toggle]');
@@ -824,7 +866,7 @@ function init(root: HTMLElement, chat: ChatView) {
         });
     }
     root.querySelector('[data-ms-info-open]')?.addEventListener('click', () => infoSheet?.showModal());
-    infoSheet?.addEventListener('click', (e) => {
+    if (infoSheet) scope(infoSheet)('click', (e) => {
         const t = e.target as Element;
         // «Recomendar algo» abre el selector de F4, que no vive en la capa superior: fuera la hoja.
         // Lo mismo con «Añadir personas» (el selector de grupo).
@@ -844,7 +886,7 @@ function init(root: HTMLElement, chat: ChatView) {
         if (!r.ok) { paint(prev); showToast('No se ha podido cambiar. Inténtalo otra vez.', 'error'); return; }
         refreshList();
     }
-    document.addEventListener('click', (e) => {
+    docOn('click', (e) => {
         if ((e.target as Element).closest?.('[data-ms-mute]')) void setMuted(!muted);
     });
 
@@ -864,14 +906,15 @@ function init(root: HTMLElement, chat: ChatView) {
         // Al abrir el teclado, el último mensaje sigue a la vista.
         if (atBottom) scroller.scrollTop = scroller.scrollHeight;
     };
-    vv?.addEventListener('resize', fitViewport);
-    vv?.addEventListener('scroll', fitViewport);
-    mobile.addEventListener('change', () => { fitViewport(); render(); });
-    fitViewport();
+    if (!opts.compact) {
+        if (vv) { scope(vv)('resize', fitViewport); scope(vv)('scroll', fitViewport); }
+        scope(mobile)('change', () => { fitViewport(); render(); });
+        fitViewport();
+    }
 
     // ---- Grupo (M2): renombrar, hacer admin, quitar y salir (handoff §4.8 y §4.10) -----------------
     // `current`: nombre, personas y papeles al día (el sondeo lo actualiza).
-    document.addEventListener('yf:ms-chat-refresh', () => poller.now());
+    docOn('yf:ms-chat-refresh', () => poller.now());
     const confirmDlg = document.getElementById('ms-confirm') as HTMLDialogElement | null;
 
     function closeMemberMenus() {
@@ -980,11 +1023,12 @@ function init(root: HTMLElement, chat: ChatView) {
         const r = await msgApi.removeMember(conv, me);
         if (!r.ok) { showToast('No se ha podido salir. Inténtalo otra vez.', 'error'); return; }
         poller.stop();
+        if (opts.onLeft) { opts.onLeft(current.title); return; }
         store.set(sessionStorage, 'yf:ms-flash', `Has salido de «${current.title}»`);
         location.href = '/mislistas/amigos/mensajes';
     }
 
-    document.addEventListener('click', (e) => {
+    docOn('click', (e) => {
         const b = (e.target as Element).closest?.<HTMLElement>('[data-gm]');
         if (!b) return;
         const box = b.closest<HTMLElement>('.ms-info, .ms-info-in');
@@ -1000,13 +1044,13 @@ function init(root: HTMLElement, chat: ChatView) {
             case 'leave': void leave(); break;
         }
     });
-    document.addEventListener('input', (e) => {
+    docOn('input', (e) => {
         const t = e.target as HTMLElement;
         if (!t.matches?.('[data-gm-ren-in]')) return;
         const n = t.closest('[data-gm-ren]')?.querySelector('[data-gm-ren-n]');
         if (n) n.textContent = `${(t as HTMLInputElement).value.length}/${GROUP_NAME_MAX}`;
     });
-    document.addEventListener('keydown', (e) => {
+    docOn('keydown', (e) => {
         const t = e.target as HTMLElement;
         if (!t.matches?.('[data-gm-ren-in]')) return;
         const box = t.closest<HTMLElement>('.ms-info, .ms-info-in');
@@ -1018,12 +1062,12 @@ function init(root: HTMLElement, chat: ChatView) {
     // Un aviso de esta conversación (o el «todo» de reconectar) → una vuelta del sondeo ya. Con el
     // canal conectado el sondeo pasa a 30 s, de respaldo; si se cae, vuelve a 5 s.
     const LIVE_POLL = 30_000;
-    document.addEventListener('yf:live-msg', (e) => {
+    docOn('yf:live-msg', (e) => {
         const ids = (e as CustomEvent<{ convs: number[] }>).detail?.convs ?? [];
         if (!ids.length || ids.includes(conv)) poller.now();
     });
     const onLive = (up: boolean) => poller.setBase(up ? LIVE_POLL : BASE_POLL);
-    document.addEventListener('yf:live-status', (e) => onLive(Boolean((e as CustomEvent<{ up: boolean }>).detail?.up)));
+    docOn('yf:live-status', (e) => onLive(Boolean((e as CustomEvent<{ up: boolean }>).detail?.up)));
     onLive(Boolean(window.yfLive?.up));
 
     // ---- Arranque --------------------------------------------------------------------------------
@@ -1034,10 +1078,25 @@ function init(root: HTMLElement, chat: ChatView) {
     else scroller.scrollTop = scroller.scrollHeight;
     void markRead();
     poller.start();
-    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void markRead(); });
+    docOn('visibilitychange', () => { if (document.visibilityState === 'visible') void markRead(); });
+
+    return {
+        destroy() {
+            ac.abort();
+            poller.stop();
+            closeMenu(false);
+            closePlus();
+        },
+        focusInput: () => input?.focus(),
+        refresh() { poller.now(); void markRead(); },
+        isMuted: () => muted,
+        setMuted,
+        leave,
+    };
 }
 
-// Al final: `init` usa constantes de módulo (`store`) que antes de su línea aún no existen.
+// Al final: `mountChat` usa constantes de módulo (`store`) que antes de su línea aún no existen.
+// La conversación de la página (el mini-chat no lleva `data-ms-chat`: la monta miniChat.ts).
 const root = document.querySelector<HTMLElement>('[data-ms-chat]');
 const raw = document.getElementById('ms-data')?.textContent;
-if (root && raw) init(root, JSON.parse(raw) as ChatView);
+if (root && raw) mountChat(root, JSON.parse(raw) as ChatView);

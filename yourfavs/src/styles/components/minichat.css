@@ -1,0 +1,155 @@
+/* =====================================================================================
+   Mensajes M6 · mini-chat de escritorio (docs/Mensajes/design_handoff_m6; medidas de m6.css).
+   Solo ≥ 1024 px: por debajo no existe (si la pantalla se estrecha, se oculta sin cerrarse).
+   Dentro va el chat de siempre (mensajes.css) en talla compacta. Solo tokens.
+   ===================================================================================== */
+#mw-root[hidden] { display: none; }
+@media (max-width: 1023.98px) { #mw-root { display: none !important; } }
+
+/* ---- La ventanita ------------------------------------------------------------------ */
+.mw {
+    position: fixed; right: 24px; bottom: 0; z-index: 90;
+    /* Tamaño: 420 × 620 por defecto; cada cual lo ajusta con el asa (miniChat.ts lo guarda y lo pone
+       en <html> como --mw-w / --mw-h, también antes del primer pintado). Nunca más que la pantalla. */
+    width: min(var(--mw-w, 420px), calc(100vw - 48px)); height: min(var(--mw-h, 620px), calc(100vh - 96px));
+    /* clip, no hidden: así nada (el foco en un menú) puede desplazar la ventanita por dentro. */
+    display: flex; flex-direction: column; overflow: clip;
+    background: var(--bg-elev); border: 1px solid var(--border); border-bottom: 0;
+    border-radius: 14px 14px 0 0; box-shadow: var(--sh-lg);
+    --gr: var(--bg-elev);
+}
+/* Solo al abrirla a mano; al reabrirse sola tras cambiar de página, sin animación. */
+.mw.is-enter { animation: mw-in 160ms ease-out; }
+@keyframes mw-in { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .mw.is-enter { animation: none; } }
+
+.mw-h { position: relative; display: flex; align-items: center; gap: 10px; height: 56px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.mw-h .tx { flex: 1; min-width: 0; }
+.mw-h .tx b { display: flex; align-items: center; gap: 5px; font: 600 14px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; }
+.mw-h .tx b > span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.mw-mute { display: inline-flex; color: var(--text-2); flex-shrink: 0; }
+.mw-mute[hidden] { display: none; }
+.mw-mute svg { width: 13px; height: 13px; }
+.mw-h .tx > span { display: block; font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mw-h .acts { display: flex; }
+.mw-h .pf-btn.ico { width: 32px; height: 32px; border-color: transparent; background: none; color: var(--text-2); }
+.mw-h .pf-btn.ico:hover, .mw-h .pf-btn.ico[aria-expanded="true"] { background: var(--bg-tint); color: var(--text); }
+.mw-h .pf-btn.ico svg { width: 16px; height: 16px; }
+/* «Actualizando»: una línea de 2 px bajo la cabecera, solo si tarda (> 300 ms). */
+.mw-prog { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; overflow: hidden; }
+.mw-prog::after { content: ''; position: absolute; top: 0; bottom: 0; width: 35%; background: var(--text-3); animation: mw-prog 1.1s ease-in-out infinite; }
+@keyframes mw-prog { from { left: -35%; } to { left: 100%; } }
+@media (prefers-reduced-motion: reduce) { .mw-prog::after { animation: none; left: 0; } }
+.mw-ban { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--bg-tint); font: 500 12px var(--font); color: var(--text-2); flex-shrink: 0; }
+.mw-ban svg { width: 14px; height: 14px; }
+.mw-ban b { color: var(--text); font-weight: 600; }
+
+/* ---- El chat dentro, en talla compacta -------------------------------------------- */
+.mw .ms-log { flex: 1; min-height: 0; padding: 6px 0 4px; background: var(--bg-elev); overflow-x: hidden; }
+/* Al pasar el ratón, la línea se pinta de lado a lado: con las medidas de aquí (avatar de 32 y 12 de
+   margen), no con las de la página (40 y 20), que la sacaban por la derecha con un scroll lateral. */
+@media (hover: hover) and (min-width: 1024px) {
+    .mw .mm:not(.del):not(.sending):hover, .mw .mm:not(.del):focus-within, .mw .mm.is-menu {
+        margin: 0 -12px 0 -54px; padding: 1px 12px 1px 54px;
+    }
+    .mw .mm:hover .gt, .mw .mm:focus-within .gt, .mw .mm.is-menu .gt { left: 8px; width: 38px; }
+    .mw .mm:not(.del):hover .mm-act, .mw .mm:focus-within .mm-act, .mw .mm.is-menu .mm-act { right: 8px; }
+}
+.mw .mg { grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; padding: 5px 12px 2px; margin-top: 4px; }
+.mw .mg-h b { font-size: 13px; }
+.mw .mm { font-size: 13.5px; }
+.mw .ms-day { margin: 10px 12px 4px; }
+.mw .ms-new { margin: 8px 12px 4px; }
+.mw .ms-sys { grid-template-columns: 32px minmax(0, 1fr); column-gap: 10px; padding: 3px 12px; }
+.mw .ms-sys p { font-size: 12.5px; }
+.mw .ms-seen { padding-left: 54px; }
+.mw .tc { max-width: none; padding: 10px; column-gap: 10px; grid-template-columns: 52px minmax(0, 1fr); }
+.mw .tc > .po { width: 52px; }
+.mw .dtile { width: 52px; }
+.mw .dtile .dd { font-size: 21px; padding-top: 5px; }
+.mw .dtile .mo { height: 18px; line-height: 18px; }
+.mw .dtile .wd { padding: 2px 0 6px; }
+.mw .tc-t { font-size: 14px; }
+.mw .pl-r .pf-btn.vf, .mw .tc-a .pf-btn.vf { flex: 0 0 30px; font-size: 0; gap: 0; width: 30px; padding: 0; justify-content: center; }
+.mw .pl-r .vf span, .mw .tc-a .vf span { display: none; }
+.mw .pl-when { font-size: 12.5px; }
+.mw .ms-c { padding: 8px 10px 10px; border-top: 1px solid var(--border); }
+.mw .ms-cb { padding: 4px; }
+.mw .ms-plus, .mw .pf-btn.ms-send { width: 32px; height: 32px; }
+.mw .ms-ta { min-height: 32px; padding: 6px 4px; font-size: 13.5px; }
+/* En otras páginas, el `:focus-visible` global de layout.css va después de mensajes.css: el borde ya lo pinta `.ms-cb`. */
+.mw .ms-ta:focus-visible { outline: 0; }
+.mw .ms-cf { display: none; }
+.mw .pm { left: 8px; right: 8px; width: auto; }
+.mw .pm-i { min-height: 48px; padding: 6px 8px; }
+.mw .pm-i small { font-size: 11.5px; }
+.mw-emp { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 20px; overflow: auto; }
+
+/* Asa para cambiar el tamaño: la esquina de arriba a la izquierda (la única libre). Se ve al pasar el
+   ratón o con el foco; doble clic vuelve al tamaño normal; con el foco, las flechas. */
+.mw-rs {
+    position: absolute; left: 0; top: 0; z-index: 7; width: 18px; height: 18px; padding: 0;
+    border: 0; border-radius: 14px 0 6px 0; background: none; color: var(--text-3); cursor: nwse-resize;
+    display: grid; place-items: center; opacity: 0; transition: opacity .15s;
+}
+.mw-rs svg { width: 11px; height: 11px; }
+.mw:hover .mw-rs, .mw-rs:focus-visible, html.mw-resizing .mw-rs { opacity: 1; }
+.mw-rs:hover, .mw-rs:focus-visible, html.mw-resizing .mw-rs { background: var(--bg-tint); color: var(--text); }
+.mw-rs:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+html.mw-resizing, html.mw-resizing * { cursor: nwse-resize !important; user-select: none !important; }
+@media (prefers-reduced-motion: reduce) { .mw-rs { transition: none; } }
+
+/* Menú «···» de la cabecera. */
+.mw .mw-menu { position: absolute; right: 8px; left: auto; top: 52px; bottom: auto; z-index: 6; min-width: 220px; }
+.mw .mw-menu[hidden] { display: none; }
+
+/* Cargando sin nada guardado. */
+.sk { display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; flex: 1; padding: 14px 12px; }
+.sk > div { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: start; }
+.sk i { display: block; height: 9px; border-radius: 5px; background: var(--border); }
+.sk .a { width: 32px; height: 32px; border-radius: 50%; }
+.sk .l { display: flex; flex-direction: column; gap: 7px; }
+
+/* ---- Minimizada --------------------------------------------------------------------- */
+.mwm {
+    position: fixed; right: 24px; bottom: 0; z-index: 90;
+    display: flex; align-items: center; width: 280px; height: 46px; padding-right: 4px;
+    background: var(--bg-elev); border: 1px solid var(--border); border-bottom: 0;
+    border-radius: 12px 12px 0 0; box-shadow: var(--sh-md);
+    --gr: var(--bg-elev);
+}
+.mwm-open { flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 9px; padding: 0 4px 0 10px; border: 0; background: none; cursor: pointer; border-radius: 12px 0 0 0; text-align: left; color: inherit; font: inherit; }
+.mwm-open:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.mwm b { flex: 1; min-width: 0; font: 500 13.5px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mwm.un b { font-weight: 700; }
+.mwm .new { font: 600 11px var(--font); color: var(--text-2); white-space: nowrap; }
+.mwm .cv-n { margin-right: 2px; }
+.mwm-up { display: grid; place-items: center; width: 32px; height: 32px; color: var(--text-2); flex-shrink: 0; }
+.mwm-up svg { width: 16px; height: 16px; }
+.mwm > .pf-btn.ico { width: 32px; height: 32px; border-color: transparent; background: none; color: var(--text-2); flex-shrink: 0; }
+.mwm > .pf-btn.ico svg { width: 16px; height: 16px; }
+
+/* ---- Lo que no debe tapar: «Volver arriba» se aparta a su izquierda --------------- */
+@media (min-width: 1024px) {
+    body.has-mw .back-to-top-container { right: calc(min(var(--mw-w, 420px), 100vw - 48px) + 40px); }
+    body.has-mw-min .back-to-top-container { right: 320px; }
+}
+
+/* ---- El desplegable «Mensajes» de la cabecera: ⤢ «Abrir en grande» en cada fila ---- */
+.hm-list .cvw { position: relative; display: flex; align-items: center; }
+.hm-list .cvw > .cv { flex: 1; min-width: 0; padding-right: 44px; }
+.hm-list .cvw > .cv-big {
+    position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+    width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+    color: var(--text-3); border: 1px solid transparent;
+}
+.hm-list .cvw > .cv-big svg { width: 15px; height: 15px; }
+.hm-list .cvw:hover > .cv-big, .hm-list .cvw:focus-within > .cv-big { color: var(--text); border-color: var(--border-strong); background: var(--bg-elev); }
+.hm-list .cv-inwin {
+    display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 7px; margin-left: 6px; vertical-align: middle;
+    border-radius: var(--r-full); border: 1px solid var(--border-strong); font: 600 10.5px var(--font); color: var(--text-2);
+}
+.hm-list .cv-inwin svg { width: 11px; height: 11px; }
+.hm-hint { display: flex; align-items: center; gap: 7px; padding: 9px 16px; border-top: 1px solid var(--border); font-size: 11.5px; line-height: 1.4; color: var(--text-2); }
+.hm-hint svg { width: 13px; height: 13px; flex-shrink: 0; }
+.hm-hint kbd { font: 600 10.5px var(--font-mono); padding: 1px 5px; border: 1px solid var(--border-strong); border-radius: 4px; color: var(--text); }

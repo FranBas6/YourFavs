@@ -1,0 +1,56 @@
+---
+/**
+ * El mini-chat de escritorio (Mensajes M6; handoff docs/Mensajes/design_handoff_m6).
+ *
+ * Solo el sitio (`#mw-root`), los diálogos de página que usa una conversación y un script en línea
+ * que, ANTES del primer pintado, vuelve a poner la ventanita (o la barra minimizada) tal como estaba
+ * en la página anterior: sin animación y sin mover el foco. Después, `miniChat.ts` la actualiza.
+ *
+ * No se monta en `/mislistas/amigos/mensajes*` (allí el chat ya está a la vista): el estado guardado
+ * se queda como estaba y vuelve al salir de ahí. Solo con sesión.
+ */
+import ChatDialogs from './messages/ChatDialogs.astro';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+import '../../styles/pages/social/mensajes.css';
+import '../../styles/components/minichat.css';
+
+const user = Astro.locals.user;
+const show = Boolean(user) && SOCIAL_PHASE.messages && SOCIAL_PHASE.minichat
+    && !Astro.url.pathname.startsWith('/mislistas/amigos/mensajes');
+---
+{show && (
+    <>
+        <div id="mw-root" data-uid={user!.uid} hidden></div>
+        <script is:inline>
+            (function () {
+                try {
+                    if (!window.matchMedia('(min-width: 1024px)').matches) return;
+                    // El tamaño elegido con el asa, antes de pintar (si no, saltaría al cargar).
+                    var sz = JSON.parse(localStorage.getItem('yf:mw-size') || 'null');
+                    if (sz && sz.w && sz.h) {
+                        document.documentElement.style.setProperty('--mw-w', sz.w + 'px');
+                        document.documentElement.style.setProperty('--mw-h', sz.h + 'px');
+                    }
+                    var root = document.getElementById('mw-root');
+                    var st = JSON.parse(localStorage.getItem('yf:mw') || 'null');
+                    if (!root || !st || st.uid !== root.getAttribute('data-uid') || !st.convId || st.state === 'closed' || Date.now() - st.at > 432e5) return;
+                    var c = JSON.parse(sessionStorage.getItem('yf:mw-cache:' + st.convId) || 'null');
+                    var html = c && (st.state === 'min' ? c.mwm : c.mw);
+                    if (!html) return;
+                    root.innerHTML = html;
+                    root.hidden = false;
+                    document.body.classList.add(st.state === 'min' ? 'has-mw-min' : 'has-mw');
+                    var log = root.querySelector('[data-ms-log-scroll]');
+                    if (log) log.scrollTop = log.scrollHeight;
+                    var ta = root.querySelector('[data-ms-input]');
+                    var draft = sessionStorage.getItem('yf:chat-draft:' + st.convId);
+                    if (ta && draft) ta.value = draft;
+                } catch (e) { /* sin almacenamiento: la pinta miniChat.ts */ }
+            })();
+        </script>
+        <ChatDialogs />
+        <script>
+            import '../../scripts/social/messages/miniChat';
+        </script>
+    </>
+)}

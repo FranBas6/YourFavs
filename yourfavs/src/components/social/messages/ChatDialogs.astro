@@ -1,0 +1,54 @@
+---
+/**
+ * Los diálogos de página de una conversación: el selector de «Plan para verla» (M5), «¿Qué vemos?»
+ * (M4d), Reportar y la confirmación sin Deshacer (quitar, salir, cancelar un plan).
+ *
+ * Los usan la página de la conversación y el mini-chat (M6), que los monta en todas las páginas de
+ * escritorio: nunca a la vez, porque en `/mislistas/amigos/mensajes*` no hay mini-chat. Los rellenan
+ * `planPick.ts`, `wtw.ts` y `chat.ts`.
+ */
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+    /** En solo lectura no hacen falta el selector de plan ni «¿Qué vemos?». */
+    readOnly?: boolean;
+}
+const { readOnly = false } = Astro.props;
+---
+{!readOnly && <div id="pk-bd" class="rk-backdrop" hidden></div>}
+{!readOnly && <div id="pk" class="rk ck pick5" role="dialog" aria-modal="true" aria-label="Plan para verla" hidden></div>}
+{!readOnly && <dialog class="wv" id="ms-wtw" aria-labelledby="ms-wtw-t"></dialog>}
+
+<dialog id="ms-report" class="so-dlg" aria-labelledby="ms-rp-t">
+    <form method="dialog" data-ms-report-form>
+        <span class="so-dlg-st" style="--sb: var(--stamp-amber); --si: var(--stamp-amber-ink)"><Icon name="lucide:flag" /></span>
+        <h3 id="ms-rp-t">Reportar mensaje</h3>
+        <p>Lo revisará el equipo de YourFavs. <span data-rp-name></span> no sabrá quién lo ha reportado.</p>
+        <div class="rp-q"><small data-rp-meta></small><span data-rp-body></span></div>
+        <fieldset class="rp-o">
+            <legend>Motivo</legend>
+            <label><input type="radio" name="reason" value="spam" checked /><span>Spam <small>· publicidad o enlaces raros</small></span></label>
+            <label><input type="radio" name="reason" value="harassment" /><span>Acoso <small>· insultos o amenazas</small></span></label>
+            <label><input type="radio" name="reason" value="other" /><span>Otro</span></label>
+        </fieldset>
+        <label class="sr-only" for="ms-rp-note">Cuéntanos algo más (opcional)</label>
+        <textarea id="ms-rp-note" class="rp-ta" maxlength="200" rows="2" placeholder="Cuéntanos algo más (opcional)" data-rp-note></textarea>
+        <div class="rp-c"><span>Una frase basta</span><b data-rp-count>0/200</b></div>
+        <div class="so-dlg-f">
+            <button type="button" class="pf-btn ghost" data-rp-cancel>Cancelar</button>
+            <button type="submit" class="pf-btn pri" data-rp-send><Icon name="lucide:flag" />Enviar reporte</button>
+        </div>
+    </form>
+</dialog>
+
+{/* Quitar a alguien, Salir del grupo y Cancelar un plan (M5): sin Deshacer, por eso confirman (handoff §4.10). Lo rellena chat.ts. */}
+<dialog id="ms-confirm" class="so-dlg" role="alertdialog" aria-labelledby="ms-cf-t" aria-describedby="ms-cf-d">
+    <span class="so-dlg-st" style="--sb: var(--stamp-red); --si: var(--stamp-red-ink)" data-cf-ico></span>
+    <h3 id="ms-cf-t" data-cf-title></h3>
+    <p id="ms-cf-d" data-cf-text></p>
+    <div class="so-cons" data-cf-cons hidden></div>
+    <div class="so-dlg-f">
+        <button type="button" class="pf-btn ghost" data-cf-cancel>Cancelar</button>
+        <button type="button" class="pf-btn pri" data-cf-ok></button>
+    </div>
+</dialog>

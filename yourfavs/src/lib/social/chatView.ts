@@ -745,6 +745,49 @@ export function infoDirectHtml(chat: ChatView): string {
 export const groupFaces = (chat: ChatView) =>
     chat.members.filter((m) => m.person.id !== chat.me.id).slice(-2).map((m) => m.person);
 
+/** El ＋ de una conversación (M4): lo que se puede añadir a un mensaje. */
+export function chatPlusHtml(chat: ChatView): string {
+    const group = chat.kind === 'group';
+    const other = group ? GONE : otherOf(chat);
+    return plusMenuHtml({
+        id: chat.id, group, title: group ? chat.title : other.name, to: group ? null : other.handle,
+        friends: group ? chat.members.filter((m) => m.friend && m.person.id !== chat.me.id).map((m) => m.person.id) : [],
+    });
+}
+
+const PLUS_LABEL = 'Añadir al mensaje: compartir un título, recomendar, ¿qué vemos?, marcar como spoiler o plan para verla';
+
+/**
+ * El compositor de una conversación, el mismo en la página y en el mini-chat (M6): el campo, el ＋
+ * con su menú y el contador; o, en solo lectura, el aviso de que ya no sois amigos. `chat.ts` lo
+ * encuentra por sus `data-ms-*`.
+ */
+export function composerHtml(chat: ChatView): string {
+    if (chat.readOnly) {
+        return `<div class="ms-c"><div class="ms-ro" role="status">${icon('lock')}<div><b>Ya no sois amigos.</b>`
+            + `<span>Podéis leer la conversación, pero no escribir. Si volvéis a ser amigos, se reabre.</span></div></div></div>`;
+    }
+    const group = chat.kind === 'group';
+    const to = group ? chat.title : firstName(otherOf(chat).name);
+    // Grupo recién creado (solo mensajes de sistema): «Escribe el primer mensaje».
+    const placeholder = group
+        ? (chat.messages.some((m) => m.kind === 'text') ? `Escribe en ${to}` : 'Escribe el primer mensaje')
+        : `Escribe a ${to}`;
+    return `<form class="ms-c" data-ms-form>`
+        // «Spoiler de Severance T2 E5 ✕» (M4c): lo pinta chat.ts al marcar desde el ＋.
+        + `<div class="ctag-row" data-ms-ctag hidden></div>`
+        + `<div class="ms-cb">`
+        + `<button type="button" class="ms-plus on" aria-label="${esc(PLUS_LABEL)}" aria-haspopup="menu" aria-expanded="false" aria-controls="ms-pm" data-ms-plus>${icon('plus', 'i-plus')}${icon('x', 'i-x')}</button>`
+        + `<textarea class="ms-ta" rows="1" maxlength="2000" enterkeyhint="enter" data-ms-input aria-label="${esc(`Mensaje para ${to}`)}" placeholder="${esc(placeholder)}"></textarea>`
+        + `<button type="submit" class="pf-btn pri ico ms-send" aria-label="Enviar" disabled data-ms-send>${icon('send')}</button>`
+        + `</div>`
+        // Menú del ＋ (M4): anclado encima del compositor en escritorio; en móvil, la hoja #ms-pm-sheet.
+        + `<div class="pm" id="ms-pm" role="menu" aria-label="Añadir al mensaje" hidden>${chatPlusHtml(chat)}</div>`
+        + `<div class="ms-cf"><span class="ms-hint">Enter para enviar · Mayús + Enter para otra línea</span><b data-ms-count hidden></b></div>`
+        + `<span class="sr-only" aria-live="polite" data-ms-count-live></span>`
+        + `</form>`;
+}
+
 export const GROUP_MAX = 10;
 export const GROUP_NAME_MAX = 40;
 
