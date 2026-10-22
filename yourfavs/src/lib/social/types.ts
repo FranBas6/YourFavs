@@ -126,10 +126,14 @@ export interface RecSent extends Omit<RecView, 'shown' | 'reply'> { recipients: 
 // -------------------------------------------------------------------------------------
 export type ConvKind = 'direct' | 'group';
 export type ConvRole = 'admin' | 'member';
-export type SysType = 'created' | 'added' | 'left' | 'removed' | 'renamed' | 'admin';
+export type SysType = 'created' | 'added' | 'left' | 'removed' | 'renamed' | 'admin' | 'plan_changed' | 'plan_cancelled';
 
 /** Mensaje de sistema de un grupo. `actor` es null en la herencia de admin («Ahora Pablo administra…»). */
-export interface MsgSys { type: SysType; actor: string | null; targets: string[]; name?: string; inherited?: boolean }
+export interface MsgSys {
+    type: SysType; actor: string | null; targets: string[]; name?: string; inherited?: boolean;
+    /** Planes (M5): de qué título y, al cambiar, el nuevo día («sáb 24 oct · 21:30»). */
+    title?: string; when?: string;
+}
 
 export interface ChatMessage {
     id: number;
@@ -206,7 +210,45 @@ export interface RecCard {
 /** Tirada de «¿Qué vemos?» enviada al chat (M4d): quién la tiene pendiente (`have`) de cuántos (`of`). */
 export interface WtwCardRef extends TitleCardRef { of: number; have: string[]; roller: string }
 export interface WtwCard { type: 'wtw'; ref: WtwCardRef; viewer: CardViewer | null }
-export type ChatCard = TitleCard | RecCard | WtwCard;
+/**
+ * Plan para verla (M5), resuelto para quien mira. `me`: lo propones tú, vas, no puedes o aún no
+ * has respondido. `yes`/`no`/`wait`: personas que están ahora en la conversación.
+ */
+export interface PlanView {
+    id: number;
+    convId: number;
+    createdBy: string;
+    mediaType: 'movie' | 'tv';
+    tmdbId: number;
+    title: string;
+    poster: string | null;
+    /** «2026-10-23» (día en Madrid). */
+    date: string;
+    /** «21:30», o null sin hora. */
+    time: string | null;
+    note: string | null;
+    source: 'plus' | 'title_card' | 'wtw';
+    wtwOf: number | null;
+    wtwHave: number | null;
+    /** El último cambio de día u hora, para «Antes: …». */
+    prevDate: string | null;
+    prevTime: string | null;
+    changed: boolean;
+    /** Hoy en Madrid según el servidor («2026-10-22»): para «Hoy» y «ya pasó». */
+    today: string;
+    phase: 'live' | 'past' | 'cancelled';
+    cancelledAt: number | null;
+    me: 'owner' | 'yes' | 'no' | 'none';
+    /** «¿La visteis?» ya contestado. */
+    seen: boolean;
+    yes: string[];
+    no: string[];
+    wait: string[];
+    /** Tu estado con el título (para «La viste · ★ 8,5» cuando ya pasó). */
+    myState: CardViewer | null;
+}
+export interface PlanCard { type: 'plan'; ref: { planId: number; title: string }; plan: PlanView | null }
+export type ChatCard = TitleCard | RecCard | WtwCard | PlanCard;
 
 /** Fila de la lista de conversaciones. */
 export interface ConvSummary {

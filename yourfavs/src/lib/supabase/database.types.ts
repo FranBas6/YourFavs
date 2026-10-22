@@ -296,13 +296,13 @@ isOneToOne: false
                   ]
                 },"profiles": {
                   Row: {
-                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"referral_suggestion_dismissed": boolean,"referred_by": string | null,"region": string | null,"rt_key": string,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
+                    "avatar_url": string | null,"created_at": string,"display_name": string | null,"email": string | null,"firebase_uid": string | null,"home_layout": Json | null,"ics_plans": boolean,"ics_token": string | null,"id": string,"language": string | null,"notif_prefs": Json | null,"onboarding": string | null,"platforms": (number)[] | null,"platforms_filter_default": boolean | null,"public_archetype": Json | null,"public_bio": string | null,"public_four": NonNullable<Json>,"public_handle": string | null,"public_handle_changed_at": string | null,"public_indexable": boolean,"public_sections": NonNullable<Json>,"public_since": string | null,"public_visibility": string,"referral_suggestion_dismissed": boolean,"referred_by": string | null,"region": string | null,"rt_key": string,"spoiler_free": boolean | null,"spoilers": Json | null,"theme": string | null,"updated_at": string
                   }
                   Insert: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"ics_plans"?: boolean,"ics_token"?: string | null,"id": string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
+                    "avatar_url"?: string | null,"created_at"?: string,"display_name"?: string | null,"email"?: string | null,"firebase_uid"?: string | null,"home_layout"?: Json | null,"ics_plans"?: boolean,"ics_token"?: string | null,"id"?: string,"language"?: string | null,"notif_prefs"?: Json | null,"onboarding"?: string | null,"platforms"?: (number)[] | null,"platforms_filter_default"?: boolean | null,"public_archetype"?: Json | null,"public_bio"?: string | null,"public_four"?: NonNullable<Json>,"public_handle"?: string | null,"public_handle_changed_at"?: string | null,"public_indexable"?: boolean,"public_sections"?: NonNullable<Json>,"public_since"?: string | null,"public_visibility"?: string,"referral_suggestion_dismissed"?: boolean,"referred_by"?: string | null,"region"?: string | null,"rt_key"?: string,"spoiler_free"?: boolean | null,"spoilers"?: Json | null,"theme"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     
@@ -391,6 +391,50 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"watch_plan_rsvps": {
+                  Row: {
+                    "answer": string,"plan_id": number,"seen_marked": boolean,"updated_at": string,"user_id": string
+                  }
+                  Insert: {
+                    "answer": string,"plan_id": number,"seen_marked"?: boolean,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "answer"?: string,"plan_id"?: number,"seen_marked"?: boolean,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "watch_plan_rsvps_plan_id_fkey"
+      columns: ["plan_id"]
+isOneToOne: false
+      referencedRelation: "watch_plans"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"watch_plans": {
+                  Row: {
+                    "cancelled_at": string | null,"changed_at": string | null,"conv_id": number,"created_at": string,"created_by": string,"id": number,"media_type": string,"message_id": number | null,"note": string | null,"plan_date": string,"plan_time": string | null,"poster": string | null,"prev_date": string | null,"prev_time": string | null,"source": string,"title": string,"tmdb_id": number,"wtw_have": number | null,"wtw_of": number | null
+                  }
+                  Insert: {
+                    "cancelled_at"?: string | null,"changed_at"?: string | null,"conv_id": number,"created_at"?: string,"created_by": string,"id"?: never,"media_type": string,"message_id"?: number | null,"note"?: string | null,"plan_date": string,"plan_time"?: string | null,"poster"?: string | null,"prev_date"?: string | null,"prev_time"?: string | null,"source"?: string,"title": string,"tmdb_id": number,"wtw_have"?: number | null,"wtw_of"?: number | null
+                  }
+                  Update: {
+                    "cancelled_at"?: string | null,"changed_at"?: string | null,"conv_id"?: number,"created_at"?: string,"created_by"?: string,"id"?: never,"media_type"?: string,"message_id"?: number | null,"note"?: string | null,"plan_date"?: string,"plan_time"?: string | null,"poster"?: string | null,"prev_date"?: string | null,"prev_time"?: string | null,"source"?: string,"title"?: string,"tmdb_id"?: number,"wtw_have"?: number | null,"wtw_of"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "watch_plans_conv_id_fkey"
+      columns: ["conv_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "watch_plans_message_id_fkey"
+      columns: ["message_id"]
+isOneToOne: true
+      referencedRelation: "messages"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"watched_episodes": {
                   Row: {
                     "episode": number,"season": number,"serie_id": number,"user_id": string,"watched_at": string | null
@@ -412,6 +456,20 @@ isOneToOne: false
           Functions: {
             "claim_app_state":
 { Args: { "p_key": string,"p_ttl_ms": number }; Returns: Json
+                           },
+"ics_new_token":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"ics_owner":
+{ Args: { "p_token": string }; Returns: {
+              "plans": boolean,"user_id": string
+            }[]
+                           },
+"ics_token_get":
+{ Args: { "p_me": string }; Returns: string
+                           },
+"ics_token_rotate":
+{ Args: { "p_me": string }; Returns: string
                            },
 "msg_add_members":
 { Args: { "p_conv": number,"p_ids": (string)[],"p_me": string }; Returns: Json
@@ -527,6 +585,76 @@ isOneToOne: false
 { Args: { "p_conv": number,"p_me": string,"p_who": (string)[] }; Returns: {
               "have": (string)[],"media_type": Database["public"]['Enums']["media_type"],"of": number,"tmdb_id": number
             }[]
+                           },
+"plan_cancel":
+{ Args: { "p_me": string,"p_plan": number }; Returns: string
+                           },
+"plan_cards":
+{ Args: { "p_ids": (number)[],"p_me": string }; Returns: Json
+                           },
+"plan_change":
+{ Args: { "p_date": string,"p_me": string,"p_note": string,"p_plan": number,"p_set_note": boolean,"p_set_time": boolean,"p_time": string }; Returns: string
+                           },
+"plan_clean_note":
+{ Args: { "p_note": string }; Returns: string
+                           },
+"plan_conv_label":
+{ Args: { "p_conv": number,"p_me": string }; Returns: string
+                           },
+"plan_get":
+{ Args: { "p_me": string,"p_plan": number }; Returns: {
+              "cancelled_at": string | null,
+"changed_at": string | null,
+"conv_id": number,
+"created_at": string,
+"created_by": string,
+"id": number,
+"media_type": string,
+"message_id": number | null,
+"note": string | null,
+"plan_date": string,
+"plan_time": string | null,
+"poster": string | null,
+"prev_date": string | null,
+"prev_time": string | null,
+"source": string,
+"title": string,
+"tmdb_id": number,
+"wtw_have": number | null,
+"wtw_of": number | null
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "watch_plans"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"plan_label":
+{ Args: { "p_date": string,"p_time": string }; Returns: string
+                           },
+"plan_mine":
+{ Args: { "p_from": string,"p_me": string,"p_to"?: string }; Returns: Json
+                           },
+"plan_notify_yes":
+{ Args: { "p_actor": string,"p_plan": Database["public"]['Tables']["watch_plans"]['Row'],"p_sub": string,"p_title": string,"p_type": string }; Returns: undefined
+                           },
+"plan_propose":
+{ Args: { "p_conv": number,"p_date": string,"p_me": string,"p_note": string,"p_ref": Json,"p_source"?: string,"p_time": string,"p_wtw_have"?: number,"p_wtw_of"?: number }; Returns: Json
+                           },
+"plan_rsvp":
+{ Args: { "p_answer": string,"p_me": string,"p_plan": number }; Returns: string
+                           },
+"plan_seen":
+{ Args: { "p_me": string,"p_plan": number }; Returns: string
+                           },
+"plan_today":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"plan_today_sync":
+{ Args: { "p_me": string }; Returns: number
+                           },
+"plan_when_ok":
+{ Args: { "p_date": string,"p_time": string }; Returns: boolean
                            },
 "renumber_actor_favs":
 { Args: Record<PropertyKey, never>; Returns: undefined

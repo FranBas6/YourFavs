@@ -74,7 +74,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     {
         key: 'calendario', label: 'Calendario', group: 'cuenta', icon: 'calendar',
         title: 'Suscripción al calendario',
-        description: 'Lleva tus estrenos a tu app de calendario de siempre.',
+        description: 'Lleva tus estrenos y tus planes a tu app de calendario de siempre.',
     },
     {
         key: 'cuenta', label: 'Cuenta y datos', group: 'cuenta', icon: 'shield',

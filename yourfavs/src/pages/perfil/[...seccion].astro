@@ -17,6 +17,7 @@ import Layout from "../../layouts/Layout.astro";
 import "../../styles/pages/ajustes.css";
 
 import { getUserProfile, setUserProfile, type UserProfile } from "../../services/BD/profile/userProfile";
+import { getIcsToken, icsPath } from "../../services/BD/profile/icsToken";
 import { clearUserTaste } from "../../services/BD/profile/userTaste";
 import { sanitizePlatformIds } from "../../services/API/shared/watchProviders";
 import { HOME_SECTIONS } from "../../utils/constants/homeSections";
@@ -172,7 +173,16 @@ if (Astro.request.method === 'POST') {
 
 const profile = (await getUserProfile()) ?? {};
 const saved = Astro.url.searchParams.get('saved') === '1';
-const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
+// Calendario (M5c): tu dirección privada; se crea la primera vez que entras aquí.
+let icsUrl: string | null = null;
+if (activeKey === 'calendario') {
+    try {
+        const token = await getIcsToken(user.uid);
+        if (token) icsUrl = `${Astro.url.origin}${icsPath(token)}`;
+    } catch (error) {
+        console.error('Error al leer la dirección del calendario:', error);
+    }
+}
 ---
 <Layout title={`${section.title} — Ajustes · YourFavs`}>
     <div class:list={["aj-root", { "is-index": isIndex }]} data-autosave>
@@ -211,7 +221,7 @@ const icsUrl = `${Astro.url.origin}/api/calendar/subscribe.ics`;
                     {activeKey === 'notificaciones' && <SeccionNotificaciones profile={profile} />}
                     {activeKey === 'contenido' && <SeccionContenido profile={profile} />}
                     {activeKey === 'apariencia' && <SeccionApariencia profile={profile} />}
-                    {activeKey === 'calendario' && <SeccionCalendario icsUrl={icsUrl} />}
+                    {activeKey === 'calendario' && <SeccionCalendario icsUrl={icsUrl} icsPlans={(profile as UserProfile).icsPlans !== false} />}
                     {activeKey === 'cuenta' && <SeccionCuenta user={user} />}
                 </div>
             </div>

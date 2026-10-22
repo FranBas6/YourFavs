@@ -38,6 +38,11 @@ const TYPE_TO_PREF: Record<NotifType, string> = {
     recommendation: 'social',
     rec_reply: 'social',
     rec_watched: 'social',
+    // Planes para verla (Mensajes M5): los escribe la BD al cambiar o cancelar un plan, y el día
+    // del plan al abrir la campana (`syncPlanToday`).
+    plan_changed: 'social',
+    plan_cancelled: 'social',
+    plan_today: 'social',
 };
 
 // Firestore no admite '/' en el id de documento.

@@ -276,8 +276,12 @@ const NOTIF_STAMP: Record<string, [StampColor, string]> = {
     recommendation: ['amber', 'send'],
     rec_reply: ['amber', 'send'],
     rec_watched: ['pink', 'eye'],
+    plan_changed: ['green', 'calendar-clock'],
+    plan_cancelled: ['green', 'calendar-x'],
+    plan_today: ['green', 'calendar-check'],
 };
 export const SOCIAL_NOTIF_TYPES = new Set(['follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched']);
+const PLAN_NOTIF_TYPES = new Set(['plan_today', 'plan_changed', 'plan_cancelled']);
 
 const POSTER_BASE = 'https://image.tmdb.org/t/p/w92';
 const srOnly = (t: string) => `<span class="sr-only">${esc(t)}</span>`;
@@ -344,6 +348,21 @@ export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; no
             + `<div class="nt-zone" data-rel-host="notif" aria-live="polite">${zone.html}</div></div>`
             + (unread ? '<span class="notif-dot" aria-hidden="true"></span>' : '')
             + `</div>`;
+    }
+
+    // Planes (M5, handoff §3.6): informativos, con el póster y su sello; todo el aviso lleva al chat.
+    if (PLAN_NOTIF_TYPES.has(it.type)) {
+        const today = it.type === 'plan_today';
+        const img = it.poster_path ? `<img src="${POSTER_BASE}${esc(it.poster_path)}" alt="" loading="lazy">` : icon('film');
+        const title = today ? esc(it.title).replace(/^Hoy:/, '<b>Hoy:</b>') : esc(it.title);
+        const line = today ? it.subtitle : [when, it.subtitle].filter(Boolean).join(' · ');
+        const label = (today ? `Plan de hoy: ${it.title.replace(/^Hoy:\s*/, '')}` : it.title) + (unread ? ', sin leer' : '');
+        return `<a href="${esc(it.href || '#')}" class="notif-item nt-social nt-plan${unread ? ' is-unread' : ''}" data-id="${esc(it.id)}" aria-label="${esc(label)}">`
+            + `<span class="rc-badged"><span class="rc-lead" style="width:34px;height:51px" aria-hidden="true">${img}</span>`
+            + `<span class="so-av-bdg" style="${stampVars(st[0], 'b')}" aria-hidden="true">${icon(st[1])}</span></span>`
+            + `<div class="nt-b"><p class="nt-t">${title}</p><div class="nt-w nt-pl-w">${icon(st[1])}<span>${esc(line)}</span></div>`
+            + (today ? `<span class="pf-btn${o.mobile ? '' : ' sm'} nt-pl-go">${icon('message-circle')}Abrir chat</span>` : '')
+            + `</div>` + (unread ? '<span class="notif-dot" aria-hidden="true"></span>' : '') + `</a>`;
     }
 
     const poster = it.poster_path

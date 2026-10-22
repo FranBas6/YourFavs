@@ -56,6 +56,8 @@ export interface UserProfile {
     platforms?: number[];       // provider_ids TMDB de "mis plataformas" (Auditoría v2 · 3.2)
     /** Catálogo y ruleta arrancan ya filtrados a `platforms` (Ajustes · A3). */
     platformsFilterDefault?: boolean;
+    /** Mensajes M5c: «Incluir mis planes» en tu calendario .ics (por defecto, sí). */
+    icsPlans?: boolean;
     /** Toggles de la campana por tipo (Bloque 4). Ausente = todo activado. */
     /** `social`: avisos entre personas (alguien te sigue…); los respeta la BD al crearlos. */
     notifPrefs?: { episodes?: boolean; releases?: boolean; anniversary?: boolean; platform?: boolean; streak?: boolean; social?: boolean };
@@ -95,6 +97,7 @@ const COLUMN: Record<Exclude<keyof UserProfile, 'updated_at'>, string> = {
     onboarding: 'onboarding',
     platforms: 'platforms',
     platformsFilterDefault: 'platforms_filter_default',
+    icsPlans: 'ics_plans',
     notifPrefs: 'notif_prefs',
     spoilerFree: 'spoiler_free',
     spoilers: 'spoilers',

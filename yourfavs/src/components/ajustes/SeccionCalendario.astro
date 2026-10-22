@@ -1,57 +1,149 @@
 ---
 /**
- * Enlace .ics para suscribir tus estrenos. Solo lectura: el feed se genera en
- * `/api/calendar/subscribe.ics` a partir de lo que sigues, así que el enlace no caduca ni hay
- * nada que configurar — de ahí el chip «EN VIVO».
+ * Ajustes → Calendario (Mensajes M5c; handoff M5 §3.8).
+ *
+ * Cada persona tiene su dirección .ics SECRETA (`/api/calendar/u/{token}.ics`): las apps de
+ * calendario no mandan la sesión, así que la dirección es lo que dice de quién es el calendario.
+ * Se ve recortada y se copia entera. «Crear una nueva» la cambia (con confirmación) y la anterior
+ * deja de funcionar al momento. «Incluir mis planes» se guarda con el autoguardado de Ajustes.
  */
-interface Props { icsUrl: string; }
-const { icsUrl } = Astro.props;
+import { Icon } from 'astro-icon/components';
+
+interface Props {
+    /** La dirección entera (https). null si no se pudo crear. */
+    icsUrl: string | null;
+    icsPlans: boolean;
+}
+const { icsUrl, icsPlans } = Astro.props;
+
+/** «yourfavs.app/api/calendar/u/k3Fz…8wTq.ics»: sin esquema y con el secreto recortado en medio. */
+const shortUrl = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/([0-9A-Za-z]{4})[0-9A-Za-z]+([0-9A-Za-z]{4})\.ics$/, '/$1…$2.ics');
 ---
-<div class="aj-card">
+<div class="aj-card" data-ics>
     <div class="aj-card-head">
         <div>
-            <h2>Tu calendario de estrenos</h2>
-            <p>Se actualiza solo con lo que sigues.</p>
+            <h2>Tu calendario en otras apps</h2>
+            <p>Estrenos de lo que sigues y tus planes. Se actualiza solo.</p>
         </div>
         <span class="aj-live">EN VIVO</span>
     </div>
     <div class="aj-card-body">
-        <div class="aj-copy-row">
-            <input type="text" id="ics-url" value={icsUrl} readonly aria-label="Enlace de suscripción" />
-            <button type="button" id="ics-copy" class="aj-btn">Copiar</button>
+        <p class="aj-field-label">Tu dirección privada<span class="aj-ics-own">solo tuya</span></p>
+        {icsUrl ? (
+            <div class="aj-copy-row aj-ics-row">
+                <div class="aj-ics-in" data-ics-url={icsUrl}>
+                    <Icon name="lucide:key" aria-hidden="true" />
+                    <span data-ics-short>{shortUrl(icsUrl)}</span>
+                    <span class="sr-only">Dirección privada de tu calendario</span>
+                </div>
+                <button type="button" class="aj-btn is-inv" data-ics-copy><Icon name="lucide:copy" aria-hidden="true" /><span>Copiar</span></button>
+            </div>
+        ) : (
+            <p class="aj-row-desc">No se ha podido crear tu dirección. Vuelve a intentarlo en un rato.</p>
+        )}
+        <div class="aj-priv" role="note">
+            <Icon name="lucide:lock" aria-hidden="true" />
+            <span><b>No la compartas.</b> Quien la tenga puede ver tus estrenos y tus planes, con quién y a qué hora.</span>
         </div>
-
+    </div>
+    <div class="aj-card-body">
         <div class="aj-steps">
             <div>
-                <p class="aj-step-t">1 · Copia el enlace</p>
-                <p class="aj-step-d">El botón lo deja en el portapapeles.</p>
+                <p class="aj-step-t">1 · Copia la dirección</p>
+                <p class="aj-step-d">El botón la deja en el portapapeles.</p>
             </div>
             <div>
-                <p class="aj-step-t">2 · Añádelo</p>
-                <p class="aj-step-d">En Google, Apple u Outlook: «suscribirse a un calendario» y pega la URL.</p>
+                <p class="aj-step-t">2 · Añádela</p>
+                <p class="aj-step-d">En Google, Apple u Outlook: «suscribirse a un calendario» y pégala.</p>
             </div>
             <div>
                 <p class="aj-step-t">3 · Listo</p>
-                <p class="aj-step-d">Los estrenos aparecen entre tus eventos, sin volver aquí.</p>
+                <p class="aj-step-d">Estrenos y planes aparecen entre tus eventos.</p>
             </div>
         </div>
     </div>
 </div>
 
+<div class="aj-card">
+    <div class="aj-row">
+        <span class="aj-row-ico" style="--ico: var(--stamp-green-ink); --ico-bg: var(--stamp-green);" aria-hidden="true"><Icon name="lucide:calendar-check" /></span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">Incluir mis planes</span>
+            <p class="aj-row-desc">Solo los planes a los que has dicho «Voy». Sin la nota ni los nombres del grupo.</p>
+        </span>
+        <label class="aj-switch">
+            <input type="checkbox" role="switch" checked={icsPlans} data-save="icsPlans" aria-label="Incluir mis planes" />
+            <span class="aj-switch-track"></span>
+        </label>
+    </div>
+    <div class="aj-row aj-ics-rot">
+        <span class="aj-row-ico" style="--ico: var(--text-2); --ico-bg: var(--bg-tint);" aria-hidden="true"><Icon name="lucide:refresh-cw" /></span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">¿La has compartido sin querer?</span>
+            <p class="aj-row-desc">Crea una nueva: la de ahora dejará de funcionar al momento y tendrás que volver a añadirla en tus apps.</p>
+        </span>
+        <button type="button" class="aj-btn" data-ics-rotate disabled={!icsUrl}><Icon name="lucide:refresh-cw" aria-hidden="true" />Crear una nueva</button>
+    </div>
+</div>
+
+<dialog id="ics-rot-dlg" class="so-dlg" role="alertdialog" aria-labelledby="ics-rot-t" aria-describedby="ics-rot-d">
+    <span class="so-dlg-st" style="--sb: var(--stamp-amber); --si: var(--stamp-amber-ink)"><Icon name="lucide:refresh-cw" /></span>
+    <h3 id="ics-rot-t">¿Crear una dirección nueva?</h3>
+    <p id="ics-rot-d">La que tienes ahora dejará de funcionar en todas las apps donde la añadiste, también en las tuyas. Tendrás que volver a suscribirte con la nueva.</p>
+    <div class="so-dlg-f">
+        <button type="button" class="pf-btn" data-ics-cancel>Cancelar</button>
+        <button type="button" class="pf-btn pri" data-ics-confirm><Icon name="lucide:refresh-cw" />Crear una nueva</button>
+    </div>
+</dialog>
+
 <script>
-    const icsBtn = document.getElementById('ics-copy');
-    const icsInput = document.getElementById('ics-url') as HTMLInputElement | null;
-    icsBtn?.addEventListener('click', async () => {
-        if (!icsInput) return;
+    import { showToast } from '../../scripts/social/toast';
+
+    const box = document.querySelector<HTMLElement>('[data-ics-url]');
+    const short = document.querySelector<HTMLElement>('[data-ics-short]');
+    const copyBtn = document.querySelector<HTMLButtonElement>('[data-ics-copy]');
+    const rotBtn = document.querySelector<HTMLButtonElement>('[data-ics-rotate]');
+    const dlg = document.getElementById('ics-rot-dlg') as HTMLDialogElement | null;
+    const okBtn = dlg?.querySelector<HTMLButtonElement>('[data-ics-confirm]');
+    let copiedTimer = 0;
+
+    const shortUrl = (u: string) => u.replace(/^https?:\/\//, '').replace(/\/([0-9A-Za-z]{4})[0-9A-Za-z]+([0-9A-Za-z]{4})\.ics$/, '/$1…$2.ics');
+
+    copyBtn?.addEventListener('click', async () => {
+        const url = box?.dataset.icsUrl;
+        if (!url) return;
         try {
-            await navigator.clipboard.writeText(icsInput.value);
-            icsBtn.textContent = '¡Copiado!';
+            await navigator.clipboard.writeText(url);
         } catch {
-            // Reserva para navegadores sin Clipboard API (o sin permiso).
-            icsInput.select();
-            document.execCommand('copy');
-            icsBtn.textContent = '¡Copiado!';
+            // Sin Clipboard API (o sin permiso): que al menos se pueda copiar a mano.
+            window.prompt('Copia tu dirección privada:', url);
+            return;
         }
-        setTimeout(() => { icsBtn.textContent = 'Copiar'; }, 1800);
+        const label = copyBtn.querySelector('span');
+        if (label) label.textContent = '¡Copiada!';
+        window.clearTimeout(copiedTimer);
+        copiedTimer = window.setTimeout(() => { if (label) label.textContent = 'Copiar'; }, 1800);
+    });
+
+    rotBtn?.addEventListener('click', () => dlg?.showModal());
+    dlg?.querySelector('[data-ics-cancel]')?.addEventListener('click', () => dlg.close());
+    dlg?.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+
+    okBtn?.addEventListener('click', async () => {
+        okBtn.disabled = true;
+        try {
+            const r = await fetch('/api/profile/ics-token/rotate', { method: 'POST' });
+            const j = await r.json().catch(() => null);
+            if (!r.ok || !j?.url) throw new Error(String(r.status));
+            if (box) box.dataset.icsUrl = j.url;
+            if (short) short.textContent = shortUrl(j.url);
+            dlg?.close();
+            showToast('Dirección nueva creada. La anterior ya no funciona.');
+        } catch {
+            dlg?.close();
+            showToast('No se ha podido crear. Inténtalo de nuevo.', 'error');
+        } finally {
+            okBtn.disabled = false;
+        }
     });
 </script>

@@ -14,7 +14,11 @@ export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anni
     | 'follow' | 'friend_request' | 'friend_accepted'
     // Recomendaciones (F4): `rec:{id}` para quien la recibe, `recrep:{id}:{uid}` para quien la envió.
     // F6: `recseen:{id}:{uid}`, quien la recibió ya la vio (lo escribe un trigger de la BD).
-    | 'recommendation' | 'rec_reply' | 'rec_watched';
+    | 'recommendation' | 'rec_reply' | 'rec_watched'
+    // Planes para verla (Mensajes M5): a quien dijo «Voy», al cambiarse o cancelarse, y el día del
+    // plan (`plan_today`, M5b). El texto ya viene escrito (`title`/`subtitle`) y `href` lleva a la
+    // conversación.
+    | 'plan_changed' | 'plan_cancelled' | 'plan_today';
 
 export interface NotificationDoc {
     id: string;
@@ -43,7 +47,7 @@ export interface NotifInput {
 // cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
 // desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
 // pendiente ENTRA o SALE de tus plataformas (diff contra snapshot, ver el generador).
-const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched']);
+const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched', 'plan_changed', 'plan_cancelled', 'plan_today']);
 
 function toMs(v: any): number {
     if (!v) return 0;

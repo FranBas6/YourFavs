@@ -1,0 +1,140 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO de Mensajes M5 (handoff M5 §3.1): la tarjeta de plan en todos
+ * sus estados, el ＋ con la quinta acción y las líneas de sistema, con datos inventados, para
+ * revisarlos en claro, oscuro y móvil. Es estática: nada se envía. En producción: 404.
+ * M5b: los avisos de la campana (§3.6), el bloque «Planes» de Ver pronto (§3.4) y la pista sin planes.
+ */
+import Layout from '../../layouts/Layout.astro';
+import { cardHtml, logHtml, plusMenuHtml } from '../../lib/social/chatView';
+import { initialsOf, notifItemHtml, stampFor } from '../../lib/social/ui';
+import type { ChatMessage, NotifView, PersonCard, PlanView } from '../../lib/social/types';
+import PlansBlock from '../../components/personal/PlansBlock.astro';
+import type { MyPlan } from '../../services/BD/social/plans';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+import '../../styles/pages/social/mensajes.css';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+let n = 0;
+const P = (name: string, handle: string): PersonCard => {
+    const id = `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+    return { id, handle, name, avatar: null, archetype: null, color: stampFor(id), initials: initialsOf(name) };
+};
+const ME = P('Fran Bas', 'franbas');
+const CARLA = P('Carla Méndez', 'carlam');
+const ANA = P('Ana Ruiz', 'ana_ve');
+const IVAN = P('Iván Soler', 'ivansoler');
+const PEPE = P('Pepe Martín', 'pepemartin');
+const LUCIA = P('Lucía Prado', 'luciap');
+const EVA = P('Eva Gil', 'evagil');
+const people = Object.fromEntries([ME, CARLA, ANA, IVAN, PEPE, LUCIA, EVA].map((p) => [p.id, p]));
+
+const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric', month: '2-digit', day: '2-digit' });
+const today = fmt.format(new Date());
+const day = (k: number) => { const [y, m, d] = today.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + k)).toISOString().slice(0, 10); };
+const now = Date.now();
+
+let pid = 0;
+const plan = (o: Partial<PlanView>): PlanView => ({
+    id: ++pid, convId: 1, createdBy: CARLA.id, mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days',
+    poster: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', date: day(1), time: '21:30', note: 'en casa de Ana', source: 'plus',
+    wtwOf: null, wtwHave: null, prevDate: null, prevTime: null, changed: false, today, phase: 'live', cancelledAt: null,
+    me: 'none', seen: false, yes: [CARLA.id, ANA.id], no: [IVAN.id], wait: [ME.id, PEPE.id], myState: null, ...o,
+});
+const states: [string, PlanView][] = [
+    ['Sin responder', plan({})],
+    ['Voy', plan({ me: 'yes', yes: [CARLA.id, ANA.id, ME.id], wait: [PEPE.id] })],
+    ['No puedo', plan({ me: 'no', no: [IVAN.id, ME.id], wait: [PEPE.id] })],
+    ['Lo propones tú', plan({ createdBy: ME.id, me: 'owner', yes: [ME.id, ANA.id], wait: [CARLA.id, PEPE.id], no: [] })],
+    ['Cambiado (las respuestas se mantienen)', plan({ me: 'yes', changed: true, date: day(2), prevDate: day(1), prevTime: '21:30', yes: [CARLA.id, ANA.id, ME.id] })],
+    ['Hoy · sin hora · desde «¿Qué vemos?»', plan({ date: today, time: null, note: null, source: 'wtw', wtwOf: 4, wtwHave: 4, me: 'yes', yes: [CARLA.id, ME.id, ANA.id, IVAN.id], no: [], wait: [] })],
+    ['Muchas personas (más de 4 van)', plan({ me: 'yes', yes: [CARLA.id, ANA.id, ME.id, IVAN.id, LUCIA.id, EVA.id, PEPE.id], no: [], wait: [] })],
+    ['Cancelado', plan({ phase: 'cancelled', cancelledAt: now - 3 * 3600_000, me: 'yes', createdBy: ANA.id })],
+    ['Ya pasó · fuiste', plan({ date: day(-1), phase: 'past', me: 'yes', yes: [CARLA.id, ME.id] })],
+    ['Ya pasó · no fuiste', plan({ date: day(-1), phase: 'past', me: 'no' })],
+    ['Ya pasó · la viste', plan({ date: day(-1), phase: 'past', me: 'yes', seen: true, myState: { state: 'seen', score: 8.5 } })],
+];
+
+let mid = 500;
+const M = (author: PersonCard, at: number, p: PlanView | null, o: Partial<ChatMessage> = {}): ChatMessage => ({
+    id: ++mid, author: author.id, kind: 'text', body: '', sys: null, at, deleted: false, folded: false, clientId: null,
+    card: p ? { type: 'plan', ref: { planId: p.id, title: p.title }, plan: p } : null,
+    spoiler: null, locked: false, lines: null, spoilerSeen: false, ...o,
+});
+const S = (sys: ChatMessage['sys'], at: number): ChatMessage => ({
+    id: ++mid, author: null, kind: 'system', body: null, sys, at, deleted: false, folded: false, clientId: null, card: null,
+    spoiler: null, locked: false, lines: null, spoilerSeen: false,
+});
+const log = logHtml([
+    M(CARLA, now - 3 * 3600_000, null, { body: '¿Y si la vemos el viernes?' }),
+    M(CARLA, now - 3 * 3600_000 + 60_000, plan({ me: 'yes', changed: true, date: day(2), prevDate: day(1), prevTime: '21:30', yes: [CARLA.id, ANA.id, ME.id], wait: [PEPE.id] })),
+    S({ type: 'plan_changed', actor: CARLA.id, targets: [], title: 'Perfect Days', when: 'sáb 24 oct · 21:30' }, now - 2 * 3600_000),
+    S({ type: 'plan_cancelled', actor: ANA.id, targets: [], title: 'Anatomía de una caída' }, now - 3600_000),
+], { me: ME.id, group: true, people, newAfter: null, seenId: null, seenAt: null, pending: [], revealed: {}, now });
+
+// M5b · campana (§3.6): el texto lo escribe la BD; aquí, como llegaría.
+const N = (o: Partial<NotifView>): NotifView => ({ id: `n${++mid}`, type: 'plan_today', title: '', subtitle: '', href: '/mislistas/amigos/mensajes/1', poster_path: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', created_at: now - 600_000, read: false, ...o });
+const notifs = [
+    N({ title: 'Hoy: Perfect Days a las 21:30 con Viernes de pelis', subtitle: 'Plan · van 3 · en casa de Ana' }),
+    N({ type: 'plan_changed', title: 'Carla Méndez ha cambiado el plan de Perfect Days: ahora el sáb 24 oct · 21:30', subtitle: 'Viernes de pelis · sigues en el plan', created_at: now - 20 * 60_000 }),
+    N({ type: 'plan_cancelled', title: 'Ana Ruiz ha cancelado el plan de Anatomía de una caída del dom 25 oct', subtitle: 'Viernes de pelis', created_at: now - 26 * 3600_000, read: true }),
+];
+
+// M5b · Ver pronto (§3.4).
+const MP = (o: Partial<MyPlan>): MyPlan => ({ id: ++pid, convId: 1, kind: 'group', with: 'Viernes de pelis', mediaType: 'movie', tmdbId: 976893, title: 'Perfect Days', poster: '/efnvsuEdkdwiWR7WyQ2QgcGt8mM.jpg', date: day(1), time: '21:30', note: 'en casa de Ana', yes: 3, seen: false, past: false, ...o });
+const myPlans = [
+    MP({ date: day(-1), past: true, title: 'Anatomía de una caída', note: null, yes: 2, kind: 'direct', with: 'Ana Ruiz' }),
+    MP({ date: today, time: null, note: null }),
+    MP({}),
+    MP({ date: day(5), mediaType: 'tv', tmdbId: 1399, title: 'The Bear', kind: 'direct', with: 'Carla Méndez', yes: 2, note: null }),
+];
+---
+<Layout title="Dev · Mensajes M5" robots="noindex, nofollow">
+    <div class="dv">
+        <h1>Mensajes M5 · Plan para verla (solo desarrollo)</h1>
+        <p class="dv-sub">Datos inventados y estáticos. Cambia de tema y estrecha la ventana para ver oscuro y móvil.</p>
+
+        <h2>Conversación — tarjeta cambiada y líneas de sistema (cambio y cancelación)</h2>
+        <section class="ms-main dv-box"><div class="ms-log"><div class="ms-log-in" set:html={log} /></div></section>
+
+        <h2>La tarjeta de plan en todos sus estados</h2>
+        <div class="dv-grid">{states.map(([label, p]) => (
+            <div class="dv-box dv-card"><small>{label}</small><Fragment set:html={cardHtml({ type: 'plan', ref: { planId: p.id, title: p.title }, plan: p }, people, { me: ME.id, at: now - 7200_000, now })} /></div>
+        ))}</div>
+
+        <h2>M5b · Campana: hoy, cambiado y cancelado</h2>
+        <div class="dv-box dv-nt" set:html={notifs.map((it) => notifItemHtml(it, { phase: SOCIAL_PHASE, now })).join('')} />
+
+        <h2>M5b · Ver pronto: el bloque «Planes» (pasado, hoy, mañana y una serie)</h2>
+        <div class="dv-box dv-vp"><PlansBlock plans={myPlans} today={today} convs={true} /></div>
+
+        <h2>M5b · Ver pronto sin planes (con conversaciones)</h2>
+        <div class="dv-box dv-vp"><PlansBlock plans={[]} today={today} convs={true} /></div>
+
+        <h2>El ＋ con la quinta acción</h2>
+        <div class="dv-box dv-pm"><div class="pm" role="menu" aria-label="Añadir al mensaje" set:html={plusMenuHtml({ id: 1, group: true, title: 'Viernes de pelis', friends: [ANA.id] })} /></div>
+    </div>
+</Layout>
+
+<style>
+    .dv { max-width: 1100px; margin: 0 auto; padding-bottom: 60px; }
+    .dv h1 { font: 700 22px var(--font); color: var(--text); margin: 0; }
+    .dv-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 8px; }
+    .dv h2 { font: 600 14px var(--font); color: var(--text-2); margin: 28px 0 10px; }
+    .dv-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
+    .dv .ms-main, .dv .ms-log { overflow: visible; }
+    .dv-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+    .dv-card { padding: 12px; }
+    .dv-card small { display: block; font: 600 11px var(--font-mono); color: var(--text-2); margin-bottom: 4px; }
+    .dv-pm { padding: 8px; max-width: 340px; }
+    .dv-pm .pm { position: static; }
+    .dv-nt { max-width: 400px; padding: 6px; }
+    .dv-vp { padding: 16px; }
+    .dv-vp :global(.vp-pls), .dv-vp :global(.vp-hint) { margin-bottom: 0; }
+</style>

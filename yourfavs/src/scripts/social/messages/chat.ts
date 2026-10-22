@@ -23,8 +23,9 @@ import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { msgApi } from './api';
 import { createPoller } from './poller';
 import { initWtw } from './wtw';
+import { openPlanPick } from './planPick';
 import { showToast } from '../toast';
-import type { ChatMessage, ChatView, RecShown, SpoilerRef } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, PlanView, RecShown, SpoilerRef } from '../../../lib/social/types';
 
 /** uuid v4 (crypto.randomUUID solo existe en contextos seguros). */
 function uuid(): string {
@@ -164,6 +165,7 @@ function init(root: HTMLElement, chat: ChatView) {
         if (c.readOnly !== chat.readOnly) { location.reload(); return true; }
         // Cambios del grupo (nombre, personas): cabecera y panel.
         if (metaChanged || fresh.some((m) => m.kind === 'system')) repaintMeta(c);
+        if (await refreshPlans()) changed = true;
         if (changed) render();
         announce(fresh);
         if (fresh.some((m) => m.author !== me)) void markRead();
@@ -398,6 +400,97 @@ function init(root: HTMLElement, chat: ChatView) {
         if (action === 'open' && btn.dataset.href) location.href = btn.dataset.href;
     }
 
+    // ---- Planes (M5) ----------------------------------------------------------------------------
+    // Responder no escribe en el chat: al sondear (o con un aviso del tiempo real) se vuelven a pedir
+    // las tarjetas de plan cargadas, para ver quién va sin recargar.
+    const planIds = () => [...new Set(msgs.flatMap((m) => (m.card?.type === 'plan' && m.card.plan ? [m.card.plan.id] : [])))].slice(-30);
+    function applyPlan(v: PlanView): boolean {
+        let changed = false;
+        for (const m of msgs) {
+            if (m.card?.type === 'plan' && m.card.ref.planId === v.id && JSON.stringify(m.card.plan) !== JSON.stringify(v)) {
+                m.card.plan = v;
+                changed = true;
+            }
+        }
+        return changed;
+    }
+    async function refreshPlans(): Promise<boolean> {
+        const ids = planIds();
+        if (!ids.length) return false;
+        try {
+            const res = await fetch(`/api/social/messages/plans?ids=${ids.join(',')}`, { headers: { Accept: 'application/json' } });
+            const d = await res.json();
+            if (!res.ok || !d.ok) return false;
+            return (d.plans as PlanView[]).map(applyPlan).some(Boolean);
+        } catch { return false; }
+    }
+    const planOf = (id: number) => msgs.find((m) => m.card?.type === 'plan' && m.card.ref.planId === id)?.card as
+        { type: 'plan'; plan: PlanView | null } | undefined;
+    // Un cambio guardado desde el selector («Cambiar fecha»).
+    document.addEventListener('yf:ms-plan', (e) => {
+        const v = (e as CustomEvent<PlanView>).detail;
+        if (v && v.convId === conv && applyPlan(v)) render();
+        poller.now(); // la línea de sistema del cambio
+    });
+
+    async function planCall(url: string, method: string, body?: unknown): Promise<PlanView | null> {
+        try {
+            const res = await fetch(url, {
+                method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
+            });
+            const d = await res.json().catch(() => ({}));
+            if (res.ok && d.ok && d.plan) return d.plan as PlanView;
+            showToast(d.error === 'closed' ? 'Este plan ya no admite cambios.' : 'No se ha podido. Inténtalo otra vez.', 'error');
+        } catch { showToast('No se ha podido. Inténtalo otra vez.', 'error'); }
+        return null;
+    }
+
+    async function rsvp(btn: HTMLButtonElement) {
+        const id = Number(btn.dataset.planId);
+        const answer = btn.dataset.planRsvp as 'yes' | 'no';
+        if (!id || btn.getAttribute('aria-pressed') === 'true') return;
+        btn.closest('.pl-r')?.querySelectorAll<HTMLButtonElement>('[data-plan-rsvp]').forEach((b) => { b.disabled = true; });
+        const v = await planCall(`/api/social/messages/plans/${id}/rsvp`, 'POST', { answer });
+        if (v) applyPlan(v);
+        render();
+        if (v) {
+            live.textContent = answer === 'yes' ? 'Vas al plan' : 'No vas al plan';
+            logEl.querySelector<HTMLElement>(`[data-plan="${id}"] [data-plan-rsvp="${answer}"]`)?.focus();
+        }
+    }
+
+    function editPlan(id: number, focusNote: boolean) {
+        const v = planOf(id)?.plan;
+        if (!v) return;
+        openPlanPick({
+            conv, edit: v, focusNote, source: v.source,
+            title: { type: v.mediaType, id: v.tmdbId, title: v.title, image: v.poster },
+            anchor: root.querySelector<HTMLElement>('[data-ms-plus]'),
+        });
+    }
+
+    async function cancelPlan(id: number) {
+        const v = planOf(id)?.plan;
+        if (!v) return;
+        const others = v.yes.filter((x) => x !== me).length;
+        const ok = await ask({
+            icon: 'calendar-x', title: '¿Cancelar el plan?', ok: 'Cancelar plan',
+            text: others
+                ? `Se avisará a ${others === 1 ? 'la persona que dijo' : `las ${others} personas que dijeron`} «Voy». La fecha dejará de salir en su Ver pronto; el título se queda.`
+                : 'La tarjeta quedará como cancelada en el chat.',
+        });
+        if (!ok) return;
+        const nv = await planCall(`/api/social/messages/plans/${id}`, 'DELETE');
+        if (nv && applyPlan(nv)) render();
+        poller.now();
+    }
+
+    async function planSeen(id: number, snooze: boolean) {
+        const v = await planCall(`/api/social/messages/plans/${id}/seen`, 'POST', { snooze });
+        if (v && applyPlan(v)) render();
+        if (v && !snooze) showToast('Marcada como vista');
+    }
+
     // ---- Acciones sobre un mensaje ----------------------------------------------------------
     // Una tarjeta se copia con su enlace (el comentario, si lo hay, delante).
     const bodyOf = (m: ChatMessage) => {
@@ -615,6 +708,25 @@ function init(root: HTMLElement, chat: ChatView) {
         if (add) { void addPending(add); return; }
         const ra = t.closest<HTMLButtonElement>('[data-tc-ra]');
         if (ra) { void actRec(ra); return; }
+        // Planes (M5).
+        const pr = t.closest<HTMLButtonElement>('[data-plan-rsvp]');
+        if (pr) { void rsvp(pr); return; }
+        const pe = t.closest<HTMLElement>('[data-plan-edit]');
+        if (pe) { pe.closest('details')?.removeAttribute('open'); editPlan(Number(pe.dataset.planEdit), pe.hasAttribute('data-plan-note')); return; }
+        const pc = t.closest<HTMLElement>('[data-plan-cancel]');
+        if (pc) { pc.closest('details')?.removeAttribute('open'); void cancelPlan(Number(pc.dataset.planCancel)); return; }
+        const ps = t.closest<HTMLElement>('[data-plan-seen], [data-plan-snooze]');
+        if (ps) { void planSeen(Number(ps.dataset.planSeen ?? ps.dataset.planSnooze), ps.hasAttribute('data-plan-snooze')); return; }
+        const pp = t.closest<HTMLElement>('[data-plan-pick]');
+        if (pp) {
+            const mt = pp.dataset.mt;
+            if (mt !== 'movie' && mt !== 'tv') return;
+            openPlanPick({
+                conv, source: 'title_card', anchor: root.querySelector<HTMLElement>('[data-ms-plus]'),
+                title: { type: mt, id: Number(pp.dataset.tmdb), title: pp.dataset.title ?? '', image: pp.dataset.image || null },
+            });
+            return;
+        }
         const rv = t.closest<HTMLElement>('[data-reveal]');
         if (rv) { void reveal(Number(rv.dataset.reveal)); return; }
         const sps = t.closest<HTMLElement>('[data-spoil-show]');

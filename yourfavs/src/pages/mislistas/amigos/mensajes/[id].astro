@@ -74,7 +74,7 @@ const plusHtml = chat ? plusMenuHtml({
     id: chat.id, group, title: group ? chat.title : other.name, to: group ? null : other.handle,
     friends: group ? chat.members.filter((m) => m.friend && m.person.id !== chat!.me.id).map((m) => m.person.id) : [],
 }) : '';
-const plusLabel = 'Añadir al mensaje: compartir un título, recomendar, ¿qué vemos? o marcar como spoiler';
+const plusLabel = 'Añadir al mensaje: compartir un título, recomendar, ¿qué vemos?, marcar como spoiler o plan para verla';
 const logInitial = chat ? logHtml(chat.messages, {
     me: chat.me.id, group, people: chat.people, newAfter: newAnchor(chat.messages, chat.me.id, chat.me.lastReadId),
     seenId: chat.seenId, seenAt: chat.seenAt, pending: [], revealed: {}, other: group ? null : other,
@@ -150,6 +150,9 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                 <div class="hd" aria-hidden="true"></div>
                 <div class="ms-info-in" set:html={infoHtml(chat)} />
             </dialog>
+            {/* Selector de día y hora de «Plan para verla» (M5): lo rellena scripts/social/messages/planPick.ts. */}
+            {!chat.readOnly && <div id="pk-bd" class="rk-backdrop" hidden></div>}
+            {!chat.readOnly && <div id="pk" class="rk ck pick5" role="dialog" aria-modal="true" aria-label="Plan para verla" hidden></div>}
             {/* «¿Qué vemos?» (M4d): lo rellena scripts/social/messages/wtw.ts al abrirlo. */}
             {!chat.readOnly && <dialog class="wv" id="ms-wtw" aria-labelledby="ms-wtw-t"></dialog>}
             {!chat.readOnly && (
@@ -185,19 +188,17 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
                 </form>
             </dialog>
 
-            {/* Quitar a alguien y Salir del grupo: sin Deshacer, por eso confirman (handoff §4.10). Lo rellena chat.ts. */}
-            {group && (
-                <dialog id="ms-confirm" class="so-dlg" role="alertdialog" aria-labelledby="ms-cf-t" aria-describedby="ms-cf-d">
-                    <span class="so-dlg-st" style="--sb: var(--stamp-red); --si: var(--stamp-red-ink)" data-cf-ico></span>
-                    <h3 id="ms-cf-t" data-cf-title></h3>
-                    <p id="ms-cf-d" data-cf-text></p>
-                    <div class="so-cons" data-cf-cons hidden></div>
-                    <div class="so-dlg-f">
-                        <button type="button" class="pf-btn ghost" data-cf-cancel>Cancelar</button>
-                        <button type="button" class="pf-btn pri" data-cf-ok></button>
-                    </div>
-                </dialog>
-            )}
+            {/* Quitar a alguien, Salir del grupo y Cancelar un plan (M5): sin Deshacer, por eso confirman (handoff §4.10). Lo rellena chat.ts. */}
+            <dialog id="ms-confirm" class="so-dlg" role="alertdialog" aria-labelledby="ms-cf-t" aria-describedby="ms-cf-d">
+                <span class="so-dlg-st" style="--sb: var(--stamp-red); --si: var(--stamp-red-ink)" data-cf-ico></span>
+                <h3 id="ms-cf-t" data-cf-title></h3>
+                <p id="ms-cf-d" data-cf-text></p>
+                <div class="so-cons" data-cf-cons hidden></div>
+                <div class="so-dlg-f">
+                    <button type="button" class="pf-btn ghost" data-cf-cancel>Cancelar</button>
+                    <button type="button" class="pf-btn pri" data-cf-ok></button>
+                </div>
+            </dialog>
 
             <script type="application/json" id="ms-data" is:inline set:html={data}></script>
             </>
