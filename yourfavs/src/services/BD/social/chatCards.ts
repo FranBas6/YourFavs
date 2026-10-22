@@ -12,7 +12,7 @@
 import { supabaseAdmin } from '../../../lib/supabase/admin';
 import { getTitleSummaries, titleKey } from '../../API/shared/titleSummaries';
 import { recViewsForNotifs } from './recommendations';
-import type { CardPerson, CardViewer, ChatMessage, RecCard, SpoilerRef, TitleCard, TitleCardRef, WtwCard } from '../../../lib/social/types';
+import type { CardPerson, CardViewer, ChatMessage, PlanCard, PlanView, RecCard, SpoilerRef, TitleCard, TitleCardRef, WtwCard } from '../../../lib/social/types';
 
 /** La copia de TMDB para una tarjeta nueva. null si TMDB no conoce el título. */
 export async function titleCardRef(mediaType: 'movie' | 'tv', tmdbId: number): Promise<TitleCardRef | null> {
@@ -58,7 +58,74 @@ function nextEpisode(last: { season: number; episode: number }, eps: Record<numb
  * `others`: las demás personas de la conversación (en un 1:1, a quién se envió la recomendación).
  */
 export async function resolveCards(me: string, conv: number, msgs: ChatMessage[], others: string[] = []): Promise<void> {
-    await Promise.all([resolveTitleCards(me, conv, msgs), resolveRecCards(me, msgs, others)]);
+    await Promise.all([resolveTitleCards(me, conv, msgs), resolveRecCards(me, msgs, others), resolvePlanCards(me, conv, msgs)]);
+}
+
+// -------------------------------------------------------------------------------------
+// Planes (M5, handoff M5 §2.3)
+// -------------------------------------------------------------------------------------
+interface RawPlan {
+    id: number; conv_id: number; created_by: string; media_type: 'movie' | 'tv'; tmdb_id: number; title: string;
+    poster: string | null; plan_date: string; plan_time: string | null; note: string | null; source: PlanView['source'];
+    wtw_of: number | null; wtw_have: number | null; prev_date: string | null; prev_time: string | null;
+    changed_at: string | null; cancelled_at: string | null; today: string;
+    answers: { user_id: string; answer: 'yes' | 'no'; seen: boolean }[];
+    members: string[];
+}
+
+/** Los planes de esos ids tal como los ve `me` (los que no puede ver no vienen). */
+export async function planViews(me: string, ids: number[], conv?: number): Promise<Map<number, PlanView>> {
+    const out = new Map<number, PlanView>();
+    if (!ids.length) return out;
+    const { data, error } = await supabaseAdmin().rpc('plan_cards', { p_me: me, p_ids: ids });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as unknown as RawPlan[];
+    // Tu estado con el título, solo para los que ya pasaron («La viste · ★ 8,5»).
+    const past = rows.filter((r) => r.plan_date < r.today && !r.cancelled_at);
+    const mine = new Map<string, CardViewer | null>();
+    if (past.length) {
+        const byConv = new Map<number, RawPlan[]>();
+        for (const r of past) byConv.set(r.conv_id, [...(byConv.get(r.conv_id) ?? []), r]);
+        for (const [c, list] of byConv) {
+            if (conv && c !== conv) continue;
+            const { data: st, error: e2 } = await supabaseAdmin().rpc('msg_card_states', {
+                p_me: me, p_conv: c, p_refs: list.map((r) => ({ t: r.media_type, id: r.tmdb_id })),
+            });
+            if (e2) throw new Error(e2.message);
+            for (const x of (st ?? []) as StateRow[]) {
+                if (x.user_id === me && x.state === 'seen') mine.set(`${x.media_type}:${x.tmdb_id}`, { state: 'seen', score: x.score == null ? null : Number(x.score) });
+            }
+        }
+    }
+    for (const r of rows) {
+        const answer = new Map(r.answers.map((a) => [a.user_id, a]));
+        const yes = r.members.filter((id) => answer.get(id)?.answer === 'yes');
+        const no = r.members.filter((id) => answer.get(id)?.answer === 'no');
+        const wait = r.members.filter((id) => !answer.has(id));
+        // Quien lo propone, primero entre los que van.
+        yes.sort((a, b) => Number(b === r.created_by) - Number(a === r.created_by));
+        const a = answer.get(me);
+        out.set(r.id, {
+            id: r.id, convId: r.conv_id, createdBy: r.created_by, mediaType: r.media_type, tmdbId: r.tmdb_id,
+            title: r.title, poster: r.poster, date: r.plan_date, time: r.plan_time, note: r.note, source: r.source,
+            wtwOf: r.wtw_of, wtwHave: r.wtw_have, prevDate: r.prev_date, prevTime: r.prev_time, changed: Boolean(r.changed_at),
+            today: r.today,
+            phase: r.cancelled_at ? 'cancelled' : r.plan_date < r.today ? 'past' : 'live',
+            cancelledAt: r.cancelled_at ? new Date(r.cancelled_at).getTime() : null,
+            me: r.created_by === me ? 'owner' : a ? a.answer : 'none',
+            seen: Boolean(a?.seen),
+            yes, no, wait,
+            myState: mine.get(`${r.media_type}:${r.tmdb_id}`) ?? null,
+        });
+    }
+    return out;
+}
+
+async function resolvePlanCards(me: string, conv: number, msgs: ChatMessage[]): Promise<void> {
+    const plans = msgs.filter((m): m is ChatMessage & { card: PlanCard } => m.card?.type === 'plan');
+    if (!plans.length) return;
+    const views = await planViews(me, plans.map((m) => m.card.ref.planId), conv);
+    for (const m of plans) m.card.plan = views.get(m.card.ref.planId) ?? null;
 }
 
 /**

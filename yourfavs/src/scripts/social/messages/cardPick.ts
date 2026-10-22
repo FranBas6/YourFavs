@@ -15,6 +15,8 @@
  *   · «Marcar como spoiler» (`[data-spoil-pick]`, desde el ＋ del chat; M4c): sugerencias («En esta
  *     conversación», «Lo que estás viendo») o búsqueda, y en series temporada y episodio (o «Toda la
  *     serie»). No envía nada: deja la marca en el compositor (`yf:ms-spoiler-set`).
+ *   · «Plan para verla» (`[data-plan-title]`, desde el ＋; M5): el mismo buscador que «Compartir» y
+ *     «Siguiente: día y hora», que abre el selector de `planPick.ts` con el título puesto.
  */
 import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
 import { MSG_MAX, gavHtml } from '../../../lib/social/chatView';
@@ -26,7 +28,8 @@ interface Title { type: 'movie' | 'tv'; id: number; title: string; sub: string; 
 type Dest = { key: string; conv: ConvSummary; friend?: undefined } | { key: string; friend: PersonCard; conv?: undefined };
 
 interface State {
-    mode: 'share' | 'sendTo' | 'spoiler';
+    /** `plan`: el primer paso de «Plan para verla» desde el ＋ (elegir título; el día va en planPick). */
+    mode: 'share' | 'sendTo' | 'spoiler' | 'plan';
     opener: HTMLElement;
     /** Dónde se ancla (el ＋ del chat cuando se abre desde su menú). */
     anchor: HTMLElement;
@@ -90,6 +93,9 @@ function headHtml(s: State): string {
     if (s.mode === 'spoiler') {
         return `${handle}<div class="rk-h"><span class="rk-st ck-st is-sp">${icon('shield')}</span><div class="rk-h-b"><div class="rk-k">Marcar como spoiler</div><b data-ck-htitle>${esc(s.pick?.title ?? '¿De qué es?')}</b></div>${close}</div>`;
     }
+    if (s.mode === 'plan') {
+        return `${handle}<div class="rk-h"><span class="rk-st ck-st is-plan">${icon('calendar-check')}</span><div class="rk-h-b"><div class="rk-k">Plan para verla en</div><b>${esc(s.convTitle)}</b></div>${close}</div>`;
+    }
     if (s.mode === 'share') {
         return `${handle}<div class="rk-h"><span class="rk-st ck-st">${icon('clapperboard')}</span><div class="rk-h-b"><div class="rk-k">Compartir en</div><b>${esc(s.convTitle)}</b></div>${close}</div>`;
     }
@@ -121,7 +127,7 @@ function listHtml(s: State): string {
         return groups.map((g, gi) => `<div class="rk-kk">${esc(g.label)}</div>`
             + g.items.map((h, i) => titleRowHtml(h, `${gi}:${i}`, same(s.pick, h))).join('')).join('');
     }
-    if (s.mode === 'share' || s.mode === 'spoiler') {
+    if (s.mode === 'share' || s.mode === 'spoiler' || s.mode === 'plan') {
         if (s.q.trim().length < 2) return `<p class="rk-note">Escribe el título de una película o serie.</p>`;
         if (s.loading && !s.hits.length) return `<p class="rk-note">Buscando…</p>`;
         const hits = s.hits.map((h, i) => ({ h, i })).filter(({ h }) => s.tab === 'all' || h.type === s.tab);
@@ -176,6 +182,9 @@ function epsHtml(s: State): string {
 }
 
 function footHtml(s: State): string {
+    if (s.mode === 'plan') {
+        return `<button type="button" class="pf-btn pri" data-ck-plan-next${s.pick ? '' : ' disabled'}>${icon('chevron-right')}Siguiente: día y hora</button>`;
+    }
     if (s.mode === 'spoiler' && s.step === 'title' && s.pick?.type === 'tv') {
         // De vuelta en el paso 1 con una serie elegida: a temporada y episodio.
         return `<button type="button" class="pf-btn pri" data-ck-next>${icon('chevron-right')}Siguiente: temporada y episodio</button>`;
@@ -212,7 +221,7 @@ function renderAll(s: State) {
     const placeholder = s.mode === 'sendTo' ? 'Buscar conversación o amigo' : 'Buscar película o serie';
     // El comentario de una tarjeta se puede marcar como spoiler de ese mismo título (la película, o
     // la serie entera): se ve oculto para quien no la haya visto y la tarjeta se ve completa.
-    const msg = s.mode === 'spoiler' ? ''
+    const msg = s.mode === 'spoiler' || s.mode === 'plan' ? ''
         : `<div class="rk-msg"><textarea data-ck-msg rows="2" maxlength="${MSG_MAX}" placeholder="Añade un comentario (opcional)" aria-label="Comentario opcional"></textarea>`
             + `<label class="ck-sp"><input type="checkbox" data-ck-sp>${icon('shield')}<span>El comentario es spoiler de este título</span></label></div>`;
     shell.innerHTML = headHtml(s)
@@ -256,7 +265,8 @@ export function openPick(opener: HTMLElement) {
         return;
     }
     if (st) { const same = st.opener === opener; close(false); if (same) return; }
-    const mode: State['mode'] = opener.hasAttribute('data-share-title') ? 'share' : opener.hasAttribute('data-spoil-pick') ? 'spoiler' : 'sendTo';
+    const mode: State['mode'] = opener.hasAttribute('data-share-title') ? 'share'
+        : opener.hasAttribute('data-spoil-pick') ? 'spoiler' : opener.hasAttribute('data-plan-title') ? 'plan' : 'sendTo';
     const d = opener.dataset;
     const target: Title | null = mode !== 'sendTo' ? null : (d.mediaType === 'movie' || d.mediaType === 'tv') && Number(d.tmdbId) > 0
         ? { type: d.mediaType, id: Number(d.tmdbId), title: d.title || '', sub: '', image: tmdbPath(d.image) }
@@ -267,12 +277,12 @@ export function openPick(opener: HTMLElement) {
         anchor: (d.anchor && document.querySelector<HTMLElement>(d.anchor)) || opener,
         conv: Number(d.conv) || 0, convTitle: d.convTitle || '', q: '', tab: 'all', hits: [], pick: null,
         target, dests: [], dest: null, sugg: [], eps: null, season: 1, episode: 1, step: 'title',
-        loading: mode !== 'share', sending: false, error: null,
+        loading: mode === 'sendTo' || mode === 'spoiler', sending: false, error: null,
     };
     st = s;
     shell.classList.toggle('is-sheet', s.sheet);
     shell.setAttribute('aria-label', mode === 'share' ? `Compartir un título en ${s.convTitle}`
-        : mode === 'spoiler' ? 'Marcar como spoiler' : `Enviar ${target!.title} a una conversación`);
+        : mode === 'spoiler' ? 'Marcar como spoiler' : mode === 'plan' ? `Plan para verla en ${s.convTitle}` : `Enviar ${target!.title} a una conversación`);
     shell.hidden = false;
     if (backdrop) backdrop.hidden = false;
     if (s.sheet) document.body.style.overflow = 'hidden';
@@ -437,7 +447,17 @@ document.addEventListener('click', (e) => {
     const s = st;
     if (!s || !shell) return;
     const t = e.target as Element;
-    if (t.closest('[data-send-to], [data-share-title], [data-spoil-pick]')) return; // lo atiende quien abre
+    if (t.closest('[data-send-to], [data-share-title], [data-spoil-pick], [data-plan-title]')) return; // lo atiende quien abre
+    if (t.closest('[data-ck-plan-next]') && s.pick) {
+        // Del título al día y la hora (planPick, con su propio selector y el mismo ancla).
+        const pick = s.pick;
+        const o = { conv: s.conv, anchor: s.anchor };
+        close(false);
+        void import('./planPick').then((m) => m.openPlanPick({
+            conv: o.conv, title: { type: pick.type, id: pick.id, title: pick.title, image: pick.image }, source: 'plus', anchor: o.anchor,
+        }));
+        return;
+    }
     if (!shell.contains(t)) { if (t === backdrop || !t.closest('dialog')) close(false); return; }
     if (t.closest('[data-ck-close]')) { close(); return; }
     if (t.closest('[data-ck-next]') && s.pick) {
@@ -477,7 +497,7 @@ document.addEventListener('click', (e) => {
 });
 
 function pickRow(s: State, row: HTMLElement) {
-    if (s.mode === 'share' || s.mode === 'spoiler') {
+    if (s.mode === 'share' || s.mode === 'spoiler' || s.mode === 'plan') {
         const sug = row.dataset.sug?.split(':').map(Number);
         const h = sug ? s.sugg[sug[0]]?.items[sug[1]] : s.hits[Number(row.dataset.hit)];
         if (h && s.mode === 'spoiler' && h.type === 'tv') {

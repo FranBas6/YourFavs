@@ -276,6 +276,8 @@ const NOTIF_STAMP: Record<string, [StampColor, string]> = {
     recommendation: ['amber', 'send'],
     rec_reply: ['amber', 'send'],
     rec_watched: ['pink', 'eye'],
+    plan_changed: ['green', 'calendar-clock'],
+    plan_cancelled: ['green', 'calendar-x'],
 };
 export const SOCIAL_NOTIF_TYPES = new Set(['follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched']);
 

@@ -610,12 +610,131 @@ dialog.wv::backdrop { background: rgba(11, 17, 32, .5); }
     .wv-ch button { height: 40px; }
     .wv-c .a .pf-btn { height: 44px; }
 }
+/* Plan para verla (M5; medidas de design_handoff_m5/m5.css): la misma caja .tc con la fecha delante. */
+.tc.pl { grid-template-columns: 64px minmax(0, 1fr); }
+.dtile {
+    width: 64px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--bg-elev);
+    overflow: hidden; text-align: center; align-self: start;
+}
+.dtile .mo { display: block; height: 20px; font: 700 10px/20px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; background: var(--text); color: var(--bg-elev); }
+.dtile .dd { display: block; font: 700 26px/1 var(--font-mono); color: var(--text); padding-top: 7px; }
+.dtile .wd { display: block; font: 600 11px var(--font); color: var(--text-2); padding: 3px 0 7px; }
+.dtile.today .mo { background: var(--accent-dark); color: #fff; }
+.dtile.off { border-style: dashed; }
+.dtile.off .mo { background: var(--border-strong); color: var(--text-2); }
+.dtile.off .dd { color: var(--text-3); text-decoration: line-through; text-decoration-thickness: 2px; }
+.dtile.sm { width: 48px; border-radius: 8px; }
+.dtile.sm .mo { height: 16px; font-size: 9px; line-height: 16px; }
+.dtile.sm .dd { font-size: 19px; padding-top: 5px; }
+.dtile.sm .wd { font-size: 10px; padding: 2px 0 5px; }
+.pl-tt { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.pl-po {
+    display: grid; place-items: center; width: 26px; aspect-ratio: 2 / 3; flex-shrink: 0; overflow: hidden;
+    border-radius: 4px; background: var(--border); color: var(--text-3);
+}
+.pl-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pl-po svg { width: 13px; height: 13px; }
+.pl-tt .tx { min-width: 0; }
+.pl-when { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 9px; font: 600 13px var(--font); color: var(--text); }
+.pl-when span { display: inline-flex; align-items: center; gap: 5px; }
+.pl-when svg { width: 14px; height: 14px; color: var(--text-2); }
+.pl-when .nt2 { font-weight: 500; color: var(--text-2); }
+.pl-src { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--text-2); }
+.pl-src svg { width: 13px; height: 13px; }
+.pl-who { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; font-size: 12px; color: var(--text-2); }
+.pl-who > div { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.pl-who .yes { font: 600 12px var(--font); color: var(--text); }
+.pl-who .yes > svg { color: var(--ok-ink); }
+.pl-who svg { width: 14px; height: 14px; }
+.pl-who .fcs { display: flex; }
+.pl-who .fcs .so-av { box-shadow: 0 0 0 2px var(--bg-tint); }
+.pl-who .fcs .so-av + .so-av { margin-left: -6px; }
+.pl-who .plus { font: 700 10.5px var(--font-mono); color: var(--text-2); margin-left: 2px; }
+.pl-who .sep { color: var(--text-3); }
+.pl-ml { font: 600 9.5px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); padding: 6px 6px 2px; }
+.pl-r { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.pl-r .q { font: 600 12px var(--font); color: var(--text); margin-right: 2px; }
+.pl-r .pf-btn { white-space: nowrap; flex-direction: row; }
+.pl-r .pf-btn[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+.pl-r a.pf-btn { text-decoration: none; }
+.mm .pl-r a.pf-btn.ghost { color: var(--text); }
+.pl-vp { flex-basis: 100%; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-2); }
+.pl-vp svg { width: 13px; height: 13px; color: var(--ok-ink); }
+.pl-own {
+    display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: var(--r-full);
+    background: var(--bg-elev); border: 1px solid var(--border-strong); font: 600 12px var(--font); color: var(--text);
+}
+.pl-own svg { width: 14px; height: 14px; color: var(--ok-ink); }
+.pl-ask { flex-basis: 100%; font: 600 13px var(--font); color: var(--text); margin-bottom: 2px; }
+.pl-prev s { color: var(--text-2); }
+.pl-more { position: relative; }
+.pl-more > summary { list-style: none; width: 30px; height: 30px; padding: 0; justify-content: center; cursor: pointer; }
+.pl-more > summary::-webkit-details-marker { display: none; }
+.pl-m.pf-menu { top: 36px; right: 0; left: auto; min-width: 220px; }
+.pl-m button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border: 0; border-radius: 7px; background: none; font: 500 13px var(--font); color: var(--text); cursor: pointer; text-align: left; }
+.pl-m button:hover, .pl-m button:focus-visible { background: var(--bg-tint); outline: none; }
+.pl-m button svg { width: 15px; height: 15px; }
+.pl-m .pf-danger { color: var(--accent-dark); }
+[data-theme="dark"] .pl-m .pf-danger { color: var(--stamp-red-ink); }
+.pl-m hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.tc.pl.off .pl-tt, .tc.pl.off .pl-when { opacity: .6; }
+.tc.pl.off .pl-when { text-decoration: line-through; text-decoration-color: var(--text-3); }
+.tc-a .vf span, .pl-r .vf span { display: inline; }
+
+/* Selector de día y hora del plan (#pk, sobre el .rk). */
+.rk.pick5 { width: 380px; }
+.rk.pick5.is-sheet { width: auto; }
+.rk .rk-s.pk-b { overflow-y: auto; overscroll-behavior: contain; flex: 1 1 auto; min-height: 0; }
+.pk-b .chp-l { margin-top: 10px; }
+.pk-b .chp-l:first-child { margin-top: 0; }
+.chp-l .opt { font: 400 10px var(--font); letter-spacing: 0; text-transform: none; color: var(--text-3); margin-left: 4px; }
+.chps.dd2 .chp { flex-direction: column; gap: 1px; height: 46px; min-width: 64px; padding: 0 10px; font-family: var(--font); }
+.chps.dd2 .chp b { font: 600 12.5px var(--font); }
+.chps.dd2 .chp small { font: 500 10.5px var(--font-mono); color: inherit; opacity: .8; }
+.chp svg { width: 14px; height: 14px; }
+.chp.off { color: var(--text-3); border-style: dashed; cursor: default; }
+.pl-in {
+    display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px; margin-top: 8px; border: 1px solid var(--border-strong);
+    border-radius: 9px; background: var(--bg); font-size: 13.5px; color: var(--text);
+}
+.pl-in:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.pl-in svg { width: 15px; height: 15px; color: var(--text-3); flex-shrink: 0; }
+.pl-in input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 0; font: 400 13.5px var(--font); color: var(--text); color-scheme: light dark; }
+.pl-in b { margin-left: auto; font: 500 11px var(--font-mono); color: var(--text-2); }
+.mcal { margin-top: 10px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px; background: var(--bg-elev); }
+.mcal-h { display: flex; align-items: center; justify-content: space-between; font: 600 13px var(--font); color: var(--text); margin-bottom: 6px; }
+.mcal-h span { display: flex; gap: 4px; }
+.mcal-h .pf-btn.ico { width: 28px; height: 28px; }
+.mcal-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.mcal-g i { font: 600 9.5px var(--font-mono); font-style: normal; text-transform: uppercase; color: var(--text-3); padding: 4px 0; }
+.mcal-g button { height: 30px; display: grid; place-items: center; border: 0; border-radius: 7px; background: none; font: 500 12px var(--font-mono); color: var(--text); cursor: pointer; }
+.mcal-g button:hover:not(.past) { background: var(--bg-tint); }
+.mcal-g button.past { color: var(--text-4, var(--text-3)); cursor: default; }
+.mcal-g button.tod { box-shadow: inset 0 0 0 1px var(--border-strong); font-weight: 700; }
+.mcal-g button.on { background: var(--text); color: var(--bg-elev); font-weight: 700; }
+.mcal-g button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.rk.pick5.is-sheet .chps { flex-wrap: nowrap; overflow-x: auto; }
+.rk.pick5.is-sheet .chps.dd2 .chp { height: 52px; min-width: 72px; }
+.rk.pick5.is-sheet .chp { height: 44px; }
+.rk.pick5.is-sheet .pl-in { height: 46px; }
+.rk.pick5.is-sheet .pl-in input { font-size: 16px; }
+/* Móvil con el teclado (la nota): fuera las píldoras; quedan la nota y «Proponer plan». */
+.rk.pick5.is-typing .pk-b .chp-l, .rk.pick5.is-typing .pk-b .chps, .rk.pick5.is-typing .pk-b .mcal { display: none; }
+
 @media (max-width: 1023.98px) {
     .ms-chat .pm { left: 8px; right: 8px; width: auto; }
     .ms-chat .tc { grid-template-columns: 56px minmax(0, 1fr); column-gap: 12px; max-width: none; }
     .ms-chat .tc-po { width: 56px; }
     .ms-chat .tc-lead .rc-lead { width: 56px !important; height: 56px !important; }
     .ms-chat .tc .pf-btn { height: 40px; }
+    .ms-chat .tc.pl { grid-template-columns: 56px minmax(0, 1fr); }
+    .ms-chat .dtile { width: 56px; }
+    .ms-chat .dtile .dd { font-size: 23px; }
+    .ms-chat .pl-r .pf-btn { height: 44px; flex: 1; }
+    .ms-chat .pl-r .q { flex-basis: 100%; }
+    .ms-chat .pl-r .vf, .ms-chat .tc-a .vf { flex: 0 0 44px; width: 44px; padding: 0; justify-content: center; }
+    .ms-chat .pl-r .vf span, .ms-chat .tc-a .vf span { display: none; }
+    .ms-chat .pl-more > summary { width: 44px; height: 44px; }
     .ms-chat .shd-f .pf-btn.sm { height: 40px; }
     .ms-chat .ctag { height: 36px; }
     .ms-chat .ctag button { width: 32px; height: 32px; }

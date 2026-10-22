@@ -12,7 +12,7 @@ import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../../utils/appTime';
 import { formatScore } from '../../utils/constants/helpers/media-helpers';
-import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef, WtwCard } from './types';
+import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, PlanView, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef, WtwCard } from './types';
 import { recHref, recLeadHtml } from './recUi';
 
 export const MSG_MAX = 2000;
@@ -179,6 +179,7 @@ export function newAnchor(msgs: ChatMessage[], me: string, lastReadId: number | 
 
 const SYS_ICON: Record<SysType, string> = {
     created: 'users', added: 'user-plus', left: 'log-out', removed: 'user-minus', renamed: 'pencil', admin: 'shield',
+    plan_changed: 'calendar-clock', plan_cancelled: 'calendar-x',
 };
 
 const partsHtml = (parts: TextPart[]) => parts.map((p) => (p.b ? `<b>${esc(p.t)}</b>` : esc(p.t))).join('');
@@ -255,6 +256,7 @@ function peopleHtml(list: CardPerson[], people: Record<string, PersonCard>): str
 
 /** Ficha de lo que enseña una tarjeta. */
 export function cardHref(card: ChatCard): string {
+    if (card.type === 'plan') return card.plan ? titleHref(card.plan) : '#';
     return card.type === 'rec' ? recHref(card.ref) : titleHref(card.ref);
 }
 
@@ -268,7 +270,139 @@ export function cardHtml(
 ): string {
     const now = o.now ?? Date.now();
     if (card.type === 'wtw') return wtwCardHtml(card, people, o.me ?? '');
+    if (card.type === 'plan') return card.plan ? planCardHtml(card.plan, people, o.me ?? '', o.at ?? now, now) : '';
     return card.type === 'title' ? titleCardHtml(card, people) : recCardHtml(card, o.other ?? null, o.at ?? now, now);
+}
+
+// -------------------------------------------------------------------------------------
+// Planes (M5; handoff M5 §3.1): la misma caja que M4 con un bloque de calendario delante.
+// Las fechas llegan como «2026-10-23» (día en Madrid) y se pintan sin pasar por la zona del navegador.
+// -------------------------------------------------------------------------------------
+const WD_PLAN = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+const parts = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return { y, m, d, wd: new Date(Date.UTC(y, m - 1, d)).getUTCDay() };
+};
+const addDays = (iso: string, n: number) => {
+    const { y, m, d } = parts(iso);
+    return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+};
+/** «vie 23 oct» (con año si no es el de `today`). */
+export function planShort(iso: string, today?: string): string {
+    const p = parts(iso);
+    return `${WD_PLAN[p.wd]} ${p.d} ${MON[p.m - 1]}${today && parts(today).y !== p.y ? ` ${p.y}` : ''}`;
+}
+/** «Hoy» · «Mañana» · «Viernes 23 oct». */
+export function planLong(iso: string, today: string): string {
+    if (iso === today) return 'Hoy';
+    if (iso === addDays(today, 1)) return 'Mañana';
+    const p = parts(iso);
+    return `${WD_LONG[p.wd]} ${p.d} ${MON[p.m - 1]}${parts(today).y !== p.y ? ` ${p.y}` : ''}`;
+}
+/** «vie 23 oct · 21:30» / «vie 23 oct · sin hora». */
+export const planWhen = (date: string, time: string | null, today?: string) => `${planShort(date, today)} · ${time ?? 'sin hora'}`;
+
+/** Bloque de calendario (`aria-hidden`: la fecha entera está en `.pl-when`). */
+export function dtileHtml(iso: string, o: { today?: boolean; off?: boolean; sm?: boolean } = {}): string {
+    const p = parts(iso);
+    const top = o.off ? 'NO VA' : o.today ? 'HOY' : MON[p.m - 1].toUpperCase();
+    return `<span class="dtile${o.today && !o.off ? ' today' : ''}${o.off ? ' off' : ''}${o.sm ? ' sm' : ''}" aria-hidden="true">`
+        + `<span class="mo">${top}</span><span class="dd">${p.d}</span><span class="wd">${WD_PLAN[p.wd]}</span></span>`;
+}
+
+/** «Carla, Ana y tú» (tú siempre al final). */
+function namesList(ids: string[], people: Record<string, PersonCard>, me: string): string {
+    const n = [...ids.filter((id) => id !== me).map((id) => firstName(people[id]?.name ?? DELETED_ACCOUNT)), ...(ids.includes(me) ? ['tú'] : [])];
+    return n.length < 2 ? n.join('') : `${n.slice(0, -1).join(', ')} y ${n[n.length - 1]}`;
+}
+
+/** Quién va, en dos líneas como mucho; con más de 4, sin nombres y «Ver quién». */
+function planWhoHtml(v: PlanView, people: Record<string, PersonCard>, me: string): string {
+    const many = v.yes.length > 4;
+    const faces = v.yes.filter((id) => people[id]).slice(0, 4).map((id) => avatarHtml(people[id], 20)).join('')
+        + (many ? `<span class="plus">+${v.yes.length - 4}</span>` : '');
+    const count = v.yes.length === 1 ? 'Va 1' : `Van ${v.yes.length}`;
+    const line1 = `<div class="yes">${icon('check')}<span class="fcs" aria-hidden="true">${faces}</span><span>${count}${many ? '' : ` · ${esc(namesList(v.yes, people, me))}`}</span></div>`;
+    const bits: string[] = [];
+    if (v.no.length) bits.push(`${icon('x')}<span>${many ? `No pueden ${v.no.length}` : `No ${v.no.length === 1 ? 'puede' : 'pueden'}: ${esc(namesList(v.no, people, me))}`}</span>`);
+    if (v.wait.length) bits.push(`${icon('clock')}<span>${many ? `Sin responder ${v.wait.length}` : `Sin responder: ${esc(namesList(v.wait, people, me))}`}</span>`);
+    const group = (label: string, ids: string[]) => ids.length
+        ? `<div class="pl-ml">${label}</div>` + ids.map((id) => `<div role="listitem">${people[id] ? avatarHtml(people[id], 22) : ''}<b>${esc(id === me ? 'Tú' : people[id]?.name ?? DELETED_ACCOUNT)}</b></div>`).join('')
+        : '';
+    const more = many
+        ? `<details class="tc-more"><summary>Ver quién</summary><div class="pf-menu tc-more-l" role="list">${group('Van', v.yes)}${group('No pueden', v.no)}${group('Sin responder', v.wait)}</div></details>`
+        : '';
+    const line2 = bits.length || more ? `<div>${bits.join('<span class="sep" aria-hidden="true">·</span>')}${more}</div>` : '';
+    return `<div class="pl-who">${line1}${line2}</div>`;
+}
+
+/** Tarjeta de plan para quien mira (handoff M5 §3.1, todos los estados). */
+function planCardHtml(v: PlanView, people: Record<string, PersonCard>, me: string, at: number, now: number): string {
+    const href = titleHref(v);
+    const owner = v.me === 'owner';
+    const off = v.phase === 'cancelled';
+    const past = v.phase === 'past';
+    const today = v.date === v.today;
+    const by = firstName(people[v.createdBy]?.name ?? DELETED_ACCOUNT);
+    const ke = off ? 'cancelado' : past ? 'ya pasó' : v.changed ? 'cambiado' : relTime(at, now);
+    const kicker = `<div class="tc-k">${stampMini('green', 'calendar-check')}<span>${owner ? 'Plan · lo propones tú' : `Plan · de ${esc(by)}`}</span><em>${esc(ke)}</em></div>`;
+    const poster = v.poster ? `<img src="https://image.tmdb.org/t/p/w92${esc(v.poster)}" alt="" loading="lazy" decoding="async">` : icon(v.mediaType === 'movie' ? 'film' : 'tv');
+    const day = planLong(v.date, v.today);
+    const when = `<div class="pl-when"><span>${icon('calendar')}${esc(day)} · ${esc(v.time ?? 'sin hora')}</span>`
+        + (v.note ? `<span class="nt2">${icon('sticky-note')}${esc(v.note)}</span>` : '') + `</div>`;
+    const src = v.source === 'wtw' && v.wtwOf
+        ? `<div class="pl-src">${icon('dice-5')}Salió en «¿Qué vemos?» · ${esc(wtwCount(v.wtwHave ?? v.wtwOf, v.wtwOf).toLowerCase())}</div>`
+        : '';
+    let zone = '';
+    if (off) {
+        zone = `<div class="tc-z nt">${icon('calendar-x')}<span>Plan cancelado por ${esc(owner ? 'ti' : by)}${v.cancelledAt ? ` · ${esc(relTime(v.cancelledAt, now))}` : ''}</span>`
+            + `<small>${v.me === 'yes' || owner ? 'Ya no sale con fecha en tu Ver pronto. El título se queda.' : 'No hace falta hacer nada.'}</small></div>`;
+    } else if (v.changed && v.prevDate && !past) {
+        zone = `<div class="tc-z nt pl-prev">${icon('calendar-clock')}<span>Antes: <s>${esc(planWhen(v.prevDate, v.prevTime, v.today))}</s></span>`
+            + `<small>Las respuestas «Voy» se mantienen.</small></div>`;
+    }
+    const ficha = `<a class="pf-btn sm ghost vf" href="${href}" aria-label="Ver ficha">${icon('arrow-up-right')}<span>Ver ficha</span></a>`;
+    let resp = '';
+    if (!off && !past) {
+        if (owner) {
+            resp = `<div class="pl-r">`
+                + `<span class="pl-own">${icon('check')}Lo propones tú · vas</span>`
+                + btn('Cambiar fecha', { kind: 'ghost', icon: 'calendar-clock', size: 'sm', attrs: `data-plan-edit="${v.id}"` })
+                + `<details class="pl-more"><summary class="pf-btn sm ico ghost" aria-label="Más opciones del plan">${icon('ellipsis')}</summary>`
+                + `<div class="pf-menu pl-m" role="menu">`
+                + `<button type="button" role="menuitem" data-plan-edit="${v.id}">${icon('calendar-clock')}Cambiar fecha u hora</button>`
+                + `<button type="button" role="menuitem" data-plan-edit="${v.id}" data-plan-note>${icon('pencil')}Editar nota</button>`
+                + `<hr><button type="button" role="menuitem" class="pf-danger" data-plan-cancel="${v.id}">${icon('calendar-x')}Cancelar plan</button>`
+                + `</div></details></div>`;
+        } else {
+            const yes = v.me === 'yes', no = v.me === 'no';
+            resp = `<div class="pl-r" role="group" aria-label="¿Vas?">${v.me === 'none' ? '<span class="q">¿Vas?</span>' : ''}`
+                + `<button type="button" class="pf-btn sm" aria-pressed="${yes}" data-plan-rsvp="yes" data-plan-id="${v.id}">${icon('check')}Voy</button>`
+                + `<button type="button" class="pf-btn sm" aria-pressed="${no}" data-plan-rsvp="no" data-plan-id="${v.id}">${icon('x')}No puedo</button>`
+                + ficha
+                + (yes ? `<span class="pl-vp">${icon('calendar-check')}En tu Ver pronto con esta fecha</span>` : '') + `</div>`;
+        }
+    } else if (past) {
+        const went = owner || v.me === 'yes';
+        if (v.myState?.state === 'seen') {
+            resp = `<div class="pl-r"><span class="tc-me ok">${icon('circle-check')}La viste${v.myState.score != null ? ` · ${ratingHtml(v.myState.score)}` : ''}</span>${ficha}</div>`;
+        } else if (went && !v.seen) {
+            const mark = v.mediaType === 'movie'
+                ? btn('Marcar como vista', { kind: 'pri', icon: 'eye', size: 'sm', attrs: `data-plan-seen="${v.id}"` })
+                : `<a class="pf-btn sm pri" href="${href}">${icon('eye')}Marcar episodios</a>`;
+            resp = `<div class="pl-r"><span class="pl-ask">¿La visteis?</span>${mark}${btn('Aún no', { kind: 'ghost', size: 'sm', attrs: `data-plan-snooze="${v.id}"` })}</div>`;
+        } else {
+            resp = `<div class="pl-r">${ficha}</div>`;
+        }
+    }
+    const meSr = owner ? 'Lo propones tú' : v.me === 'yes' ? 'Vas' : v.me === 'no' ? 'No puedes' : 'Aún no has respondido';
+    const sr = `Plan: ${v.title}, ${day}${v.time ? ` a las ${v.time}` : ''}${v.note ? `, ${v.note}` : ''}. `
+        + (off ? 'Cancelado' : past ? 'Ya pasó' : `${meSr}. ${v.yes.length === 1 ? 'Va 1' : `Van ${v.yes.length}`}`);
+    return `<div class="tc pl${off ? ' off' : ''}" role="article" aria-label="${esc(sr)}" data-plan="${v.id}">`
+        + kicker + dtileHtml(v.date, { today, off })
+        + `<div class="tc-b"><div class="pl-tt"><a class="pl-po" href="${href}" tabindex="-1" aria-hidden="true">${poster}</a>`
+        + `<div class="tx"><a class="tc-t" href="${href}">${esc(v.title)}</a><div class="tc-m">${v.mediaType === 'movie' ? 'Película' : 'Serie'}</div></div></div>`
+        + when + src + zone + (off ? '' : planWhoHtml(v, people, me)) + resp + `</div></div>`;
 }
 
 /** «Pendiente de los 4» · «Pendiente de 3 de 4». */
@@ -315,7 +449,13 @@ function titleCardHtml(card: TitleCard, people: Record<string, PersonCard>): str
     const acts = (card.viewer ? '' : btn('Añadir a Pendientes', {
         kind: 'pri', icon: 'bookmark-plus', size: 'sm',
         attrs: `data-tc-add data-mt="${r.mediaType}" data-tmdb="${r.tmdbId}"`,
-    })) + `<a class="pf-btn sm ghost" href="${href}">${icon('arrow-up-right')}Ver ficha</a>`;
+    }))
+        // M5: quedar para verla, con el mismo selector de día y hora del ＋.
+        + btn('Quedar para verla', {
+            icon: 'calendar-plus', size: 'sm',
+            attrs: `data-plan-pick data-mt="${r.mediaType}" data-tmdb="${r.tmdbId}" data-title="${esc(r.title)}" data-image="${esc(r.poster ?? '')}"`,
+        })
+        + `<a class="pf-btn sm ghost vf" href="${href}" aria-label="Ver ficha">${icon('arrow-up-right')}<span>Ver ficha</span></a>`;
     const known = card.people.filter((p) => people[p.id]);
     const sr = [`Título: ${r.title}`, me.sr, ...known.map((p) => personBit(p, firstName(people[p.id].name), false))].join('. ');
     return `<div class="tc" role="article" aria-label="${esc(sr)}">`
@@ -409,6 +549,9 @@ export function plusMenuHtml(conv: { id: number; group: boolean; title: string; 
     // Marcar como spoiler (M4c): lo que escribas a continuación sale oculto para quien no haya llegado.
     html += item(`data-spoil-pick data-conv="${conv.id}" data-anchor="[data-ms-plus]"`, 'blue', 'shield', 'Marcar como spoiler',
         'De una película o de un episodio');
+    // Plan para verla (M5): un título y un día; quien diga «Voy» la tendrá en Ver pronto con la fecha.
+    html += item(`data-plan-title data-conv="${conv.id}" data-conv-title="${esc(conv.title)}" data-anchor="[data-ms-plus]"`, 'green', 'calendar-check',
+        'Plan para verla', 'Un título y un día. Quien vaya, la tendrá en Ver pronto');
     return html;
 }
 

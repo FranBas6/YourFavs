@@ -39,7 +39,8 @@ function unwrap<T>(r: { data: unknown; error: { message: string } | null }): T {
 interface RawMsg {
     id: number; author: string | null; kind: 'text' | 'system'; body: string | null; sys: MsgSys | null;
     created_at: string; deleted: boolean; folded: boolean; client_id: string | null;
-    card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: WtwCardRef } | null;
+    card?: { type: 'title'; ref: TitleCardRef } | { type: 'rec'; ref: RecCardRef } | { type: 'wtw'; ref: WtwCardRef }
+        | { type: 'plan'; ref: { planId: number; title: string } } | null;
     spoiler?: SpoilerRef | null; locked?: boolean; lines?: number[] | null; spoiler_seen?: boolean;
 }
 interface RawConv {
@@ -67,6 +68,7 @@ export function toMessage(r: RawMsg, me: string): ChatMessage {
         card: r.card?.type === 'title' ? { type: 'title', ref: r.card.ref, viewer: null, people: [] }
             : r.card?.type === 'rec' ? { type: 'rec', ref: r.card.ref, dir: r.author === me ? 'out' : 'in', state: r.author === me ? 'sent' : 'pending' }
             : r.card?.type === 'wtw' ? { type: 'wtw', ref: r.card.ref, viewer: null }
+            : r.card?.type === 'plan' ? { type: 'plan', ref: r.card.ref, plan: null }
             : null,
         spoiler: r.spoiler ?? null, locked: Boolean(r.locked), lines: r.lines ?? null, spoilerSeen: Boolean(r.spoiler_seen),
     };

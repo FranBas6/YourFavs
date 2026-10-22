@@ -89,7 +89,9 @@ export function initWtw(o: { conv: number; chat: ChatView; onSent: (m: ChatMessa
         return `<div class="wv-k">${faces(r.have)}<span>${esc(wtwCount(n, r.of))}</span></div>${note}${again}`
             + `<div class="wv-c${reduce.matches ? ' fade' : ''}"><a class="po" href="/${r.mediaType === 'movie' ? 'movie' : 'serie'}/${r.tmdbId}" tabindex="-1" aria-hidden="true">${poster}</a>`
             + `<div class="wv-cb"><div class="t">${esc(r.title)}</div><div class="m">${esc(titleMeta(r))}</div>`
-            + `<div class="a">${btn(sendTo, { kind: 'pri', icon: 'send', size: 'sm', attrs: 'data-wv-send' })}${btn('Otra', { icon: 'dice-5', size: 'sm', attrs: 'data-wv-again' })}</div></div></div>`
+            + `<div class="a">${btn(sendTo, { kind: 'pri', icon: 'send', size: 'sm', attrs: 'data-wv-send' })}`
+            + `${btn('Quedar para verla', { icon: 'calendar-plus', size: 'sm', attrs: 'data-wv-plan' })}`
+            + `${btn('Otra', { icon: 'dice-5', size: 'sm', attrs: 'data-wv-again' })}</div></div></div>`
             + `<p class="wv-pv">${icon('eye-off')}<span>Solo tú ves las tiradas. ${group ? 'Al grupo' : `A ${esc(firstName(people.find((p) => p.id !== me)?.name ?? ''))}`} le llega la que envíes.</span></p>`;
     }
 
@@ -197,6 +199,17 @@ export function initWtw(o: { conv: number; chat: ChatView; onSent: (m: ChatMessa
             return;
         }
         if (t.closest('[data-wv-again]')) { void roll(); return; }
+        // M5: de la tirada a un plan. Llega al chat UNA tarjeta, la del plan, con «Salió en ¿Qué vemos?».
+        if (t.closest('[data-wv-plan]') && cur && !cur.empty) {
+            const r = cur.roll;
+            dlg.close();
+            void import('./planPick').then((m) => m.openPlanPick({
+                conv: o.conv, source: 'wtw', wtw: { of: r.of, have: r.have.length },
+                title: { type: r.mediaType, id: r.tmdbId, title: r.title, image: r.poster ?? null },
+                anchor: document.querySelector<HTMLElement>('[data-ms-plus]'),
+            }));
+            return;
+        }
         const s = t.closest<HTMLButtonElement>('[data-wv-send]');
         if (s) { void send(s); return; }
         if (t.closest('[data-wv-share]')) {

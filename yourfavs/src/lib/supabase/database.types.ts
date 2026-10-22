@@ -391,6 +391,50 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"watch_plan_rsvps": {
+                  Row: {
+                    "answer": string,"plan_id": number,"seen_marked": boolean,"updated_at": string,"user_id": string
+                  }
+                  Insert: {
+                    "answer": string,"plan_id": number,"seen_marked"?: boolean,"updated_at"?: string,"user_id": string
+                  }
+                  Update: {
+                    "answer"?: string,"plan_id"?: number,"seen_marked"?: boolean,"updated_at"?: string,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "watch_plan_rsvps_plan_id_fkey"
+      columns: ["plan_id"]
+isOneToOne: false
+      referencedRelation: "watch_plans"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"watch_plans": {
+                  Row: {
+                    "cancelled_at": string | null,"changed_at": string | null,"conv_id": number,"created_at": string,"created_by": string,"id": number,"media_type": string,"message_id": number | null,"note": string | null,"plan_date": string,"plan_time": string | null,"poster": string | null,"prev_date": string | null,"prev_time": string | null,"source": string,"title": string,"tmdb_id": number,"wtw_have": number | null,"wtw_of": number | null
+                  }
+                  Insert: {
+                    "cancelled_at"?: string | null,"changed_at"?: string | null,"conv_id": number,"created_at"?: string,"created_by": string,"id"?: never,"media_type": string,"message_id"?: number | null,"note"?: string | null,"plan_date": string,"plan_time"?: string | null,"poster"?: string | null,"prev_date"?: string | null,"prev_time"?: string | null,"source"?: string,"title": string,"tmdb_id": number,"wtw_have"?: number | null,"wtw_of"?: number | null
+                  }
+                  Update: {
+                    "cancelled_at"?: string | null,"changed_at"?: string | null,"conv_id"?: number,"created_at"?: string,"created_by"?: string,"id"?: never,"media_type"?: string,"message_id"?: number | null,"note"?: string | null,"plan_date"?: string,"plan_time"?: string | null,"poster"?: string | null,"prev_date"?: string | null,"prev_time"?: string | null,"source"?: string,"title"?: string,"tmdb_id"?: number,"wtw_have"?: number | null,"wtw_of"?: number | null
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "watch_plans_conv_id_fkey"
+      columns: ["conv_id"]
+isOneToOne: false
+      referencedRelation: "conversations"
+      referencedColumns: ["id"]
+    },{
+      foreignKeyName: "watch_plans_message_id_fkey"
+      columns: ["message_id"]
+isOneToOne: true
+      referencedRelation: "messages"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"watched_episodes": {
                   Row: {
                     "episode": number,"season": number,"serie_id": number,"user_id": string,"watched_at": string | null
@@ -527,6 +571,67 @@ isOneToOne: false
 { Args: { "p_conv": number,"p_me": string,"p_who": (string)[] }; Returns: {
               "have": (string)[],"media_type": Database["public"]['Enums']["media_type"],"of": number,"tmdb_id": number
             }[]
+                           },
+"plan_cancel":
+{ Args: { "p_me": string,"p_plan": number }; Returns: string
+                           },
+"plan_cards":
+{ Args: { "p_ids": (number)[],"p_me": string }; Returns: Json
+                           },
+"plan_change":
+{ Args: { "p_date": string,"p_me": string,"p_note": string,"p_plan": number,"p_set_note": boolean,"p_set_time": boolean,"p_time": string }; Returns: string
+                           },
+"plan_clean_note":
+{ Args: { "p_note": string }; Returns: string
+                           },
+"plan_get":
+{ Args: { "p_me": string,"p_plan": number }; Returns: {
+              "cancelled_at": string | null,
+"changed_at": string | null,
+"conv_id": number,
+"created_at": string,
+"created_by": string,
+"id": number,
+"media_type": string,
+"message_id": number | null,
+"note": string | null,
+"plan_date": string,
+"plan_time": string | null,
+"poster": string | null,
+"prev_date": string | null,
+"prev_time": string | null,
+"source": string,
+"title": string,
+"tmdb_id": number,
+"wtw_have": number | null,
+"wtw_of": number | null
+            }
+                          SetofOptions: {
+        from: "*"
+        to: "watch_plans"
+        isOneToOne: true
+        isSetofReturn: false
+      } },
+"plan_label":
+{ Args: { "p_date": string,"p_time": string }; Returns: string
+                           },
+"plan_notify_yes":
+{ Args: { "p_actor": string,"p_plan": Database["public"]['Tables']["watch_plans"]['Row'],"p_sub": string,"p_title": string,"p_type": string }; Returns: undefined
+                           },
+"plan_propose":
+{ Args: { "p_conv": number,"p_date": string,"p_me": string,"p_note": string,"p_ref": Json,"p_source"?: string,"p_time": string,"p_wtw_have"?: number,"p_wtw_of"?: number }; Returns: Json
+                           },
+"plan_rsvp":
+{ Args: { "p_answer": string,"p_me": string,"p_plan": number }; Returns: string
+                           },
+"plan_seen":
+{ Args: { "p_me": string,"p_plan": number }; Returns: string
+                           },
+"plan_today":
+{ Args: Record<PropertyKey, never>; Returns: string
+                           },
+"plan_when_ok":
+{ Args: { "p_date": string,"p_time": string }; Returns: boolean
                            },
 "renumber_actor_favs":
 { Args: Record<PropertyKey, never>; Returns: undefined

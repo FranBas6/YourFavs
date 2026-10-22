@@ -45,6 +45,14 @@ export function sysParts(sys: MsgSys, me: string, name: Names): TextPart[] {
             return meToo ? [actor, { t: ' te ha quitado' }] : [actor, { t: ' ha quitado a ' }, ...joinNames(others)];
         case 'renamed':
             return byMe ? [{ t: `Has cambiado el nombre a ${quoted}` }] : [actor, { t: ` ha cambiado el nombre a ${quoted}` }];
+        case 'plan_changed':
+            return byMe
+                ? [{ t: 'Has cambiado el plan de ' }, { t: sys.title ?? '', b: true }, { t: ` al ${sys.when ?? ''}` }]
+                : [actor, { t: ' ha cambiado el plan de ' }, { t: sys.title ?? '', b: true }, { t: ` al ${sys.when ?? ''}` }];
+        case 'plan_cancelled':
+            return byMe
+                ? [{ t: 'Has cancelado el plan de ' }, { t: sys.title ?? '', b: true }]
+                : [actor, { t: ' ha cancelado el plan de ' }, { t: sys.title ?? '', b: true }];
         case 'admin':
             if (sys.inherited) return meToo ? [{ t: 'Ahora administras el grupo' }] : [{ t: 'Ahora ' }, ...joinNames(others), { t: ' administra el grupo' }];
             if (byMe) return [{ t: 'Has dado permisos de administración a ' }, ...joinNames(others)];
@@ -70,7 +78,10 @@ export function previewOf(m: ChatMessage | null, me: string, group: boolean, peo
     const sp = m.spoiler;
     const spoiler = sp ? `Spoiler de ${sp.title}${sp.season && sp.episode ? ` T${sp.season} E${sp.episode}` : ''}` : '';
     // Una tarjeta sin comentario: su título entre comillas («Tú: «Perfect Days»»).
-    const card = m.card ? (m.card.type === 'wtw' ? `¿Qué vemos? · ${m.card.ref.title}` : `«${m.card.ref.title}»`) : '';
+    const card = !m.card ? ''
+        : m.card.type === 'wtw' ? `¿Qué vemos? · ${m.card.ref.title}`
+        : m.card.type === 'plan' ? `Plan · ${m.card.ref.title}`
+        : `«${m.card.ref.title}»`;
     const body = spoiler || (m.body ?? '').replace(/\s+/g, ' ').trim() || card;
     if (m.author === me) return `Tú: ${body}`;
     return group ? `${firstName(name(m.author))}: ${body}` : body;
