@@ -14,7 +14,8 @@ import { dedupeFranchises } from '../services/API/shared/catalogRows';
  *   · Semillas: las de `genrePreferences` (favoritos, me gusta, onboarding, notas altas, vistas
  *     recientes), hasta SEED_LIMIT por tipo. Las primeras por peso y afinidad; las últimas
  *     (EXPLORE_SEEDS) reservadas a lo que MENOS se parece a tus géneros top, para que lo distinto
- *     que añades entre sí o sí. Como mucho 2 semillas con el mismo perfil de géneros.
+ *     que añades entre sí o sí (con EXPLORE_WEIGHT). Como mucho 2 semillas con el mismo perfil de
+ *     géneros, y en el resultado como mucho MAX_PER_SEED_IN_RESULT títulos de la misma.
  *   · Candidatos: /recommendations de cada semilla (hasta MAX_ITEMS_PER_SEED) + un discover por tus
  *     géneros top ordenado por popularidad con filtros de calidad, con la página rotada por día.
  *   · Rotación: entre los candidatos de cada semilla y en el orden final, un desempate que cambia
@@ -48,7 +49,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v10';    // v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
+const BLOB_KEY = 'personalRecs_v11';    // v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 const l1 = new Map<string, { data: PersonalRecResult; expires: number }>();
@@ -75,7 +76,18 @@ function serializeRecs(r: PersonalRecResult): SerializedRecs {
 
 const SEED_LIMIT = 10;
 /** De las SEED_LIMIT, cuántas se reservan a lo menos parecido a tus géneros top. */
-const EXPLORE_SEEDS = 3;
+const EXPLORE_SEEDS = 2;
+/**
+ * Lo que generan las semillas de variedad entra con este peso: tiene que aparecer, no subirse al podio
+ * (en prod, Sendokai y Los Simpson: la película ponían Los Proud y LA CQ en el top de series).
+ */
+const EXPLORE_WEIGHT = 0.7;
+/**
+ * Títulos de una misma semilla que caben en el resultado final; el resto baja al final de la lista.
+ * Ataque a los Titanes colocaba 6 series seguidas (TMDB infla las notas del anime), como pasaba en
+ * mayo con el anime deportivo. Es por semilla, no por género: a Memento le pasaría lo mismo.
+ */
+const MAX_PER_SEED_IN_RESULT = 3;
 /** Semillas con el mismo perfil de géneros que caben a la vez. */
 const MAX_SAME_PROFILE = 2;
 const RESULT_LIMIT = 24;
@@ -84,7 +96,7 @@ const MIN_VOTE_COUNT_MOVIE = 300;
 const MIN_VOTE_COUNT_TV = 150;
 // H: cap por seed → 1 seed nicho no puede monopolizar el pool con 10 recos cerradas.
 const MAX_ITEMS_PER_SEED_MOVIE = 5;
-const MAX_ITEMS_PER_SEED_TV = 6;
+const MAX_ITEMS_PER_SEED_TV = 5;
 /** Entre cuántos de los mejores de cada semilla se rota a diario. */
 const ROTATE_POOL = 10;
 /** Cuánto mueve la rotación diaria el orden final (sobre un score híbrido de ~3–8). */
@@ -221,14 +233,15 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
             .slice(0, ROTATE_POOL)
             .sort((a: any, b: any) => jitter(a.id) - jitter(b.id))
             .slice(0, perSeed);
+        const w = seed.explore ? seed.weight * EXPLORE_WEIGHT : seed.weight;
         for (const m of eligible) {
             const k = String(m.id);
             const cur = agg.get(k);
             if (cur) {
-                cur.score += seed.weight; cur.sources += 1;
-                if (seed.weight > (cur.seedWeight ?? 0)) { cur.seedId = seed.id; cur.seedWeight = seed.weight; }
+                cur.score += w; cur.sources += 1;
+                if (w > (cur.seedWeight ?? 0)) { cur.seedId = seed.id; cur.seedWeight = w; }
             } else {
-                agg.set(k, { item: m, score: seed.weight, sources: 1, seedId: seed.id, seedWeight: seed.weight });
+                agg.set(k, { item: m, score: w, sources: 1, seedId: seed.id, seedWeight: w });
             }
         }
     };
@@ -303,12 +316,24 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     // I: score híbrido. sources×1.5 + score×0.5 + (rating/10)×2, más el desempate del día.
     const hybridScore = (a: Agg) =>
         a.sources * 1.5 + a.score * 0.5 + ((a.item.vote_average ?? 0) / 10) * 2 + jitter(a.item.id) * DAILY_JITTER;
-    const sortAgg = (m: Map<string, Agg>, titles: Map<string, string>) => dedupeFranchises(Array.from(m.values())
+    /** Tope por semilla: los que sobran de una misma semilla pasan al final, en su orden. */
+    const capPerSeed = (list: Agg[]) => {
+        const seen = new Map<string, number>();
+        const head: Agg[] = [];
+        const tail: Agg[] = [];
+        for (const a of list) {
+            const n = a.seedId ? (seen.get(a.seedId) || 0) : 0;
+            if (a.seedId) seen.set(a.seedId, n + 1);
+            (n < MAX_PER_SEED_IN_RESULT ? head : tail).push(a);
+        }
+        return [...head, ...tail];
+    };
+    const sortAgg = (m: Map<string, Agg>, titles: Map<string, string>) => dedupeFranchises(capPerSeed(Array.from(m.values())
         .sort((a, b) =>
             hybridScore(b) - hybridScore(a) ||
             b.sources - a.sources ||
             (b.item.vote_average ?? 0) - (a.item.vote_average ?? 0)
-        )
+        ))
         .map(r => ({
             ...r.item,
             _recScore: r.score,
