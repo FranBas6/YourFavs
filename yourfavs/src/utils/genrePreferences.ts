@@ -88,7 +88,7 @@ type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'genrePrefs_v6';        // v6: semillas = favs + me gusta + onboarding + notas ≥ 8 + vistas recientes, con recencia; v5 exclusión = todas las listas
+const BLOB_KEY = 'genrePrefs_v7';        // v7: cupo de semillas por señal; v6: semillas = favs + me gusta + onboarding + notas ≥ 8 + vistas recientes, con recencia; v5 exclusión = todas las listas
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 const l1 = new Map<string, { data: GenrePrefs; expires: number }>();
@@ -125,8 +125,13 @@ const RECENCY_BONUS = 0.5;
 const RECENCY_DAYS = 365;
 const TASTE_GENRE_WEIGHT = 4;
 const TASTE_PRIOR_SHARE = 0.3;
-/** Semillas que se resuelven contra TMDB (una petición por título sin géneros guardados). */
-const MAX_SEEDS_RESOLVED = 40;
+/**
+ * Semillas que se resuelven contra TMDB (una petición por título sin géneros guardados), con cupo
+ * por señal: por peso a secas, 179 favoritas se comían los 40 huecos y Me gusta, las notas y las vistas
+ * recientes no llegaban ni a competir (visto en prod, 2026-10-27). Dentro de cada señal, las de más
+ * peso (= las más recientes); el onboarding entra entero (≤ 10).
+ */
+const SEED_QUOTA: Record<SeedWhy, number> = { fav: 20, like: 10, rated: 6, seen: 6, taste: 10 };
 const TOP_N_MOVIES = 5;
 const TOP_N_TV = 4;
 
@@ -261,8 +266,8 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const tasteMovies = tasteTitles.filter((t) => t.media_type === 'movie');
     const tasteTv = tasteTitles.filter((t) => t.media_type === 'tv');
 
-    // Semillas por tipo (ver cabecera). Solo las MAX_SEEDS_RESOLVED de más peso van a TMDB a por
-    // sus géneros: con bibliotecas grandes, el resto no iba a entrar de todos modos.
+    // Semillas por tipo (ver cabecera). Solo las del cupo de cada señal van a TMDB a por sus
+    // géneros: con bibliotecas grandes, el resto no iba a entrar de todos modos.
     const movieAllSeeds = collectSeeds({
         favs: movFavs, like: snap.movLike, seen: snap.movVistos, taste: tasteMovies,
         rated: rated('movie', [...movFavs, ...snap.movLike, ...snap.movVistos, ...snap.movPend, ...snap.movVerPronto]),
@@ -271,8 +276,12 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
         favs: tvFavs, like: snap.tvLike, seen: snap.tvVistos, taste: tasteTv,
         rated: rated('tv', [...tvFavs, ...snap.tvLike, ...snap.tvVistos, ...snap.tvSig, ...snap.tvPend, ...snap.tvVerPronto, ...snap.tvAbandonadas]),
     }, now);
-    const movieSeeds = movieAllSeeds.slice(0, MAX_SEEDS_RESOLVED);
-    const tvSeeds = tvAllSeeds.slice(0, MAX_SEEDS_RESOLVED);
+    const withQuota = (seeds: Seed[]) => {
+        const left = { ...SEED_QUOTA };
+        return seeds.filter((s) => left[s.why]-- > 0);
+    };
+    const movieSeeds = withQuota(movieAllSeeds);
+    const tvSeeds = withQuota(tvAllSeeds);
 
     // Exclusión de recomendaciones: TODO lo que el usuario ya tiene en cualquier
     // lista (fijas + colecciones) + las semillas. Esto solo evita recomendar lo ya guardado.
