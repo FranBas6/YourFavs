@@ -32,8 +32,9 @@ const l1 = new Map<string, { data: unknown[]; expires: number }>();
  * La clave es el título antes de los dos puntos, que es como TMDB nombra las sagas
  * («Vengadores: Endgame», «Spider-Man: No Way Home», «Gabriel's Inferno: Part II»). No pilla
  * «The Amazing Spider-Man» frente a «Spider-Man: …», pero sí el agrupamiento que se ve.
+ * También la usa «Para ti» (`personalRecommendations.ts`).
  */
-function dedupeFranchises<T extends { title?: string; name?: string }>(items: T[]): T[] {
+export function dedupeFranchises<T extends { title?: string; name?: string }>(items: T[]): T[] {
     const seen = new Set<string>();
     const out: T[] = [];
     for (const it of items) {

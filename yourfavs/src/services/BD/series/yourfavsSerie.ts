@@ -27,6 +27,17 @@ async function unlogEpisode(serieId: string, season: number, episode: number): P
 // Cualquier cambio de progreso cambia el resumen anual (episodios, heatmap, top series y
 // el mes a mes). Antes solo lo invalidaban las mutaciones de LISTAS, así que marcar un
 // episodio podía tardar hasta 1 h (el TTL) en verse en "Tu cine en números".
+/** Vacía las cachés de «Para ti» (semillas y resultado) de este usuario. */
+async function bustRecs(): Promise<void> {
+    try {
+        const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
+            import('../../../utils/genrePreferences'), import('../../../utils/personalRecommendations'),
+        ]);
+        invalidateGenrePreferencesCache();
+        invalidatePersonalRecsCache();
+    } catch { /* la caché caduca sola */ }
+}
+
 async function bustYearStats(): Promise<void> {
     try {
         const { invalidateYearStatsCache } = await import('../../../utils/yearStats');
@@ -68,6 +79,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             const { setRating } = await import('../lists/ratings');
             await setRating('tv', serieId, ratingNum);
         } catch { /* la nota inline ya está guardada */ }
+        await bustRecs(); // una nota ≥ 8 siembra «Para ti»
         return `/serie/${serieId}`;
     }
 
@@ -78,6 +90,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             const { deleteRating } = await import('../lists/ratings');
             await deleteRating('tv', serieId);
         } catch { /* ignore */ }
+        await bustRecs();
         return `/serie/${serieId}`;
     }
 

@@ -16,6 +16,17 @@ const LIST_TYPE_MAP: Record<string, string> = {
     'viendo': 'MoviesViendo',
 };
 
+/** Vacía las cachés de «Para ti» (semillas y resultado) de este usuario. */
+async function bustRecs(): Promise<void> {
+    try {
+        const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
+            import('../../../utils/genrePreferences'), import('../../../utils/personalRecommendations'),
+        ]);
+        invalidateGenrePreferencesCache();
+        invalidatePersonalRecsCache();
+    } catch { /* la caché caduca sola */ }
+}
+
 export async function handleMovieFavAction(formData: FormData): Promise<string> {
     const movieId = String(formData.get('id'));
     const action = String(formData.get('action'));
@@ -66,11 +77,13 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
             const { setRating } = await import('../lists/ratings');
             await setRating('movie', movieId, ratingNum);
         } catch { /* la nota inline ya está guardada */ }
+        await bustRecs(); // una nota ≥ 8 siembra «Para ti»
         return `/movie/${movieId}`;
     }
 
     if (action === 'delete_rating') {
         await updateExisting({ rating: null });
+        await bustRecs();
         try {
             const { deleteRating } = await import('../lists/ratings');
             await deleteRating('movie', movieId);

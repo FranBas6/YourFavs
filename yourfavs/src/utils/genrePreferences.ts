@@ -5,6 +5,8 @@ import { getCurrentUid } from '../services/BD/shared/userScope';
 import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import { getUserTaste } from '../services/BD/profile/userTaste';
 import { getCustomLists, getListItems } from '../services/BD/lists/customLists';
+import { listRatings } from '../services/BD/lists/ratings';
+import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
 // que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).
@@ -33,31 +35,51 @@ async function collectLibraryIds(): Promise<{ movies: Set<string>; tv: Set<strin
 }
 
 /**
- * Preferencias de género (Fase F · modelo simplificado).
+ * Preferencias de género y semillas del motor de recomendaciones.
  *
- * Las recomendaciones se construyen SOLO desde dos señales explícitas:
- *   1) los gustos del onboarding (taste: géneros + títulos), y
- *   2) los FAVORITOS de pelis y series.
- * Se dejaron de mezclar el resto de listas (me gusta, vistos, siguiendo,
- * pendientes, ver-pronto, alto-rating): "lo que sigo" ≠ "lo que le digo al
- * sistema que me gusta". Menos ruido, más fiel a la intención del usuario.
+ * Qué siembra (decisión de Fran, 2026-10-27, que amplía la fase F «solo favoritos + onboarding»;
+ * aquello dejaba fuera casi todo lo que el usuario añadía y «Para ti» no cambiaba nunca):
+ *   · Favoritos (peso 3) · Me gusta (2) · títulos del onboarding (2) · nota ≥ 8 en cualquier lista (2)
+ *   · Vistas de los últimos 90 días (1, decayendo hasta 0 al cumplir los 90).
+ *   Pendientes, Ver pronto y Siguiendo NO siembran: son intención, no gusto. Solo excluyen.
+ *   Lo reciente pesa más: cada semilla multiplica por hasta ×1.5 según lo nueva que sea (un favorito
+ *   de esta semana manda sobre uno de hace dos años). Un título en varias señales se queda con la mayor.
+ *
+ * Los géneros del onboarding son un PRIOR que se diluye: pesan 4 cada uno con la biblioteca vacía y,
+ * en cuanto hay semillas, como mucho el 30 % de su masa repartido entre ellos. Así mandan al empezar y
+ * ceden cuando ya hay datos (antes eran 4 fijos y con pocas listas tapaban cualquier cambio).
  *
  * Cachés keyed por uid (cierra la tarea #100): cada usuario tiene su propio
  * cómputo en L1 (memoria) y L2 (Netlify Blobs); sin esto el taste de uno se
  * filtraría a las recos de otro al compartir Lambda.
  */
+/** De dónde sale una semilla (para «porque te gustó X» y el panel de depuración). */
+export type SeedWhy = 'fav' | 'like' | 'taste' | 'rated' | 'seen';
+
+export interface Seed {
+    id: string;
+    /** Peso final, con el extra de recencia ya aplicado. */
+    weight: number;
+    why: SeedWhy;
+    /** Cuándo entró la señal (ms); 0 si no se sabe (títulos del onboarding). */
+    at: number;
+    title?: string;
+}
+
 export interface GenrePrefs {
     movies: { topGenres: number[]; weighted: Record<number, number> };
     tv: { topGenres: number[]; weighted: Record<number, number> };
     libraryIds: { movies: Set<string>; tv: Set<string> };
     genresById: { movies: Record<string, number[]>; tv: Record<string, number[]> };
-    /** Semillas (id → peso) ya listas para el motor; evita re-leer favs/taste. */
-    seeds: { movies: Array<[string, number]>; tv: Array<[string, number]> };
+    /** Títulos de las semillas resueltos junto a sus géneros (los docs no los guardan). */
+    titlesById: { movies: Record<string, string>; tv: Record<string, string> };
+    /** Semillas ya listas para el motor, de mayor a menor peso; evita re-leer la biblioteca. */
+    seeds: { movies: Seed[]; tv: Seed[] };
     /** Géneros explícitos del onboarding (para superficie/debug). */
     tasteGenres: number[];
     breakdown: {
-        movies: { favs: number; taste: number };
-        tv: { favs: number; taste: number };
+        movies: Record<SeedWhy, number>;
+        tv: Record<SeedWhy, number>;
     };
 }
 
@@ -66,7 +88,7 @@ type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'genrePrefs_v5';        // v5: exclusión = TODAS las listas (no solo favs); v4 favs+taste
+const BLOB_KEY = 'genrePrefs_v6';        // v6: semillas = favs + me gusta + onboarding + notas ≥ 8 + vistas recientes, con recencia; v5 exclusión = todas las listas
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 const l1 = new Map<string, { data: GenrePrefs; expires: number }>();
@@ -91,18 +113,59 @@ function serialize(p: GenrePrefs): SerializedGenrePrefs {
     };
 }
 
-const W_FAV = 2;            // un favorito
-const W_TASTE_TITLE = 2.5; // un título elegido en el onboarding (señal explícita) pesa algo más
-const TASTE_GENRE_WEIGHT = 4; // peso por género explícito del onboarding en el mapa ponderado
+const W_FAV = 3;
+const W_LIKE = 2;
+const W_TASTE_TITLE = 2;
+const W_RATED = 2;
+const W_SEEN = 1;
+const RATED_MIN = 8;
+const SEEN_WINDOW_DAYS = 90;
+/** Hasta ×1.5 para lo añadido hoy; sin extra a partir de un año. */
+const RECENCY_BONUS = 0.5;
+const RECENCY_DAYS = 365;
+const TASTE_GENRE_WEIGHT = 4;
+const TASTE_PRIOR_SHARE = 0.3;
+/** Semillas que se resuelven contra TMDB (una petición por título sin géneros guardados). */
+const MAX_SEEDS_RESOLVED = 40;
 const TOP_N_MOVIES = 5;
-const TOP_N_TV = 3;
+const TOP_N_TV = 4;
 
-function mergeMaxWeight(map: Map<string, number>, items: { id: string | number }[], weight: number) {
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Mete una señal en el mapa de semillas: si el título ya estaba, se queda la de mayor peso. */
+function mergeSignal(
+    map: Map<string, Seed>,
+    items: { id: string | number; added_at?: unknown; title?: string }[],
+    why: SeedWhy,
+    base: number,
+    now: number,
+    scale: (ageDays: number) => number = () => 1,
+) {
     for (const it of items) {
         const id = String(it.id);
-        const cur = map.get(id) ?? 0;
-        if (weight > cur) map.set(id, weight);
+        const at = getFirebaseTimestamp(it.added_at) || 0;
+        const ageDays = at ? Math.max(0, (now - at) / DAY_MS) : RECENCY_DAYS;
+        const s = scale(ageDays);
+        if (s <= 0) continue;
+        const weight = base * s * (1 + RECENCY_BONUS * Math.max(0, 1 - ageDays / RECENCY_DAYS));
+        const cur = map.get(id);
+        if (cur && cur.weight >= weight) continue;
+        map.set(id, { id, weight, why, at, ...(it.title ? { title: it.title } : {}) });
     }
+}
+
+/** Las semillas de un tipo: favoritos, me gusta, onboarding, notas altas y vistas recientes. */
+function collectSeeds(
+    lists: { favs: any[]; like: any[]; seen: any[]; rated: any[]; taste: { id: number; title: string }[] },
+    now: number,
+): Seed[] {
+    const map = new Map<string, Seed>();
+    mergeSignal(map, lists.favs, 'fav', W_FAV, now);
+    mergeSignal(map, lists.like, 'like', W_LIKE, now);
+    mergeSignal(map, lists.taste, 'taste', W_TASTE_TITLE, now);
+    mergeSignal(map, lists.rated, 'rated', W_RATED, now);
+    mergeSignal(map, lists.seen, 'seen', W_SEEN, now, (age) => Math.max(0, 1 - age / SEEN_WINDOW_DAYS));
+    return Array.from(map.values()).sort((a, b) => b.weight - a.weight);
 }
 
 /**
@@ -112,19 +175,20 @@ function mergeMaxWeight(map: Map<string, number>, items: { id: string | number }
  * (sus docs no guardan géneros). Esto recorta drásticamente las llamadas en frío.
  */
 async function resolveGenres(
-    entries: Array<[string, number]>,
+    seeds: Seed[],
     preGenres: Map<string, number[]>,
     mediaType: 'movie' | 'tv',
-): Promise<{ weight: number; genres: number[] }[]> {
+): Promise<{ weight: number; genres: number[]; title?: string }[]> {
     return processBatch(
-        entries,
-        async ([id, weight]: [string, number]) => {
-            const pre = preGenres.get(id);
-            if (pre && pre.length) return { weight, genres: pre };
+        seeds,
+        async (s: Seed) => {
+            const pre = preGenres.get(s.id);
+            if (pre && pre.length) return { weight: s.weight, genres: pre, title: s.title };
             try {
-                const d = await tmdbFetch<any>(`/${mediaType}/${id}`);
-                return { weight, genres: (d?.genres || []).map((g: any) => g.id as number) };
-            } catch { return { weight, genres: [] as number[] }; }
+                const d = await tmdbFetch<any>(`/${mediaType}/${s.id}`);
+                const title = s.title || (mediaType === 'movie' ? d?.title : d?.name) || undefined;
+                return { weight: s.weight, genres: (d?.genres || []).map((g: any) => g.id as number), title };
+            } catch { return { weight: s.weight, genres: [] as number[], title: s.title }; }
         },
         10
     );
@@ -149,8 +213,13 @@ function aggregateGenres(
     for (const e of entries) {
         for (const g of e.genres) weighted[g] = (weighted[g] || 0) + e.weight;
     }
-    // Inyectar los géneros explícitos del onboarding con peso fuerte → dominan topGenres.
-    for (const g of tasteGenres) weighted[g] = (weighted[g] || 0) + TASTE_GENRE_WEIGHT;
+    // El prior del onboarding: 4 por género con la biblioteca vacía; con semillas, como mucho el
+    // 30 % de su masa repartido entre los géneros elegidos (así se diluye conforme hay datos).
+    const mass = entries.reduce((sum, e) => sum + e.weight * e.genres.length, 0);
+    const prior = mass > 0 && tasteGenres.length
+        ? Math.min(TASTE_GENRE_WEIGHT, Math.max(1, (TASTE_PRIOR_SHARE * mass) / tasteGenres.length))
+        : TASTE_GENRE_WEIGHT;
+    for (const g of tasteGenres) weighted[g] = (weighted[g] || 0) + prior;
 
     const topGenres = Object.entries(weighted)
         .sort(([, a], [, b]) => b - a)
@@ -175,9 +244,15 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
         return data;
     }
 
-    const [{ movFavs, tvFavs }, taste] = await Promise.all([
-        getLibrarySnapshot(), getUserTaste(),
+    const [snap, taste, ratings] = await Promise.all([
+        getLibrarySnapshot(), getUserTaste(), listRatings().catch(() => []),
     ]);
+    const { movFavs, tvFavs } = snap;
+    // Las notas: el almacén canónico (`ratings`, con fecha) más las copiadas en las listas.
+    const rated = (kind: 'movie' | 'tv', docs: any[]) => [
+        ...ratings.filter((r) => r.media_type === kind && r.score >= RATED_MIN).map((r) => ({ id: r.tmdb_id, added_at: r.updated_at })),
+        ...docs.filter((d) => Number(d?.rating) >= RATED_MIN),
+    ];
     // Géneros del onboarding, ya partidos por tipo (F.7). Retrocompat: docs
     // pre-F.7 traen `genres` (IDs de cine) → alimentan cine; TV tira de favoritos.
     const movieTasteGenres = taste?.movieGenres ?? taste?.genres ?? [];
@@ -186,50 +261,62 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const tasteMovies = tasteTitles.filter((t) => t.media_type === 'movie');
     const tasteTv = tasteTitles.filter((t) => t.media_type === 'tv');
 
-    // Semillas: favoritos + títulos del onboarding (dedup por id, peso máximo).
-    const movieMap = new Map<string, number>();
-    mergeMaxWeight(movieMap, movFavs as any, W_FAV);
-    mergeMaxWeight(movieMap, tasteMovies, W_TASTE_TITLE);
-
-    const tvMap = new Map<string, number>();
-    mergeMaxWeight(tvMap, tvFavs as any, W_FAV);
-    mergeMaxWeight(tvMap, tasteTv, W_TASTE_TITLE);
-
-    const movieEntries = Array.from(movieMap.entries());
-    const tvEntries = Array.from(tvMap.entries());
+    // Semillas por tipo (ver cabecera). Solo las MAX_SEEDS_RESOLVED de más peso van a TMDB a por
+    // sus géneros: con bibliotecas grandes, el resto no iba a entrar de todos modos.
+    const movieAllSeeds = collectSeeds({
+        favs: movFavs, like: snap.movLike, seen: snap.movVistos, taste: tasteMovies,
+        rated: rated('movie', [...movFavs, ...snap.movLike, ...snap.movVistos, ...snap.movPend, ...snap.movVerPronto]),
+    }, now);
+    const tvAllSeeds = collectSeeds({
+        favs: tvFavs, like: snap.tvLike, seen: snap.tvVistos, taste: tasteTv,
+        rated: rated('tv', [...tvFavs, ...snap.tvLike, ...snap.tvVistos, ...snap.tvSig, ...snap.tvPend, ...snap.tvVerPronto, ...snap.tvAbandonadas]),
+    }, now);
+    const movieSeeds = movieAllSeeds.slice(0, MAX_SEEDS_RESOLVED);
+    const tvSeeds = tvAllSeeds.slice(0, MAX_SEEDS_RESOLVED);
 
     // Exclusión de recomendaciones: TODO lo que el usuario ya tiene en cualquier
-    // lista (fijas + colecciones) + las semillas. Los seeds (favs+taste) siguen
-    // alimentando la afinidad; esto solo evita recomendar lo ya guardado.
+    // lista (fijas + colecciones) + las semillas. Esto solo evita recomendar lo ya guardado.
     const libraryIds = await collectLibraryIds();
-    movieEntries.forEach(([id]) => libraryIds.movies.add(id));
-    tvEntries.forEach(([id]) => libraryIds.tv.add(id));
+    movieAllSeeds.forEach((s) => libraryIds.movies.add(s.id));
+    tvAllSeeds.forEach((s) => libraryIds.tv.add(s.id));
 
-    // Géneros ya guardados en los docs (pelis sí; series no → se pedirán a TMDB).
+    // Géneros ya guardados en los docs (hoy ninguno los trae; se piden a TMDB, y de paso el título).
     const movieDocGenres = docGenreMap(movFavs as any[]);
     const tvDocGenres = docGenreMap(tvFavs as any[]);
 
     const [movieDetails, tvDetails] = await Promise.all([
-        resolveGenres(movieEntries, movieDocGenres, 'movie'),
-        resolveGenres(tvEntries, tvDocGenres, 'tv'),
+        resolveGenres(movieSeeds, movieDocGenres, 'movie'),
+        resolveGenres(tvSeeds, tvDocGenres, 'tv'),
     ]);
 
     const movieGenresById: Record<string, number[]> = {};
-    movieEntries.forEach(([id], i) => { movieGenresById[id] = movieDetails[i]?.genres || []; });
+    const movieTitles: Record<string, string> = {};
+    movieSeeds.forEach((s, i) => {
+        movieGenresById[s.id] = movieDetails[i]?.genres || [];
+        if (movieDetails[i]?.title) movieTitles[s.id] = movieDetails[i].title!;
+    });
     const tvGenresById: Record<string, number[]> = {};
-    tvEntries.forEach(([id], i) => { tvGenresById[id] = tvDetails[i]?.genres || []; });
+    const tvTitles: Record<string, string> = {};
+    tvSeeds.forEach((s, i) => {
+        tvGenresById[s.id] = tvDetails[i]?.genres || [];
+        if (tvDetails[i]?.title) tvTitles[s.id] = tvDetails[i].title!;
+    });
+
+    const count = (seeds: Seed[]): Record<SeedWhy, number> => {
+        const c: Record<SeedWhy, number> = { fav: 0, like: 0, taste: 0, rated: 0, seen: 0 };
+        for (const s of seeds) c[s.why]++;
+        return c;
+    };
 
     const data: GenrePrefs = {
         movies: aggregateGenres(movieDetails, TOP_N_MOVIES, movieTasteGenres),
         tv: aggregateGenres(tvDetails, TOP_N_TV, tvTasteGenres),
         libraryIds,
         genresById: { movies: movieGenresById, tv: tvGenresById },
-        seeds: { movies: movieEntries, tv: tvEntries },
+        titlesById: { movies: movieTitles, tv: tvTitles },
+        seeds: { movies: movieSeeds, tv: tvSeeds },
         tasteGenres: movieTasteGenres,
-        breakdown: {
-            movies: { favs: movFavs.length, taste: tasteMovies.length },
-            tv: { favs: tvFavs.length, taste: tasteTv.length },
-        },
+        breakdown: { movies: count(movieAllSeeds), tv: count(tvAllSeeds) },
     };
 
     l1.set(uidKey, { data, expires: now + L1_TTL_MS });
