@@ -90,7 +90,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Recomendaciones</h1>
             <p class="text-gray-500 text-base">
                 {hasLibrary
-                    ? 'Calculadas a partir de los géneros que más aparecen en tu biblioteca'
+                    ? 'A partir de tus favoritos, lo que te gusta, tus notas altas y lo último que has visto. Cambian cada día.'
                     : 'Añade contenido a tu biblioteca para generar recomendaciones'}
             </p>
         </header>
@@ -108,19 +108,27 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
 
                 <div class="grid md:grid-cols-2 gap-4 mb-4">
                     <div class="bg-white rounded-lg p-3 border border-amber-200">
-                        <h3 class="font-semibold text-gray-800 mb-2">🎬 Películas — semillas (favs + onboarding)</h3>
+                        <h3 class="font-semibold text-gray-800 mb-2">🎬 Películas — señales (un título cuenta una vez, con la de más peso)</h3>
                         <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
-                            <li>Favoritos: <strong>{prefs.breakdown.movies.favs}</strong> (peso 2)</li>
-                            <li>Onboarding (títulos): <strong>{prefs.breakdown.movies.taste}</strong> (peso 2.5)</li>
+                            <li>Favoritos: <strong>{prefs.breakdown.movies.fav}</strong> (peso 3)</li>
+                            <li>Me gusta: <strong>{prefs.breakdown.movies.like}</strong> (peso 2)</li>
+                            <li>Onboarding (títulos): <strong>{prefs.breakdown.movies.taste}</strong> (peso 2)</li>
+                            <li>Nota ≥ 8: <strong>{prefs.breakdown.movies.rated}</strong> (peso 2)</li>
+                            <li>Vistas en 90 días: <strong>{prefs.breakdown.movies.seen}</strong> (peso 1, decayendo)</li>
+                            <li class="text-gray-500">Lo reciente pesa hasta ×1.5 · semillas resueltas: <strong>{prefs.seeds.movies.length}</strong></li>
                             <li class="pt-1 border-t border-gray-200 mt-1">Únicos en map: <strong>{prefs.libraryIds.movies.size}</strong></li>
                         </ul>
                     </div>
                     <div class="bg-white rounded-lg p-3 border border-amber-200">
-                        <h3 class="font-semibold text-gray-800 mb-2">📺 Series — semillas (favs + onboarding)</h3>
+                        <h3 class="font-semibold text-gray-800 mb-2">📺 Series — señales (un título cuenta una vez, con la de más peso)</h3>
                         <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
-                            <li>Favoritos: <strong>{prefs.breakdown.tv.favs}</strong> (peso 2)</li>
-                            <li>Onboarding (títulos): <strong>{prefs.breakdown.tv.taste}</strong> (peso 2.5)</li>
-                            <li>Géneros del onboarding: <strong>{prefs.tasteGenres.length}</strong> (peso 4 c/u)</li>
+                            <li>Favoritos: <strong>{prefs.breakdown.tv.fav}</strong> (peso 3)</li>
+                            <li>Me gusta: <strong>{prefs.breakdown.tv.like}</strong> (peso 2)</li>
+                            <li>Onboarding (títulos): <strong>{prefs.breakdown.tv.taste}</strong> (peso 2)</li>
+                            <li>Nota ≥ 8: <strong>{prefs.breakdown.tv.rated}</strong> (peso 2)</li>
+                            <li>Vistas en 90 días: <strong>{prefs.breakdown.tv.seen}</strong> (peso 1, decayendo)</li>
+                            <li class="text-gray-500">Lo reciente pesa hasta ×1.5 · semillas resueltas: <strong>{prefs.seeds.tv.length}</strong></li>
+                            <li>Géneros del onboarding: <strong>{prefs.tasteGenres.length}</strong> (prior: 4 c/u sin biblioteca; luego ≤ 30 % de la masa)</li>
                             <li class="pt-1 border-t border-gray-200 mt-1">Únicos en map: <strong>{prefs.libraryIds.tv.size}</strong></li>
                         </ul>
                     </div>
@@ -156,12 +164,12 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                 {recs && (
                     <div class="grid md:grid-cols-2 gap-4 mb-4">
                         <div class="bg-white rounded-lg p-3 border border-amber-200">
-                            <h3 class="font-semibold text-gray-800 mb-2">🎬 Seeds (después filtro afinidad)</h3>
-                            <p class="text-xs text-amber-700 mb-1 font-mono">Filtro afinidad: {recs.filterStats.movies.kept}/{recs.filterStats.movies.total} · diversificados: {recs.filterStats.movies.diversified}</p>
+                            <h3 class="font-semibold text-gray-800 mb-2">🎬 Semillas elegidas</h3>
+                            <p class="text-xs text-amber-700 mb-1 font-mono">{recs.filterStats.movies.kept} de {recs.filterStats.movies.total} · por la cuota de variedad: {recs.filterStats.movies.diversified}</p>
                             <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
                                 {recs.seedsMovies.map((s: any) => (
                                     <li>
-                                        · <strong>{s.title || `id ${s.id}`}</strong> <span class="text-gray-400">(peso {s.weight.toFixed(1)})</span><br/>
+                                        · <strong>{s.title || `id ${s.id}`}</strong> <span class="text-gray-400">(peso {s.weight.toFixed(1)} · {s.why}{s.explore ? ' · variedad' : ''})</span><br/>
                                         <span class="text-gray-500 ml-3">[{(s.genres || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
                                     </li>
                                 ))}
@@ -169,12 +177,12 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                             </ul>
                         </div>
                         <div class="bg-white rounded-lg p-3 border border-amber-200">
-                            <h3 class="font-semibold text-gray-800 mb-2">📺 Seeds (después filtro afinidad)</h3>
-                            <p class="text-xs text-amber-700 mb-1 font-mono">Filtro afinidad: {recs.filterStats.tv.kept}/{recs.filterStats.tv.total} · diversificados: {recs.filterStats.tv.diversified}</p>
+                            <h3 class="font-semibold text-gray-800 mb-2">📺 Semillas elegidas</h3>
+                            <p class="text-xs text-amber-700 mb-1 font-mono">{recs.filterStats.tv.kept} de {recs.filterStats.tv.total} · por la cuota de variedad: {recs.filterStats.tv.diversified}</p>
                             <ul class="text-xs text-gray-700 space-y-0.5 font-mono">
                                 {recs.seedsTv.map((s: any) => (
                                     <li>
-                                        · <strong>{s.title || `id ${s.id}`}</strong> <span class="text-gray-400">(peso {s.weight.toFixed(1)})</span><br/>
+                                        · <strong>{s.title || `id ${s.id}`}</strong> <span class="text-gray-400">(peso {s.weight.toFixed(1)} · {s.why}{s.explore ? ' · variedad' : ''})</span><br/>
                                         <span class="text-gray-500 ml-3">[{(s.genres || []).map((g: number) => getGenreName(g)).join(', ')}]</span>
                                     </li>
                                 ))}
@@ -212,7 +220,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                 )}
 
                 <p class="text-xs text-amber-800 mt-3">
-                    💡 Feed unificado: <strong>recommendations por seed</strong> (sources ≥ 1) mezclado con <strong>discover endurecido</strong> como booster suave (+0.5 score, sources = 0). Items solo-discover quedan abajo; seeds reales dominan el top.
+                    💡 Feed unificado: <strong>recommendations por semilla</strong> (sources ≥ 1; de las 10 mejores de cada una, 5–6 distintas cada día) mezclado con <strong>discover por tus géneros</strong> (popularidad, página rotada por día) como booster suave (+0.5 score, sources = 0). El orden final lleva un desempate diario: mañana cambia.
                 </p>
             </div>
         )}
@@ -261,7 +269,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
                             Series para ti
-                            <span class="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">favoritos + tus géneros</span>
+                            <span class="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">lo que te gusta + tus géneros</span>
                             <span class="text-sm font-normal text-gray-400">({seriesRecomendadas.length})</span>
                         </h2>
 
@@ -293,7 +301,7 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
                         <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
                             <span class="w-1 h-6 bg-red-500 rounded-full"></span>
                             Películas para ti
-                            <span class="text-xs font-normal text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">favoritos + tus géneros</span>
+                            <span class="text-xs font-normal text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">lo que te gusta + tus géneros</span>
                             <span class="text-sm font-normal text-gray-400">({peliculasRecomendadas.length})</span>
                         </h2>
 
