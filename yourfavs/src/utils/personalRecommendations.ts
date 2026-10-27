@@ -49,7 +49,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v11';    // v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
+const BLOB_KEY = 'personalRecs_v12';    // v12: 2 huecos principales para señales que no sean favorito y peso mínimo en variedad; v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 const l1 = new Map<string, { data: PersonalRecResult; expires: number }>();
@@ -90,6 +90,14 @@ const EXPLORE_WEIGHT = 0.7;
 const MAX_PER_SEED_IN_RESULT = 3;
 /** Semillas con el mismo perfil de géneros que caben a la vez. */
 const MAX_SAME_PROFILE = 2;
+/**
+ * De las semillas principales, cuántas se reservan a señales que NO sean favorito (Me gusta, nota,
+ * vista reciente) cuando las haya: con 179 favoritas a peso 3 × recencia, un Me gusta (2) nunca
+ * llegaba a las principales y «le doy a Me gusta a algo nuevo» no se notaba (prod, 2026-10-27).
+ */
+const NON_FAV_CORE = 2;
+/** Peso mínimo para entrar por variedad: lo distinto sí, pero algo marcado, no un resto casi caducado. */
+const EXPLORE_MIN_WEIGHT = 2;
 const RESULT_LIMIT = 24;
 // E: filtro vote_count mínimo para cortar nicho obscuro (pelis más exigente que series).
 const MIN_VOTE_COUNT_MOVIE = 300;
@@ -154,13 +162,18 @@ function pickSeeds(scored: Scored[], limit: number): SeedInfo[] {
         out.push({ id: x.seed.id, weight: x.seed.weight, title: x.seed.title, genres: x.genres, why: x.seed.why, ...(explore ? { explore: true } : {}) });
     };
     const core = Math.max(1, limit - EXPLORE_SEEDS);
+    const fits = (x: Scored) => x.genres.length > 0 && (perProfile.get(profileKey(x.genres)) || 0) < MAX_SAME_PROFILE;
+    // Primero, las que no son favorito (hasta NON_FAV_CORE); luego el resto por puntuación.
+    for (const x of byScore) {
+        if (out.length >= Math.min(core, NON_FAV_CORE)) break;
+        if (x.seed.why !== 'fav' && x.seed.weight >= EXPLORE_MIN_WEIGHT && fits(x)) take(x, false);
+    }
     for (const x of byScore) {
         if (out.length >= core) break;
-        if (!x.genres.length || (perProfile.get(profileKey(x.genres)) || 0) >= MAX_SAME_PROFILE) continue;
-        take(x, false);
+        if (!used.has(x.seed.id) && fits(x)) take(x, false);
     }
-    // Variedad: de lo que queda, lo menos afín primero (solo con géneros conocidos).
-    const rest = byScore.filter((x) => !used.has(x.seed.id) && x.genres.length);
+    // Variedad: de lo que queda con peso suficiente, lo menos afín primero (solo con géneros conocidos).
+    const rest = byScore.filter((x) => !used.has(x.seed.id) && x.genres.length && x.seed.weight >= EXPLORE_MIN_WEIGHT);
     const explore = [...rest].sort((a, b) => a.affinity - b.affinity || b.seed.weight - a.seed.weight);
     for (const x of explore) {
         if (out.length >= limit) break;
