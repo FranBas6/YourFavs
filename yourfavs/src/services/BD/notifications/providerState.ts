@@ -25,13 +25,19 @@ export interface ProviderState {
     version?: number;                               // conjunto de listas vigiladas; si cambia → re-siembra en silencio
     day: string;                                    // "YYYY-MM-DD" (Madrid) en que se capturó
     map: Record<string, ProviderSnapEntry>;         // key "movie:123" → entrada
+    /**
+     * Títulos que faltaron en la ÚLTIMA comparación pero siguen en `map` a la espera de confirmarse
+     * (key → día en que faltaron). Los datos de plataformas de TMDB dan bandazos; «salió» solo se
+     * avisa si falta dos veces seguidas (N4, 2026-10-28).
+     */
+    pending?: Record<string, string>;
 }
 
 export async function readProviderState(): Promise<ProviderState | null> {
     try {
         const d = await readUserState<any>('notif_provider_state');
         if (!d) return null;
-        return { version: d?.version, day: d?.day || '', map: d?.map || {} };
+        return { version: d?.version, day: d?.day || '', map: d?.map || {}, pending: d?.pending || {} };
     } catch {
         return null;
     }

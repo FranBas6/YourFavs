@@ -41,7 +41,7 @@ const DAY_TTL_MS = 18 * 60 * 60 * 1000;
 const briefL1 = new Map<string, { data: DailyBrief; expires: number }>();
 const platformsL1 = new Map<string, { data: PendienteOnPlatform[]; expires: number }>();
 
-const MAX_PENDIENTES_CHECKED = 30;
+const MAX_PENDIENTES_CHECKED = 60; // N3 (2026-10-28): 30 dejaba fuera media watchlist
 const MAX_FAVLIKE_CHECKED = 40;
 
 export interface PendienteOnPlatform {

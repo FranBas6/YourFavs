@@ -26,6 +26,23 @@ const TTL_MS = 6 * 60 * 60 * 1000;
 // de las personas que sigue un usuario a otro. Clave = uid de la sesión.
 const memCache = new Map<string, { data: PersonUpcoming[]; expires: number }>();
 
+/**
+ * Ruido de los créditos que no es un estreno de verdad (N4, 2026-10-28): galas, especiales,
+ * documentales, programas de entrevistas o realities en los que la persona sale «como ella misma»,
+ * y vídeos directos sin póster. La campana avisaba de «Disney Legends Awards Ceremony» o
+ * «Euphoria: A Look Back» como si fueran estrenos.
+ */
+const NOISE_GENRES = new Set([99, 10763, 10764, 10767]); // documental, noticias, reality, entrevistas
+const NOISE_TITLE = /\b(awards?|ceremony|gala|a look back|behind the scenes|making of|red carpet|special|especial)\b/i;
+const SELF = /\b(self|himself|herself|themselves|narrator|host|presenter|voice of self)\b/i;
+function isNoise(c: any): boolean {
+    if (c.video || !c.poster_path) return true;
+    if ((c.genre_ids || []).some((g: number) => NOISE_GENRES.has(g))) return true;
+    if (c.character && SELF.test(String(c.character))) return true;
+    const title = c.media_type === 'movie' ? c.title : c.name;
+    return NOISE_TITLE.test(String(title || ''));
+}
+
 export function invalidateUpcomingPeopleCache() {
     const uid = getCurrentUid();
     if (uid) memCache.delete(uid); else memCache.clear();
@@ -54,6 +71,7 @@ export async function getUpcomingFromFollowedPeople(): Promise<PersonUpcoming[]>
             for (const c of [...(credits?.cast || []), ...(credits?.crew || [])]) {
                 const date: string | undefined = c.media_type === 'movie' ? c.release_date : c.first_air_date;
                 if (!date || date <= today) continue;
+                if (isNoise(c)) continue;
                 out.push({
                     person_id: person.id,
                     person_name: person.name,

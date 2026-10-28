@@ -11,6 +11,11 @@
  * El "cambio de plataforma" (entró/salió) también es on-open: NO usa cron. Compara el
  * estado de HOY contra un snapshot por usuario (providerState) y materializa solo los
  * cambios. Ver platformChangeItems() más abajo.
+ *
+ * 2026-10-28 (N1/N2/N4, tras meses de campana casi muda): los episodios avisan EL DÍA que salen,
+ * hay aviso de temporada nueva para toda serie de tus listas, lo marcado con «Avisarme» en una
+ * ficha avisa de verdad (cines, digital, plataforma), los estrenos de quien sigues avisan también el
+ * día del estreno, y «cambió de plataforma» ignora los bandazos (ver `titleSignals.ts`).
  */
 import { getRadar } from '../shared/radar';
 import { anniversarySignal, getLibraryOnMyPlatforms, type LibraryOrigin } from '../shared/dailyBrief';
@@ -22,10 +27,14 @@ import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getWatchStreak } from '../../BD/series/yourfavsSerie';
 import { readProviderState, writeProviderState, type ProviderSnapEntry } from '../../BD/notifications/providerState';
 import { appDateParts } from '../../../utils/appTime';
+import { seriesSignals, subscribedMovieSignals, watchlistMovieSignals } from './titleSignals';
+import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
 
 // type de notificación → clave del toggle en el perfil (UserProfile.notifPrefs)
 const TYPE_TO_PREF: Record<NotifType, string> = {
     new_episode: 'episodes',
+    new_season: 'episodes',
+    premiere: 'releases',
     on_platform: 'platform',
     person_release: 'releases',
     anniversary: 'anniversary',
@@ -82,21 +91,41 @@ export async function syncNotifications(platforms: number[] = [], force = false)
 
     const items: NotifInput[] = [];
 
+    // Episodios (el día que salen) y temporadas nuevas. Lo suscrito con «Avisarme» llega aunque el
+    // interruptor de series esté apagado: lo pediste título a título.
+    try {
+        for (const { always, ...it } of await seriesSignals()) {
+            if (always || enabled(it.type)) items.push(it);
+        }
+    } catch (error) {
+        console.error('[notifications] series:', (error as Error).message);
+    }
+
+    // Películas con «Avisarme»: cines, digital, plataforma. Siempre (lo pediste tú).
+    try {
+        items.push(...await subscribedMovieSignals(platforms));
+    } catch (error) {
+        console.error('[notifications] subs:', (error as Error).message);
+    }
+
+    // Películas de Ver pronto y Pendientes (N3): estrenos con el interruptor de estrenos, «ya en
+    // plataforma» con el de plataformas.
+    try {
+        for (const { always, ...it } of await watchlistMovieSignals(platforms)) {
+            if (always || enabled(it.type)) items.push(it);
+        }
+    } catch (error) {
+        console.error('[notifications] watchlist:', (error as Error).message);
+    }
+
     try {
         const radar = await getRadar(platforms);
         for (const g of radar.groups) {
             for (const it of g.items) {
-                if (g.key === 'episodes' && enabled('new_episode')) {
-                    const epTag = it.meta.split(' · ')[0]; // "T2·E55" (estable por episodio)
-                    items.push({
-                        id: safeId(`episode:${it.tmdb_id}:${epTag}`),
-                        type: 'new_episode', title: it.title, subtitle: it.meta,
-                        href: it.href, poster_path: it.poster_path,
-                    });
-                // NB: el grupo 'platforms' (pendientes ya streameables) NO se materializa
-                // desde el radar: sin diff volcaría toda la watchlist. Lo cubre
-                // platformChangeItems() abajo, que solo emite los que ENTRARON/SALIERON.
-                } else if (g.key === 'people' && enabled('person_release')) {
+                // NB: ni 'episodes' (ahora en `seriesSignals`, el día que salen) ni 'platforms'
+                // (sin diff volcaría toda la watchlist; lo cubre platformChangeItems()) se
+                // materializan desde el radar: solo el anuncio de los estrenos de quien sigues.
+                if (g.key === 'people' && enabled('person_release')) {
                     items.push({
                         id: safeId(`release:${it.media_type}:${it.tmdb_id}`),
                         type: 'person_release', title: it.title, subtitle: it.meta,
@@ -107,6 +136,29 @@ export async function syncNotifications(platforms: number[] = [], force = false)
         }
     } catch (error) {
         console.error('[notifications] radar:', (error as Error).message);
+    }
+
+    // Estrenos de quien sigues, EL DÍA del estreno (el anuncio de arriba llega hasta 90 días antes).
+    if (enabled('premiere')) {
+        try {
+            const todayNum = appDateParts(Date.now()).dayNum;
+            for (const u of await getUpcomingFromFollowedPeople()) {
+                const diff = appDateParts(new Date(u.release_date + 'T12:00:00').getTime()).dayNum - todayNum;
+                if (diff > 0 || diff < -2) continue;
+                const names = u.person_names?.length ? u.person_names : [u.person_name];
+                const who = names.length > 1 ? `${names[0]} y ${names.length - 1} más` : names[0];
+                const when = diff === 0 ? 'hoy' : diff === -1 ? 'ayer' : 'hace 2 días';
+                items.push({
+                    id: safeId(`premiere:${u.media_type}:${u.tmdb_id}`),
+                    type: 'premiere', title: u.title,
+                    subtitle: u.media_type === 'movie' ? `${who} · en cines desde ${when}` : `${who} · se estrenó ${when}`,
+                    href: u.media_type === 'movie' ? `/movie/${u.tmdb_id}` : `/serie/${u.tmdb_id}`,
+                    poster_path: u.poster_path,
+                });
+            }
+        } catch (error) {
+            console.error('[notifications] premiere:', (error as Error).message);
+        }
     }
 
     if (enabled('anniversary')) {
@@ -175,8 +227,9 @@ export async function syncNotifications(platforms: number[] = [], force = false)
  * nueva, que es lo que pasa si comparas contra una memoria que no la conocía).
  *   v1: Pendientes + Ver pronto.
  *   v2: + Favoritos + Me gusta.
+ *   v3: mismo conjunto; cambia la forma (`pending`) y los ids pasan a llevar el mes.
  */
-const PROVIDER_STATE_VERSION = 2;
+const PROVIDER_STATE_VERSION = 3;
 
 // Copy según de qué lista viene el título (fav/like/watchlist).
 function enteredSubtitle(provider: string, origin: LibraryOrigin | undefined): string {
@@ -199,6 +252,10 @@ function leftSubtitle(provider: string, origin: LibraryOrigin | undefined): stri
  * · Ya procesado hoy (snapshot.day === day) → no re-diffea (idempotente entre instancias).
  * · "Salió" solo se emite si el título SIGUE en tu biblioteca (Pendientes/Ver pronto/Favs/
  *   Me gusta). Si ya no está en ninguna, lo quitaste tú → no es "salió".
+ * · Bandazos (N4): los datos de plataformas de TMDB van y vienen de un día a otro. «Salió» solo se
+ *   avisa si el título falta DOS comparaciones seguidas (`pending`); si vuelve entre medias, nada.
+ *   Y los ids llevan el mes (`platform:in:movie:123:2026-10`): como mucho un aviso al mes por
+ *   título y sentido, en vez de uno nuevo cada día que oscile.
  * · El copy distingue "tu favorito" / "te gustó" / "de tu lista" según el origin.
  * · Sin plataformas seleccionadas → función desactivada (no toca el snapshot).
  */
@@ -227,13 +284,17 @@ async function platformChangeItems(platforms: number[], day: string): Promise<No
     const items: NotifInput[] = [];
     const hrefFor = (e: ProviderSnapEntry, id: string) =>
         e.media_type === 'movie' ? `/movie/${id}` : `/serie/${id}`;
+    const month = day.slice(0, 7);
+    const prevPending = prev.pending ?? {};
+    const pending: Record<string, string> = {};
 
-    // ENTRÓ: está en hoy y no estaba en el snapshot previo.
+    // ENTRÓ: está en hoy y no estaba en el snapshot previo (si estaba a la espera de confirmar su
+    // salida, es un bandazo: vuelve sin aviso).
     for (const [key, e] of Object.entries(hoy)) {
         if (key in prev.map) continue;
         const id = key.split(':')[1];
         items.push({
-            id: safeId(`platform:in:${key}:${day}`),
+            id: safeId(`platform:in:${key}:${month}`),
             type: 'platform_change',
             title: e.title,
             subtitle: enteredSubtitle(e.name, e.origin),
@@ -244,7 +305,14 @@ async function platformChangeItems(platforms: number[], day: string): Promise<No
 
     // SALIÓ: estaba en el snapshot previo, ya no está en hoy, PERO sigue en tu biblioteca
     // (Pendientes/Ver pronto/Favoritos/Me gusta). Si ya no está, lo quitaste tú → no es "salió".
-    const leftKeys = Object.keys(prev.map).filter((k) => !(k in hoy));
+    // La primera vez que falta solo se anota (`pending`) y se conserva en el mapa; se avisa a la segunda.
+    const missing = Object.keys(prev.map).filter((k) => !(k in hoy));
+    const leftKeys = missing.filter((k) => k in prevPending);
+    for (const k of missing) {
+        if (k in prevPending) continue;
+        pending[k] = day;
+        hoy[k] = prev.map[k];
+    }
     if (leftKeys.length) {
         let stillMine: Set<string>;
         try {
@@ -260,7 +328,7 @@ async function platformChangeItems(platforms: number[], day: string): Promise<No
             const e = prev.map[key];
             const id = key.split(':')[1];
             items.push({
-                id: safeId(`platform:out:${key}:${day}`),
+                id: safeId(`platform:out:${key}:${month}`),
                 type: 'platform_change',
                 title: e.title,
                 subtitle: leftSubtitle(e.name, e.origin),
@@ -270,7 +338,7 @@ async function platformChangeItems(platforms: number[], day: string): Promise<No
         }
     }
 
-    await writeProviderState({ version: PROVIDER_STATE_VERSION, day, map: hoy });
+    await writeProviderState({ version: PROVIDER_STATE_VERSION, day, map: hoy, pending });
     return items;
 }
 

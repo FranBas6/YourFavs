@@ -265,6 +265,8 @@ export function personRowHtml(p: PersonCard, rel: Relation, o: RowOpts): string 
 // -------------------------------------------------------------------------------------
 const NOTIF_STAMP: Record<string, [StampColor, string]> = {
     new_episode: ['blue', 'tv'],
+    new_season: ['blue', 'tv'],
+    premiere: ['red', 'ticket'],
     person_release: ['red', 'clapperboard'],
     anniversary: ['purple', 'calendar-days'],
     on_platform: ['green', 'popcorn'],
