@@ -1,0 +1,74 @@
+---
+/**
+ * Una fila de `/mislistas/recomendaciones` (C, 2026-10-28): cabecera de sección y carril horizontal
+ * con las cards de siempre (`CardMovie` / `CardSerie` con su vista previa al pasar el ratón).
+ *
+ * Mezcla películas y series en el mismo carril; el filtro Todo · Series · Películas ya llega aplicado.
+ * Con menos de MIN_ITEMS no se pinta: una fila de dos pósters se lee como un error.
+ */
+import SectionHeader from '../SectionHeader.astro';
+import HoverPreview from '../HoverPreview.astro';
+import CardMovie from '../Cards/CardMovie.astro';
+import CardSerie from '../Cards/CardSerie.astro';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import { getGenreName } from '../../utils/constants/genres';
+import '../../styles/components/reco-row.css';
+
+export interface RecoRowItem {
+    kind: 'movie' | 'tv';
+    item: any;
+}
+
+interface Props {
+    title: string;
+    icon: string;
+    color?: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
+    subtitle?: string;
+    why?: string;
+    items: RecoRowItem[];
+    /** Episodios vistos por serie, para la barra de progreso de `CardSerie`. */
+    watched?: Record<string, { watched: number }>;
+    /** «Porque viste X» en cada card (solo en las filas que mezclan semillas). */
+    showSeed?: boolean;
+    headingId: string;
+}
+
+const MIN_ITEMS = 4;
+const { title, icon, color = 'slate', subtitle, why, items, watched = {}, showSeed = false, headingId } = Astro.props;
+const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }));
+---
+{items.length >= MIN_ITEMS && (
+    <section class="yf-row rr" aria-labelledby={headingId}>
+        <SectionHeader title={title} icon={icon} color={color} subtitle={subtitle} why={why} count={items.length} headingId={headingId} />
+        <div class="rr-lane">
+            {items.map(({ kind, item }) => (
+                <div class="rr-card">
+                    {kind === 'movie' ? (
+                        <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0, 4)} rating={item.vote_average}><CardMovie
+                            id={String(item.id)}
+                            img={posterUrl(item.poster_path) || '/placeholder.jpg'}
+                            title={item.title}
+                            vote_average={item.vote_average}
+                            overview={item.overview}
+                            release_date={item.release_date}
+                            genres={genresOf(item)}
+                            seedTitle={showSeed ? item._recSeedTitle : undefined}
+                        /></HoverPreview>
+                    ) : (
+                        <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0, 4)} rating={item.vote_average}><CardSerie
+                            id={String(item.id)}
+                            img={posterUrl(item.poster_path) || '/placeholder.jpg'}
+                            name={item.name}
+                            vote_average={item.vote_average}
+                            overview={item.overview}
+                            first_air_date={item.first_air_date}
+                            genres={genresOf(item)}
+                            watchedEpisodes={watched[String(item.id)]?.watched}
+                            seedTitle={showSeed ? item._recSeedTitle : undefined}
+                        /></HoverPreview>
+                    )}
+                </div>
+            ))}
+        </div>
+    </section>
+)}
