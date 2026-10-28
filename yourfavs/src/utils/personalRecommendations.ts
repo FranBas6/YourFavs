@@ -21,6 +21,10 @@ import { dedupeFranchises } from '../services/API/shared/catalogRows';
  *   · Rotación: entre los candidatos de cada semilla y en el orden final, un desempate que cambia
  *     cada día (uid + fecha). Mismo día, mismo resultado; mañana, caras nuevas. La caché lleva el
  *     día en la clave.
+ *   · Filas (C, 2026-10-28): además del feed mezclado (`movies`/`tv`, que es lo que pinta la portada),
+ *     `rows` guarda lo que cada semilla dio (hasta ROW_PER_SEED, para «Porque te gustó X»), el discover
+ *     («Más de tus géneros») y las tendencias de la semana sin lo que ya tienes. Viajan en la misma
+ *     caché: la página de recomendaciones no hace ninguna llamada más.
  */
 export interface SeedInfo {
     id: string;
@@ -32,9 +36,23 @@ export interface SeedInfo {
     explore?: boolean;
 }
 
+/** Lo que dio una semilla, para su fila «Porque te gustó X». */
+export interface SeedRow {
+    seed: SeedInfo;
+    items: any[];
+}
+
+/** Material de las filas de `/mislistas/recomendaciones`, por tipo. */
+export interface RecRows {
+    seeds: SeedRow[];
+    genres: any[];
+    trending: any[];
+}
+
 export interface PersonalRecResult {
     movies: any[];
     tv: any[];
+    rows: { movies: RecRows; tv: RecRows };
     seedsMovies: SeedInfo[];
     seedsTv: SeedInfo[];
     libraryIds: { movies: Set<string>; tv: Set<string> };
@@ -49,7 +67,7 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v12';    // v12: 2 huecos principales para señales que no sean favorito y peso mínimo en variedad; v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
+const BLOB_KEY = 'personalRecs_v13';    // v13: `rows` para las filas por motivo; v12: 2 huecos principales para señales que no sean favorito y peso mínimo en variedad; v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 const l1 = new Map<string, { data: PersonalRecResult; expires: number }>();
@@ -111,6 +129,17 @@ const ROTATE_POOL = 10;
 const DAILY_JITTER = 0.6;
 /** Páginas del discover por las que se rota. */
 const DISCOVER_PAGES = 3;
+/** Títulos que se guardan por semilla para su fila (de los ROTATE_POOL mejores, en el orden del día). */
+const ROW_PER_SEED = 10;
+/** Títulos de «Más de tus géneros» y «Tendencias» que se guardan por tipo. */
+const ROW_LIMIT = 14;
+
+/** Solo lo que pintan las cards: la caché de las filas no carga con el resto de la respuesta de TMDB. */
+const slim = (m: any) => ({
+    id: m.id, title: m.title, name: m.name, poster_path: m.poster_path, backdrop_path: m.backdrop_path,
+    vote_average: m.vote_average, vote_count: m.vote_count, overview: m.overview,
+    release_date: m.release_date, first_air_date: m.first_air_date, genre_ids: m.genre_ids,
+});
 
 /** Hash estable [0, 1) de una cadena (FNV-1a), para la rotación diaria. */
 function hash01(str: string): number {
@@ -187,18 +216,11 @@ function pickSeeds(scored: Scored[], limit: number): SeedInfo[] {
     return out;
 }
 
-/** Cuando no hay semillas ni género (usuario sin favs ni onboarding): tendencias. */
-async function trendingFallback(
-    mediaType: 'movie' | 'tv',
-    libIds: Set<string>,
-    minVotes: number,
-): Promise<any[]> {
-    const list = await getTrending<any>(mediaType, 'week').catch(() => [] as any[]);
+/** Tendencias de la semana sin lo que ya tienes, de mejor a peor nota. */
+function trendingMinusLibrary(list: any[], libIds: Set<string>, minVotes: number): any[] {
     return list
         .filter((m) => !libIds.has(String(m.id)) && (m.vote_count ?? 0) >= minVotes)
-        .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
-        .slice(0, RESULT_LIMIT)
-        .map((m) => ({ ...m, _recScore: 0, _recSources: 0, _fallback: true }));
+        .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0));
 }
 
 export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
@@ -236,16 +258,21 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const movieAgg = new Map<string, Agg>();
     const tvAgg = new Map<string, Agg>();
 
+    const movieSeedRows: SeedRow[] = [];
+    const tvSeedRows: SeedRow[] = [];
     const collect = (
         agg: Map<string, Agg>, seed: SeedInfo, results: any[], libIds: Set<string>, minVotes: number, perSeed: number,
+        rows: SeedRow[],
     ) => {
-        // Los ROTATE_POOL mejores por nota y, de ellos, perSeed distintos cada día.
-        const eligible = results
+        // Los ROTATE_POOL mejores por nota, en el orden del día: los perSeed primeros van al feed y
+        // hasta ROW_PER_SEED a la fila de la semilla.
+        const pool = results
             .filter((m: any) => !libIds.has(String(m.id)) && (m.vote_count ?? 0) >= minVotes)
             .sort((a: any, b: any) => (b.vote_average ?? 0) - (a.vote_average ?? 0))
             .slice(0, ROTATE_POOL)
-            .sort((a: any, b: any) => jitter(a.id) - jitter(b.id))
-            .slice(0, perSeed);
+            .sort((a: any, b: any) => jitter(a.id) - jitter(b.id));
+        if (pool.length) rows.push({ seed, items: pool.slice(0, ROW_PER_SEED).map(slim) });
+        const eligible = pool.slice(0, perSeed);
         const w = seed.explore ? seed.weight * EXPLORE_WEIGHT : seed.weight;
         for (const m of eligible) {
             const k = String(m.id);
@@ -259,11 +286,12 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         }
     };
 
-    // Discover por géneros top: popularidad con filtros de calidad y página rotada por día. Corre
-    // EN PARALELO con las recommendations de las semillas.
+    // Discover por tus DOS géneros principales a la vez (coma = «y» en TMDB): con todos los top en
+    // «o» (`|`) y por popularidad salía casi lo más visto en general. Calidad mínima y página rotada
+    // por día. Corre EN PARALELO con las recommendations de las semillas.
     const discoverPage = String(1 + Math.floor(hash01(`${salt}:discover`) * DISCOVER_PAGES));
-    const movieGenresParam = prefs.movies.topGenres.join('|');
-    const tvGenresParam = prefs.tv.topGenres.join('|');
+    const movieGenresParam = prefs.movies.topGenres.slice(0, 2).join(',');
+    const tvGenresParam = prefs.tv.topGenres.slice(0, 2).join(',');
     const discoverMoviePromise = movieGenresParam
         ? tmdbFetchList<any>('/discover/movie', {
             with_genres: movieGenresParam,
@@ -285,21 +313,23 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
         }).catch(() => [] as any[])
         : Promise.resolve([] as any[]);
 
-    const [, , discoverMoviesList, discoverTvList] = await Promise.all([
+    const [, , discoverMoviesList, discoverTvList, trendingMoviesList, trendingTvList] = await Promise.all([
         processBatch(movieSeeds, async (seed: SeedInfo) => {
             try {
                 const r = await tmdbFetch<any>(`/movie/${seed.id}/recommendations`);
-                collect(movieAgg, seed, r?.results || [], prefs.libraryIds.movies, MIN_VOTE_COUNT_MOVIE, MAX_ITEMS_PER_SEED_MOVIE);
+                collect(movieAgg, seed, r?.results || [], prefs.libraryIds.movies, MIN_VOTE_COUNT_MOVIE, MAX_ITEMS_PER_SEED_MOVIE, movieSeedRows);
             } catch {}
         }, 8),
         processBatch(tvSeeds, async (seed: SeedInfo) => {
             try {
                 const r = await tmdbFetch<any>(`/tv/${seed.id}/recommendations`);
-                collect(tvAgg, seed, r?.results || [], prefs.libraryIds.tv, MIN_VOTE_COUNT_TV, MAX_ITEMS_PER_SEED_TV);
+                collect(tvAgg, seed, r?.results || [], prefs.libraryIds.tv, MIN_VOTE_COUNT_TV, MAX_ITEMS_PER_SEED_TV, tvSeedRows);
             } catch {}
         }, 8),
         discoverMoviePromise,
         discoverTvPromise,
+        getTrending<any>('movie', 'week').catch(() => [] as any[]),
+        getTrending<any>('tv', 'week').catch(() => [] as any[]),
     ]);
 
     // Booster conservador: candidatos solo-discover entran con score bajo; los que coinciden
@@ -360,12 +390,38 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
 
     // Fallback: sin semillas ni género (usuario nuevo sin favs ni onboarding) el pool queda
     // vacío → mostramos tendencias en vez de un hueco. También cubre cobertura parcial.
-    if (movies.length === 0) movies = await trendingFallback('movie', prefs.libraryIds.movies, MIN_VOTE_COUNT_MOVIE);
-    if (tv.length === 0) tv = await trendingFallback('tv', prefs.libraryIds.tv, MIN_VOTE_COUNT_TV);
+    const trendingMovies = trendingMinusLibrary(trendingMoviesList, prefs.libraryIds.movies, MIN_VOTE_COUNT_MOVIE);
+    const trendingTv = trendingMinusLibrary(trendingTvList, prefs.libraryIds.tv, MIN_VOTE_COUNT_TV);
+    const asFallback = (list: any[]) => list.slice(0, RESULT_LIMIT).map((m) => ({ ...m, _recScore: 0, _recSources: 0, _fallback: true }));
+    if (movies.length === 0) movies = asFallback(trendingMovies);
+    if (tv.length === 0) tv = asFallback(trendingTv);
+
+    // Filas: las semillas en el orden en que se eligieron (peso + afinidad, variedad al final).
+    const seedOrder = (seeds: SeedInfo[]) => new Map(seeds.map((x, i) => [x.id, i]));
+    const byPick = (rows: SeedRow[], seeds: SeedInfo[]) => {
+        const order = seedOrder(seeds);
+        return rows.sort((a, b) => (order.get(a.seed.id) ?? 99) - (order.get(b.seed.id) ?? 99));
+    };
+    const genreRow = (list: any[], libIds: Set<string>, minVotes: number) => dedupeFranchises(list
+        .filter((m) => !libIds.has(String(m.id)) && (m.vote_count ?? 0) >= minVotes))
+        .slice(0, ROW_LIMIT).map(slim);
+    const rows = {
+        movies: {
+            seeds: byPick(movieSeedRows, movieSeeds),
+            genres: genreRow(discoverMoviesList, prefs.libraryIds.movies, MIN_VOTE_COUNT_MOVIE),
+            trending: dedupeFranchises(trendingMovies).slice(0, ROW_LIMIT).map(slim),
+        },
+        tv: {
+            seeds: byPick(tvSeedRows, tvSeeds),
+            genres: genreRow(discoverTvList, prefs.libraryIds.tv, MIN_VOTE_COUNT_TV),
+            trending: dedupeFranchises(trendingTv).slice(0, ROW_LIMIT).map(slim),
+        },
+    };
 
     const data: PersonalRecResult = {
         movies,
         tv,
+        rows,
         seedsMovies: movieSeeds,
         seedsTv: tvSeeds,
         libraryIds: prefs.libraryIds,

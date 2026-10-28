@@ -1,17 +1,15 @@
 ---
 import Layout from "../../layouts/Layout.astro"
-import CardMovie from "../../components/Cards/CardMovie.astro";
-import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getWatchedProgressBatch } from "../../services/BD/series/yourfavsSerie";
 import { calculateGenrePreferences } from "../../utils/genrePreferences";
 import { getPersonalRecommendations } from "../../utils/personalRecommendations";
 import { getGenreName } from "../../utils/constants/genres";
-import { posterUrl } from "../../services/API/shared/tmdbClient";
 import { safeFetch } from "../../utils/safeFetch";
 import { withTimeout, isTimeout } from "../../utils/withTimeout";
 import PersonalNav from "../../components/personal/PersonalNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
+import RecoRow, { type RecoRowItem } from "../../components/personal/RecoRow.astro";
+import type { SeedInfo } from "../../utils/personalRecommendations";
 import '../../styles/pages/personal/personal.css';
 
 const debug = Astro.url.searchParams.get("debug") === "1";
@@ -46,7 +44,13 @@ try {
 
 const seriesRecomendadas = recs?.tv ?? [];
 const peliculasRecomendadas = recs?.movies ?? [];
-const allSeriesIdsForWatched = seriesRecomendadas.map((s: any) => String(s.id));
+// Todas las series que pueden salir en alguna fila (la barra de progreso de CardSerie).
+const allSeriesIdsForWatched = Array.from(new Set([
+    ...seriesRecomendadas,
+    ...(recs?.rows?.tv.seeds.flatMap((r) => r.items) ?? []),
+    ...(recs?.rows?.tv.genres ?? []),
+    ...(recs?.rows?.tv.trending ?? []),
+].map((s: any) => String(s.id))));
 const watchedMap = await safeFetch(
     getWatchedProgressBatch(allSeriesIdsForWatched),
     'personal/recomendaciones/watchedMap',
@@ -59,6 +63,83 @@ const showMovies = filter === "peliculas" || filter === "todos";
 const totalRecs = seriesRecomendadas.length + peliculasRecomendadas.length;
 const hasLibrary = !!prefs && (prefs.libraryIds.movies.size + prefs.libraryIds.tv.size) > 0;
 const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres.length) > 0;
+
+/*
+ * Filas por motivo (C, 2026-10-28), en carrusel: «Para ti hoy» (el feed mezclado), una por semilla
+ * («Porque te gustó X»), «Fuera de tu zona» (las semillas de variedad), «Más de tus géneros» (el
+ * discover) y «Tendencias que no tienes». Todo sale de la misma caché del motor. Un título sale solo
+ * en la PRIMERA fila que lo enseña, y el filtro Todo · Series · Películas se aplica a todas.
+ */
+type Kind = 'movie' | 'tv';
+const shownKind = (kind: Kind) => (kind === 'movie' ? showMovies : showSeries);
+const tag = (kind: Kind, list: any[] = []): RecoRowItem[] => (shownKind(kind) ? list.map((item) => ({ kind, item })) : []);
+/** Película, serie, película…: con el filtro en «Todo» ninguna fila es solo de un tipo. */
+function interleave(a: RecoRowItem[], b: RecoRowItem[]): RecoRowItem[] {
+    const out: RecoRowItem[] = [];
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+        if (a[i]) out.push(a[i]);
+        if (b[i]) out.push(b[i]);
+    }
+    return out;
+}
+const shown = new Set<string>();
+/** Quita lo que ya salió en una fila anterior y, si la fila se queda, lo marca como enseñado. */
+function claim(list: RecoRowItem[], max: number, min = 4): RecoRowItem[] {
+    const fresh = list.filter(({ kind, item }) => !shown.has(`${kind}:${item.id}`)).slice(0, max);
+    if (fresh.length >= min) fresh.forEach(({ kind, item }) => shown.add(`${kind}:${item.id}`));
+    return fresh.length >= min ? fresh : [];
+}
+
+const rowsData = recs?.rows;
+const forYouToday = claim(interleave(tag('movie', peliculasRecomendadas), tag('tv', seriesRecomendadas)), 12);
+
+// «Porque te gustó X»: las semillas principales (sin las de variedad), alternando tipo. Con el filtro en
+// «Todo», 2 de cada; con un solo tipo, 4.
+const SEED_WHY: Record<string, { lead: string; chip: string }> = {
+    fav: { lead: 'Porque te encantó', chip: 'en tus favoritas' },
+    like: { lead: 'Porque te gustó', chip: 'en Me gusta' },
+    rated: { lead: 'Por tu buena nota a', chip: 'tu nota' },
+    seen: { lead: 'Porque has visto', chip: 'vista hace poco' },
+    taste: { lead: 'Porque elegiste', chip: 'en tus gustos' },
+};
+const perKind = showMovies && showSeries ? 2 : 4;
+const seedRowsOf = (kind: Kind) => (shownKind(kind) ? (kind === 'movie' ? rowsData?.movies.seeds : rowsData?.tv.seeds) ?? [] : [])
+    .filter((r) => !r.seed.explore && r.seed.title);
+const movieSeedRows = seedRowsOf('movie');
+const tvSeedRows = seedRowsOf('tv');
+const seedRows: { seed: SeedInfo; kind: Kind; items: RecoRowItem[] }[] = [];
+{
+    let m = 0, t = 0, mi = 0, ti = 0;
+    while ((m < perKind && mi < movieSeedRows.length) || (t < perKind && ti < tvSeedRows.length)) {
+        for (const kind of ['movie', 'tv'] as Kind[]) {
+            const pool = kind === 'movie' ? movieSeedRows : tvSeedRows;
+            while (kind === 'movie' ? (m < perKind && mi < pool.length) : (t < perKind && ti < pool.length)) {
+                const r = pool[kind === 'movie' ? mi++ : ti++];
+                const items = claim(tag(kind, r.items), 10);
+                if (!items.length) continue;
+                seedRows.push({ seed: r.seed, kind, items });
+                if (kind === 'movie') m++; else t++;
+                break;
+            }
+        }
+    }
+}
+
+// «Fuera de tu zona»: lo que dieron las semillas de variedad, con su «Porque viste X» en cada card.
+const exploreOf = (kind: Kind) => tag(kind, ((kind === 'movie' ? rowsData?.movies.seeds : rowsData?.tv.seeds) ?? [])
+    .filter((r) => r.seed.explore)
+    .flatMap((r) => r.items.slice(0, 5).map((it: any) => ({ ...it, _recSeedTitle: r.seed.title }))));
+const outsideZone = claim(interleave(exploreOf('movie'), exploreOf('tv')), 12);
+
+const moreGenres = claim(interleave(tag('movie', rowsData?.movies.genres), tag('tv', rowsData?.tv.genres)), 14);
+// El chip dice qué dos géneros a la vez se han pedido (el motor usa los dos principales de cada tipo).
+const pairOf = (ids: number[] = []) => ids.slice(0, 2).map((id) => getGenreName(id)).filter(Boolean).join(' + ');
+const genreChip = Array.from(new Set([
+    ...(showMovies ? [pairOf(prefs?.movies.topGenres)] : []),
+    ...(showSeries ? [pairOf(prefs?.tv.topGenres)] : []),
+].filter(Boolean))).join(' · ');
+const trendingRow = claim(interleave(tag('movie', rowsData?.movies.trending), tag('tv', rowsData?.tv.trending)), 14);
+const anyRow = forYouToday.length + seedRows.length + outsideZone.length + moreGenres.length + trendingRow.length > 0;
 ---
 <Layout title="Recomendaciones">
     {isWarming && (
@@ -262,71 +343,62 @@ const hasGenres = !!prefs && (prefs.movies.topGenres.length + prefs.tv.topGenres
             </EmptyState>
         )}
 
-        {hasLibrary && (
-            <div class="space-y-10">
-                {showSeries && (
-                    <section id="series-section" class="scroll-mt-20">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                            Series para ti
-                            <span class="text-xs font-normal text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">lo que te gusta + tus géneros</span>
-                            <span class="text-sm font-normal text-gray-400">({seriesRecomendadas.length})</span>
-                        </h2>
+        {hasLibrary && !anyRow && (
+            <EmptyState size="sm" title="Sin recomendaciones por ahora" description="Quizá ya lo tienes todo en tu biblioteca, o aún no hay datos suficientes. Marca algo en Favoritos o Me gusta y vuelve mañana." />
+        )}
 
-                        {seriesRecomendadas.length === 0 && (
-                            <EmptyState size="sm" title="Sin recomendaciones de series" description="Quizá ya las tienes todas en tu biblioteca, o aún no hay datos suficientes para identificar tus géneros favoritos." />
-                        )}
-                        {seriesRecomendadas.length > 0 && (
-                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                {seriesRecomendadas.map((item: any) => (
-                                    <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
-                                        id={item.id.toString()}
-                                        img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                        name={item.name}
-                                        vote_average={item.vote_average}
-                                        overview={item.overview}
-                                        first_air_date={item.first_air_date}
-                                        genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
-                                        watchedEpisodes={watchedMap[String(item.id)]?.watched}
-                                        seedTitle={item._recSeedTitle}
-                                    /></HoverPreview>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {showMovies && (
-                    <section id="movies-section" class="scroll-mt-20">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                            Películas para ti
-                            <span class="text-xs font-normal text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">lo que te gusta + tus géneros</span>
-                            <span class="text-sm font-normal text-gray-400">({peliculasRecomendadas.length})</span>
-                        </h2>
-
-                        {peliculasRecomendadas.length === 0 && (
-                            <EmptyState size="sm" title="Sin recomendaciones de películas" description="Quizá ya las tienes todas en tu biblioteca, o aún no hay datos suficientes para identificar tus géneros favoritos." />
-                        )}
-                        {peliculasRecomendadas.length > 0 && (
-                            <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                                {peliculasRecomendadas.map((item: any) => (
-                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
-                                        id={item.id.toString()}
-                                        img={posterUrl(item.poster_path) || "/placeholder.jpg"}
-                                        title={item.title}
-                                        vote_average={item.vote_average}
-                                        overview={item.overview}
-                                        release_date={item.release_date}
-                                        genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
-                                        seedTitle={item._recSeedTitle}
-                                    /></HoverPreview>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-
+        {hasLibrary && anyRow && (
+            <div class="rr-stack">
+                <RecoRow
+                    headingId="rr-hoy"
+                    title="Para ti hoy"
+                    subtitle="Lo mejor de todo lo de abajo. Cambia cada día."
+                    icon="sparkles"
+                    color="amber"
+                    items={forYouToday}
+                    watched={watchedMap}
+                    showSeed
+                />
+                {seedRows.map((r, i) => (
+                    <RecoRow
+                        headingId={`rr-seed-${i}`}
+                        title={`${SEED_WHY[r.seed.why ?? 'fav']?.lead ?? 'Porque te gustó'} ${r.seed.title}`}
+                        why={SEED_WHY[r.seed.why ?? 'fav']?.chip}
+                        icon={r.kind === 'movie' ? 'clapperboard' : 'tv'}
+                        color={r.kind === 'movie' ? 'red' : 'blue'}
+                        items={r.items}
+                        watched={watchedMap}
+                    />
+                ))}
+                <RecoRow
+                    headingId="rr-fuera"
+                    title="Fuera de tu zona"
+                    subtitle="Sale de lo que menos se parece a lo de siempre en tus listas."
+                    icon="compass"
+                    color="purple"
+                    items={outsideZone}
+                    watched={watchedMap}
+                    showSeed
+                />
+                <RecoRow
+                    headingId="rr-generos"
+                    title="Más de tus géneros"
+                    subtitle="Lo más visto ahora que junta tus dos géneros más repetidos."
+                    why={genreChip || undefined}
+                    icon="shapes"
+                    color="green"
+                    items={moreGenres}
+                    watched={watchedMap}
+                />
+                <RecoRow
+                    headingId="rr-tendencias"
+                    title="Tendencias que no tienes"
+                    subtitle="Lo más visto esta semana que aún no está en ninguna de tus listas."
+                    icon="trending-up"
+                    color="pink"
+                    items={trendingRow}
+                    watched={watchedMap}
+                />
             </div>
         )}
         </>)}

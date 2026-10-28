@@ -1,0 +1,32 @@
+/* =====================================================================================
+   Filas de `/mislistas/recomendaciones` (components/personal/RecoRow.astro).
+   Carril horizontal con snap, como «Lo que ven tus amigos» (social-row.css), pero con las cards
+   grandes del catálogo. Solo tokens: el tema oscuro sale solo.
+   ===================================================================================== */
+
+.rr + .rr { margin-top: var(--s-8, 48px); }
+@media (max-width: 768px) { .rr + .rr { margin-top: var(--s-7, 36px); } }
+
+.rr-lane {
+    display: flex; gap: 16px; overflow-x: auto; padding: 4px 4px 12px;
+    scroll-snap-type: x mandatory; scroll-padding-left: 4px;
+    scrollbar-width: thin; scrollbar-color: var(--border-strong) var(--bg-tint);
+    overscroll-behavior-x: contain;
+}
+.rr-lane::-webkit-scrollbar { height: 8px; }
+.rr-lane::-webkit-scrollbar-track { background: var(--bg-tint); border-radius: 4px; }
+.rr-lane::-webkit-scrollbar-thumb { background-color: var(--border-strong); border-radius: 4px; }
+
+/* Ancho fijo: el carril enseña 5–6 en escritorio y deja asomar la siguiente en móvil. */
+.rr-card { flex: 0 0 196px; min-width: 0; scroll-snap-align: start; display: flex; }
+.rr-card > * { width: 100%; }
+@media (max-width: 768px) {
+    .rr-lane { gap: 12px; }
+    .rr-card { flex-basis: 156px; }
+}
+/* En móvil el carril sangra hasta el borde de la pantalla (como los de la portada): 14px es el
+   margen de la página ahí (10.5 del <main> + 3.5 de la sección). */
+@media (max-width: 640px) {
+    .rr-lane { margin: 0 -14px; padding-left: 14px; padding-right: 14px; scroll-padding-left: 14px; }
+    .rr-card { flex-basis: 146px; }
+}
