@@ -2,6 +2,7 @@
 import '../../styles/components/cards.css';
 import {formatCardDate, getRatingColor, isRecentRelease} from "../../utils/constants/helpers/card-helpers";
 import { formatScore } from "../../utils/constants/helpers/media-helpers";
+import { episodeTypeTag } from "../../utils/episodeType";
 
 interface Props {
     id: string;
@@ -79,7 +80,8 @@ if (followed && next_episode_to_air?.air_date) {
     const days = Math.round((air.getTime() - today.getTime()) / 86400000);
     if (days >= 0 && days <= COUNTDOWN_MAX_DAYS) {
         countdownLabel = days === 0 ? '● HOY' : days === 1 ? '● MAÑANA' : `● EN ${days} DÍAS`;
-        nextEpTag = `PRÓXIMO · T${next_episode_to_air.season_number}·E${next_episode_to_air.episode_number}`;
+        const finaleTag = episodeTypeTag(next_episode_to_air.episode_type); // B2b: «· FINAL» / «· PARÓN»
+        nextEpTag = `PRÓXIMO · T${next_episode_to_air.season_number}·E${next_episode_to_air.episode_number}${finaleTag ? ` · ${finaleTag}` : ''}`;
     }
 }
 ---

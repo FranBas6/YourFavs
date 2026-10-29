@@ -31,7 +31,8 @@ export async function getAllSeasonProviders(
     seasons: number[],
 ): Promise<SeasonProviderMap> {
     if (seasons.length === 0) return {};
-    const key = `wp_v1_tv_${serieId}`;
+    // v2 (B4b): los proveedores incluyen también «gratis» y «con anuncios»; las entradas v1 no los traían.
+    const key = `wp_v2_tv_${serieId}`;
 
     const hot = mem.get(key);
     if (hot && hot.expires > Date.now()) return hot.data;

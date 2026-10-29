@@ -158,11 +158,35 @@ export interface MovieBundle {
     videos: any[];
     /** Pósters en el idioma del perfil o sin idioma, `file_path` como URL original (sin recortar). */
     posters: PosterImage[];
+    /** B4a: fondos (backdrops) con el mismo filtro de idioma, ≤ 20, URL original. */
+    backdrops: PosterImage[];
     logo: string | null;
     additionalInfo: Record<string, any>;
     externalIds: any;
     reviews: { results: any[] };
     keywords: { id: number; name: string }[];
+    /** B3: estrenos en el país del perfil (cines, digital…), el primero de cada tipo, por fecha. */
+    regionReleases: RegionRelease[];
+}
+
+/** Tipos de `release_dates` de TMDB. */
+export type ReleaseType = 1 | 2 | 3 | 4 | 5 | 6;
+export interface RegionRelease { type: ReleaseType; date: string; note: string | null }
+
+/**
+ * Estrenos de una película en un país: el primero de cada tipo (1 premiere, 2 cines limitado, 3 cines,
+ * 4 digital, 5 físico, 6 TV), ordenados por fecha. `note` es lo que TMDB apunta (festival, «reestreno»…).
+ */
+export function releasesInRegion(releaseDates: any, region: string): RegionRelease[] {
+    const country = (releaseDates?.results || []).find((r: any) => r.iso_3166_1 === region);
+    const firstByType = new Map<number, RegionRelease>();
+    for (const r of country?.release_dates || []) {
+        const date = String(r.release_date || '').slice(0, 10);
+        if (!date || ![1, 2, 3, 4, 5, 6].includes(r.type)) continue;
+        const prev = firstByType.get(r.type);
+        if (!prev || date < prev.date) firstByType.set(r.type, { type: r.type, date, note: r.note?.trim() || null });
+    }
+    return [...firstByType.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
@@ -183,7 +207,7 @@ export async function getMovieBundle(movieId: string | number): Promise<MovieBun
     const own = getCurrentLanguage().slice(0, 2);
     let data: any;
     let enReviews: { results?: any[] };
-    let images: { posters?: TMDBPosterImage[]; logos?: any[] };
+    let images: { posters?: TMDBPosterImage[]; backdrops?: TMDBPosterImage[]; logos?: any[] };
     try {
         [data, enReviews, images] = await Promise.all([
             tmdbFetch<any>(`/movie/${movieId}`, {
@@ -230,11 +254,16 @@ export async function getMovieBundle(movieId: string | number): Promise<MovieBun
         posters: (images.posters || [])
             .filter((poster) => poster.iso_639_1 === own || poster.iso_639_1 === null)
             .map((poster) => ({ ...poster, file_path: originalUrl(poster.file_path) })),
+        backdrops: (images.backdrops || [])
+            .filter((b) => b.iso_639_1 === own || b.iso_639_1 === null)
+            .slice(0, 20)
+            .map((b) => ({ ...b, file_path: originalUrl(b.file_path) })),
         logo: pickTitleLogo(images?.logos),
         additionalInfo: buildAdditionalInfo('movie', { ...detail, release_dates }, keywords?.keywords),
         externalIds: external_ids || {},
         reviews: mergeReviews(reviews?.results, enReviews.results),
         keywords: keywordList,
+        regionReleases: releasesInRegion(release_dates, getCurrentRegion()),
     };
 }
 

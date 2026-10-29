@@ -52,11 +52,14 @@ function toItem(raw: any): MultiSearchItem | null {
     if (!title) return null;
 
     if (type === 'person') {
+        // B5: «Conocido por» — TMDB manda en `known_for` sus títulos más conocidos (ya en tu idioma).
+        const knownFor = (raw.known_for || []).map((k: any) => k.title || k.name).filter(Boolean).slice(0, 2).join(', ');
+        const dept = DEPARTMENT_ES[raw.known_for_department] || raw.known_for_department || 'Persona';
         return {
             id: raw.id,
             media_type: 'person',
             title,
-            subtitle: DEPARTMENT_ES[raw.known_for_department] || raw.known_for_department || 'Persona',
+            subtitle: knownFor ? `${dept} · ${knownFor}` : dept,
             image: raw.profile_path ? posterUrl(raw.profile_path, 'w92') : null,
             poster_path: raw.profile_path ?? null,
             rating: null,

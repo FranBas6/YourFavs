@@ -20,6 +20,7 @@
 import { tmdbFetch } from '../shared/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts } from '../../../utils/appTime';
+import { episodeTypeLabel } from '../../../utils/episodeType';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
 import { getCurrentRegion } from '../../BD/shared/userScope';
@@ -104,9 +105,10 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
                 const diff = daysFromToday(ep.air_date);
                 if (diff > 0 || diff < -GRACE_DAYS) continue;
                 const tag = `T${ep.season_number}·E${ep.episode_number}`;
+                const kind = episodeTypeLabel(ep.episode_type); // B2b: final de temporada / parón
                 items.push({
                     id: `episode:${id}:${tag}`, type: 'new_episode', title: d.name,
-                    subtitle: `${tag} · ${sinceLabel(ep.air_date)}`, href, poster_path: d.poster_path ?? null, always,
+                    subtitle: `${tag}${kind ? ` · ${kind}` : ''} · ${sinceLabel(ep.air_date)}`, href, poster_path: d.poster_path ?? null, always,
                 });
             }
         }
