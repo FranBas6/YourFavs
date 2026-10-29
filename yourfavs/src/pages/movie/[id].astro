@@ -15,6 +15,8 @@ import {
 } from "../../services/API/Movies/InfoMovies";
 import { peekTopActors } from "../../utils/topActorsLibrary";
 import { posterUrl, backdropUrl, originalUrl } from "../../services/API/shared/tmdbClient";
+import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
+import { getCurrentRegion } from "../../services/BD/shared/userScope";
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
@@ -216,7 +218,25 @@ const seenWithMap = _topActors ? new Map(_topActors.map((a) => [a.id, a.appearan
 
 const movieKeywords: { id: number; name: string }[] = additionalInfo.keywords || [];
 const movieLanguages: { iso_639_1: string; name: string }[] = additionalInfo.languages || [];
-const movieStatus = item?.status && item.status !== 'Released' ? item.status : null;
+// B3: el estado en español (solo se enseña si no está estrenada).
+const MOVIE_STATUS_LABEL: Record<string, string> = {
+    Rumored: 'Rumoreada', Planned: 'Anunciada', 'In Production': 'En producción',
+    'Post Production': 'Posproducción', Canceled: 'Cancelada',
+};
+const movieStatus = item?.status && item.status !== 'Released' ? (MOVIE_STATUS_LABEL[item.status] ?? item.status) : null;
+
+// B3: estrenos en el país del perfil (ya llegan en el paquete). La fila «Estreno» de arriba es la fecha
+// mundial de TMDB; aquí van cines, digital, físico… del país, cada uno con su fecha.
+const RELEASE_TYPE_LABEL: Record<number, string> = {
+    1: 'Premiere', 2: 'Cines (limitado)', 3: 'Cines', 4: 'Digital', 5: 'Físico', 6: 'Televisión',
+};
+const regionCode = getCurrentRegion();
+const regionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === regionCode)?.label ?? regionCode;
+const regionReleases = (bundle?.regionReleases ?? []).map((r) => ({
+    label: RELEASE_TYPE_LABEL[r.type],
+    date: new Date(r.date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }),
+    note: r.type === 1 ? r.note : null,
+}));
 
 // Reviews de TMDB (top 5 con contenido)
 const reviews = (reviewsData.results || [])
@@ -233,7 +253,8 @@ const yearsAgo = releaseYear ? new Date().getFullYear() - releaseYear : null;
 // Nota comparativa: percentil respecto a recomendaciones + similares
 const allRelated = moviesRecommendations.filter((m: any) => m.vote_average > 0);
 const betterThanCount = allRelated.filter((m: any) => item?.vote_average > m.vote_average).length;
-const ratingPercentile = allRelated.length >= 5 ? Math.round((betterThanCount / allRelated.length) * 100) : null;
+// Sin votos (p. ej. sin estrenar) no hay nota que comparar: antes salía «Mejor que el 0%».
+const ratingPercentile = allRelated.length >= 5 && item?.vote_count > 0 ? Math.round((betterThanCount / allRelated.length) * 100) : null;
 const mainGenre = item?.genres?.[0]?.name || null;
 
 // Categorizar videos (el tráiler principal ya va en `trailerUrl`)
@@ -528,13 +549,26 @@ const jsonLd = item ? {
                         <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
                         <ul class="space-y-2.5 text-sm sm:text-base">
                             <li class="flex justify-between"><span class="text-gray-500">Estreno</span><span class="text-gray-800 font-medium">{formatDate(item?.release_date)}</span></li>
+                            {regionReleases.length > 0 && (
+                                <li class="flex justify-between gap-3">
+                                    <span class="text-gray-500 flex-shrink-0">En {regionLabel}</span>
+                                    <span class="text-right flex flex-col gap-0.5">
+                                        {regionReleases.map((r) => (
+                                            <span class="text-gray-800 font-medium">
+                                                <span class="text-gray-500 font-normal">{r.label}</span> · {r.date}
+                                                {r.note && <span class="block text-xs text-gray-500 font-normal">{r.note}</span>}
+                                            </span>
+                                        ))}
+                                    </span>
+                                </li>
+                            )}
                             <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
                             {item?.original_title && item.original_title !== item.title && (
                                 <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_title}</span></li>
                             )}
-                            {item?.runtime && (
+                            {item?.runtime > 0 && (
                                 <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{Math.floor(item.runtime / 60)}h {item.runtime % 60}min</span></li>
                             )}
                             {additionalInfo.budget && additionalInfo.budget > 0 && (

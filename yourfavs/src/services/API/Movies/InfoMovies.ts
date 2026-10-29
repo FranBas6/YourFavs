@@ -163,6 +163,28 @@ export interface MovieBundle {
     externalIds: any;
     reviews: { results: any[] };
     keywords: { id: number; name: string }[];
+    /** B3: estrenos en el país del perfil (cines, digital…), el primero de cada tipo, por fecha. */
+    regionReleases: RegionRelease[];
+}
+
+/** Tipos de `release_dates` de TMDB. */
+export type ReleaseType = 1 | 2 | 3 | 4 | 5 | 6;
+export interface RegionRelease { type: ReleaseType; date: string; note: string | null }
+
+/**
+ * Estrenos de una película en un país: el primero de cada tipo (1 premiere, 2 cines limitado, 3 cines,
+ * 4 digital, 5 físico, 6 TV), ordenados por fecha. `note` es lo que TMDB apunta (festival, «reestreno»…).
+ */
+export function releasesInRegion(releaseDates: any, region: string): RegionRelease[] {
+    const country = (releaseDates?.results || []).find((r: any) => r.iso_3166_1 === region);
+    const firstByType = new Map<number, RegionRelease>();
+    for (const r of country?.release_dates || []) {
+        const date = String(r.release_date || '').slice(0, 10);
+        if (!date || ![1, 2, 3, 4, 5, 6].includes(r.type)) continue;
+        const prev = firstByType.get(r.type);
+        if (!prev || date < prev.date) firstByType.set(r.type, { type: r.type, date, note: r.note?.trim() || null });
+    }
+    return [...firstByType.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
@@ -235,6 +257,7 @@ export async function getMovieBundle(movieId: string | number): Promise<MovieBun
         externalIds: external_ids || {},
         reviews: mergeReviews(reviews?.results, enReviews.results),
         keywords: keywordList,
+        regionReleases: releasesInRegion(release_dates, getCurrentRegion()),
     };
 }
 
