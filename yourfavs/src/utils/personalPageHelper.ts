@@ -1,7 +1,6 @@
-import { fetchMovieDetails } from "../services/API/Movies/tmdbMovies";
-import { fetchSerieDetails } from "../services/API/Series/tmdbSeries";
 import { getWatchedProgressBatch, getWatchStreak } from "../services/BD/series/yourfavsSerie";
 import { tmdbFetch } from "../services/API/shared/tmdbClient";
+import { getTitleDetails } from "../services/API/shared/tmdbTitleCache";
 import { getCurrentRegion } from "../services/BD/shared/userScope";
 import { mapAndDeduplicateProviders } from "../services/API/shared/tmdbInfoService";
 import { getGenreName } from "./constants/genres";
@@ -88,9 +87,11 @@ export async function fetchPersonalPageData(
 
     try {
         [seriesData, moviesData] = await Promise.all([config.getSeries(), config.getMovies()]);
+        // Detalles de TMDB guardados solo mientras TMDB dice que son válidos y, lo que falte, pedido
+        // 30 a la vez (antes 10 y en cada visita): mismos datos, mucho menos esperar (C4).
         const [seriesResults, moviesResults] = await Promise.all([
-            processBatch(seriesData.map((s) => s.id), (id) => fetchSerieDetails(id), 10),
-            processBatch(moviesData.map((p) => p.id), (id) => fetchMovieDetails(id), 10),
+            getTitleDetails('tv', seriesData.map((s) => s.id)),
+            getTitleDetails('movie', moviesData.map((p) => p.id)),
         ]);
         seriesItems = seriesResults.filter((s) => s !== null);
         moviesItems = moviesResults.filter((m) => m !== null);

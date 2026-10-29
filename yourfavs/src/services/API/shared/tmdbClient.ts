@@ -42,6 +42,29 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * (los callers como `tmdbFetchList`/`safeFetch` ya lo capturan → sección vacía, sin crash).
  */
 export async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+    const res = await tmdbRequest(path, params);
+    return res.json() as Promise<T>;
+}
+
+/**
+ * Como `tmdbFetch`, pero dice además durante cuánto tiempo considera TMDB válida la respuesta
+ * (`Cache-Control: max-age` menos `Age`, en ms; 0 si no lo dice). TMDB sirve las fichas desde su
+ * CDN y, mientras dura ese tiempo, pedirlas otra vez devuelve exactamente lo mismo: es el plazo que
+ * se puede guardar una respuesta sin enseñar nada más viejo que TMDB (C4, `tmdbTitleCache.ts`).
+ */
+export async function tmdbFetchWithFreshness<T>(
+    path: string,
+    params: Record<string, string> = {},
+): Promise<{ data: T; freshForMs: number }> {
+    const res = await tmdbRequest(path, params);
+    const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get('cache-control') || '')?.[1] ?? 0);
+    const age = Number(res.headers.get('age') || 0);
+    const freshForMs = Math.max(0, (maxAge - (Number.isFinite(age) ? age : 0)) * 1000);
+    return { data: (await res.json()) as T, freshForMs };
+}
+
+/** Petición a TMDB con idioma, timeout y un reintento; devuelve la respuesta OK o lanza. */
+async function tmdbRequest(path: string, params: Record<string, string>): Promise<Response> {
     const allParams = new URLSearchParams({
         api_key: API_KEY,
         language: getCurrentLanguage(),
@@ -70,7 +93,7 @@ export async function tmdbFetch<T>(path: string, params: Record<string, string> 
         }
         clearTimeout(timer);
 
-        if (res.ok) return res.json() as Promise<T>;
+        if (res.ok) return res;
 
         if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
             await res.body?.cancel().catch(() => {}); // libera la conexión antes de reintentar
