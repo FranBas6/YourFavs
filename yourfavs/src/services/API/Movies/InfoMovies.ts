@@ -158,6 +158,8 @@ export interface MovieBundle {
     videos: any[];
     /** Pósters en el idioma del perfil o sin idioma, `file_path` como URL original (sin recortar). */
     posters: PosterImage[];
+    /** B4a: fondos (backdrops) con el mismo filtro de idioma, ≤ 20, URL original. */
+    backdrops: PosterImage[];
     logo: string | null;
     additionalInfo: Record<string, any>;
     externalIds: any;
@@ -205,7 +207,7 @@ export async function getMovieBundle(movieId: string | number): Promise<MovieBun
     const own = getCurrentLanguage().slice(0, 2);
     let data: any;
     let enReviews: { results?: any[] };
-    let images: { posters?: TMDBPosterImage[]; logos?: any[] };
+    let images: { posters?: TMDBPosterImage[]; backdrops?: TMDBPosterImage[]; logos?: any[] };
     try {
         [data, enReviews, images] = await Promise.all([
             tmdbFetch<any>(`/movie/${movieId}`, {
@@ -252,6 +254,10 @@ export async function getMovieBundle(movieId: string | number): Promise<MovieBun
         posters: (images.posters || [])
             .filter((poster) => poster.iso_639_1 === own || poster.iso_639_1 === null)
             .map((poster) => ({ ...poster, file_path: originalUrl(poster.file_path) })),
+        backdrops: (images.backdrops || [])
+            .filter((b) => b.iso_639_1 === own || b.iso_639_1 === null)
+            .slice(0, 20)
+            .map((b) => ({ ...b, file_path: originalUrl(b.file_path) })),
         logo: pickTitleLogo(images?.logos),
         additionalInfo: buildAdditionalInfo('movie', { ...detail, release_dates }, keywords?.keywords),
         externalIds: external_ids || {},

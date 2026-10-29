@@ -109,6 +109,8 @@ export interface SeriesBundle {
     seasonEpisodes: Record<number, any[]>;
     /** Pósters de la serie y luego de cada temporada, idioma del perfil o sin idioma, URL original. */
     posters: PosterImage[];
+    /** B4a: fondos (backdrops) de la serie, idioma del perfil o sin idioma, ≤ 20, URL original. */
+    backdrops: PosterImage[];
     logo: string | null;
     additionalInfo: Record<string, any>;
     externalIds: any;
@@ -236,6 +238,10 @@ export async function getSeriesBundle(seriesId: string | number): Promise<Series
         posters: rawPosters
             .filter((poster) => poster.iso_639_1 === own || poster.iso_639_1 === null)
             .map((poster) => ({ ...poster, file_path: originalUrl(poster.file_path) })),
+        backdrops: ((images?.backdrops || []) as TMDBPosterImage[])
+            .filter((b) => b.iso_639_1 === own || b.iso_639_1 === null)
+            .slice(0, 20)
+            .map((b) => ({ ...b, file_path: originalUrl(b.file_path) })),
         logo: pickTitleLogo(images?.logos),
         additionalInfo: buildAdditionalInfo('tv', { ...detail, content_ratings }, keywords?.results),
         externalIds: external_ids || {},

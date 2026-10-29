@@ -428,7 +428,8 @@ const productionCountries: string[] = item?.origin_country || [];
 
 // Categorizar videos (el tráiler principal ya va en `trailerUrl`)
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
-const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
+// B4a: también cabeceras y resúmenes («Opening Credits», «Recap»), que antes se descartaban.
+const behindScenes = allVideos.filter((v: any) => ['Behind the Scenes', 'Bloopers', 'Featurette', 'Opening Credits', 'Recap'].includes(v.type));
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
 
 // JSON-LD structured data (schema.org TVSeries)
@@ -1270,6 +1271,7 @@ const jsonLd = item ? {
 
                     <!-- Pósters -->
                     <LightboxGallery posters={posters} prefix="poster" />
+                    <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
 
                     <!-- Reparto -->
                     <CastGrid cast={cast} seenWith={seenWithMap} />

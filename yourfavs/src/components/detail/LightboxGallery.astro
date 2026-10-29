@@ -7,9 +7,17 @@ interface Props {
     posters: Poster[];
     prefix?: string;
     title?: string;
+    /** «poster» (2:3, por defecto) o «backdrop» (16:9, fondos de la película o serie). */
+    variant?: 'poster' | 'backdrop';
 }
 
-const { posters, prefix = "poster", title = "Pósters" } = Astro.props;
+const { posters, prefix = "poster", title = "Pósters", variant = 'poster' } = Astro.props;
+const isBackdrop = variant === 'backdrop';
+// Miniaturas en tamaño reducido (B4a): `file_path` llega como URL `original` y antes también se usaba
+// para la miniatura (hasta 40 imágenes enteras al abrir la galería). El visor sigue en `original`.
+const thumbOf = (url: string) => url.replace('/t/p/original/', isBackdrop ? '/t/p/w300/' : '/t/p/w342/');
+const gridClass = isBackdrop ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5';
+const aspectClass = isBackdrop ? 'aspect-video' : 'aspect-[2/3]';
 ---
 {posters && posters.length > 0 && (
     <>
@@ -18,10 +26,10 @@ const { posters, prefix = "poster", title = "Pósters" } = Astro.props;
                 <span>{title} ({posters.length})</span>
                 <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
             </summary>
-            <div class="px-5 pb-5 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+            <div class={`px-5 pb-5 grid ${gridClass} gap-2`}>
                 {posters.map((poster, index) => (
                     <a href={`#${prefix}-${index}`} class="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity">
-                        <img src={poster.file_path} alt={`${title} ${index + 1}`} loading="lazy" class="w-full aspect-[2/3] object-cover" />
+                        <img src={thumbOf(poster.file_path)} alt={`${title} ${index + 1}`} loading="lazy" class={`w-full ${aspectClass} object-cover`} />
                     </a>
                 ))}
             </div>
@@ -30,7 +38,7 @@ const { posters, prefix = "poster", title = "Pósters" } = Astro.props;
         {posters.map((poster, index) => (
             <div id={`${prefix}-${index}`} class="lightbox fixed inset-0 items-center justify-center bg-black/80 p-4" style="z-index: 9999;">
                 <a href="#_" class="absolute inset-0" aria-label="Cerrar"></a>
-                <img src={poster.file_path} alt={`${title} ${index + 1}`} class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
+                <img src={poster.file_path} alt={`${title} ${index + 1}`} loading="lazy" class="relative max-h-[90vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
                 <a href="#_" class="absolute top-4 right-4 text-white/80 hover:text-white text-3xl font-light leading-none z-10" aria-label="Cerrar">&times;</a>
                 {index > 0 && (
                     <a href={`#${prefix}-${index - 1}`} class="absolute left-4 top-1/2 -translate-y-1/2 text-white/70 hover:text-white z-10" aria-label="Anterior">
