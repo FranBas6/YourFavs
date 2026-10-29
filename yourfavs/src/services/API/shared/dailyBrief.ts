@@ -20,6 +20,7 @@ import { getCurrentUid, getCurrentRegion } from '../../BD/shared/userScope';
 import { getCached, setCached } from '../../../utils/recsBlobCache';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts, APP_TZ } from '../../../utils/appTime';
+import { episodeTypeLabel } from '../../../utils/episodeType';
 
 export type BriefSignalKind = 'new_episode' | 'on_platform' | 'anniversary' | 'finishing';
 
@@ -274,7 +275,7 @@ export async function getDailyBrief(
         signals.push({
             kind: 'new_episode',
             title: recent.name,
-            subtitle: `T${recent.next_season}·E${recent.next_episode} · ${recent.air_date === today ? 'hoy' : 'esta semana'}`,
+            subtitle: `T${recent.next_season}·E${recent.next_episode}${episodeTypeLabel(recent.episode_type) ? ` · ${episodeTypeLabel(recent.episode_type)}` : ''} · ${recent.air_date === today ? 'hoy' : 'esta semana'}`,
             href: hrefFor('tv', recent.id),
             poster_path: recent.poster_path,
         });

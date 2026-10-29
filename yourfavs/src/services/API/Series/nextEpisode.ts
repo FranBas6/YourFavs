@@ -23,6 +23,8 @@ export interface NextEpisodeItem {
     next_episode: number;
     next_episode_name: string;
     air_date: string | null;
+    /** `episode_type` de TMDB («finale», «mid_season»…) para marcar finales (B2b). */
+    episode_type?: string | null;
     /** Nota TMDB del episodio (1 decimal) o null si no tiene votos. */
     vote_average: number | null;
     overview: string;
@@ -88,6 +90,7 @@ export async function computeNextEpisode(
         next_episode: next.episode_number,
         next_episode_name: next.name || `Episodio ${next.episode_number}`,
         air_date: next.air_date ?? null,
+        episode_type: next.episode_type ?? null,
         vote_average: next.vote_average && next.vote_count > 0
             ? Math.round(next.vote_average * 10) / 10
             : null,

@@ -5,6 +5,7 @@ import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
 import { fetchSerieDetails } from '../Series/tmdbSeries';
 import { fetchMovieDetails } from '../Movies/tmdbMovies';
 import { processBatch } from '../../../utils/processBatch';
+import { episodeTypeLabel } from '../../../utils/episodeType';
 
 export interface CalendarEvent {
     tmdb_id: string;
@@ -72,8 +73,11 @@ export async function getCalendarData(
     opts: CalendarOptions = {},
 ): Promise<CalendarData> {
     // Etiqueta de episodio: "T2 E5" y, si se permite, " - Nombre del episodio".
-    const epLabel = (s: number | string, e: number | string, name?: string | null) =>
-        `T${s} E${e}${name && !opts.hideEpisodeTitles ? ' - ' + name : ''}`;
+    // B2b: «· Final de temporada» / «· Parón…» según `episode_type` (no es spoiler: va también sin títulos).
+    const epLabel = (s: number | string, e: number | string, name?: string | null, episodeType?: string | null) => {
+        const kind = episodeTypeLabel(episodeType);
+        return `T${s} E${e}${name && !opts.hideEpisodeTitles ? ' - ' + name : ''}${kind ? ' · ' + kind.charAt(0).toUpperCase() + kind.slice(1) : ''}`;
+    };
 
     const { start, end } = getMonthRange(year, month);
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
@@ -267,7 +271,7 @@ export async function getCalendarData(
                                 title: serie.name,
                                 poster_path: posterUrl(serie.poster_path),
                                 event_type: 'episode',
-                                label: epLabel(ep.season_number, ep.episode_number, ep.name),
+                                label: epLabel(ep.season_number, ep.episode_number, ep.name, ep.episode_type),
                                 is_subscribed: isSub,
                                 is_following: isFollowing,
                             });
@@ -287,7 +291,7 @@ export async function getCalendarData(
                 title: serie.name,
                 poster_path: posterUrl(serie.poster_path),
                 event_type: 'episode',
-                label: epLabel(nextEp.season_number, nextEp.episode_number, nextEp.name),
+                label: epLabel(nextEp.season_number, nextEp.episode_number, nextEp.name, nextEp.episode_type),
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });
@@ -300,7 +304,7 @@ export async function getCalendarData(
                 title: serie.name,
                 poster_path: posterUrl(serie.poster_path),
                 event_type: 'episode',
-                label: epLabel(lastEp.season_number, lastEp.episode_number, lastEp.name),
+                label: epLabel(lastEp.season_number, lastEp.episode_number, lastEp.name, lastEp.episode_type),
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });
