@@ -12,14 +12,10 @@ import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
 import {
-    getSeriesById, getSeriesCast, getSeriesDirectorsAndRoles,
-    getSeriesTrailer, getSeriesStatus, getEpisodesBySeasonNumber,
-    fetchAllSeriesPosters, getSerieRecommendationsOrSimilar, getSeriesAdditionalInfo,
-    getSeriesVideos
+    getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
 } from "../../services/API/Series/InfoSeries";
 import { getAllSeasonProviders, buildProviderCoverage } from "../../services/API/Series/seasonProviders";
-import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
-import { getTitleLogo, getReviews } from "../../services/API/shared/tmdbInfoService";
+import { posterUrl, originalUrl } from "../../services/API/shared/tmdbClient";
 import { peekTopActors } from "../../utils/topActorsLibrary";
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
@@ -127,14 +123,16 @@ if (Astro.request.method === 'POST') {
     }
 }
 
-// Todas las llamadas TMDB iniciales en paralelo
-let [item, cast, directors, trailerUrl, status] = await Promise.all([
-    safeFetch(getSeriesById({id}), `serie/${id}/details`, null as any),
-    safeFetch(getSeriesCast(id), `serie/${id}/cast`, [] as any[]),
-    safeFetch(getSeriesDirectorsAndRoles(id), `serie/${id}/directors`, [] as { name: string; job: string }[]),
-    safeFetch(getSeriesTrailer(id), `serie/${id}/trailer`, null),
-    safeFetch(getSeriesStatus(id), `serie/${id}/status`, '' as any),
-]);
+// La ficha en pocas llamadas a TMDB (C2): detalle, reparto, equipo, vídeos, imágenes, keywords,
+// clasificación, ids externos, traducciones, reseñas, proveedores y TODAS las temporadas (episodios,
+// pósters y reparto) con append_to_response, en una llamada + bloques de 20 en paralelo. Antes:
+// `/tv/{id}` ×5 y cuatro llamadas por temporada.
+const bundle = await safeFetch(getSeriesBundle(id), `serie/${id}/bundle`, null as SeriesBundle | null);
+let item = bundle?.item ?? null;
+let cast = bundle?.cast ?? [];
+let directors = bundle?.directors ?? [];
+let trailerUrl = bundle?.trailerUrl ?? null;
+let status = bundle?.status ?? '';
 if (!item) return Astro.redirect('/404');
 let title = item?.name || "Serie no encontrada";
 
@@ -153,16 +151,11 @@ const clientData = {
     next_episode_to_air: item?.next_episode_to_air || null
 };
 
-// Obtener episodios de TODAS las temporadas en paralelo (antes era secuencial)
+// Episodios de TODAS las temporadas: ya vienen en el paquete de la ficha (C2).
 const allSeasonEpisodes: { [key: number]: any[] } = {};
 if (item?.seasons) {
-    const episodeResults = await Promise.all(
-        item.seasons.map((season: any) =>
-            safeFetch(getEpisodesBySeasonNumber(id, season.season_number), `serie/${id}/episodes/${season.season_number}`, [] as any[])
-        )
-    );
-    item.seasons.forEach((season: any, i: number) => {
-        allSeasonEpisodes[season.season_number] = episodeResults[i] || [];
+    item.seasons.forEach((season: any) => {
+        allSeasonEpisodes[season.season_number] = bundle?.seasonEpisodes[season.season_number] || [];
     });
 }
 
@@ -359,27 +352,24 @@ import type {PosterImage} from '../../services/API/Series/InfoSeries';
 // Segundo bloque de datos — todo en paralelo
 const tmdbId = item?.id;
 
+// Ya vienen en el paquete de la ficha (C2): sin llamadas.
+const allPosters: PosterImage[] = bundle?.posters ?? [];
+const externalIds: any = bundle?.externalIds ?? {};
+const additionalInfo: Record<string, any> = bundle?.additionalInfo ?? { keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null };
+const allVideos: any[] = bundle?.videos ?? [];
+const reviewsData = bundle?.reviews ?? { results: [] };
+const serieLogo = bundle?.logo ?? null;
+
 const [
-    allPosters,
     seriesRecommendationsData,
-    externalIds,
-    additionalInfo,
-    allVideos,
-    reviewsData,
-    serieLogo,
     crossMediaMovies,
 ] = await Promise.all([
-    id ? fetchAllSeriesPosters(id).catch(() => []) : Promise.resolve([]),
     tmdbId ? getSerieRecommendationsOrSimilar(tmdbId) : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
-    tmdbId ? tmdbFetch<any>(`/tv/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
-    id ? getSeriesAdditionalInfo(id) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null }),
-    id ? getSeriesVideos(id) : Promise.resolve([]),
-    tmdbId ? getReviews('tv', tmdbId) : Promise.resolve({ results: [] }),
-    tmdbId ? getTitleLogo('tv', tmdbId) : Promise.resolve(null),
     // Películas de la misma saga. En paralelo con el resto para no sumar nada al TTFB, y
     // cacheada 24h desde la primera visita (incluido el resultado vacío, que es el habitual).
+    // Las keywords ya llegan en el paquete: así no las vuelve a pedir.
     tmdbId
-        ? getCrossMediaRelated({ type: 'tv', id: tmdbId, title: item?.name || '', originalTitle: item?.original_name })
+        ? getCrossMediaRelated({ type: 'tv', id: tmdbId, title: item?.name || '', originalTitle: item?.original_name, keywords: bundle?.keywords })
             .catch(() => [])
         : Promise.resolve([]),
 ]);

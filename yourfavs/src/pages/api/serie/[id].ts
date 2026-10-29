@@ -18,18 +18,10 @@
  */
 import type { APIRoute } from 'astro';
 import {
-    getSeriesById,
-    getSeriesCast,
-    getSeriesDirectorsAndRoles,
-    getSeriesTrailer,
-    fetchAllSeriesPosters,
+    getSeriesBundle,
     getSerieRecommendationsOrSimilar,
-    getSeriesAdditionalInfo,
-    getSeriesVideos,
-    getEpisodesBySeasonNumber,
+    type SeriesBundle,
 } from '../../../services/API/Series/InfoSeries';
-import { getTitleLogo, getReviews } from '../../../services/API/shared/tmdbInfoService';
-import { tmdbFetch } from '../../../services/API/shared/tmdbClient';
 import { safeFetch } from '../../../utils/safeFetch';
 
 export const prerender = false;
@@ -45,40 +37,19 @@ export const GET: APIRoute = async ({ params }) => {
     const id = params.id;
     if (!id) return json({ ok: false, error: 'Falta el id' }, 400);
 
-    // Bloque 1: básicos en paralelo (igual que la página).
-    const [item, cast, crew, trailerUrl] = await Promise.all([
-        safeFetch(getSeriesById({ id }), `serie/${id}/details`, null as any),
-        safeFetch(getSeriesCast(id), `serie/${id}/cast`, [] as any[]),
-        safeFetch(getSeriesDirectorsAndRoles(id), `serie/${id}/directors`, [] as { name: string; job: string }[]),
-        safeFetch(getSeriesTrailer(id), `serie/${id}/trailer`, null),
-    ]);
-
-    if (!item) return json({ ok: false, error: 'Serie no encontrada' }, 404);
+    // Bloque 1: la ficha en pocas llamadas a TMDB, temporadas incluidas (igual que la página, C2).
+    const bundle = await safeFetch(getSeriesBundle(id), `serie/${id}/bundle`, null as SeriesBundle | null);
+    const item = bundle?.item;
+    if (!bundle || !item) return json({ ok: false, error: 'Serie no encontrada' }, 404);
 
     const tmdbId = item.id;
+    const { cast, directors: crew, trailerUrl, externalIds, additionalInfo, videos, reviews: reviewsData, logo: titleLogo } = bundle;
+    const posters = bundle.posters.slice(0, 40);
 
-    // Bloque 2: dependen de item, no entre sí.
-    const [
-        posters,
-        recommendationsData,
-        externalIds,
-        additionalInfo,
-        videos,
-        reviewsData,
-        titleLogo,
-    ] = await Promise.all([
-        fetchAllSeriesPosters(id).then((p) => p.slice(0, 40)).catch(() => []),
-        tmdbId
-            ? getSerieRecommendationsOrSimilar(tmdbId)
-            : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
-        tmdbId ? tmdbFetch<any>(`/tv/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
-        getSeriesAdditionalInfo(id).catch(() => ({ keywords: [], languages: [], content_ratings: [] })),
-        getSeriesVideos(id).catch(() => []),
-        tmdbId
-            ? getReviews('tv', tmdbId)
-            : Promise.resolve({ results: [] }),
-        tmdbId ? getTitleLogo('tv', tmdbId) : Promise.resolve(null),
-    ]);
+    // Bloque 2: recomendaciones (dependen de item).
+    const recommendationsData = tmdbId
+        ? await getSerieRecommendationsOrSimilar(tmdbId)
+        : { success: false, recommendations: [], type: 'recommendations' as const };
 
     // Reseñas: top 5 con contenido (igual que la web).
     const reviews = (reviewsData.results || [])
@@ -89,11 +60,7 @@ export const GET: APIRoute = async ({ params }) => {
     // cliente muestra las stats por temporada (rating/duración medios, mejor, rango)
     // en la tarjeta colapsada, sin fetches extra. Se traen en paralelo.
     const rawSeasons = (item.seasons ?? []) as any[];
-    const episodesBySeason = await Promise.all(
-        rawSeasons.map((s) =>
-            getEpisodesBySeasonNumber(tmdbId, s.season_number).catch(() => [] as any[]),
-        ),
-    );
+    const episodesBySeason = rawSeasons.map((s) => bundle.seasonEpisodes[s.season_number] || []);
     const seasons = rawSeasons.map((s: any, i: number) => ({
         id: s.id,
         season_number: s.season_number,
