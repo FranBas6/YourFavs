@@ -15,7 +15,7 @@ import {
     getMovieTrailer, fetchAllMoviePosters, getMovieCollectionInfo,
     getMovieRecommendationsOrSimilar, getMoviesAdditionalInfo, getMovieVideos
 } from "../../services/API/Movies/InfoMovies";
-import { getTitleLogo } from "../../services/API/shared/tmdbInfoService";
+import { getTitleLogo, getReviews } from "../../services/API/shared/tmdbInfoService";
 import { peekTopActors } from "../../utils/topActorsLibrary";
 import { posterUrl, backdropUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
@@ -206,7 +206,7 @@ const [
     tmdbId ? tmdbFetch<any>(`/movie/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
     tmdbId ? getMoviesAdditionalInfo(tmdbId) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null, budget: null, revenue: null }),
     id ? getMovieVideos(id) : Promise.resolve([]),
-    tmdbId ? tmdbFetch<{ results: any[] }>(`/movie/${tmdbId}/reviews`).catch(() => ({ results: [] })) : Promise.resolve({ results: [] }),
+    tmdbId ? getReviews('movie', tmdbId) : Promise.resolve({ results: [] }),
     tmdbId ? getTitleLogo('movie', tmdbId) : Promise.resolve(null),
     // Series de la misma saga. Va aquí dentro, en paralelo con el resto, para no sumar nada al
     // TTFB: es una búsqueda en TMDB y, al primer acierto, sale de caché las 24h siguientes.

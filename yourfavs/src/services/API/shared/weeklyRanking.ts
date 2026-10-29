@@ -60,9 +60,9 @@ async function discoverPopular(mediaType: 'movie' | 'tv', region: string, provid
     const params: Record<string, string> = {
         sort_by: 'popularity.desc',
         'vote_count.gte': '50',
-        watch_region: region,
     };
-    if (provider) params.with_watch_providers = String(provider);
+    // `watch_region` solo filtra junto a `with_watch_providers`; sin plataforma el Top es mundial.
+    if (provider) { params.with_watch_providers = String(provider); params.watch_region = region; }
     try {
         const data = await tmdbFetch<{ results?: TmdbHit[] }>(`/discover/${mediaType}`, params);
         return data.results || [];

@@ -68,6 +68,9 @@ export function getLanguageDisplayName(iso: string): string {
 const ratingMap: Record<string, Record<string, string>> = {
     'ES': {
         'APTA': 'Apta para todos los públicos',
+        // En películas TMDB usa «A» (y alguna vez «TP») para lo mismo.
+        'A': 'Apta para todos los públicos',
+        'TP': 'Apta para todos los públicos',
         '7': 'No recomendada para menores de 7 años',
         '12': 'No recomendada para menores de 12 años',
         '16': 'No recomendada para menores de 16 años',

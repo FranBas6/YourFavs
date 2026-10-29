@@ -16,7 +16,7 @@ export async function getMoviesAndSeriesByMemberName(
     try {
         // 1. Buscar el ID del miembro
         const searchData = await tmdbFetch<{ results: any[] }>('/search/person', {
-            query: encodeURIComponent(memberName),
+            query: memberName, // tmdbFetch ya lo codifica
         });
 
         if (!searchData.results.length) {

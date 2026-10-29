@@ -1,9 +1,14 @@
 ---
+import { getCurrentLanguage } from '../../services/BD/shared/userScope';
+import { getLanguageDisplayName } from '../../utils/constants/helpers/media-helpers';
+
 interface Review {
     author: string;
     content: string;
     created_at?: string;
     author_details?: { rating?: number };
+    /** Idioma ISO-639-1 con el que llegó (lo pone `getReviews`). */
+    lang?: string;
 }
 
 interface Props {
@@ -12,6 +17,9 @@ interface Props {
 }
 
 const { reviews, title = "Opiniones de la comunidad" } = Astro.props;
+// Las reseñas en otro idioma (casi siempre inglés) llevan una etiqueta para que no pillen por sorpresa.
+const ownLang = getCurrentLanguage().slice(0, 2);
+const langLabel = (lang?: string) => (lang && lang !== ownLang ? `en ${getLanguageDisplayName(lang).toLowerCase()}` : null);
 ---
 {reviews.length > 0 && (
     <details class="bg-white rounded-xl border border-gray-200">
@@ -29,6 +37,9 @@ const { reviews, title = "Opiniones de la comunidad" } = Astro.props;
                                 <span class="text-xs px-1.5 py-0.5 bg-yellow-50 text-yellow-700 rounded">{review.author_details.rating}/10</span>
                             )}
                             <span class="text-xs text-gray-400">{review.created_at ? new Date(review.created_at).toLocaleDateString('es-ES') : ''}</span>
+                            {langLabel(review.lang) && (
+                                <span class="text-[11px] px-1.5 py-0.5 rounded border border-gray-200 text-gray-500">{langLabel(review.lang)}</span>
+                            )}
                         </div>
                         <p class="text-sm text-gray-600 line-clamp-4 group-open:line-clamp-none leading-relaxed">{review.content}</p>
                         <span class="text-xs text-blue-500 mt-1 inline-block group-open:hidden">Leer más...</span>

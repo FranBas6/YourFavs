@@ -1,5 +1,6 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
 import { tmdbFetch, tmdbFetchList } from '../shared/tmdbClient';
+import { getCurrentRegion } from '../../BD/shared/userScope';
 import { getMostPopular, getTopRated, searchByTitle } from '../shared/tmdbDiscoverService';
 
 // --- Fetch de detalles (específico de movies por el endpoint) ---
@@ -19,7 +20,7 @@ export const getLatestMovies = async ({ page }: { page?: string }): Promise<Movi
     const pageNumber = page || "1";
 
     try {
-        const movies = await tmdbFetchList<Movie>('/movie/now_playing', { page: pageNumber });
+        const movies = await tmdbFetchList<Movie>('/movie/now_playing', { page: pageNumber, region: getCurrentRegion() });
 
         const today = new Date();
         const oneWeekLater = new Date();
@@ -48,7 +49,7 @@ export const getNowPlayingMoviesInSpain = async ({ page }: { page?: string }): P
     const pageNumber = page || "1";
 
     try {
-        const movies = await tmdbFetchList<Movie>('/movie/now_playing', { page: pageNumber, region: 'ES' });
+        const movies = await tmdbFetchList<Movie>('/movie/now_playing', { page: pageNumber, region: getCurrentRegion() });
 
         return movies.sort((a, b) => {
             if (b.popularity !== a.popularity) return b.popularity - a.popularity;
@@ -86,9 +87,10 @@ export const getMoviesByCategory = async (category: string, page: string = "1"):
         let movies: Movie[];
 
         if (genreOrUpcoming === "upcoming") {
+            // `/upcoming` ignora `sort_by` (se ordena abajo); con `region` las fechas son las de tu país.
             movies = await tmdbFetchList<Movie>('/movie/upcoming', {
                 page,
-                sort_by: 'popularity.desc',
+                region: getCurrentRegion(),
             });
             movies = movies.filter(movie => movie.release_date && isUpcomingMovie(movie.release_date));
         } else {

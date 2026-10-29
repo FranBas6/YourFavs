@@ -33,7 +33,7 @@ export const getCombinedCastCredits = async (personId: string): Promise<any[]> =
 export const getActorsByName = async ({ name, page }: { name: string; page?: string }): Promise<Actor[]> => {
     try {
         const results = await tmdbFetchList<any>('/search/person', {
-            query: encodeURIComponent(name),
+            query: name, // tmdbFetch ya lo codifica (con encodeURIComponent llegaba «Tom%20Hanks» literal)
             page: page || '1',
         });
 

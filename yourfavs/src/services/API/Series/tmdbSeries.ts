@@ -27,12 +27,9 @@ export const getLatestSeries = async ({ page }: { page?: string }): Promise<Seri
         oneWeekLater.setDate(today.getDate() + 7);
 
         const filteredSeries = series.filter((serie) => {
+            // `/tv/on_the_air` no trae `next_episode_to_air` (solo el detalle): se filtra por el estreno.
             const firstAirDate = serie.first_air_date ? new Date(serie.first_air_date) : null;
-            const nextEpisodeDate = serie.next_episode_to_air?.air_date ? new Date(serie.next_episode_to_air.air_date) : null;
-
-            if (firstAirDate && firstAirDate > oneWeekLater) return false;
-            if (nextEpisodeDate && nextEpisodeDate > oneWeekLater) return false;
-            return true;
+            return !(firstAirDate && firstAirDate > oneWeekLater);
         });
 
         return filteredSeries.sort((a, b) => {

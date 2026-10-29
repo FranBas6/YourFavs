@@ -19,7 +19,7 @@ export async function getMoviesAndSeriesByCompanyName(
 
         if (!companyId) {
             const searchData = await tmdbFetch<{ results: any[] }>('/search/company', {
-                query: encodeURIComponent(companyName),
+                query: companyName, // tmdbFetch ya lo codifica
             });
 
             if (!searchData.results.length) {

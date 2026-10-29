@@ -26,7 +26,7 @@ import {
     getMoviesAdditionalInfo,
     getMovieVideos,
 } from '../../../services/API/Movies/InfoMovies';
-import { getTitleLogo } from '../../../services/API/shared/tmdbInfoService';
+import { getTitleLogo, getReviews } from '../../../services/API/shared/tmdbInfoService';
 import { tmdbFetch } from '../../../services/API/shared/tmdbClient';
 import { safeFetch } from '../../../utils/safeFetch';
 
@@ -79,7 +79,7 @@ export const GET: APIRoute = async ({ params }) => {
             : Promise.resolve({ keywords: [], languages: [], content_ratings: [], tagline: null, budget: null, revenue: null }),
         getMovieVideos(id).catch(() => []),
         tmdbId
-            ? tmdbFetch<{ results: any[] }>(`/movie/${tmdbId}/reviews`).catch(() => ({ results: [] }))
+            ? getReviews('movie', tmdbId)
             : Promise.resolve({ results: [] }),
         tmdbId ? getTitleLogo('movie', tmdbId) : Promise.resolve(null),
     ]);

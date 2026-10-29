@@ -2,6 +2,7 @@ import { fetchMovieDetails } from "../services/API/Movies/tmdbMovies";
 import { fetchSerieDetails } from "../services/API/Series/tmdbSeries";
 import { getWatchedProgressBatch, getWatchStreak } from "../services/BD/series/yourfavsSerie";
 import { tmdbFetch } from "../services/API/shared/tmdbClient";
+import { getCurrentRegion } from "../services/BD/shared/userScope";
 import { mapAndDeduplicateProviders } from "../services/API/shared/tmdbInfoService";
 import { getGenreName } from "./constants/genres";
 import { processBatch } from "./processBatch";
@@ -169,13 +170,13 @@ export async function fetchPersonalPageData(
             processBatch(filteredSeries.map((s: any) => s.id), async (id: number) => {
                 try {
                     const data = await tmdbFetch<{ results: any }>(`/tv/${id}/watch/providers`, {});
-                    return { id, providers: mapAndDeduplicateProviders(data.results?.ES || {}) };
+                    return { id, providers: mapAndDeduplicateProviders(data.results?.[getCurrentRegion()] || data.results?.ES || {}) };
                 } catch { return { id, providers: [] }; }
             }, 10),
             processBatch(filteredMovies.map((m: any) => m.id), async (id: number) => {
                 try {
                     const data = await tmdbFetch<{ results: any }>(`/movie/${id}/watch/providers`, {});
-                    return { id, providers: mapAndDeduplicateProviders(data.results?.ES || {}) };
+                    return { id, providers: mapAndDeduplicateProviders(data.results?.[getCurrentRegion()] || data.results?.ES || {}) };
                 } catch { return { id, providers: [] }; }
             }, 10),
         ]);

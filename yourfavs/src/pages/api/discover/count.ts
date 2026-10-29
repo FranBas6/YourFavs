@@ -15,7 +15,8 @@ import { buildDiscoverFilterParams, type AdvancedFilters } from '../../../servic
 export const prerender = false;
 
 // Solo permitimos params de contexto conocidos (el body viene del cliente).
-const ALLOWED_BASE = new Set(['with_genres', 'with_watch_providers', 'watch_region', 'with_networks', 'vote_count.gte']);
+// `with_keywords` / `with_companies`: sin ellos el contador de /catalogo/keyword/{id} contaba todo el catálogo.
+const ALLOWED_BASE = new Set(['with_genres', 'with_watch_providers', 'watch_region', 'with_networks', 'with_keywords', 'with_companies', 'vote_count.gte']);
 
 function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
