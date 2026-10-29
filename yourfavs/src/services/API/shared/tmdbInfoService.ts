@@ -32,7 +32,7 @@ export function pickBestTrailerKey(videos: VideoLike[]): string | null {
 }
 
 /** Vídeos en el idioma del perfil primero (TMDB los devuelve mezclados). */
-const ownLanguageFirst = (videos: any[]) => {
+export const ownLanguageFirst = (videos: any[]) => {
     const own = primaryLang();
     return [...videos].sort((a, b) => Number(b.iso_639_1 === own) - Number(a.iso_639_1 === own));
 };
@@ -78,9 +78,15 @@ export async function getReviews(mediaType: MediaType, id: string | number): Pro
             ? Promise.resolve(empty)
             : tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`, { language: 'en-US' }).catch(() => empty),
     ]);
+    return mergeReviews(ownData.results, enData.results);
+}
+
+/** Junta reseñas del idioma del perfil (primero) y las inglesas, sin duplicar y con `lang`. */
+export function mergeReviews(own: any[] | undefined, en: any[] | undefined): { results: any[] } {
+    const ownLang = primaryLang();
     const seen = new Set<string>();
     const results: any[] = [];
-    for (const [list, lang] of [[ownData.results, own], [enData.results, 'en']] as const) {
+    for (const [list, lang] of [[own, ownLang], [en, 'en']] as const) {
         for (const r of list || []) {
             if (!r?.id || seen.has(r.id)) continue;
             seen.add(r.id);
@@ -124,13 +130,42 @@ export async function getDirectorsAndRoles(
             return [];
         }
 
-        return data.crew
-            .filter((member: any) => relevantRoles.includes(member.job))
-            .map((person: any) => ({ name: person.name, job: person.job }));
+        return crewByRoles(data.crew, relevantRoles);
     } catch (error) {
         console.error(`Error al obtener directores y roles de ${mediaType}/${id}:`, error);
         return [];
     }
+}
+
+/** Miembros del equipo con un `job` de la lista (forma `{name, job}` de `CrewGrid`). */
+export function crewByRoles(crew: any[] | undefined, relevantRoles: string[]): { name: string; job: string }[] {
+    return (crew || [])
+        .filter((member: any) => relevantRoles.includes(member.job))
+        .map((person: any) => ({ name: person.name, job: person.job }));
+}
+
+/**
+ * La «info adicional» de una ficha a partir del detalle (con `release_dates` en película o
+ * `content_ratings` en serie adjuntos) y sus keywords. La usan `getAdditionalInfo` y los paquetes
+ * de ficha (`getMovieBundle`), así que las dos rutas dan exactamente lo mismo.
+ */
+export function buildAdditionalInfo(mediaType: MediaType, detailData: any, keywords: any[] | undefined): Record<string, any> {
+    const base: Record<string, any> = {
+        keywords: keywords || [],
+        networks: detailData.networks || [],
+        content_ratings: mediaType === 'movie'
+            ? movieCertifications(detailData.release_dates)
+            : detailData.content_ratings?.results || [],
+        episode_run_time: detailData.episode_run_time || [],
+        languages: detailData.spoken_languages || [],
+        tagline: detailData.tagline || null,
+    };
+    // Campos exclusivos de películas
+    if (mediaType === 'movie') {
+        base.budget = detailData.budget || null;
+        base.revenue = detailData.revenue || null;
+    }
+    return base;
 }
 
 /**
@@ -147,25 +182,8 @@ export async function getAdditionalInfo(
             tmdbFetch<any>(`/${mediaType}/${id}`, { append_to_response: mediaType === 'movie' ? 'release_dates' : 'content_ratings' }),
         ]);
 
-        const base: Record<string, any> = {
-            // TMDB devuelve las keywords en `keywords` (películas) o `results` (series).
-            keywords: keywordsData.keywords || keywordsData.results || [],
-            networks: detailData.networks || [],
-            content_ratings: mediaType === 'movie'
-                ? movieCertifications(detailData.release_dates)
-                : detailData.content_ratings?.results || [],
-            episode_run_time: detailData.episode_run_time || [],
-            languages: detailData.spoken_languages || [],
-            tagline: detailData.tagline || null,
-        };
-
-        // Campos exclusivos de películas
-        if (mediaType === 'movie') {
-            base.budget = detailData.budget || null;
-            base.revenue = detailData.revenue || null;
-        }
-
-        return base;
+        // TMDB devuelve las keywords en `keywords` (películas) o `results` (series).
+        return buildAdditionalInfo(mediaType, detailData, keywordsData.keywords || keywordsData.results);
     } catch (error) {
         console.error(`Error al obtener información adicional de ${mediaType}/${id}:`, error);
         return {
@@ -350,18 +368,22 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
  * luego inglés, luego neutro; dentro de cada idioma el de mayor vote_average.
  * Devuelve una URL w500 lista para <img>, o null (la ficha cae al título de texto).
  */
+/** Logo del título: mejor votado en español, si no en inglés, si no sin idioma (URL w500). */
+export function pickTitleLogo(logos: { file_path: string; iso_639_1: string | null; vote_average?: number }[] | undefined): string | null {
+    if (!logos?.length) return null;
+    const pick = (lang: string | null) =>
+        logos.filter((l) => l.iso_639_1 === lang).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
+    const best = pick('es') || pick('en') || pick(null) || logos[0];
+    return best ? `https://image.tmdb.org/t/p/w500${best.file_path}` : null;
+}
+
 export async function getTitleLogo(mediaType: MediaType, id: number | string): Promise<string | null> {
     try {
         const data = await tmdbFetch<{ logos?: { file_path: string; iso_639_1: string | null; vote_average?: number }[] }>(
             `/${mediaType}/${id}/images`,
             { include_image_language: 'es,en,null' }
         );
-        const logos = data.logos || [];
-        if (!logos.length) return null;
-        const pick = (lang: string | null) =>
-            logos.filter((l) => l.iso_639_1 === lang).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
-        const best = pick('es') || pick('en') || pick(null) || logos[0];
-        return best ? `https://image.tmdb.org/t/p/w500${best.file_path}` : null;
+        return pickTitleLogo(data.logos);
     } catch {
         return null;
     }

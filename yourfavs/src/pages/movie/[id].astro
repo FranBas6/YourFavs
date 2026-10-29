@@ -11,13 +11,10 @@ import SagaProgress from "../../components/detail/SagaProgress.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/movie/movie.css';
 import {
-    getMovieById, getMovieCast, getMovieDirectorsAndRoles,
-    getMovieTrailer, fetchAllMoviePosters, getMovieCollectionInfo,
-    getMovieRecommendationsOrSimilar, getMoviesAdditionalInfo, getMovieVideos
+    getMovieBundle, getMovieCollectionInfo, getMovieRecommendationsOrSimilar, type MovieBundle
 } from "../../services/API/Movies/InfoMovies";
-import { getTitleLogo, getReviews } from "../../services/API/shared/tmdbInfoService";
 import { peekTopActors } from "../../utils/topActorsLibrary";
-import { posterUrl, backdropUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
+import { posterUrl, backdropUrl, originalUrl } from "../../services/API/shared/tmdbClient";
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
@@ -82,15 +79,17 @@ let cast: CastMember[] = []; // Cambio aquí: de string[] a CastMember[]
 let directors: { name: string; job: string }[] = [];
 let trailerUrl: string | null = null;
 let title = "Película no encontrada";
+let bundle: MovieBundle | null = null;
 
 if (id) {
-    // Todas las llamadas TMDB en paralelo (antes eran secuenciales)
-    [item, cast, directors, trailerUrl] = await Promise.all([
-        safeFetch(getMovieById({id}), `movie/${id}/details`, null as any),
-        safeFetch(getMovieCast(id), `movie/${id}/cast`, [] as CastMember[]),
-        safeFetch(getMovieDirectorsAndRoles(id), `movie/${id}/directors`, [] as { name: string; job: string }[]),
-        safeFetch(getMovieTrailer(id), `movie/${id}/trailer`, null),
-    ]);
+    // UNA llamada a TMDB con append_to_response trae detalle, reparto, equipo, vídeos, imágenes,
+    // keywords, fechas de estreno, ids externos, traducciones, reseñas y proveedores (C1). Antes
+    // eran ~19 llamadas sueltas, varias repetidas.
+    bundle = await safeFetch(getMovieBundle(id), `movie/${id}/bundle`, null as MovieBundle | null);
+    item = bundle?.item ?? null;
+    cast = bundle?.cast ?? [];
+    directors = bundle?.directors ?? [];
+    trailerUrl = bundle?.trailerUrl ?? null;
     if (!item) return Astro.redirect('/404');
     title = item?.title || title;
 }
@@ -189,29 +188,26 @@ import type {PosterImage} from '../../services/API/Movies/InfoMovies';
 // Segundo bloque de datos (dependen de item pero no entre sí) — todo en paralelo
 const tmdbId = item?.id;
 
+// Ya vienen en el paquete de la ficha (C1): sin llamadas.
+const allPosters: PosterImage[] = bundle?.posters ?? [];
+const externalIds: any = bundle?.externalIds ?? {};
+const additionalInfo: Record<string, any> = bundle?.additionalInfo ?? { keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null, budget: null, revenue: null };
+const allVideos: any[] = bundle?.videos ?? [];
+const reviewsData = bundle?.reviews ?? { results: [] };
+const movieLogo = bundle?.logo ?? null;
+
 const [
-    allPosters,
     collectionInfo,
     moviesRecommendationsData,
-    externalIds,
-    additionalInfo,
-    allVideos,
-    reviewsData,
-    movieLogo,
     crossMediaSeries,
 ] = await Promise.all([
-    id ? fetchAllMoviePosters(id).catch(() => []) : Promise.resolve([]),
     item?.belongs_to_collection ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null) : Promise.resolve(null),
     tmdbId ? getMovieRecommendationsOrSimilar(tmdbId) : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
-    tmdbId ? tmdbFetch<any>(`/movie/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
-    tmdbId ? getMoviesAdditionalInfo(tmdbId) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null, budget: null, revenue: null }),
-    id ? getMovieVideos(id) : Promise.resolve([]),
-    tmdbId ? getReviews('movie', tmdbId) : Promise.resolve({ results: [] }),
-    tmdbId ? getTitleLogo('movie', tmdbId) : Promise.resolve(null),
     // Series de la misma saga. Va aquí dentro, en paralelo con el resto, para no sumar nada al
     // TTFB: es una búsqueda en TMDB y, al primer acierto, sale de caché las 24h siguientes.
+    // Las keywords ya llegan en el paquete: así no las vuelve a pedir.
     tmdbId
-        ? getCrossMediaRelated({ type: 'movie', id: tmdbId, title: item?.title || '', originalTitle: item?.original_title })
+        ? getCrossMediaRelated({ type: 'movie', id: tmdbId, title: item?.title || '', originalTitle: item?.original_title, keywords: bundle?.keywords })
             .catch(() => [])
         : Promise.resolve([]),
 ]);

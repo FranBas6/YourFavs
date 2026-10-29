@@ -10,11 +10,25 @@ import {
     buildProvidersByCountry,
     buildProviderLinksByCountry,
     getRecommendationsOrSimilar as sharedGetRecommendationsOrSimilar,
+    buildAdditionalInfo,
+    crewByRoles,
+    mergeReviews,
+    ownLanguageFirst,
+    pickBestTrailerKey,
+    pickTitleLogo,
+    videoLanguages,
 } from '../shared/tmdbInfoService';
 
 const BASE_URL = "https://api.themoviedb.org/3";
 
 // --- Funciones únicas de películas ---
+
+/** «Disponible en español»: traducción es-ES y fecha de estreno en España (ambas cosas). */
+function hasSpanishVersion(translations: any[] | undefined, releaseResults: any[] | undefined): boolean {
+    const hasTextTranslation = (translations || []).some((t: any) => t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES');
+    const hasSpainRelease = (releaseResults || []).some((r: any) => r.iso_3166_1 === 'ES');
+    return hasTextTranslation && hasSpainRelease;
+}
 
 async function checkMovieSpanishTranslation(movieId: string): Promise<boolean> {
     try {
@@ -224,11 +238,13 @@ export const searchCollections = async (query: string, page: number = 1): Promis
 
 // --- Funciones delegadas a módulos compartidos ---
 
+const MOVIE_CREW_ROLES = [
+    "Director", "Producer", "Executive Producer", "Director of Photography",
+    "Original Music Composer", "Screenplay", "Writer", "Editor"
+];
+
 export const getMovieDirectorsAndRoles = async (movieId: string) =>
-    sharedGetDirectorsAndRoles('movie', movieId, [
-        "Director", "Producer", "Executive Producer", "Director of Photography",
-        "Original Music Composer", "Screenplay", "Writer", "Editor"
-    ]);
+    sharedGetDirectorsAndRoles('movie', movieId, MOVIE_CREW_ROLES);
 
 export const getMovieTrailer = async (movieId: string) =>
     sharedGetTrailer('movie', movieId);
@@ -238,6 +254,97 @@ export const getMovieVideos = async (movieId: string) =>
 
 export const getMoviesAdditionalInfo = async (movieId: string) =>
     sharedGetAdditionalInfo('movie', movieId);
+
+// --- Ficha en UNA llamada (C1, 2026-10-29) ---
+
+export interface MovieBundle {
+    /** `/movie/{id}` crudo + lo que añadía `getMovieById` (proveedores y «en español»). */
+    item: any;
+    cast: MovieCastMember[];
+    directors: { name: string; job: string }[];
+    trailerUrl: string | null;
+    videos: any[];
+    /** Pósters en el idioma del perfil o sin idioma, `file_path` como URL original (sin recortar). */
+    posters: PosterImage[];
+    logo: string | null;
+    additionalInfo: Record<string, any>;
+    externalIds: any;
+    reviews: { results: any[] };
+    keywords: { id: number; name: string }[];
+}
+
+/**
+ * Todo lo público de la ficha de película con `append_to_response` (TMDB admite hasta 20 sub-recursos
+ * y cada uno respeta sus propios parámetros de idioma). Antes eran ~19 llamadas sueltas, varias
+ * repetidas (`/movie/{id}` ×3, `/credits` ×2, `/videos` ×2, `/images` ×2, `/keywords` ×2) y tres
+ * `fetch` en crudo sin timeout. Cada campo devuelto tiene EXACTAMENTE la forma que daban las
+ * funciones sueltas (`getMovieById`, `getMovieCast`, `getMovieDirectorsAndRoles`, `getMovieTrailer`,
+ * `getMovieVideos`, `fetchAllMoviePosters`, `getTitleLogo`, `getMoviesAdditionalInfo`, `getReviews`),
+ * así que la ficha y `/api/movie/[id]` no cambian. Las reseñas inglesas van aparte: dentro del
+ * append heredarían el idioma del perfil. Las imágenes también van aparte y SIN idioma: con
+ * `include_image_language` TMDB esconde algunos pósters «sin idioma» (Interstellar: 17 → 10), así
+ * que se piden como antes y se filtran aquí. Dos llamadas en paralelo en vez de ~19.
+ * El equipo llega en otro orden que con `/credits` suelto (mismas personas): se deja el de TMDB.
+ * Devuelve `null` si la película no existe o TMDB falla.
+ */
+export async function getMovieBundle(movieId: string | number): Promise<MovieBundle | null> {
+    const own = getCurrentLanguage().slice(0, 2);
+    let data: any;
+    let enReviews: { results?: any[] };
+    let images: { posters?: TMDBPosterImage[]; logos?: any[] };
+    try {
+        [data, enReviews, images] = await Promise.all([
+            tmdbFetch<any>(`/movie/${movieId}`, {
+                append_to_response: 'credits,videos,keywords,release_dates,external_ids,translations,reviews,watch/providers',
+                include_video_language: videoLanguages(),
+            }),
+            own === 'en'
+                ? Promise.resolve({ results: [] })
+                : tmdbFetch<{ results: any[] }>(`/movie/${movieId}/reviews`, { language: 'en-US' }).catch(() => ({ results: [] })),
+            tmdbFetch<any>(`/movie/${movieId}/images`, { language: '' }).catch(() => ({})),
+        ]);
+    } catch (error) {
+        console.error(`❌ Error al obtener la ficha de la película ${movieId}:`, error);
+        return null;
+    }
+    if (!data?.id) return null;
+
+    const { credits, videos, keywords, release_dates, external_ids, translations, reviews, ...detail } = data;
+    const providers = data['watch/providers']?.results;
+    delete (detail as any)['watch/providers'];
+
+    const item = {
+        ...detail,
+        hasSpanishTranslation: hasSpanishVersion(translations?.translations, release_dates?.results),
+        providers: mapAndDeduplicateProviders(providers?.[getCurrentRegion()] || providers?.ES || {}),
+        providersByCountry: buildProvidersByCountry(providers),
+        providerLinksByCountry: buildProviderLinksByCountry(providers),
+    };
+    const videoList = ownLanguageFirst(videos?.results || []);
+    const trailerKey = pickBestTrailerKey(videoList);
+    const keywordList = (keywords?.keywords || []).map((k: any) => ({ id: k.id, name: k.name }));
+
+    return {
+        item,
+        cast: (credits?.cast || []).map((actor: any) => ({
+            id: actor.id,
+            name: actor.name,
+            character: actor.character || "",
+            profile_path: actor.profile_path || null,
+        })),
+        directors: crewByRoles(credits?.crew, MOVIE_CREW_ROLES),
+        trailerUrl: trailerKey ? `https://www.youtube.com/watch?v=${trailerKey}` : null,
+        videos: videoList,
+        posters: (images.posters || [])
+            .filter((poster) => poster.iso_639_1 === own || poster.iso_639_1 === null)
+            .map((poster) => ({ ...poster, file_path: originalUrl(poster.file_path) })),
+        logo: pickTitleLogo(images?.logos),
+        additionalInfo: buildAdditionalInfo('movie', { ...detail, release_dates }, keywords?.keywords),
+        externalIds: external_ids || {},
+        reviews: mergeReviews(reviews?.results, enReviews.results),
+        keywords: keywordList,
+    };
+}
 
 // --- Recomendaciones ---
 

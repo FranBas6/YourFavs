@@ -47,6 +47,9 @@ export async function tmdbFetch<T>(path: string, params: Record<string, string> 
         language: getCurrentLanguage(),
         ...params,
     });
+    // `language: ''` = petición SIN idioma. No es lo mismo que mandarlo vacío: `/images` sin
+    // `language` devuelve todas las imágenes y con `language=` vacío se deja algunas (C1).
+    if (params.language === '') allParams.delete('language');
 
     const url = `${BASE_URL}${path}?${allParams.toString()}`;
 

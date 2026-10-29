@@ -16,18 +16,11 @@
  */
 import type { APIRoute } from 'astro';
 import {
-    getMovieById,
-    getMovieCast,
-    getMovieDirectorsAndRoles,
-    getMovieTrailer,
-    fetchAllMoviePosters,
+    getMovieBundle,
     getMovieCollectionInfo,
     getMovieRecommendationsOrSimilar,
-    getMoviesAdditionalInfo,
-    getMovieVideos,
+    type MovieBundle,
 } from '../../../services/API/Movies/InfoMovies';
-import { getTitleLogo, getReviews } from '../../../services/API/shared/tmdbInfoService';
-import { tmdbFetch } from '../../../services/API/shared/tmdbClient';
 import { safeFetch } from '../../../utils/safeFetch';
 
 export const prerender = false;
@@ -43,45 +36,23 @@ export const GET: APIRoute = async ({ params }) => {
     const id = params.id;
     if (!id) return json({ ok: false, error: 'Falta el id' }, 400);
 
-    // Bloque 1: básicos en paralelo (igual que la página).
-    const [item, cast, crew, trailerUrl] = await Promise.all([
-        safeFetch(getMovieById({ id }), `movie/${id}/details`, null as any),
-        safeFetch(getMovieCast(id), `movie/${id}/cast`, [] as any[]),
-        safeFetch(getMovieDirectorsAndRoles(id), `movie/${id}/directors`, [] as { name: string; job: string }[]),
-        safeFetch(getMovieTrailer(id), `movie/${id}/trailer`, null),
-    ]);
-
-    if (!item) return json({ ok: false, error: 'Película no encontrada' }, 404);
+    // Bloque 1: la ficha en UNA llamada a TMDB (igual que la página, C1).
+    const bundle = await safeFetch(getMovieBundle(id), `movie/${id}/bundle`, null as MovieBundle | null);
+    const item = bundle?.item;
+    if (!bundle || !item) return json({ ok: false, error: 'Película no encontrada' }, 404);
 
     const tmdbId = item.id;
+    const { cast, directors: crew, trailerUrl, externalIds, additionalInfo, videos, reviews: reviewsData, logo: titleLogo } = bundle;
+    const posters = bundle.posters.slice(0, 40);
 
-    // Bloque 2: dependen de item, no entre sí (igual que la página).
-    const [
-        posters,
-        collection,
-        recommendationsData,
-        externalIds,
-        additionalInfo,
-        videos,
-        reviewsData,
-        titleLogo,
-    ] = await Promise.all([
-        fetchAllMoviePosters(id).then((p) => p.slice(0, 40)).catch(() => []),
+    // Bloque 2: saga y recomendaciones (dependen de item, no entre sí).
+    const [collection, recommendationsData] = await Promise.all([
         item.belongs_to_collection
             ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null)
             : Promise.resolve(null),
         tmdbId
             ? getMovieRecommendationsOrSimilar(tmdbId)
             : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
-        tmdbId ? tmdbFetch<any>(`/movie/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
-        tmdbId
-            ? getMoviesAdditionalInfo(tmdbId)
-            : Promise.resolve({ keywords: [], languages: [], content_ratings: [], tagline: null, budget: null, revenue: null }),
-        getMovieVideos(id).catch(() => []),
-        tmdbId
-            ? getReviews('movie', tmdbId)
-            : Promise.resolve({ results: [] }),
-        tmdbId ? getTitleLogo('movie', tmdbId) : Promise.resolve(null),
     ]);
 
     // Reseñas: top 5 con contenido (igual que la web).
