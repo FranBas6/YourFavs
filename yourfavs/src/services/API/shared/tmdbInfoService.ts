@@ -32,55 +32,17 @@ export function pickBestTrailerKey(videos: VideoLike[]): string | null {
 }
 
 /** Vídeos en el idioma del perfil primero (TMDB los devuelve mezclados). */
-const ownLanguageFirst = (videos: any[]) => {
+export const ownLanguageFirst = (videos: any[]) => {
     const own = primaryLang();
     return [...videos].sort((a, b) => Number(b.iso_639_1 === own) - Number(a.iso_639_1 === own));
 };
 
-/**
- * Obtener el trailer (YouTube) de una película o serie
- */
-export async function getTrailer(mediaType: MediaType, id: string): Promise<string | null> {
-    try {
-        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`, { include_video_language: videoLanguages() });
-        const key = pickBestTrailerKey(data.results || []);
-        return key ? `https://www.youtube.com/watch?v=${key}` : null;
-    } catch (error) {
-        console.error(`Error al obtener el trailer de ${mediaType}/${id}:`, error);
-        return null;
-    }
-}
-
-/**
- * Obtener todos los videos de una película o serie
- */
-export async function getVideos(mediaType: MediaType, id: string): Promise<any[]> {
-    try {
-        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`, { include_video_language: videoLanguages() });
-        return ownLanguageFirst(data.results || []);
-    } catch (error) {
-        console.error(`Error al obtener los videos de ${mediaType}/${id}:`, error);
-        return [];
-    }
-}
-
-/**
- * Reseñas de TMDB: las del idioma del perfil y, detrás, las inglesas (casi todas las de TMDB están
- * en inglés: pidiendo solo `es-ES` la ficha se quedaba vacía). Cada reseña lleva `lang` para que
- * `ReviewsSection` marque las que no están en tu idioma. Sin duplicados (por `id`).
- */
-export async function getReviews(mediaType: MediaType, id: string | number): Promise<{ results: any[] }> {
-    const own = primaryLang();
-    const empty = { results: [] as any[] };
-    const [ownData, enData] = await Promise.all([
-        tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`).catch(() => empty),
-        own === 'en'
-            ? Promise.resolve(empty)
-            : tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`, { language: 'en-US' }).catch(() => empty),
-    ]);
+/** Junta reseñas del idioma del perfil (primero) y las inglesas, sin duplicar y con `lang`. */
+export function mergeReviews(own: any[] | undefined, en: any[] | undefined): { results: any[] } {
+    const ownLang = primaryLang();
     const seen = new Set<string>();
     const results: any[] = [];
-    for (const [list, lang] of [[ownData.results, own], [enData.results, 'en']] as const) {
+    for (const [list, lang] of [[own, ownLang], [en, 'en']] as const) {
         for (const r of list || []) {
             if (!r?.id || seen.has(r.id)) continue;
             seen.add(r.id);
@@ -108,76 +70,35 @@ export function movieCertifications(releaseDates: any): { iso_3166_1: string; ra
     return out;
 }
 
-/**
- * Obtener directores y roles relevantes del equipo
- */
-export async function getDirectorsAndRoles(
-    mediaType: MediaType,
-    id: string,
-    relevantRoles: string[]
-): Promise<{ name: string; job: string }[]> {
-    try {
-        const data = await tmdbFetch<{ crew: any[] }>(`/${mediaType}/${id}/credits`);
-
-        if (!data.crew) {
-            console.error(`No se encontró información del equipo para ${mediaType}/${id}`);
-            return [];
-        }
-
-        return data.crew
-            .filter((member: any) => relevantRoles.includes(member.job))
-            .map((person: any) => ({ name: person.name, job: person.job }));
-    } catch (error) {
-        console.error(`Error al obtener directores y roles de ${mediaType}/${id}:`, error);
-        return [];
-    }
+/** Miembros del equipo con un `job` de la lista (forma `{name, job}` de `CrewGrid`). */
+export function crewByRoles(crew: any[] | undefined, relevantRoles: string[]): { name: string; job: string }[] {
+    return (crew || [])
+        .filter((member: any) => relevantRoles.includes(member.job))
+        .map((person: any) => ({ name: person.name, job: person.job }));
 }
 
 /**
- * Obtener información adicional (keywords, networks, content_ratings, etc.)
+ * La «info adicional» de una ficha a partir del detalle (con `release_dates` en película o
+ * `content_ratings` en serie adjuntos) y sus keywords. La usan `getAdditionalInfo` y los paquetes
+ * de ficha (`getMovieBundle`), así que las dos rutas dan exactamente lo mismo.
  */
-export async function getAdditionalInfo(
-    mediaType: MediaType,
-    id: string
-): Promise<Record<string, any>> {
-    try {
-        const [keywordsData, detailData] = await Promise.all([
-            tmdbFetch<{ results?: any[]; keywords?: any[] }>(`/${mediaType}/${id}/keywords`),
-            // `content_ratings` solo existe en series; en películas la edad viene en `release_dates`.
-            tmdbFetch<any>(`/${mediaType}/${id}`, { append_to_response: mediaType === 'movie' ? 'release_dates' : 'content_ratings' }),
-        ]);
-
-        const base: Record<string, any> = {
-            // TMDB devuelve las keywords en `keywords` (películas) o `results` (series).
-            keywords: keywordsData.keywords || keywordsData.results || [],
-            networks: detailData.networks || [],
-            content_ratings: mediaType === 'movie'
-                ? movieCertifications(detailData.release_dates)
-                : detailData.content_ratings?.results || [],
-            episode_run_time: detailData.episode_run_time || [],
-            languages: detailData.spoken_languages || [],
-            tagline: detailData.tagline || null,
-        };
-
-        // Campos exclusivos de películas
-        if (mediaType === 'movie') {
-            base.budget = detailData.budget || null;
-            base.revenue = detailData.revenue || null;
-        }
-
-        return base;
-    } catch (error) {
-        console.error(`Error al obtener información adicional de ${mediaType}/${id}:`, error);
-        return {
-            keywords: [],
-            networks: [],
-            content_ratings: [],
-            episode_run_time: [],
-            languages: [],
-            tagline: null,
-            ...(mediaType === 'movie' ? { budget: null, revenue: null } : {}),
-        };
+export function buildAdditionalInfo(mediaType: MediaType, detailData: any, keywords: any[] | undefined): Record<string, any> {
+    const base: Record<string, any> = {
+        keywords: keywords || [],
+        networks: detailData.networks || [],
+        content_ratings: mediaType === 'movie'
+            ? movieCertifications(detailData.release_dates)
+            : detailData.content_ratings?.results || [],
+        episode_run_time: detailData.episode_run_time || [],
+        languages: detailData.spoken_languages || [],
+        tagline: detailData.tagline || null,
+    };
+    // Campos exclusivos de películas
+    if (mediaType === 'movie') {
+        base.budget = detailData.budget || null;
+        base.revenue = detailData.revenue || null;
     }
+    return base;
 }
 
 /**
@@ -261,20 +182,25 @@ export function mapAndDeduplicateProviders(esProviders: any) {
 
 /**
  * Obtener recomendaciones, similares, o combinación de ambas.
- * mapDetailToItem transforma la respuesta detallada de TMDB al tipo esperado.
+ * `mapItem` transforma cada resultado de la lista de TMDB al tipo esperado.
+ *
+ * C3 (2026-10-29): antes se pedía el DETALLE de las 20 primeras recomendaciones (20 llamadas por
+ * ficha) solo para quitar las de la misma saga y mapear géneros. La lista ya trae todo lo que pinta
+ * el carrusel, y la saga se quita con los ids de sus partes (`excludeIds`, que la ficha ya pide
+ * para «Saga»: se pasa la promesa y las dos peticiones van en paralelo).
  */
 export async function getRecommendationsOrSimilar<T extends { id: any; poster_path?: string }>(
     mediaType: MediaType,
     itemId: number,
-    mapDetailToItem: (data: any) => T,
-    shouldExclude?: (data: any) => boolean
+    mapItem: (data: any) => T,
+    excludeIds?: Promise<Set<number>> | Set<number> | null
 ): Promise<{
     success: boolean;
     recommendations: T[];
     type: 'recommendations' | 'similar' | 'combined';
     error?: string;
 }> {
-    async function fetchAndMap(endpoint: 'recommendations' | 'similar', fetchDetails: boolean): Promise<{
+    async function fetchAndMap(endpoint: 'recommendations' | 'similar', applyExclude: boolean): Promise<{
         success: boolean;
         items: T[];
         total_results?: number;
@@ -287,19 +213,12 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
             const filtered = data.results.filter((item: any) => item.poster_path);
 
             let items: T[];
-            if (fetchDetails) {
-                const detailedPromises = filtered.slice(0, 20).map(async (item: any) => {
-                    try {
-                        const detail = await tmdbFetch<any>(`/${mediaType}/${item.id}`);
-                        if (shouldExclude && shouldExclude(detail)) return null;
-                        return mapDetailToItem(detail);
-                    } catch {
-                        return null;
-                    }
-                });
-                items = (await Promise.all(detailedPromises)).filter(Boolean).slice(0, 12) as T[];
+            if (applyExclude) {
+                // Mismo recorte que cuando se pedían detalles: de las 20 primeras, fuera la saga, 12.
+                const excluded = (await excludeIds) ?? new Set<number>();
+                items = filtered.slice(0, 20).filter((item: any) => !excluded.has(item.id)).slice(0, 12).map(mapItem);
             } else {
-                items = filtered.slice(0, 12).map(mapDetailToItem);
+                items = filtered.slice(0, 12).map(mapItem);
             }
 
             return { success: true, items, total_results: data.total_results };
@@ -309,7 +228,7 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
         }
     }
 
-    // Intentar recomendaciones primero (con fetch de detalles)
+    // Intentar recomendaciones primero (quitando la propia saga)
     const recResult = await fetchAndMap('recommendations', true);
 
     // Si hay suficientes, devolver directamente
@@ -317,7 +236,7 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
         return { success: true, recommendations: recResult.items, type: 'recommendations' };
     }
 
-    // Si no, intentar similares (sin fetch de detalles, más rápido)
+    // Si no, intentar similares (como siempre, sin quitar la saga)
     const simResult = await fetchAndMap('similar', false);
 
     if (simResult.success) {
@@ -350,19 +269,12 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
  * luego inglés, luego neutro; dentro de cada idioma el de mayor vote_average.
  * Devuelve una URL w500 lista para <img>, o null (la ficha cae al título de texto).
  */
-export async function getTitleLogo(mediaType: MediaType, id: number | string): Promise<string | null> {
-    try {
-        const data = await tmdbFetch<{ logos?: { file_path: string; iso_639_1: string | null; vote_average?: number }[] }>(
-            `/${mediaType}/${id}/images`,
-            { include_image_language: 'es,en,null' }
-        );
-        const logos = data.logos || [];
-        if (!logos.length) return null;
-        const pick = (lang: string | null) =>
-            logos.filter((l) => l.iso_639_1 === lang).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
-        const best = pick('es') || pick('en') || pick(null) || logos[0];
-        return best ? `https://image.tmdb.org/t/p/w500${best.file_path}` : null;
-    } catch {
-        return null;
-    }
+/** Logo del título: mejor votado en español, si no en inglés, si no sin idioma (URL w500). */
+export function pickTitleLogo(logos: { file_path: string; iso_639_1: string | null; vote_average?: number }[] | undefined): string | null {
+    if (!logos?.length) return null;
+    const pick = (lang: string | null) =>
+        logos.filter((l) => l.iso_639_1 === lang).sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0))[0];
+    const best = pick('es') || pick('en') || pick(null) || logos[0];
+    return best ? `https://image.tmdb.org/t/p/w500${best.file_path}` : null;
 }
+

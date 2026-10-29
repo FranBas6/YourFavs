@@ -12,7 +12,8 @@
 import { defineMiddleware } from 'astro:middleware';
 import { createSupabaseServerClient } from './lib/supabase/server';
 import { SESSION_FLAG, clearSessionFlag, setSessionFlag } from './lib/supabase/authHttp';
-import { runWithUser, setRequestPrefs } from './services/BD/shared/userScope';
+import { runWithUser, setRequestPrefs, startTmdbMeter } from './services/BD/shared/userScope';
+import { installTmdbMeter, withTmdbReport } from './lib/dev/tmdbMeter';
 import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
 import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalogUrl';
 
@@ -125,6 +126,9 @@ export const onRequest = defineMiddleware(async (context, next) => {
     // Envolvemos el resto del request en el store de usuario: cualquier llamada a
     // services/BD/** durante este render leerá el uid de aquí (AsyncLocalStorage).
     return runWithUser(context.locals.user?.uid ?? null, async () => {
+        // Solo `astro dev` (C0): cuenta las llamadas a TMDB de esta petición y las resume en consola.
+        const tmdbT0 = Date.now();
+        const tmdbCalls = import.meta.env.DEV ? (installTmdbMeter(), startTmdbMeter()) : null;
         // Perfil: si personalizó nombre/avatar, prevalecen sobre los de Google
         // (así el header y el menú reflejan la edición del perfil).
         if (context.locals.user) {
@@ -160,6 +164,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
         }
         const response = await next();
         applyCacheHeaders(response, path, Boolean(context.locals.user));
-        return response;
+        return tmdbCalls ? withTmdbReport(response, path, tmdbCalls, tmdbT0) : response;
     }, { db: supabase, authId: context.locals.user?.authId ?? null });
 });

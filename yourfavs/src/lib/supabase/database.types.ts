@@ -365,6 +365,19 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"tmdb_cache": {
+                  Row: {
+                    "data": NonNullable<Json>,"expires_at": string,"fetched_at": string,"language": string,"media_type": Database["public"]['Enums']["media_type"],"tmdb_id": number
+                  }
+                  Insert: {
+                    "data": NonNullable<Json>,"expires_at": string,"fetched_at"?: string,"language": string,"media_type": Database["public"]['Enums']["media_type"],"tmdb_id": number
+                  }
+                  Update: {
+                    "data"?: NonNullable<Json>,"expires_at"?: string,"fetched_at"?: string,"language"?: string,"media_type"?: Database["public"]['Enums']["media_type"],"tmdb_id"?: number
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"user_state": {
                   Row: {
                     "data": NonNullable<Json>,"key": string,"updated_at": string,"user_id": string
