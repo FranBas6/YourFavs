@@ -337,6 +337,34 @@ const episodeRuntime: number | null = (() => {
 // Fecha del último episodio emitido, solo si la serie ya no sigue (si sigue, manda «Próximo episodio»).
 const lastAirDate: string | null = (status === 'Ended' || status === 'Canceled') && item?.last_air_date ? item.last_air_date : null;
 
+// B2a (2026-10-29): marca de episodio según `episode_type` de TMDB («finale», «mid_season»). El último
+// episodio de la última temporada de una serie terminada es «FINAL DE SERIE». No es un spoiler: dice
+// dónde acaba la temporada, igual que el número de episodios.
+const seriesIsOver = status === 'Ended' || status === 'Canceled';
+const lastRegularSeasonNumber = Math.max(0, ...regularSeasons.map((s: any) => s.season_number));
+function episodeMark(ep: any): { label: string; title: string } | null {
+    if (!ep) return null;
+    if (ep.episode_type === 'finale') {
+        const seasonEps = allSeasonEpisodes[ep.season_number] || [];
+        const isLastOfSeries = seriesIsOver && ep.season_number === lastRegularSeasonNumber
+            && ep.episode_number === seasonEps[seasonEps.length - 1]?.episode_number;
+        return isLastOfSeries
+            ? { label: 'FINAL DE SERIE', title: 'Último episodio de la serie' }
+            : { label: 'FINAL', title: 'Último episodio de la temporada' };
+    }
+    if (ep.episode_type === 'mid_season') {
+        return { label: 'PARÓN', title: 'Final de mitad de temporada: la temporada para y sigue más adelante' };
+    }
+    return null;
+}
+// Dirección y guion de un episodio (vienen en `crew` de cada episodio).
+const EPISODE_WRITER_JOBS = ['Writer', 'Teleplay', 'Screenplay'];
+function episodeCredits(ep: any): { directors: string[]; writers: string[] } {
+    const crew: any[] = ep?.crew || [];
+    const names = (jobs: string[]) => [...new Set(crew.filter((c) => jobs.includes(c.job)).map((c) => c.name as string))];
+    return { directors: names(['Director']), writers: names(EPISODE_WRITER_JOBS) };
+}
+
 // Ordenar temporadas: primero las regulares, luego las especiales
 const sortedSeasons = item?.seasons?.sort((a, b) => {
     // Las temporadas especiales (0) van al final
@@ -941,6 +969,9 @@ const jsonLd = item ? {
                             <div class="flex flex-wrap gap-3 text-sm text-gray-600 mb-2">
                                 <span>T{item.next_episode_to_air.season_number} E{item.next_episode_to_air.episode_number}</span>
                                 <span>{formatDate(item.next_episode_to_air.air_date)}</span>
+                                {episodeMark(item.next_episode_to_air) && (
+                                    <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 self-center" title={episodeMark(item.next_episode_to_air)!.title}>{episodeMark(item.next_episode_to_air)!.label}</span>
+                                )}
                             </div>
                             {item.next_episode_to_air.overview && (
                                 <details class="text-sm text-gray-600 group">
@@ -965,6 +996,9 @@ const jsonLd = item ? {
                                     <div class="flex flex-wrap gap-3 text-sm text-gray-500 mb-2">
                                         <span>T{item.last_episode_to_air.season_number} E{item.last_episode_to_air.episode_number}</span>
                                         <span>{formatDate(item.last_episode_to_air.air_date)}</span>
+                                        {episodeMark(item.last_episode_to_air) && (
+                                            <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 self-center" title={episodeMark(item.last_episode_to_air)!.title}>{episodeMark(item.last_episode_to_air)!.label}</span>
+                                        )}
                                         {item.last_episode_to_air.vote_average > 0 && <span class="text-yellow-600">{item.last_episode_to_air.vote_average.toFixed(1)}</span>}
                                     </div>
                                     {item.last_episode_to_air.overview && (
@@ -1141,6 +1175,8 @@ const jsonLd = item ? {
                                             )}
                                             {seasonEpisodes.map((episode) => {
                                                 const isWatched = watchedSet.has(`${season.season_number}-${episode.episode_number}`);
+                                                const mark = episodeMark(episode);
+                                                const credits = episodeCredits(episode);
                                                 return (
                                                 <div>
                                                     <details class={`border-b pb-2 last:border-0 group ${season.season_number === 0 ? 'border-purple-100' : 'border-gray-100'}`}>
@@ -1148,6 +1184,9 @@ const jsonLd = item ? {
                                                             <span class={`font-bold px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${season.season_number === 0 ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
                                                                 {season.season_number === 0 ? `E${episode.episode_number}` : episode.episode_number}
                                                             </span>
+                                                            {mark && (
+                                                                <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex-shrink-0" title={mark.title}>{mark.label}</span>
+                                                            )}
                                                             <div class="flex-1 min-w-0">
                                                                 <p class="font-medium text-gray-800 text-sm truncate group-open:whitespace-normal group-open:overflow-visible">{episode.name}</p>
                                                                 <p class="text-xs text-gray-500 mt-0.5 truncate">
@@ -1173,6 +1212,18 @@ const jsonLd = item ? {
                                                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
                                                                     Mostrar (spoilers)
                                                                 </button>
+                                                            )}
+                                                            {/* Dirección y guion (B2a): no es spoiler, va sin difuminar */}
+                                                            {(credits.directors.length > 0 || credits.writers.length > 0) && (
+                                                                <p class="text-xs text-gray-600 mb-3">
+                                                                    {credits.directors.length > 0 && (
+                                                                        <span><span class="font-semibold">Dirección:</span> {credits.directors.map((n, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`} class="hover:text-blue-600 hover:underline">{n}</a></>))}</span>
+                                                                    )}
+                                                                    {credits.directors.length > 0 && credits.writers.length > 0 && <span class="text-gray-400">  ·  </span>}
+                                                                    {credits.writers.length > 0 && (
+                                                                        <span><span class="font-semibold">Guion:</span> {credits.writers.map((n, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`} class="hover:text-blue-600 hover:underline">{n}</a></>))}</span>
+                                                                    )}
+                                                                </p>
                                                             )}
                                                             {/* Imagen */}
                                                             {episode.still_path && (
