@@ -30,7 +30,7 @@ import { getDailyBrief, type DailyBrief } from "../services/API/shared/dailyBrie
 import WhatToWatch from "../components/personal/WhatToWatch.astro";
 import SectionHeader from "../components/SectionHeader.astro";
 import { Icon } from 'astro-icon/components';
-import {fetchAllPlatforms} from "../utils/constants/platforms";
+import {fetchPlatformOfTheDay} from "../utils/constants/platforms";
 import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
 import {posterUrl, backdropUrl} from "../services/API/shared/tmdbClient";
@@ -56,7 +56,7 @@ const [
     popularSeries,
     topRatedMovies,
     topRatedSeries,
-    platforms,
+    platformOfDay,
     categoriesMovies,
     categoriesSeries,
     continueWatching,
@@ -73,7 +73,8 @@ const [
     safeFetch(getMostPopularSeries({page: pageStr}), 'home/popularSeries', [] as Serie[]),
     safeFetch(getTopRatedMovies({page: pageStr}), 'home/topRatedMovies', [] as Movie[]),
     safeFetch(getTopRatedSeries({page: pageStr}), 'home/topRatedSeries', [] as Serie[]),
-    safeFetch(fetchAllPlatforms(pageStr, Astro.locals.user?.region || 'ES'), 'home/platforms', []),
+    // Una plataforma por día y solo sus 2 listas (antes: 14 discover por carga para enseñar una al azar).
+    safeFetch(fetchPlatformOfTheDay(pageStr, Astro.locals.user?.region || 'ES'), 'home/platforms', null),
     safeFetch(getMoviesByCategory(randomCategorySlug, pageStr), 'home/categoriesMovies', [] as Movie[]),
     safeFetch(getSeriesByCategory(randomCategorySlug, pageStr), 'home/categoriesSeries', [] as Serie[]),
     safeFetch(getNextEpisodesData(), 'home/continueWatching', [] as any[]),
@@ -93,7 +94,8 @@ const [
     safeFetch(readHooksDoc(), 'home/hooks', null),
 ]);
 
-const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+// Si TMDB falla la fila sale vacía (y no se pinta) en vez de romper la portada.
+const randomPlatform = platformOfDay ?? { name: '', slug: '', logo: '', movies: [], series: [] };
 
 // Brief diario "Hoy en tu cine" (① · solo con sesión). Reutiliza `continueWatching`
 // (ya calculado arriba) para no recomputar el "siguiente episodio"; cacheado por
