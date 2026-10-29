@@ -20,6 +20,8 @@ interface RequestContext {
     db: SupabaseServer | null;
     /** Id de Supabase Auth del usuario (dueño de las filas en Postgres). */
     authId: string | null;
+    /** Solo en `astro dev`: llamadas a TMDB de esta petición (C0, `lib/dev/tmdbMeter.ts`). */
+    tmdbCalls?: string[];
 }
 
 const als = new AsyncLocalStorage<RequestContext>();
@@ -85,6 +87,19 @@ export function setRequestPrefs(prefs: { language?: string | null; region?: stri
     if (!s) return;
     if (prefs.language) s.language = prefs.language;
     if (prefs.region) s.region = prefs.region;
+}
+
+/** Solo dev (C0): abre la lista de llamadas a TMDB de esta petición y la devuelve. */
+export function startTmdbMeter(): string[] | null {
+    const s = als.getStore();
+    if (!s) return null;
+    s.tmdbCalls = [];
+    return s.tmdbCalls;
+}
+
+/** Solo dev (C0): anota una llamada a TMDB en la petición en curso (si hay medidor abierto). */
+export function recordTmdbCall(call: string): void {
+    als.getStore()?.tmdbCalls?.push(call);
 }
 
 /** Idioma de contenido del request (perfil) — default es-ES fuera de contexto. */
