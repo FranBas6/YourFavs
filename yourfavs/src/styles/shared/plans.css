@@ -62,10 +62,14 @@
 .cal-k-ep     { --sb: var(--stamp-blue);   --si: var(--stamp-blue-ink); }
 .cal-k-season { --sb: var(--stamp-purple); --si: var(--stamp-purple-ink); }
 .cal-k-person { --sb: var(--stamp-pink);   --si: var(--stamp-pink-ink); }
-.cal-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--si); }
+/* Solo los puntos de esta página, que siempre llevan su tipo (.cal-k-*). El calendario de la cabecera
+   también usa `.cal-dot` (header.css, con .cal-dot-movie/-serie/-season) y, desde que el mini-chat carga
+   este CSS en todas las páginas, un `.cal-dot` suelto aquí le ponía `var(--si)` (sin definir fuera de
+   .cal-k-*) y dejaba sus puntos transparentes. */
+.cal-dot:is(.cal-k-movie, .cal-k-ep, .cal-k-season, .cal-k-person) { width: 6px; height: 6px; border-radius: 50%; background: var(--si); }
 .cal-dot.pl { display: inline-flex; width: auto; height: auto; border-radius: 0; background: none; color: var(--text); }
 .cal-dot.pl svg { width: 10px; height: 10px; }
-@media (min-width: 640px) { .cal-dot { width: 8px; height: 8px; } }
+@media (min-width: 640px) { .cal-dot:is(.cal-k-movie, .cal-k-ep, .cal-k-season, .cal-k-person) { width: 8px; height: 8px; } }
 .cal-ce { background: var(--sb); color: var(--si); }
 .cal-tx { color: var(--si); }
 .cal-row { background: var(--sb); border-color: var(--sb); }
