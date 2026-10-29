@@ -26,23 +26,6 @@ export const NETWORKS = [
 ] as const;
 
 /**
- * Obtener series producidas por una cadena TV específica.
- */
-export async function fetchSeriesByNetwork<T>(
-    networkId: number,
-    page: string = "1"
-): Promise<T[]> {
-    // Ordenadas por nota (vote_average) con guard de vote_count mínimo
-    // para evitar series con 1-2 votos altísimos que no representan calidad real.
-    return tmdbFetchList<T>(`/discover/tv`, {
-        page,
-        with_networks: networkId.toString(),
-        sort_by: 'vote_average.desc',
-        'vote_count.gte': '100',
-    });
-}
-
-/**
  * Obtener contenido por proveedor de streaming (Netflix, Amazon, etc.)
  */
 export async function fetchByProvider<T>(

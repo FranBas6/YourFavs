@@ -37,50 +37,6 @@ export const ownLanguageFirst = (videos: any[]) => {
     return [...videos].sort((a, b) => Number(b.iso_639_1 === own) - Number(a.iso_639_1 === own));
 };
 
-/**
- * Obtener el trailer (YouTube) de una película o serie
- */
-export async function getTrailer(mediaType: MediaType, id: string): Promise<string | null> {
-    try {
-        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`, { include_video_language: videoLanguages() });
-        const key = pickBestTrailerKey(data.results || []);
-        return key ? `https://www.youtube.com/watch?v=${key}` : null;
-    } catch (error) {
-        console.error(`Error al obtener el trailer de ${mediaType}/${id}:`, error);
-        return null;
-    }
-}
-
-/**
- * Obtener todos los videos de una película o serie
- */
-export async function getVideos(mediaType: MediaType, id: string): Promise<any[]> {
-    try {
-        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`, { include_video_language: videoLanguages() });
-        return ownLanguageFirst(data.results || []);
-    } catch (error) {
-        console.error(`Error al obtener los videos de ${mediaType}/${id}:`, error);
-        return [];
-    }
-}
-
-/**
- * Reseñas de TMDB: las del idioma del perfil y, detrás, las inglesas (casi todas las de TMDB están
- * en inglés: pidiendo solo `es-ES` la ficha se quedaba vacía). Cada reseña lleva `lang` para que
- * `ReviewsSection` marque las que no están en tu idioma. Sin duplicados (por `id`).
- */
-export async function getReviews(mediaType: MediaType, id: string | number): Promise<{ results: any[] }> {
-    const own = primaryLang();
-    const empty = { results: [] as any[] };
-    const [ownData, enData] = await Promise.all([
-        tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`).catch(() => empty),
-        own === 'en'
-            ? Promise.resolve(empty)
-            : tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`, { language: 'en-US' }).catch(() => empty),
-    ]);
-    return mergeReviews(ownData.results, enData.results);
-}
-
 /** Junta reseñas del idioma del perfil (primero) y las inglesas, sin duplicar y con `lang`. */
 export function mergeReviews(own: any[] | undefined, en: any[] | undefined): { results: any[] } {
     const ownLang = primaryLang();
@@ -114,29 +70,6 @@ export function movieCertifications(releaseDates: any): { iso_3166_1: string; ra
     return out;
 }
 
-/**
- * Obtener directores y roles relevantes del equipo
- */
-export async function getDirectorsAndRoles(
-    mediaType: MediaType,
-    id: string,
-    relevantRoles: string[]
-): Promise<{ name: string; job: string }[]> {
-    try {
-        const data = await tmdbFetch<{ crew: any[] }>(`/${mediaType}/${id}/credits`);
-
-        if (!data.crew) {
-            console.error(`No se encontró información del equipo para ${mediaType}/${id}`);
-            return [];
-        }
-
-        return crewByRoles(data.crew, relevantRoles);
-    } catch (error) {
-        console.error(`Error al obtener directores y roles de ${mediaType}/${id}:`, error);
-        return [];
-    }
-}
-
 /** Miembros del equipo con un `job` de la lista (forma `{name, job}` de `CrewGrid`). */
 export function crewByRoles(crew: any[] | undefined, relevantRoles: string[]): { name: string; job: string }[] {
     return (crew || [])
@@ -166,36 +99,6 @@ export function buildAdditionalInfo(mediaType: MediaType, detailData: any, keywo
         base.revenue = detailData.revenue || null;
     }
     return base;
-}
-
-/**
- * Obtener información adicional (keywords, networks, content_ratings, etc.)
- */
-export async function getAdditionalInfo(
-    mediaType: MediaType,
-    id: string
-): Promise<Record<string, any>> {
-    try {
-        const [keywordsData, detailData] = await Promise.all([
-            tmdbFetch<{ results?: any[]; keywords?: any[] }>(`/${mediaType}/${id}/keywords`),
-            // `content_ratings` solo existe en series; en películas la edad viene en `release_dates`.
-            tmdbFetch<any>(`/${mediaType}/${id}`, { append_to_response: mediaType === 'movie' ? 'release_dates' : 'content_ratings' }),
-        ]);
-
-        // TMDB devuelve las keywords en `keywords` (películas) o `results` (series).
-        return buildAdditionalInfo(mediaType, detailData, keywordsData.keywords || keywordsData.results);
-    } catch (error) {
-        console.error(`Error al obtener información adicional de ${mediaType}/${id}:`, error);
-        return {
-            keywords: [],
-            networks: [],
-            content_ratings: [],
-            episode_run_time: [],
-            languages: [],
-            tagline: null,
-            ...(mediaType === 'movie' ? { budget: null, revenue: null } : {}),
-        };
-    }
 }
 
 /**
@@ -375,14 +278,3 @@ export function pickTitleLogo(logos: { file_path: string; iso_639_1: string | nu
     return best ? `https://image.tmdb.org/t/p/w500${best.file_path}` : null;
 }
 
-export async function getTitleLogo(mediaType: MediaType, id: number | string): Promise<string | null> {
-    try {
-        const data = await tmdbFetch<{ logos?: { file_path: string; iso_639_1: string | null; vote_average?: number }[] }>(
-            `/${mediaType}/${id}/images`,
-            { include_image_language: 'es,en,null' }
-        );
-        return pickTitleLogo(data.logos);
-    } catch {
-        return null;
-    }
-}

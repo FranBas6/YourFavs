@@ -1,6 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import type { CastMember, Provider, ProductionCompany } from "../../types/Media";
+import type { CastMember, ProductionCompany } from "../../types/Media";
 import {
     getLanguageDisplayName, getContentRating,
     formatDate, getRatingStars, formatTrailerUrl, providerLinks
@@ -157,32 +157,6 @@ const isUnreleased = item?.release_date ? new Date(item.release_date) > new Date
 const notifSub = isUnreleased ? await getNotificationSub('movie', id) : null;
 const isNotifSubscribed = !!notifSub;
 
-interface ProviderElement {
-    name: string;
-    logo: string | null;
-    link: string | undefined;
-    type: string;
-}
-
-const providerElements: ProviderElement[] = item?.providers?.map((provider: Provider) => {
-    const link = providerLinks[provider.provider_name];
-    const hasLogo = !!provider.logo_path;
-    return {
-        name: provider.provider_name,
-        logo: hasLogo ? posterUrl(provider.logo_path, 'w200') : null,
-        link,
-        type: provider.type || 'flatrate'
-    };
-}) || [];
-
-// Agrupar por tipo
-const providersByType = providerElements.reduce((acc: Record<string, ProviderElement[]>, p) => {
-    const key = p.type || 'flatrate';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(p);
-    return acc;
-}, {} as Record<string, ProviderElement[]>);
-
 import type {PosterImage} from '../../services/API/Movies/InfoMovies';
 
 // Segundo bloque de datos (dependen de item pero no entre sí) — todo en paralelo
@@ -262,8 +236,7 @@ const betterThanCount = allRelated.filter((m: any) => item?.vote_average > m.vot
 const ratingPercentile = allRelated.length >= 5 ? Math.round((betterThanCount / allRelated.length) * 100) : null;
 const mainGenre = item?.genres?.[0]?.name || null;
 
-// Categorizar videos
-const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
+// Categorizar videos (el tráiler principal ya va en `trailerUrl`)
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
 const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');

@@ -1,12 +1,8 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
-import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
+import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
 import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
 import { getGenreName } from "../../../utils/constants/genres";
 import {
-    getTrailer as sharedGetTrailer,
-    getVideos as sharedGetVideos,
-    getAdditionalInfo as sharedGetAdditionalInfo,
-    getDirectorsAndRoles as sharedGetDirectorsAndRoles,
     mapAndDeduplicateProviders,
     buildProvidersByCountry,
     buildProviderLinksByCountry,
@@ -20,8 +16,6 @@ import {
     videoLanguages,
 } from '../shared/tmdbInfoService';
 
-const BASE_URL = "https://api.themoviedb.org/3";
-
 // --- Funciones únicas de series ---
 
 /** «Disponible en España»: alguna plataforma (suscripción, alquiler o compra) y traducción es-ES. */
@@ -31,53 +25,6 @@ function isAvailableInSpain(providersResults: any, translations: any[] | undefin
     const hasSpanishTranslation = (translations || []).some((t: any) => t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES');
     return hasProvider && hasSpanishTranslation;
 }
-
-async function checkSeriesSpanishAvailability(seriesId: string): Promise<boolean> {
-    try {
-        const providersUrl = `${BASE_URL}/tv/${seriesId}/watch/providers?api_key=${API_KEY}`;
-        const providersRes = await fetch(providersUrl);
-
-        if (!providersRes.ok) return false;
-
-        const providersData = await providersRes.json();
-        const esProviders = providersData.results?.[getCurrentRegion()] || providersData.results?.ES || {};
-        const hasProvider = esProviders.flatrate?.length > 0 ||
-            esProviders.rent?.length > 0 ||
-            esProviders.buy?.length > 0;
-
-        const translationsUrl = `${BASE_URL}/tv/${seriesId}/translations?api_key=${API_KEY}`;
-        const translationsRes = await fetch(translationsUrl);
-
-        let hasSpanishTranslation = false;
-        if (translationsRes.ok) {
-            const translationsData = await translationsRes.json();
-            const translations = translationsData.translations || [];
-            hasSpanishTranslation = translations.some((t: any) =>
-                t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES'
-            );
-        }
-
-        return hasProvider && hasSpanishTranslation;
-    } catch (error) {
-        console.error(`Error verificando disponibilidad en España para serie ${seriesId}:`, error);
-        return false;
-    }
-}
-
-export const getSeriesById = async ({ id }: { id: string }) => {
-    const [serie, providersData] = await Promise.all([
-        tmdbFetch<Serie>(`/tv/${id}`),
-        tmdbFetch<{ results: any }>(`/tv/${id}/watch/providers`, {}),
-    ]);
-
-    const esProviders = providersData.results?.[getCurrentRegion()] || providersData.results?.ES || {};
-    serie.availableInSpain = await checkSeriesSpanishAvailability(id);
-    serie.providers = mapAndDeduplicateProviders(esProviders);
-    (serie as any).providersByCountry = buildProvidersByCountry(providersData.results);
-    (serie as any).providerLinksByCountry = buildProviderLinksByCountry(providersData.results);
-
-    return serie;
-};
 
 /**
  * Providers de UNA temporada concreta.
@@ -110,49 +57,6 @@ interface CastMember {
     profile_path?: string;
 }
 
-export const getSeriesCast = async (tvId: string): Promise<CastMember[]> => {
-    try {
-        const seriesData = await tmdbFetch<{ number_of_seasons: number }>(`/tv/${tvId}`);
-        const totalSeasons = seriesData.number_of_seasons;
-        const allCast = new Map<number, CastMember>();
-
-        const seasonNumbers = Array.from({ length: totalSeasons }, (_, i) => i + 1);
-        const results = await Promise.all(
-            seasonNumbers.map(season =>
-                tmdbFetch<{ cast?: any[] }>(`/tv/${tvId}/season/${season}/credits`).catch(() => ({ cast: [] as any[] }))
-            )
-        );
-
-        for (const data of results) {
-            data.cast?.forEach((actor: any) => {
-                if (!allCast.has(actor.id)) {
-                    allCast.set(actor.id, {
-                        id: actor.id,
-                        name: actor.name,
-                        character: actor.character || '',
-                        profile_path: actor.profile_path || null,
-                    });
-                }
-            });
-        }
-
-        return Array.from(allCast.values());
-    } catch (error) {
-        console.error(`Error al obtener el reparto de la serie ${tvId}:`, error);
-        return [];
-    }
-};
-
-export const getSeriesStatus = async (seriesId: string): Promise<string | null> => {
-    try {
-        const data = await tmdbFetch<{ status: string }>(`/tv/${seriesId}`);
-        return data.status || null;
-    } catch (error) {
-        console.error("Error al obtener el estado de la serie:", error);
-        return null;
-    }
-};
-
 export async function getEpisodesBySeasonNumber(serieId: number | string, seasonNumber: number): Promise<any[]> {
     try {
         const data = await tmdbFetch<{ episodes?: any[] }>(`/tv/${serieId}/season/${seasonNumber}`);
@@ -184,67 +88,11 @@ export interface PosterImage {
     width: number;
 }
 
-export const fetchAllSeriesPosters = async (
-    serieId: string | number,
-    language: string = getCurrentLanguage()
-): Promise<PosterImage[]> => {
-    const numericId = typeof serieId === 'string' ? parseInt(serieId, 10) : serieId;
-    const fullImagePath = (path: string) => originalUrl(path);
-
-    try {
-        const seriesData = await tmdbFetch<{ seasons: any[] }>(`/tv/${numericId}`, {});
-        const seasons = seriesData.seasons || [];
-
-        const fetchImages = (url: string) =>
-            fetch(url)
-                .then(r => r.json())
-                .catch(() => ({ posters: [] }));
-
-        const [seriesImagesData, ...seasonResults] = await Promise.all([
-            fetchImages(`${BASE_URL}/tv/${numericId}/images?api_key=${API_KEY}`),
-            ...seasons.map((season: any) =>
-                fetchImages(`${BASE_URL}/tv/${numericId}/season/${season.season_number}/images?api_key=${API_KEY}`)
-            ),
-        ]);
-
-        let posters: TMDBPosterImage[] = seriesImagesData.posters || [];
-        for (const seasonImagesData of seasonResults) {
-            if (Array.isArray(seasonImagesData.posters)) {
-                posters = posters.concat(seasonImagesData.posters);
-            }
-        }
-
-        if (language !== "" && language !== "all") {
-            posters = posters.filter(poster => poster.iso_639_1 === language.split('-')[0] || poster.iso_639_1 === null);
-        }
-
-        return posters.map(poster => ({
-            ...poster,
-            file_path: fullImagePath(poster.file_path),
-        }));
-    } catch (error) {
-        console.error(`Error al obtener los pósters de la serie ${numericId}:`, error);
-        return [];
-    }
-};
-
 // --- Funciones delegadas a módulos compartidos ---
 
 const SERIES_CREW_ROLES = [
     "Director", "Producer", "Executive Producer", "Visual Effects", "Original Music Composer"
 ];
-
-export const getSeriesDirectorsAndRoles = async (tvId: string) =>
-    sharedGetDirectorsAndRoles('tv', tvId, SERIES_CREW_ROLES);
-
-export const getSeriesTrailer = async (seriesId: string) =>
-    sharedGetTrailer('tv', seriesId);
-
-export const getSeriesVideos = async (seriesId: string) =>
-    sharedGetVideos('tv', seriesId);
-
-export const getSeriesAdditionalInfo = async (seriesId: string) =>
-    sharedGetAdditionalInfo('tv', seriesId);
 
 // --- Ficha en pocas llamadas (C2, 2026-10-29) ---
 
@@ -425,61 +273,6 @@ function mapSerieDetail(data: any): Serie {
         last_episode_to_air: data.last_episode_to_air,
         next_episode_to_air: data.next_episode_to_air,
         providers: [],
-    };
-}
-
-function mapSerieSimilar(data: any): Serie {
-    return {
-        adult: false,
-        backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
-        genres: [],
-        genre_ids: data.genre_ids ?? [],
-        id: data.id,
-        origin_country: data.origin_country ?? [],
-        original_language: data.original_language,
-        original_name: data.original_name,
-        overview: data.overview,
-        popularity: data.popularity,
-        poster_path: posterUrl(data.poster_path),
-        first_air_date: data.first_air_date,
-        name: data.name,
-        vote_average: data.vote_average,
-        vote_count: data.vote_count,
-        languages: undefined,
-        seasons: undefined,
-        production_companies: undefined,
-        homepage: undefined,
-        last_episode_to_air: undefined,
-        next_episode_to_air: undefined,
-        providers: [],
-    };
-}
-
-export async function getSerieRecommendations(serieId: number): Promise<{
-    success: boolean;
-    recommendations: Serie[];
-    total_results?: number;
-    error?: string;
-}> {
-    const result = await sharedGetRecommendationsOrSimilar<Serie>('tv', serieId, mapSerieDetail);
-    return {
-        success: result.success,
-        recommendations: result.recommendations,
-        error: result.error,
-    };
-}
-
-export async function getSimilarSeries(serieId: number): Promise<{
-    success: boolean;
-    recommendations: Serie[];
-    total_results?: number;
-    error?: string;
-}> {
-    const result = await sharedGetRecommendationsOrSimilar<Serie>('tv', serieId, mapSerieSimilar);
-    return {
-        success: result.success,
-        recommendations: result.recommendations,
-        error: result.error,
     };
 }
 

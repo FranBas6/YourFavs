@@ -1,11 +1,7 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
 import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
-import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
+import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
 import {
-    getTrailer as sharedGetTrailer,
-    getVideos as sharedGetVideos,
-    getAdditionalInfo as sharedGetAdditionalInfo,
-    getDirectorsAndRoles as sharedGetDirectorsAndRoles,
     mapAndDeduplicateProviders,
     buildProvidersByCountry,
     buildProviderLinksByCountry,
@@ -19,8 +15,6 @@ import {
     videoLanguages,
 } from '../shared/tmdbInfoService';
 
-const BASE_URL = "https://api.themoviedb.org/3";
-
 // --- Funciones únicas de películas ---
 
 /** «Disponible en español»: traducción es-ES y fecha de estreno en España (ambas cosas). */
@@ -30,76 +24,12 @@ function hasSpanishVersion(translations: any[] | undefined, releaseResults: any[
     return hasTextTranslation && hasSpainRelease;
 }
 
-async function checkMovieSpanishTranslation(movieId: string): Promise<boolean> {
-    try {
-        const translationsUrl = `${BASE_URL}/movie/${movieId}/translations?api_key=${API_KEY}`;
-        const translationsRes = await fetch(translationsUrl);
-
-        if (!translationsRes.ok) return false;
-
-        const translationsData = await translationsRes.json();
-        const translations = translationsData.translations || [];
-        const hasTextTranslation = translations.some((t: any) =>
-            t.iso_639_1 === 'es' && t.iso_3166_1 === 'ES'
-        );
-
-        const releasesUrl = `${BASE_URL}/movie/${movieId}/release_dates?api_key=${API_KEY}`;
-        const releasesRes = await fetch(releasesUrl);
-
-        let hasSpainRelease = false;
-        if (releasesRes.ok) {
-            const releasesData = await releasesRes.json();
-            const releases = releasesData.results || [];
-            hasSpainRelease = releases.some((r: any) => r.iso_3166_1 === 'ES');
-        }
-
-        return hasTextTranslation && hasSpainRelease;
-    } catch (error) {
-        console.error(`Error verificando traducciones para película ${movieId}:`, error);
-        return false;
-    }
-}
-
-export const getMovieById = async ({ id }: { id: string }) => {
-    const movie = await tmdbFetch<any>(`/movie/${id}`);
-    movie.hasSpanishTranslation = await checkMovieSpanishTranslation(id);
-
-    const providersData = await tmdbFetch<{ results: any }>(`/movie/${id}/watch/providers`, {});
-    const esProviders = providersData.results?.[getCurrentRegion()] || providersData.results?.ES || {};
-    movie.providers = mapAndDeduplicateProviders(esProviders);
-    movie.providersByCountry = buildProvidersByCountry(providersData.results);
-    movie.providerLinksByCountry = buildProviderLinksByCountry(providersData.results);
-
-    return movie;
-};
-
 interface MovieCastMember {
     id: number;
     name: string;
     character: string;
     profile_path?: string;
 }
-
-export const getMovieCast = async (movieId: string): Promise<MovieCastMember[]> => {
-    try {
-        const data = await tmdbFetch<{ cast: any[] }>(`/movie/${movieId}/credits`);
-
-        if (!data.cast) {
-            console.error("No se encontró información del reparto");
-            return [];
-        }
-
-        return data.cast.map((actor: any) => ({
-            id: actor.id,
-            name: actor.name,
-            character: actor.character || "",
-            profile_path: actor.profile_path || null,
-        }));
-    } catch (error) {
-        console.error("Error al obtener el reparto:", error);
-        return [];
-    }
-};
 
 // Interfaz original TMDB
 interface TMDBPosterImage {
@@ -121,32 +51,6 @@ export interface PosterImage {
     vote_count: number;
     width: number;
 }
-
-export const fetchAllMoviePosters = async (
-    movieId: string | number,
-    language: string = getCurrentLanguage()
-): Promise<PosterImage[]> => {
-    const numericId = typeof movieId === 'string' ? parseInt(movieId, 10) : movieId;
-    const fullImagePath = (path: string) => originalUrl(path);
-
-    try {
-        const movieImagesRes = await fetch(`${BASE_URL}/movie/${numericId}/images?api_key=${API_KEY}`);
-        const movieImagesData = await movieImagesRes.json();
-        let posters: TMDBPosterImage[] = movieImagesData.posters || [];
-
-        if (language !== "" && language !== "all") {
-            posters = posters.filter(poster => poster.iso_639_1 === language.split('-')[0] || poster.iso_639_1 === null);
-        }
-
-        return posters.map(poster => ({
-            ...poster,
-            file_path: fullImagePath(poster.file_path),
-        }));
-    } catch (error) {
-        console.error(`Error al obtener los pósters de la película ${numericId}:`, error);
-        return [];
-    }
-};
 
 export interface MovieCollectionInfo {
     id: number;
@@ -242,18 +146,6 @@ const MOVIE_CREW_ROLES = [
     "Director", "Producer", "Executive Producer", "Director of Photography",
     "Original Music Composer", "Screenplay", "Writer", "Editor"
 ];
-
-export const getMovieDirectorsAndRoles = async (movieId: string) =>
-    sharedGetDirectorsAndRoles('movie', movieId, MOVIE_CREW_ROLES);
-
-export const getMovieTrailer = async (movieId: string) =>
-    sharedGetTrailer('movie', movieId);
-
-export const getMovieVideos = async (movieId: string) =>
-    sharedGetVideos('movie', movieId);
-
-export const getMoviesAdditionalInfo = async (movieId: string) =>
-    sharedGetAdditionalInfo('movie', movieId);
 
 // --- Ficha en UNA llamada (C1, 2026-10-29) ---
 
@@ -365,20 +257,6 @@ function mapMovieDetail(data: any): Movie {
         original_title: data.original_title,
         release_date: data.release_date,
         video: data.video,
-    };
-}
-
-export async function getSimilarMovies(movieId: number): Promise<{
-    success: boolean;
-    recommendations: Movie[];
-    total_results?: number;
-    error?: string;
-}> {
-    const result = await sharedGetRecommendationsOrSimilar<Movie>('movie', movieId, mapMovieDetail);
-    return {
-        success: result.success,
-        recommendations: result.recommendations,
-        error: result.error,
     };
 }
 

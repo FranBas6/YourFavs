@@ -305,25 +305,6 @@ const yearsActiveCalc = (() => {
     return `${startYear} - ${endYear}`;
 })();
 
-const providerElements = item?.providers?.map((provider) => {
-    const link = providerLinks[provider.provider_name];
-    const hasLogo = !!provider.logo_path;
-    return {
-        name: provider.provider_name,
-        logo: hasLogo ? posterUrl(provider.logo_path, 'w200') : null,
-        link,
-        type: provider.type || 'flatrate'
-    };
-}) || [];
-
-// Agrupar por tipo
-const providersByType = providerElements.reduce((acc: Record<string, any[]>, p) => {
-    const key = p.type || 'flatrate';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(p);
-    return acc;
-}, {} as Record<string, any[]>);
-
 const statusMap = {
     "Returning Series": "Serie en emisión",
     Ended: "Finalizada",
@@ -394,8 +375,7 @@ const serieNetworks: { id: number; name: string; logo_path: string | null }[] = 
 const reviews = (reviewsData.results || []).filter((r: any) => r.content && r.content.length > 50).slice(0, 5);
 const productionCountries: string[] = item?.origin_country || [];
 
-// Categorizar videos
-const trailers = allVideos.filter((v: any) => v.type === 'Trailer');
+// Categorizar videos (el tráiler principal ya va en `trailerUrl`)
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
 const behindScenes = allVideos.filter((v: any) => v.type === 'Behind the Scenes' || v.type === 'Bloopers' || v.type === 'Featurette');
 const teasers = allVideos.filter((v: any) => v.type === 'Teaser');
