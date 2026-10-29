@@ -422,7 +422,9 @@ const withFriends = SOCIAL_PHASE.friends && Boolean(Astro.locals.user);
         if (prov) {
             where += '<span class="wtw-provider-pill">' +
                 (prov.logo ? '<img src="https://image.tmdb.org/t/p/w45' + escapeHtml(prov.logo) + '" alt=""/>' : '') +
-                'En ' + escapeHtml(prov.name) + '</span>';
+                'En ' + escapeHtml(prov.name) + '</span>' +
+                // Los datos de plataformas son de JustWatch y hay que citarlos donde se muestran.
+                '<span class="wtw-fits">vía JustWatch</span>';
         }
         if (timeFilter !== 'any') {
             where += '<span class="wtw-fits">· encaja en tu tiempo</span>';
