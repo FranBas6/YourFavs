@@ -1,5 +1,7 @@
 import type { APIRoute } from 'astro';
 import { tmdbFetch } from '../../../../services/API/shared/tmdbClient';
+import { pickBestTrailerKey, videoLanguages } from '../../../../services/API/shared/tmdbInfoService';
+import { getCurrentLanguage } from '../../../../services/BD/shared/userScope';
 
 export const prerender = false;
 
@@ -15,23 +17,6 @@ interface VideoEntry {
 const cache = new Map<string, { data: { trailer: string | null }; expires: number }>();
 const TTL_MS = 24 * 60 * 60 * 1000;
 
-function pickBestTrailer(videos: VideoEntry[]): string | null {
-    if (!videos || videos.length === 0) return null;
-    const yt = videos.filter(v => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
-    if (yt.length === 0) return null;
-
-    const score = (v: VideoEntry) => {
-        let s = 0;
-        if (v.iso_639_1 === 'es') s += 100;
-        else if (v.iso_639_1 === 'en') s += 50;
-        if (v.type === 'Trailer') s += 30;
-        if (v.official) s += 20;
-        return s;
-    };
-    yt.sort((a, b) => score(b) - score(a));
-    return yt[0].key;
-}
-
 export const GET: APIRoute = async ({ params }) => {
     const { type, id } = params;
     if (!type || !id || (type !== 'movie' && type !== 'tv')) {
@@ -41,7 +26,8 @@ export const GET: APIRoute = async ({ params }) => {
         });
     }
 
-    const cacheKey = `${type}_${id}`;
+    // El idioma va en la clave: el tráiler elegido depende del idioma del perfil.
+    const cacheKey = `${type}_${id}_${getCurrentLanguage()}`;
     const cached = cache.get(cacheKey);
     if (cached && cached.expires > Date.now()) {
         return new Response(JSON.stringify(cached.data), {
@@ -51,8 +37,8 @@ export const GET: APIRoute = async ({ params }) => {
     }
 
     try {
-        const data = await tmdbFetch<{ results?: VideoEntry[] }>(`/${type}/${id}/videos`);
-        const trailer = pickBestTrailer(data.results || []);
+        const data = await tmdbFetch<{ results?: VideoEntry[] }>(`/${type}/${id}/videos`, { include_video_language: videoLanguages() });
+        const trailer = pickBestTrailerKey(data.results || []);
         const payload = { trailer };
         cache.set(cacheKey, { data: payload, expires: Date.now() + TTL_MS });
         return new Response(JSON.stringify(payload), {

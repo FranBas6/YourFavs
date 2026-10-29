@@ -28,7 +28,7 @@ import {
     getSeriesVideos,
     getEpisodesBySeasonNumber,
 } from '../../../services/API/Series/InfoSeries';
-import { getTitleLogo } from '../../../services/API/shared/tmdbInfoService';
+import { getTitleLogo, getReviews } from '../../../services/API/shared/tmdbInfoService';
 import { tmdbFetch } from '../../../services/API/shared/tmdbClient';
 import { safeFetch } from '../../../utils/safeFetch';
 
@@ -75,7 +75,7 @@ export const GET: APIRoute = async ({ params }) => {
         getSeriesAdditionalInfo(id).catch(() => ({ keywords: [], languages: [], content_ratings: [] })),
         getSeriesVideos(id).catch(() => []),
         tmdbId
-            ? tmdbFetch<{ results: any[] }>(`/tv/${tmdbId}/reviews`).catch(() => ({ results: [] }))
+            ? getReviews('tv', tmdbId)
             : Promise.resolve({ results: [] }),
         tmdbId ? getTitleLogo('tv', tmdbId) : Promise.resolve(null),
     ]);

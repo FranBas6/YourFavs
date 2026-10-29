@@ -1,13 +1,50 @@
 import { tmdbFetch, type MediaType } from './tmdbClient';
+import { getCurrentLanguage } from '../../BD/shared/userScope';
+
+/** Idioma del perfil en ISO-639-1 (`es-ES` → `es`). */
+const primaryLang = () => getCurrentLanguage().slice(0, 2);
+
+/**
+ * Idiomas de vídeo que pedimos a TMDB: el del perfil, inglés y «sin idioma».
+ * Sin `include_video_language`, `/videos` devuelve SOLO los del `language` de la petición, y
+ * muchísimos títulos no tienen tráiler en español (A1, 2026-10-29: 0 vídeos frente a 12).
+ */
+export const videoLanguages = () => {
+    const p = primaryLang();
+    return p === 'en' ? 'en,null' : `${p},en,null`;
+};
+
+interface VideoLike { site?: string; type?: string; key?: string; iso_639_1?: string | null; official?: boolean }
+
+/**
+ * Mejor tráiler de YouTube: idioma del perfil > inglés > resto; Trailer > Teaser; oficial > no.
+ * La comparten las fichas (`getTrailer`) y la vista previa al pasar el ratón (`/api/videos`).
+ */
+export function pickBestTrailerKey(videos: VideoLike[]): string | null {
+    const yt = (videos || []).filter(v => v.site === 'YouTube' && v.key && (v.type === 'Trailer' || v.type === 'Teaser'));
+    if (yt.length === 0) return null;
+    const own = primaryLang();
+    const score = (v: VideoLike) =>
+        (v.iso_639_1 === own ? 100 : v.iso_639_1 === 'en' ? 50 : 0)
+        + (v.type === 'Trailer' ? 30 : 0)
+        + (v.official ? 20 : 0);
+    return [...yt].sort((a, b) => score(b) - score(a))[0].key!;
+}
+
+/** Vídeos en el idioma del perfil primero (TMDB los devuelve mezclados). */
+const ownLanguageFirst = (videos: any[]) => {
+    const own = primaryLang();
+    return [...videos].sort((a, b) => Number(b.iso_639_1 === own) - Number(a.iso_639_1 === own));
+};
 
 /**
  * Obtener el trailer (YouTube) de una película o serie
  */
 export async function getTrailer(mediaType: MediaType, id: string): Promise<string | null> {
     try {
-        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`);
-        const trailer = data.results.find((video: any) => video.type === 'Trailer' && video.site === 'YouTube');
-        return trailer ? `https://www.youtube.com/watch?v=${trailer.key}` : null;
+        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`, { include_video_language: videoLanguages() });
+        const key = pickBestTrailerKey(data.results || []);
+        return key ? `https://www.youtube.com/watch?v=${key}` : null;
     } catch (error) {
         console.error(`Error al obtener el trailer de ${mediaType}/${id}:`, error);
         return null;
@@ -19,12 +56,56 @@ export async function getTrailer(mediaType: MediaType, id: string): Promise<stri
  */
 export async function getVideos(mediaType: MediaType, id: string): Promise<any[]> {
     try {
-        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`);
-        return data.results || [];
+        const data = await tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/videos`, { include_video_language: videoLanguages() });
+        return ownLanguageFirst(data.results || []);
     } catch (error) {
         console.error(`Error al obtener los videos de ${mediaType}/${id}:`, error);
         return [];
     }
+}
+
+/**
+ * Reseñas de TMDB: las del idioma del perfil y, detrás, las inglesas (casi todas las de TMDB están
+ * en inglés: pidiendo solo `es-ES` la ficha se quedaba vacía). Cada reseña lleva `lang` para que
+ * `ReviewsSection` marque las que no están en tu idioma. Sin duplicados (por `id`).
+ */
+export async function getReviews(mediaType: MediaType, id: string | number): Promise<{ results: any[] }> {
+    const own = primaryLang();
+    const empty = { results: [] as any[] };
+    const [ownData, enData] = await Promise.all([
+        tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`).catch(() => empty),
+        own === 'en'
+            ? Promise.resolve(empty)
+            : tmdbFetch<{ results: any[] }>(`/${mediaType}/${id}/reviews`, { language: 'en-US' }).catch(() => empty),
+    ]);
+    const seen = new Set<string>();
+    const results: any[] = [];
+    for (const [list, lang] of [[ownData.results, own], [enData.results, 'en']] as const) {
+        for (const r of list || []) {
+            if (!r?.id || seen.has(r.id)) continue;
+            seen.add(r.id);
+            results.push({ ...r, lang });
+        }
+    }
+    return { results };
+}
+
+/**
+ * Clasificación por edades de una PELÍCULA con la forma de `content_ratings` de las series
+ * (`{iso_3166_1, rating}[]`), para que `getContentRating()` y la ficha sirvan igual.
+ * En películas TMDB no tiene `content_ratings`: la edad va en `release_dates[].certification`.
+ * Por país: la del estreno en cines (3), si no limitado (2), premiere (1) y luego el resto.
+ */
+export function movieCertifications(releaseDates: any): { iso_3166_1: string; rating: string }[] {
+    const order = [3, 2, 1, 4, 5, 6];
+    const out: { iso_3166_1: string; rating: string }[] = [];
+    for (const country of releaseDates?.results || []) {
+        const dated = (country.release_dates || [])
+            .filter((d: any) => typeof d.certification === 'string' && d.certification.trim())
+            .sort((a: any, b: any) => order.indexOf(a.type) - order.indexOf(b.type));
+        if (dated.length) out.push({ iso_3166_1: country.iso_3166_1, rating: dated[0].certification.trim() });
+    }
+    return out;
 }
 
 /**
@@ -62,14 +143,17 @@ export async function getAdditionalInfo(
     try {
         const [keywordsData, detailData] = await Promise.all([
             tmdbFetch<{ results?: any[]; keywords?: any[] }>(`/${mediaType}/${id}/keywords`),
-            tmdbFetch<any>(`/${mediaType}/${id}`, { append_to_response: 'content_ratings' }),
+            // `content_ratings` solo existe en series; en películas la edad viene en `release_dates`.
+            tmdbFetch<any>(`/${mediaType}/${id}`, { append_to_response: mediaType === 'movie' ? 'release_dates' : 'content_ratings' }),
         ]);
 
         const base: Record<string, any> = {
             // TMDB devuelve las keywords en `keywords` (películas) o `results` (series).
             keywords: keywordsData.keywords || keywordsData.results || [],
             networks: detailData.networks || [],
-            content_ratings: detailData.content_ratings?.results || [],
+            content_ratings: mediaType === 'movie'
+                ? movieCertifications(detailData.release_dates)
+                : detailData.content_ratings?.results || [],
             episode_run_time: detailData.episode_run_time || [],
             languages: detailData.spoken_languages || [],
             tagline: detailData.tagline || null,

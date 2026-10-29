@@ -19,7 +19,7 @@ import {
 } from "../../services/API/Series/InfoSeries";
 import { getAllSeasonProviders, buildProviderCoverage } from "../../services/API/Series/seasonProviders";
 import { posterUrl, originalUrl, tmdbFetch } from "../../services/API/shared/tmdbClient";
-import { getTitleLogo } from "../../services/API/shared/tmdbInfoService";
+import { getTitleLogo, getReviews } from "../../services/API/shared/tmdbInfoService";
 import { peekTopActors } from "../../utils/topActorsLibrary";
 import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
@@ -374,7 +374,7 @@ const [
     tmdbId ? tmdbFetch<any>(`/tv/${tmdbId}/external_ids`).catch(() => ({})) : Promise.resolve({}),
     id ? getSeriesAdditionalInfo(id) : Promise.resolve({ keywords: [], networks: [], content_ratings: [], episode_run_time: [], languages: [], tagline: null }),
     id ? getSeriesVideos(id) : Promise.resolve([]),
-    tmdbId ? tmdbFetch<{ results: any[] }>(`/tv/${tmdbId}/reviews`).catch(() => ({ results: [] })) : Promise.resolve({ results: [] }),
+    tmdbId ? getReviews('tv', tmdbId) : Promise.resolve({ results: [] }),
     tmdbId ? getTitleLogo('tv', tmdbId) : Promise.resolve(null),
     // Películas de la misma saga. En paralelo con el resto para no sumar nada al TTFB, y
     // cacheada 24h desde la primera visita (incluido el resultado vacío, que es el habitual).
