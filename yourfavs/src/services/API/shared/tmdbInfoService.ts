@@ -279,20 +279,25 @@ export function mapAndDeduplicateProviders(esProviders: any) {
 
 /**
  * Obtener recomendaciones, similares, o combinación de ambas.
- * mapDetailToItem transforma la respuesta detallada de TMDB al tipo esperado.
+ * `mapItem` transforma cada resultado de la lista de TMDB al tipo esperado.
+ *
+ * C3 (2026-10-29): antes se pedía el DETALLE de las 20 primeras recomendaciones (20 llamadas por
+ * ficha) solo para quitar las de la misma saga y mapear géneros. La lista ya trae todo lo que pinta
+ * el carrusel, y la saga se quita con los ids de sus partes (`excludeIds`, que la ficha ya pide
+ * para «Saga»: se pasa la promesa y las dos peticiones van en paralelo).
  */
 export async function getRecommendationsOrSimilar<T extends { id: any; poster_path?: string }>(
     mediaType: MediaType,
     itemId: number,
-    mapDetailToItem: (data: any) => T,
-    shouldExclude?: (data: any) => boolean
+    mapItem: (data: any) => T,
+    excludeIds?: Promise<Set<number>> | Set<number> | null
 ): Promise<{
     success: boolean;
     recommendations: T[];
     type: 'recommendations' | 'similar' | 'combined';
     error?: string;
 }> {
-    async function fetchAndMap(endpoint: 'recommendations' | 'similar', fetchDetails: boolean): Promise<{
+    async function fetchAndMap(endpoint: 'recommendations' | 'similar', applyExclude: boolean): Promise<{
         success: boolean;
         items: T[];
         total_results?: number;
@@ -305,19 +310,12 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
             const filtered = data.results.filter((item: any) => item.poster_path);
 
             let items: T[];
-            if (fetchDetails) {
-                const detailedPromises = filtered.slice(0, 20).map(async (item: any) => {
-                    try {
-                        const detail = await tmdbFetch<any>(`/${mediaType}/${item.id}`);
-                        if (shouldExclude && shouldExclude(detail)) return null;
-                        return mapDetailToItem(detail);
-                    } catch {
-                        return null;
-                    }
-                });
-                items = (await Promise.all(detailedPromises)).filter(Boolean).slice(0, 12) as T[];
+            if (applyExclude) {
+                // Mismo recorte que cuando se pedían detalles: de las 20 primeras, fuera la saga, 12.
+                const excluded = (await excludeIds) ?? new Set<number>();
+                items = filtered.slice(0, 20).filter((item: any) => !excluded.has(item.id)).slice(0, 12).map(mapItem);
             } else {
-                items = filtered.slice(0, 12).map(mapDetailToItem);
+                items = filtered.slice(0, 12).map(mapItem);
             }
 
             return { success: true, items, total_results: data.total_results };
@@ -327,7 +325,7 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
         }
     }
 
-    // Intentar recomendaciones primero (con fetch de detalles)
+    // Intentar recomendaciones primero (quitando la propia saga)
     const recResult = await fetchAndMap('recommendations', true);
 
     // Si hay suficientes, devolver directamente
@@ -335,7 +333,7 @@ export async function getRecommendationsOrSimilar<T extends { id: any; poster_pa
         return { success: true, recommendations: recResult.items, type: 'recommendations' };
     }
 
-    // Si no, intentar similares (sin fetch de detalles, más rápido)
+    // Si no, intentar similares (como siempre, sin quitar la saga)
     const simResult = await fetchAndMap('similar', false);
 
     if (simResult.success) {

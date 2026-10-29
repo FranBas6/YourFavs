@@ -1,6 +1,7 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
 import { tmdbFetch, API_KEY, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
 import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
+import { getGenreName } from "../../../utils/constants/genres";
 import {
     getTrailer as sharedGetTrailer,
     getVideos as sharedGetVideos,
@@ -398,11 +399,14 @@ export async function getSeriesBundle(seriesId: string | number): Promise<Series
 // --- Recomendaciones ---
 
 function mapSerieDetail(data: any): Serie {
+    // Sirve para el detalle y, desde C3, para los resultados de la lista de recomendaciones, que
+    // traen `genre_ids` en vez de `genres` (y no traen temporadas, cadenas ni episodios).
+    const genreIds: number[] = data.genre_ids ?? data.genres?.map((g: any) => g.id) ?? [];
     return {
         adult: false,
         backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
-        genres: data.genres ?? [],
-        genre_ids: data.genres?.map((g: any) => g.id) ?? [],
+        genres: data.genres ?? genreIds.map((id) => ({ id, name: getGenreName(id) })),
+        genre_ids: genreIds,
         id: data.id,
         origin_country: data.origin_country ?? [],
         original_language: data.original_language,

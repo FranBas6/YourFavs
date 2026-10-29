@@ -352,7 +352,8 @@ function mapMovieDetail(data: any): Movie {
     return {
         adult: data.adult,
         backdrop_path: backdropUrl(data.backdrop_path, 'w500'),
-        genre_ids: data.genres?.map((g: any) => g.id) || [],
+        // La lista trae `genre_ids`; el detalle, `genres` (antes los similares salían sin géneros).
+        genre_ids: data.genre_ids ?? data.genres?.map((g: any) => g.id) ?? [],
         id: data.id,
         original_language: data.original_language,
         overview: data.overview,
@@ -365,38 +366,6 @@ function mapMovieDetail(data: any): Movie {
         release_date: data.release_date,
         video: data.video,
     };
-}
-
-export async function getMovieRecommendations(movieId: number): Promise<{
-    success: boolean;
-    recommendations: Movie[];
-    total_results?: number;
-    error?: string;
-}> {
-    try {
-        const movieData = await tmdbFetch<any>(`/movie/${movieId}`);
-        const collectionId = movieData.belongs_to_collection?.id;
-
-        const result = await sharedGetRecommendationsOrSimilar<Movie>(
-            'movie',
-            movieId,
-            mapMovieDetail,
-            collectionId ? (data: any) => data.belongs_to_collection?.id === collectionId : undefined
-        );
-
-        return {
-            success: result.success,
-            recommendations: result.recommendations,
-            error: result.error,
-        };
-    } catch (error) {
-        console.error('Error al obtener recomendaciones:', error);
-        return {
-            success: false,
-            recommendations: [],
-            error: error instanceof Error ? error.message : 'Error desconocido',
-        };
-    }
 }
 
 export async function getSimilarMovies(movieId: number): Promise<{
@@ -413,22 +382,25 @@ export async function getSimilarMovies(movieId: number): Promise<{
     };
 }
 
-export async function getMovieRecommendationsOrSimilar(movieId: number): Promise<{
+/**
+ * Recomendaciones de la ficha. `collectionPartIds`: ids de las películas de su saga (la promesa de
+ * `getMovieCollectionInfo` que la ficha ya lanza), para no recomendar la propia saga. Antes se pedía
+ * otra vez `/movie/{id}` y el detalle de 20 recomendaciones para saberlo (C3).
+ */
+export async function getMovieRecommendationsOrSimilar(
+    movieId: number,
+    collectionPartIds?: Promise<number[] | null | undefined> | null,
+): Promise<{
     success: boolean;
     recommendations: Movie[];
     type: 'recommendations' | 'similar' | 'combined';
     error?: string;
 }> {
     try {
-        const movieData = await tmdbFetch<any>(`/movie/${movieId}`);
-        const collectionId = movieData.belongs_to_collection?.id;
-
-        return sharedGetRecommendationsOrSimilar<Movie>(
-            'movie',
-            movieId,
-            mapMovieDetail,
-            collectionId ? (data: any) => data.belongs_to_collection?.id === collectionId : undefined
-        );
+        const excludeIds = collectionPartIds
+            ? collectionPartIds.then((ids) => new Set(ids ?? [])).catch(() => new Set<number>())
+            : null;
+        return await sharedGetRecommendationsOrSimilar<Movie>('movie', movieId, mapMovieDetail, excludeIds);
     } catch (error) {
         console.error('Error al obtener recomendaciones:', error);
         return {

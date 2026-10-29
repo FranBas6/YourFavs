@@ -45,13 +45,14 @@ export const GET: APIRoute = async ({ params }) => {
     const { cast, directors: crew, trailerUrl, externalIds, additionalInfo, videos, reviews: reviewsData, logo: titleLogo } = bundle;
     const posters = bundle.posters.slice(0, 40);
 
-    // Bloque 2: saga y recomendaciones (dependen de item, no entre sí).
+    // Bloque 2: saga y recomendaciones, en paralelo; las recomendaciones quitan la saga con sus ids (C3).
+    const collectionPromise = item.belongs_to_collection
+        ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null)
+        : Promise.resolve(null);
     const [collection, recommendationsData] = await Promise.all([
-        item.belongs_to_collection
-            ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null)
-            : Promise.resolve(null),
+        collectionPromise,
         tmdbId
-            ? getMovieRecommendationsOrSimilar(tmdbId)
+            ? getMovieRecommendationsOrSimilar(tmdbId, item.belongs_to_collection ? collectionPromise.then((c) => c?.parts?.map((p) => p.id)) : null)
             : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
     ]);
 

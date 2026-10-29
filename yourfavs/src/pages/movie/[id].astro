@@ -196,13 +196,18 @@ const allVideos: any[] = bundle?.videos ?? [];
 const reviewsData = bundle?.reviews ?? { results: [] };
 const movieLogo = bundle?.logo ?? null;
 
+// La saga se pide una vez y sus ids sirven también para no recomendar la propia saga (C3).
+const collectionPromise = item?.belongs_to_collection ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null) : Promise.resolve(null);
+
 const [
     collectionInfo,
     moviesRecommendationsData,
     crossMediaSeries,
 ] = await Promise.all([
-    item?.belongs_to_collection ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null) : Promise.resolve(null),
-    tmdbId ? getMovieRecommendationsOrSimilar(tmdbId) : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
+    collectionPromise,
+    tmdbId
+        ? getMovieRecommendationsOrSimilar(tmdbId, item?.belongs_to_collection ? collectionPromise.then((c) => c?.parts?.map((p) => p.id)) : null)
+        : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
     // Series de la misma saga. Va aquí dentro, en paralelo con el resto, para no sumar nada al
     // TTFB: es una búsqueda en TMDB y, al primer acierto, sale de caché las 24h siguientes.
     // Las keywords ya llegan en el paquete: así no las vuelve a pedir.
