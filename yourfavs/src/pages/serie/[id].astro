@@ -314,6 +314,29 @@ const statusMap = {
 
 const yearsActive = yearsActiveCalc;
 
+// B1 (2026-10-29): datos que ya llegan de TMDB y no se enseñaban.
+// Tipo de serie: solo se marca lo que NO es ficción normal (Scripted).
+const SERIES_TYPE_LABEL: Record<string, string> = {
+    Miniseries: 'Miniserie', Documentary: 'Documental', Reality: 'Reality',
+    'Talk Show': 'Talk show', News: 'Noticias', Video: 'Vídeo',
+};
+const seriesTypeLabel: string | null = SERIES_TYPE_LABEL[item?.type as string] ?? null;
+// Creadores (enlazan a su página de equipo, como el resto del equipo).
+const createdBy: { name: string }[] = (item?.created_by || []).filter((c: any) => c?.name);
+// Duración por episodio: la de TMDB si la da; si no (cada vez más frecuente), la media real de
+// los episodios regulares ya cargados.
+const episodeRuntime: number | null = (() => {
+    const declared = Number(item?.episode_run_time?.[0]);
+    if (declared > 0) return declared;
+    const runtimes = regularSeasons
+        .flatMap((s: any) => allSeasonEpisodes[s.season_number] || [])
+        .map((ep: any) => Number(ep.runtime))
+        .filter((n: number) => n > 0);
+    return runtimes.length ? Math.round(runtimes.reduce((a: number, b: number) => a + b, 0) / runtimes.length) : null;
+})();
+// Fecha del último episodio emitido, solo si la serie ya no sigue (si sigue, manda «Próximo episodio»).
+const lastAirDate: string | null = (status === 'Ended' || status === 'Canceled') && item?.last_air_date ? item.last_air_date : null;
+
 // Ordenar temporadas: primero las regulares, luego las especiales
 const sortedSeasons = item?.seasons?.sort((a, b) => {
     // Las temporadas especiales (0) van al final
@@ -439,6 +462,9 @@ const jsonLd = item ? {
                             <span class={`px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'Returning Series' ? 'bg-green-500/80' : status === 'Ended' ? 'bg-gray-500/80' : status === 'Canceled' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
                                 {status ? ((statusMap as any)[status] || status) : ''}
                             </span>
+                            {seriesTypeLabel && (
+                                <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/20 text-white">{seriesTypeLabel}</span>
+                            )}
                             <span class="text-white/70">{yearsActive}</span>
                             <span class="text-white/70">{regularSeasonsCount} temporadas</span>
                             <span class="text-white/70">{totalRegularEpisodes} episodios</span>
@@ -689,6 +715,22 @@ const jsonLd = item ? {
                             <li class="flex justify-between"><span class="text-gray-500">Emisión</span><span class="text-gray-800 font-medium">{yearsActive}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Temporadas</span><span class="text-gray-800 font-medium">{regularSeasonsCount}{hasSpecialSeasons ? ` + ${specialSeasonsCount} especiales` : ''}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="text-gray-800 font-medium">{totalRegularEpisodes}</span></li>
+                            {episodeRuntime && (
+                                <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{formatRuntime(episodeRuntime)} por episodio</span></li>
+                            )}
+                            {lastAirDate && (
+                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Última emisión</span><span class="text-gray-800 font-medium text-right">{formatDate(lastAirDate)}</span></li>
+                            )}
+                            {createdBy.length > 0 && (
+                                <li class="flex justify-between gap-2">
+                                    <span class="text-gray-500 flex-shrink-0">Creada por</span>
+                                    <span class="text-gray-800 font-medium text-right">
+                                        {createdBy.map((c, i) => (
+                                            <>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(c.name)}`} class="hover:text-blue-600 hover:underline">{c.name}</a></>
+                                        ))}
+                                    </span>
+                                </li>
+                            )}
                             <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
                             <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
