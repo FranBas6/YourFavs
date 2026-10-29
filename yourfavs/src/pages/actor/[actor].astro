@@ -125,7 +125,21 @@ const totalActorsFavorites = actorsFavs.length;
 // Ordenación
 const sortBy = Astro.url.searchParams.get('sort') || 'popularity';
 const moviesSorted = sortBycriterion(movies, sortBy, 'release_date');
-const seriesSorted = sortBycriterion(series, sortBy, 'first_air_date');
+// B5: con el orden por defecto (popularidad), las apariciones sueltas van al final: un solo episodio
+// o «como él mismo» (programas, galas, entrevistas: personaje «Self», como el filtro de ruido de la
+// campana). El resto conserva el orden de siempre.
+const seriesSortedRaw = sortBycriterion(series, sortBy, 'first_air_date');
+const SELF_ROLE = /\b(self|himself|herself|themselves|narrator|host|presenter)\b/i;
+const isCameo = (s: any) => Number(s.episode_count) <= 1 || SELF_ROLE.test(s.character || '');
+const seriesSorted = sortBy === 'popularity'
+    ? [...seriesSortedRaw.filter((s) => !isCameo(s)), ...seriesSortedRaw.filter(isCameo)]
+    : seriesSortedRaw;
+// «Tyrion Lannister · 73 ep.» (TMDB da `episode_count` por serie en combined_credits).
+const characterWithEpisodes = (s: any) => {
+    const n = Number(s.episode_count);
+    const eps = n > 0 ? `${n} ep.` : '';
+    return [s.character, eps].filter(Boolean).join(' · ') || undefined;
+};
 
 const hasSocial = actorInfo.redes && Object.values(actorInfo.redes).some(v => v);
 
@@ -637,7 +651,7 @@ const jsonLd = {
                                 overview={item.overview}
                                 first_air_date={item.first_air_date}
                                 genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                character={item.character}
+                                character={characterWithEpisodes(item)}
                             />
                         ))}
                     </div>
