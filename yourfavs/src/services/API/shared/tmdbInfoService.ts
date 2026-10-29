@@ -150,11 +150,15 @@ export function buildProviderLinksByCountry(rawResults: Record<string, any> | un
     return out;
 }
 
+/** Tipos de disponibilidad de TMDB/JustWatch. `free` = gratis; `ads` = gratis con anuncios (B4b). */
+export type ProviderType = 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
+
 /**
- * Mapear y deduplicar proveedores de streaming (flatrate > rent > buy)
+ * Mapear y deduplicar proveedores de streaming (flatrate > free > ads > rent > buy).
+ * Quien necesite solo suscripciones filtra `type === 'flatrate'` (ruleta, Brief, campana, cobertura).
  */
 export function mapAndDeduplicateProviders(esProviders: any) {
-    const mapProviders = (list: any[] | undefined, type: 'flatrate' | 'rent' | 'buy') =>
+    const mapProviders = (list: any[] | undefined, type: ProviderType) =>
         (list || []).map((provider: any) => ({
             provider_id: provider.provider_id,
             provider_name: provider.provider_name,
@@ -163,13 +167,16 @@ export function mapAndDeduplicateProviders(esProviders: any) {
         }));
 
     const flatrate = mapProviders(esProviders.flatrate, 'flatrate');
+    const free = mapProviders(esProviders.free, 'free');
+    const ads = mapProviders(esProviders.ads, 'ads');
     const rent = mapProviders(esProviders.rent, 'rent');
     const buy = mapProviders(esProviders.buy, 'buy');
 
-    const combined = [...flatrate, ...rent, ...buy];
-    const uniqueById = new Map<number, { provider_id: number; provider_name: string; logo_path: string; type: 'flatrate' | 'rent' | 'buy' }>();
+    const combined = [...flatrate, ...free, ...ads, ...rent, ...buy];
+    const uniqueById = new Map<number, { provider_id: number; provider_name: string; logo_path: string; type: ProviderType }>();
 
-    const priority = { flatrate: 3, rent: 2, buy: 1 } as const;
+    // Si una plataforma ofrece el título de varias formas, manda la más barata para ti.
+    const priority = { flatrate: 5, free: 4, ads: 3, rent: 2, buy: 1 } as const;
     for (const p of combined) {
         const existing = uniqueById.get(p.provider_id);
         if (!existing || priority[p.type] > priority[existing.type]) {

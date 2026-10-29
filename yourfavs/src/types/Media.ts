@@ -9,7 +9,7 @@ export interface Provider {
     provider_id: number;
     provider_name: string;
     logo_path: string;
-    type?: 'flatrate' | 'rent' | 'buy';
+    type?: 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
 }
 
 export interface ProductionCompany {

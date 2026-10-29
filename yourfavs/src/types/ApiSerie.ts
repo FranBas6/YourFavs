@@ -70,7 +70,7 @@ export type Serie = {
         provider_id: number;
         provider_name: string;
         logo_path: string;
-        type?: 'flatrate' | 'rent' | 'buy';
+        type?: 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
     }[];
     character?: string;  // Añadido 'character' para series de tipo "cast"ç
     imdb_id?: string;

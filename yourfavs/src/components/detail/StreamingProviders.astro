@@ -8,7 +8,7 @@ interface RawProvider {
     provider_id: number;
     provider_name: string;
     logo_path: string;
-    type: 'flatrate' | 'rent' | 'buy';
+    type: 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';
 }
 
 interface ScopeData {
@@ -186,6 +186,7 @@ const clientPayload = {
                 const flatrate = list.filter((p) => p.type === 'flatrate');
                 const mine = knowsMyPlatforms ? flatrate.filter((p) => mySet.has(p.provider_id)) : [];
                 const otherSubs = knowsMyPlatforms ? flatrate.filter((p) => !mySet.has(p.provider_id)) : flatrate;
+                const freeList = list.filter((p) => p.type === 'free' || p.type === 'ads'); // B4b
                 const rentBuy = list.filter((p) => p.type === 'rent' || p.type === 'buy');
                 const hidden = c.code !== defaultCountry;
                 return (
@@ -249,6 +250,23 @@ const clientPayload = {
                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
                                                 </span>
                                             )}
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {freeList.length > 0 && (
+                            <div>
+                                <p class="text-[10px] font-mono font-semibold text-gray-400 uppercase tracking-[.12em] mb-1.5">Gratis</p>
+                                <div class="flex flex-wrap gap-2">
+                                    {freeList.map((p) => (
+                                        <a href={linkFor(p, c.code)} target="_blank" rel="noopener"
+                                           class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray-200 hover:border-gray-400 transition-colors">
+                                            {p.logo_path && <img src={posterUrl(p.logo_path, 'w200')} alt="" class="w-5 h-5 rounded flex-shrink-0" />}
+                                            <span class="text-xs font-medium text-gray-700">{p.provider_name}</span>
+                                            {p.type === 'ads' && <span class="text-[10px] text-gray-400">con anuncios</span>}
+                                            <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>
                                         </a>
                                     ))}
                                 </div>
@@ -402,6 +420,7 @@ const clientPayload = {
                     var flat = list.filter(function (p) { return p.type === 'flatrate'; });
                     var isMine = knowsMine ? flat.filter(function (p) { return mine.has(p.provider_id); }) : [];
                     var others = knowsMine ? flat.filter(function (p) { return !mine.has(p.provider_id); }) : flat;
+                    var freeList = list.filter(function (p) { return p.type === 'free' || p.type === 'ads'; });
                     var rentBuy = list.filter(function (p) { return p.type === 'rent' || p.type === 'buy'; });
                     var href = function (p) { return linkFor(p, data, code); };
 
@@ -420,6 +439,9 @@ const clientPayload = {
                         inner += knowsMine
                             ? section('Con otra suscripción', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + others.map(function (p) { return chipSmall(p, href(p), badge(p)); }).join('') + '</div>')
                             : section('✓ Incluido en suscripción', 'text-emerald-600', '<div class="space-y-2">' + others.map(function (p) { return rowBig(p, href(p), 'other', badge(p)); }).join('') + '</div>');
+                    }
+                    if (freeList.length) {
+                        inner += section('Gratis', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + freeList.map(function (p) { return chipSmall(p, href(p), p.type === 'ads' ? '<span class="text-[10px] text-gray-400">con anuncios</span>' : ''); }).join('') + '</div>');
                     }
                     if (rentBuy.length) {
                         inner += section('Alquiler / Compra', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + rentBuy.map(function (p) { return chipSmall(p, href(p)); }).join('') + '</div>');

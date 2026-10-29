@@ -33,7 +33,7 @@ export type Movie = {
         provider_id: number;
         provider_name: string;
         logo_path: string;
-        type?: 'flatrate' | 'rent' | 'buy';  // Añadida propiedad 'type' para consistencia
+        type?: 'flatrate' | 'free' | 'ads' | 'rent' | 'buy';  // free/ads: gratis y con anuncios (B4b)
     }[];  // Array de plataformas de visualización
     character?: string;  // Añadido 'character' para películas de tipo "cast"
     imdb_id?: string;
