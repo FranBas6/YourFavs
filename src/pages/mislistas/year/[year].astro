@@ -216,7 +216,8 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
                                 {[
                                     stats.activeMonth.series > 0 ? `${stats.activeMonth.series} ${stats.activeMonth.series === 1 ? 'serie' : 'series'}` : '',
                                     stats.activeMonth.movies > 0 ? `${stats.activeMonth.movies} ${stats.activeMonth.movies === 1 ? 'película' : 'películas'}` : '',
-                                    stats.activeWeekday ? `${WEEKDAY_NAMES[stats.activeWeekday.weekday]}s` : '',
+                                    // Plural del día: «Sábados», «Domingos», pero «Viernes» (de lunes a viernes ya acaban en s).
+                                    stats.activeWeekday ? WEEKDAY_NAMES[stats.activeWeekday.weekday].replace(/([^s])$/, '$1s') : '',
                                 ].filter(Boolean).join(' · ')}
                             </div>
                         )}
