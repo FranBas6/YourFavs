@@ -16,8 +16,10 @@ import '../../styles/components/friends-seen.css';
 interface Props {
     mediaType: 'movie' | 'tv';
     tmdbId: number | string | undefined;
+    /** Etiqueta pequeña junto al título (la ficha de episodio pone «de la serie»: no es por episodio). */
+    note?: string;
 }
-const { mediaType, tmdbId } = Astro.props;
+const { mediaType, tmdbId, note } = Astro.props;
 const me = Astro.locals.user?.uid;
 const id = Number(tmdbId);
 const view = SOCIAL_PHASE.friends && me && Number.isInteger(id)
@@ -38,6 +40,7 @@ const footer = [
     <section class="bg-white rounded-xl border border-gray-200 p-4 fsn" aria-labelledby="fsn-t">
         <h3 id="fsn-t" class="text-base font-semibold text-gray-800 mb-3">
             {shown.length ? 'Amigos que la han visto' : 'Tus amigos'}
+            {note && <small class="fsn-note">{note}</small>}
         </h3>
         {shown.length > 0 && (
             <ul class="fsn-list">

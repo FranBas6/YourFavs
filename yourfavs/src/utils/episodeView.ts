@@ -158,3 +158,53 @@ export function progressLine(o: {
 /** Los anteriores a este en la temporada, ya emitidos y sin ver («Tienes 2 anteriores sin ver · Marcarlos»). */
 export const earlierUnseen = (current: number, seasonEps: SeasonEp[], watched: Set<number>) =>
     seasonEps.filter((x) => x.e < current && x.aired && !watched.has(x.e)).map((x) => x.e);
+
+/** «Domingo 19 jun 2011» (columna «Este episodio»). */
+export function mediumDate(key: string): string {
+    const p = new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+        .formatToParts(at(key));
+    const v = (t: string) => p.find((x) => x.type === t)?.value ?? '';
+    return `${capital(v('weekday'))} ${v('day')} ${v('month').replace('.', '')} ${v('year')}`;
+}
+
+/** «hace 15 años» · «hace 3 meses» · «hace 2 días» · «hoy» · «en 4 días». */
+export function relativeAgo(key: string, today = todayKey()): string {
+    const d = daysBetween(key, today);
+    if (d === 0) return 'hoy';
+    if (d < 0) return d === -1 ? 'mañana' : `en ${-d} días`;
+    if (d === 1) return 'ayer';
+    if (d < 30) return `hace ${d} días`;
+    const months = Math.floor(d / 30.44);
+    if (months < 12) return months === 1 ? 'hace 1 mes' : `hace ${months} meses`;
+    const years = Math.floor(d / 365.25);
+    return years === 1 ? 'hace 1 año' : `hace ${years} años`;
+}
+
+/**
+ * El equipo de un episodio (`crew` de TMDB). Dirección y guion con la misma regla que el acordeón
+ * de la ficha de serie (`episodeCredits`); más fotografía, montaje y música si están.
+ */
+export function episodeCrew(crew: any[] | undefined): Record<'directors' | 'writers' | 'photo' | 'editing' | 'music', string[]> {
+    const list = crew ?? [];
+    const names = (jobs: string[]) => [...new Set(list.filter((c) => jobs.includes(c?.job)).map((c) => String(c.name)))];
+    return {
+        directors: names(['Director']),
+        writers: names(['Writer', 'Teleplay', 'Screenplay']),
+        photo: names(['Director of Photography']),
+        editing: names(['Editor']),
+        music: names(['Original Music Composer', 'Music', 'Composer']),
+    };
+}
+
+/** Tipo de episodio en palabras (columna «Este episodio»). */
+export function episodeKind(season: number, episodeType: string | null | undefined): string {
+    if (season === 0) return 'Especial';
+    if (episodeType === 'finale') return 'Final de temporada';
+    if (episodeType === 'mid_season') return 'Parón de mitad de temporada';
+    return 'Episodio';
+}
+
+/** Tipo de oferta de una plataforma, en palabras. */
+export const PROVIDER_KIND: Record<string, string> = {
+    flatrate: 'Suscripción', free: 'Gratis', ads: 'Gratis con anuncios', rent: 'Alquiler', buy: 'Compra',
+};

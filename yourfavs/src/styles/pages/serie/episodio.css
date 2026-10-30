@@ -197,6 +197,95 @@ a.enc:hover { border-color: var(--border-strong); }
 .etr li.cur a { background: var(--bg-elev); border: 2px solid var(--text); color: var(--text); font-weight: 700; }
 .etr li.cur.w a { background: var(--ok-soft); }
 
+/* ---- Cuerpo (D4b-3) ----------------------------------------------------------------------------- */
+.eb { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 44px; padding: 40px 32px 0; }
+.eb-m { min-width: 0; display: flex; flex-direction: column; gap: 44px; }
+/* SectionHeader compacto (stamp de 34 y título de 20), sin tocar el componente. */
+.eb .yf-section-header { margin-bottom: 18px; padding-bottom: 14px; }
+.eb .yf-sh-title { font-size: 20px; }
+.eb .yf-stamp { --st-size: 34px; }
+.syn { font: 400 16px/1.7 var(--font); color: var(--text-2); max-width: 66ch; text-wrap: pretty; margin: 0; white-space: pre-line; }
+.syn-e { display: flex; align-items: center; gap: 10px; margin: 0; font: 500 14px var(--font); color: var(--text-3); }
+.syn-e svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* Reparto: habituales e invitados por separado; los que pasan del tope, ocultos hasta «Mostrar». */
+.cast-b + .cast-b { margin-top: 26px; }
+.cast-h { display: flex; align-items: baseline; gap: 8px; font: 600 14px var(--font); color: var(--text); margin: 0 0 12px; }
+.cast-h span { font: 500 12px var(--font); color: var(--text-3); }
+.pcg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.pcg.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pc { display: flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; border-radius: var(--r-md); }
+.pc:hover b { color: var(--primary); }
+.pc img, .pc-ph { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; object-fit: cover; background: var(--bg-tint); }
+.pc-ph { display: grid; place-items: center; font: 700 15px var(--font); color: var(--text-3); }
+.pc-t { min-width: 0; }
+.pc b { display: block; font: 600 13px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-t > span { display: block; font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-cast]:not(.is-open) .pc.xtra { display: none; }
+.more {
+    display: inline-flex; align-items: center; gap: 6px; height: 34px; margin-top: 14px; padding: 0 14px;
+    border-radius: var(--r-full); border: 1px solid var(--border-strong); background: var(--bg-elev);
+    font: 600 12.5px var(--font); color: var(--text); cursor: pointer;
+}
+.more svg { width: 14px; height: 14px; }
+.more[hidden] { display: none; }
+/* Con los invitados ocultos por spoilers, «Mostrar las N» espera a que los destapes. */
+.yf-spoil:not(.revealed) + .more { display: none; }
+
+/* Fotogramas y vídeos. */
+.gal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.gal .st16 { box-shadow: none; border-radius: 8px; }
+.gal .st16:hover img { opacity: .88; }
+.yf-spoil:has(> .gal) { border-radius: 8px; overflow: hidden; }
+.vids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.vid { margin: 0; }
+.vid .st16 { box-shadow: none; border-radius: 8px; }
+.vid iframe { width: 100%; height: 100%; border: 0; display: block; }
+.vid figcaption { margin-top: 8px; }
+.vid b { display: block; font: 600 13.5px var(--font); color: var(--text); }
+.vid span { font-size: 12px; color: var(--text-3); }
+
+/* Columna lateral. */
+.eb-s { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.esc { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+.esc h3 { font: 600 14px var(--font); color: var(--text); margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.esc h3 small { margin-left: auto; font: 500 11.5px var(--font); color: var(--text-3); }
+.esc dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 9px 12px; font-size: 13px; margin: 0; }
+.esc dt { color: var(--text-3); }
+.esc dd { color: var(--text); font-weight: 500; min-width: 0; margin: 0; }
+.esc dd small { display: block; font-size: 11.5px; font-weight: 400; color: var(--text-3); }
+.esc dd a { color: inherit; text-decoration: none; }
+.esc dd a:hover { color: var(--primary); text-decoration: underline; }
+.esc dd .rt { display: inline-flex; align-items: center; gap: 4px; font: 600 13px var(--font); letter-spacing: 0; }
+.esc dd .rt svg { width: 13px; height: 13px; color: var(--stamp-amber-ink); fill: var(--stamp-amber-ink); stroke: none; }
+.esc .mu { color: var(--text-3); font-weight: 400; }
+.esc hr { border: 0; border-top: 1px solid var(--border); margin: 3px 0; grid-column: 1 / -1; }
+.prv { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; }
+.prv-r { display: flex; align-items: center; gap: 10px; font: 500 13px var(--font); color: var(--text); }
+.prv-r img, .prv-r .lg { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; object-fit: cover; }
+.prv-r .lg { display: grid; place-items: center; background: var(--card); color: var(--card-text); font: 800 10.5px var(--font); }
+.prv-r > span { min-width: 0; }
+.prv-r small { display: block; font-size: 11.5px; color: var(--text-3); }
+.prv-r .pf-btn { margin-left: auto; height: 30px; }
+.prv-e { margin: 0; font-size: 13px; color: var(--text-3); }
+.prv-jw { margin: 12px 0 0; font-size: 11px; color: var(--text-4); }
+.prv-jw a { color: inherit; }
+.lnk { display: flex; align-items: center; gap: 8px; font: 600 13px var(--font); color: var(--text); text-decoration: none; }
+.lnk:hover { border-color: var(--border-strong); }
+.lnk svg { width: 15px; height: 15px; color: var(--text-3); margin-left: auto; }
+.lnk .imdb { height: 24px; font-size: 11px; }
+.m-only { display: none; }
+
+/* Visor de fotogramas: la base (:target) es la .lightbox de detail-common.css. */
+.ep-lb { align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .85); }
+.ep-lb img { position: relative; max-width: min(1280px, 92vw); max-height: 88vh; object-fit: contain; border-radius: 8px; }
+.ep-lb-x { position: absolute; inset: 0; }
+.ep-lb-c { position: absolute; top: 14px; right: 18px; z-index: 2; font-size: 34px; line-height: 1; color: rgba(255, 255, 255, .85); text-decoration: none; }
+.ep-lb-p, .ep-lb-n { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; color: rgba(255, 255, 255, .8); }
+.ep-lb-p { left: 12px; }
+.ep-lb-n { right: 12px; }
+.ep-lb-p svg, .ep-lb-n svg { width: 36px; height: 36px; }
+
 /* ---- 404 (estilo de 404.astro, con tokens) ------------------------------------------------------ */
 .ep-404 { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 72px 16px; min-height: 50vh; justify-content: center; }
 .ep-404-k { font: 600 12px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 0; }
@@ -231,6 +320,30 @@ a.enc:hover { border-color: var(--border-strong); }
     .ea-r .ea-pv span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .en { margin: 16px 0 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+    /* Cuerpo: una columna, la lateral al final; reparto y fotogramas en carriles que se deslizan. */
+    .eb { display: flex; flex-direction: column; gap: 32px; padding: 28px 0 0; }
+    .eb-m { gap: 32px; }
+    .eb .yf-section-header { padding-bottom: 10px; margin-bottom: 14px; }
+    .eb .yf-sh-title { font-size: 16px; }
+    .syn { font-size: 15px; }
+    /* Los carriles sangran hasta el borde derecho de la ventana (100% = ancho del bloque, a todo el <main>). */
+    .pcg, .pcg.g3 { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin-right: calc((100% - 100vw) / 2); padding-right: 12px; scroll-snap-type: x proximity; }
+    .pcg::-webkit-scrollbar { display: none; }
+    .pc { flex: 0 0 88px; flex-direction: column; text-align: center; gap: 6px; scroll-snap-align: start; }
+    .pc img, .pc-ph { width: 72px; height: 72px; }
+    .pc-t { width: 100%; }
+    .pc b { font-size: 12px; }
+    .pc-t > span { font-size: 11px; }
+    [data-cast]:not(.is-open) .pc.xtra { display: flex; } /* en el carril caben todos */
+    .more { display: none; }
+    .gal { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; margin-right: calc((100% - 100vw) / 2); padding-right: 12px; scroll-snap-type: x proximity; }
+    .gal::-webkit-scrollbar { display: none; }
+    .gal .st16 { flex: 0 0 250px; scroll-snap-align: start; }
+    .vids { grid-template-columns: 1fr; }
+    .esc dl { grid-template-columns: 90px minmax(0, 1fr); }
+    .m-only { display: block; }
+    .d-only { display: none; }
     .en .etr { grid-column: 1 / -1; grid-row: 1; }
     .enc { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
     .enc.nx { flex-direction: column; text-align: right; }

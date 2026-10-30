@@ -11,6 +11,7 @@ import { countSeriesPasses } from "../../services/BD/lists/watchLog";
 import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
+import '../../styles/shared/spoil.css'; // modo sin spoilers, compartido con la ficha de episodio (TMDB D4)
 import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
 } from "../../services/API/Series/InfoSeries";
@@ -1304,33 +1305,13 @@ const jsonLd = item ? {
     </article>
 </Layout>
 
-<style is:global>
-    /* Modo sin spoilers (§2): difumina el episodio no visto; «Mostrar» revela.
-       El blur es SELECTIVO (A3b): solo lo marcado con `.yf-blur`, que la ficha pone en el
-       fotograma y/o en la sinopsis según el desglose del perfil. Antes se difuminaba todo hijo
-       directo del contenedor, así que no había forma de tapar una cosa y dejar la otra. */
-    .yf-spoil { position: relative; }
-    .yf-spoil .yf-blur { filter: blur(15px); pointer-events: none; user-select: none; transition: filter .35s ease; }
-    .yf-spoil.revealed .yf-blur { filter: none; pointer-events: auto; user-select: auto; }
-    .yf-spoil-btn {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2;
-        display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
-        background: rgba(17, 24, 39, .82); color: #fff; border: none; border-radius: 9px;
-        padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-    }
-    .yf-spoil-btn:hover { background: rgba(17, 24, 39, .94); }
-    .yf-spoil.revealed .yf-spoil-btn { display: none; }
-    @media (prefers-reduced-motion: reduce) { .yf-spoil .yf-blur { transition: none; } }
-</style>
+<script>
+    // Modo sin spoilers (§2): «Mostrar» revela el episodio difuminado. El blur es SELECTIVO (A3b):
+    // solo lo marcado con `.yf-blur`. CSS y script compartidos con la ficha de episodio (TMDB D4):
+    // `styles/shared/spoil.css` y `scripts/shared/spoil.ts`.
+    import '../../scripts/shared/spoil';
+</script>
 <script is:inline>
-    // Revelar el episodio difuminado (§2 modo sin spoilers) al tocar «Mostrar».
-    document.addEventListener('click', function (e) {
-        var b = e.target.closest && e.target.closest('.yf-spoil-btn');
-        if (!b) return;
-        var host = b.closest('.yf-spoil');
-        if (host) host.classList.add('revealed');
-    });
-
     // Confirmación al cambiar el modo sin spoilers de esta serie (flag `sp` en la URL tras el POST).
     (function () {
         try {

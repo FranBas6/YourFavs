@@ -12,10 +12,17 @@
  *     el comentario y el spoiler de este episodio), IMDb y «Ver en {plataforma}».
  *   · Navegación (`.en`): anterior y siguiente cruzando temporadas (la T0, aparte) y la tira de la
  *     temporada, con visto / actual / final / sin emitir.
+ *   · Cuerpo (`.eb`, D4b-3): sinopsis, reparto (habituales e invitados por separado, con tope),
+ *     fotogramas (con su visor) y vídeos; al lado, «Este episodio», dónde verlo, amigos e IMDb.
+ *     Sin ver y con el modo sin spoilers: sinopsis, invitados y fotogramas ocultos hasta «Mostrar».
  */
 import Layout from '../../../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
 import '../../../../styles/shared/spoil.css';
+import '../../../../styles/shared/detail-common.css';
+import SectionHeader from '../../../../components/SectionHeader.astro';
+import FriendsSeen from '../../../../components/detail/FriendsSeen.astro';
+import { SUPPORTED_COUNTRIES } from '../../../../services/API/shared/tmdbInfoService';
 import '../../../../styles/pages/serie/episodio.css';
 import { getEpisodeDetail, type EpisodeRef } from '../../../../services/API/Series/episodeDetail';
 import { getWatchedProgress } from '../../../../services/BD/series/yourfavsSerie';
@@ -27,8 +34,9 @@ import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/shared/tmdbClient';
 import { safeFetch } from '../../../../utils/safeFetch';
 import {
-    airState, countdown, decimal, earlierUnseen, epCode, episodeHref, episodeTags, isPlaceholderTitle, longDate,
-    progressLine, runtimeLabel, shortDate, tinyDate, todayKey, watchedLabel, TAG_STYLE,
+    airState, countdown, decimal, earlierUnseen, epCode, episodeCrew, episodeHref, episodeKind, episodeTags,
+    isPlaceholderTitle, longDate, mediumDate, progressLine, relativeAgo, runtimeLabel, shortDate, tinyDate,
+    todayKey, watchedLabel, PROVIDER_KIND, TAG_STYLE,
 } from '../../../../utils/episodeView';
 
 const posInt = (v: string | undefined, min: number) => (v && /^\d{1,5}$/.test(v) && Number(v) >= min ? Number(v) : null);
@@ -61,6 +69,7 @@ const isWatched = (s: number, e: number) => watched.has(`${s}-${e}`);
 // Igual que la ficha de serie: la serie manda sobre el ajuste general, y solo con sesión.
 const spoilerFree = !!user && (spoilerPref !== null ? spoilerPref : user.spoilers?.enabled === true);
 const hideStills = spoilerFree && user?.spoilers?.hideStills !== false;
+const hideSynopsis = spoilerFree && user?.spoilers?.hideSynopsis !== false;
 
 // --- El episodio ---------------------------------------------------------------------------------
 const today = todayKey();
@@ -144,6 +153,26 @@ const clientData = d ? {
     seasonEps, watched: [...watchedInSeason], seriesWatched, seriesTotal,
     next: next ? { href: next.href, code: next.code, name: next.name, season: d.next!.season, episode: d.next!.episode } : null,
 } : null;
+// --- Cuerpo (D4b-3) ------------------------------------------------------------------------------
+interface Person { id: number; name: string; character: string; profile_path: string | null }
+const person = (p: any): Person => ({ id: p.id, name: p.name ?? '', character: p.character ?? '', profile_path: p.profile_path ?? null });
+const regulars: Person[] = (ep?.credits?.cast ?? []).map(person);
+const guests: Person[] = (ep?.guest_stars ?? ep?.credits?.guest_stars ?? []).map(person);
+const REG_CAP = 8, GUEST_CAP = 9;
+const isAnimation = (d?.series.genres ?? []).some((g) => g.id === 16);
+const crew = episodeCrew(ep?.crew ?? ep?.credits?.crew);
+const videos: { key: string; name: string; type: string }[] = (ep?.videos?.results ?? []).filter((v: any) => v.site === 'YouTube' && v.key);
+const unseenHidden = !seenThis;
+const blurSynopsis = hideSynopsis && unseenHidden;
+const blurGallery = hideStills && unseenHidden;
+const regionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === region)?.label ?? region;
+const allProviders: any[] = seasonProviders?.providersByCountry?.[region] ?? [];
+const originNotSpain = !(d?.series.origin_country ?? []).includes('ES');
+// Filas del equipo: si falta un dato, en uno sin emitir sale «Sin confirmar»; si ya se emitió, la fila no sale.
+const crewRows = ([
+    ['Dirección', crew.directors], ['Guion', crew.writers], ['Fotografía', crew.photo], ['Montaje', crew.editing], ['Música', crew.music],
+] as [string, string[]][]).filter(([label, names]) => names.length || (air === 'soon' && (label === 'Dirección' || label === 'Guion')));
+
 // «T1·E10 · Fuego y sangre», el comentario con que llega «Enviar a…».
 const sendMsg = d ? `${epCode(season!, episode!)} · ${title}` : '';
 
@@ -227,7 +256,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                         ) : (
                             <div class="st16">
                                 <img src={stillUrl(still, 'w780')} alt={`Fotograma de ${title}`} />
-                                {stills.length > 1 && <a class="cnt" href="#fotogramas" aria-label={`Ver los ${stills.length} fotogramas`}><Icon name="lucide:image" aria-hidden="true" />1 / {stills.length}</a>}
+                                {stills.length > 1 && <a class="cnt" href="#still-0" aria-label={`Ver los ${stills.length} fotogramas`}><Icon name="lucide:image" aria-hidden="true" />1 / {stills.length}</a>}
                             </div>
                         ))}
                     </div>
@@ -345,6 +374,148 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                     <span class="enc nx off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Siguiente</span><b>No hay más episodios</b></span></span>
                 )}
             </div>
+
+            <!-- Cuerpo: lectura a la izquierda, consulta a la derecha -->
+            <div class="eb">
+                <div class="eb-m">
+                    <section aria-labelledby="ep-syn">
+                        <SectionHeader title="Sinopsis" icon="align-left" color="slate" headingId="ep-syn" />
+                        {ep.overview ? (blurSynopsis ? (
+                            <div class="yf-spoil txt">
+                                <p class="syn yf-blur" aria-hidden="true" inert>{ep.overview}</p>
+                                <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar sinopsis</button>
+                            </div>
+                        ) : <p class="syn">{ep.overview}</p>) : (
+                            <p class="syn-e"><Icon name="lucide:clock" aria-hidden="true" />{air === 'aired' ? 'No hay descripción disponible.' : 'Aún no hay sinopsis. Suele publicarse unos días antes del estreno.'}</p>
+                        )}
+                    </section>
+
+                    <section aria-labelledby="ep-cast">
+                        <SectionHeader title="Reparto" icon="users" color="blue" headingId="ep-cast" />
+                        {regulars.length > 0 && (
+                            <div class="cast-b" data-cast>
+                                <h3 class="cast-h">{isAnimation ? 'Voces habituales' : 'Habituales en este episodio'}<span>{regulars.length}</span></h3>
+                                <div class="pcg">
+                                    {regulars.map((p, i) => (
+                                        <a class:list={['pc', { xtra: i >= REG_CAP }]} href={`/actor/${p.id}`}>
+                                            {p.profile_path ? <img src={posterUrl(p.profile_path, 'w185')} alt="" loading="lazy" /> : <span class="pc-ph" aria-hidden="true">{p.name.charAt(0)}</span>}
+                                            <span class="pc-t"><b>{p.name}</b><span>{p.character}</span></span>
+                                        </a>
+                                    ))}
+                                </div>
+                                {regulars.length > REG_CAP && <button type="button" class="more" aria-expanded="false" data-more><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar los {regulars.length}</button>}
+                            </div>
+                        )}
+                        <div class="cast-b" data-cast>
+                            <h3 class="cast-h">Estrellas invitadas<span>{guests.length}</span></h3>
+                            {guests.length === 0 ? (
+                                <p class="syn-e"><Icon name="lucide:users" aria-hidden="true" />Sin estrellas invitadas anunciadas</p>
+                            ) : (
+                                <div class:list={[{ 'yf-spoil': blurSynopsis }]}>
+                                    <div class:list={['pcg g3', { 'yf-blur': blurSynopsis }]} aria-hidden={blurSynopsis ? 'true' : undefined} inert={blurSynopsis || undefined}>
+                                        {guests.map((p, i) => (
+                                            <a class:list={['pc', { xtra: i >= GUEST_CAP }]} href={`/actor/${p.id}`}>
+                                                {p.profile_path ? <img src={posterUrl(p.profile_path, 'w185')} alt="" loading="lazy" /> : <span class="pc-ph" aria-hidden="true">{p.name.charAt(0)}</span>}
+                                                <span class="pc-t"><b>{p.name}</b><span>{p.character}</span></span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                    {blurSynopsis && <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar invitados</button>}
+                                </div>
+                            )}
+                            {guests.length > GUEST_CAP && <button type="button" class="more" aria-expanded="false" data-more><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar las {guests.length}</button>}
+                        </div>
+                    </section>
+
+                    {stills.length > 1 && (
+                        <section aria-labelledby="ep-stills" id="fotogramas">
+                            <SectionHeader title="Fotogramas" icon="image" color="purple" cap={`${stills.length} fotogramas`} headingId="ep-stills" />
+                            <div class:list={[{ 'yf-spoil': blurGallery }]}>
+                                <div class:list={['gal', { 'yf-blur': blurGallery }]} aria-hidden={blurGallery ? 'true' : undefined} inert={blurGallery || undefined}>
+                                    {stills.map((p, i) => (
+                                        <a class="st16" href={`#still-${i}`} aria-label={`Fotograma ${i + 1} de ${stills.length}`}><img src={stillUrl(p, 'w300')} alt="" loading="lazy" /></a>
+                                    ))}
+                                </div>
+                                {blurGallery && <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar fotogramas</button>}
+                            </div>
+                        </section>
+                    )}
+
+                    {videos.length > 0 && (
+                        <section aria-labelledby="ep-vids">
+                            <SectionHeader title="Vídeos" icon="play" color="red" cap={`${videos.length} ${videos.length === 1 ? 'vídeo' : 'vídeos'}`} headingId="ep-vids" />
+                            <div class="vids">
+                                {videos.slice(0, 4).map((v) => (
+                                    <figure class="vid">
+                                        <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                        <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
+                                    </figure>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+                </div>
+
+                <aside class="eb-s">
+                    <section class="esc" aria-labelledby="ep-info">
+                        <h3 id="ep-info">Este episodio</h3>
+                        <dl>
+                            <dt>Emisión</dt>
+                            <dd>{ep.air_date ? <>{mediumDate(ep.air_date)}<small>{relativeAgo(ep.air_date, today)}{originNotSpain ? ' · emisión original' : ''}</small></> : <span class="mu">Por anunciar</span>}</dd>
+                            {runtime && <><dt>Duración</dt><dd>{runtime}</dd></>}
+                            <dt>Nota TMDB</dt>
+                            <dd>{score ? <span class="rt"><Icon name="lucide:star" aria-hidden="true" />{score} · {votes.toLocaleString('es-ES')} {votes === 1 ? 'voto' : 'votos'}</span> : <span class="mu">{air === 'aired' ? 'Sin votos todavía' : 'Sin nota hasta que se emita'}</span>}</dd>
+                            <dt>Tipo</dt>
+                            <dd>{episodeKind(season!, ep.episode_type)}</dd>
+                            {crewRows.length > 0 && <hr />}
+                            {crewRows.map(([label, names]) => (
+                                <>
+                                    <dt>{label}</dt>
+                                    <dd>{names.length ? names.map((n, i) => <>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`}>{n}</a></>) : <span class="mu">Sin confirmar</span>}</dd>
+                                </>
+                            ))}
+                            {imdbId && <><dt class="m-only">IMDb</dt><dd class="m-only"><a class="imdb" href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener">IMDb</a></dd></>}
+                        </dl>
+                    </section>
+
+                    <section class="esc" aria-labelledby="ep-where">
+                        <h3 id="ep-where">Dónde ver {season === 0 ? 'los especiales' : `la T${season}`}<small>{regionLabel}</small></h3>
+                        {allProviders.length > 0 ? (
+                            <ul class="prv">
+                                {allProviders.slice(0, 6).map((p) => (
+                                    <li class="prv-r">
+                                        {p.logo_path ? <img src={posterUrl(p.logo_path, 'w92')} alt="" loading="lazy" /> : <span class="lg" aria-hidden="true">{p.provider_name.slice(0, 2)}</span>}
+                                        <span>{p.provider_name}<small>{PROVIDER_KIND[p.type] ?? ''}</small></span>
+                                        {providerLink && <a class="pf-btn sm" href={providerLink} target="_blank" rel="noopener" aria-label={`Ver en ${p.provider_name}`}>Ver</a>}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p class="prv-e">No está en plataformas de {regionLabel} ahora mismo.</p>
+                        )}
+                        <p class="prv-jw">Disponibilidad por <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a></p>
+                    </section>
+
+                    <FriendsSeen mediaType="tv" tmdbId={id!} note="de la serie" />
+
+                    {imdbId && (
+                        <a class="esc lnk d-only" href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener">
+                            <span class="imdb">IMDb</span>Este episodio en IMDb<Icon name="lucide:external-link" aria-hidden="true" />
+                        </a>
+                    )}
+                </aside>
+            </div>
+
+            <!-- Visor de fotogramas (CSS :target de detail-common.css, como LightboxGallery) -->
+            {stills.length > 0 && stills.map((p, i) => (
+                <div id={`still-${i}`} class="lightbox ep-lb" role="dialog" aria-label={`Fotograma ${i + 1} de ${stills.length}`}>
+                    <a href="#_" class="ep-lb-x" aria-label="Cerrar"></a>
+                    <img src={stillUrl(p, 'original')} alt={`Fotograma ${i + 1} de ${title}`} loading="lazy" />
+                    <a href="#_" class="ep-lb-c" aria-label="Cerrar">&times;</a>
+                    {i > 0 && <a href={`#still-${i - 1}`} class="ep-lb-p" aria-label="Anterior"><Icon name="lucide:chevron-left" /></a>}
+                    {i < stills.length - 1 && <a href={`#still-${i + 1}`} class="ep-lb-n" aria-label="Siguiente"><Icon name="lucide:chevron-right" /></a>}
+                </div>
+            ))}
         </article>
     )}
 </Layout>
@@ -374,6 +545,17 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
         strip.addEventListener('scroll', fades, { passive: true });
         window.addEventListener('resize', fades);
     }
+
+    // «Mostrar los N» del reparto: despliega en el sitio.
+    document.querySelectorAll<HTMLButtonElement>('[data-more]').forEach((b) => {
+        b.addEventListener('click', () => {
+            const box = b.closest<HTMLElement>('[data-cast]');
+            const open = !box?.classList.contains('is-open');
+            box?.classList.toggle('is-open', open);
+            b.setAttribute('aria-expanded', String(open));
+            b.hidden = open;
+        });
+    });
 
     // El selector de temporada se cierra al pulsar fuera o con Escape.
     const sel = document.querySelector<HTMLDetailsElement>('.ssel');
