@@ -148,20 +148,46 @@ const JOYAS: CatalogRowDef = {
  * Contratiempo, El secreto de sus ojos, Los olvidados, Voces inocentes — que es lo que uno espera al
  * pedir cine en español. Suelo de votos más bajo en series porque acumulan menos.
  */
-const ESPANOL: CatalogRowDef = {
-    key: 'espanol',
-    title: 'En español',
-    subtitle: 'Lo mejor valorado en español, de España y de Latinoamérica.',
-    why: 'idioma original = español, por nota',
+/**
+ * «En español» eran dos cosas distintas mezcladas (decisión de Fran, TMDB E5): lo hecho en España y
+ * lo de Latinoamérica van por separado. Se filtra por país de origen (`with_origin_country`, `|` =
+ * «o»), así que una coproducción hispano-argentina sale en las dos, que es lo que es.
+ */
+const ESPANA: CatalogRowDef = {
+    key: 'espana',
+    title: 'Hecho en España',
+    subtitle: 'Lo mejor valorado de producción española, coproducciones incluidas.',
+    why: 'país de origen = España, por nota',
     media: 'movie',
-    params: { with_original_language: 'es' },
+    params: { with_origin_country: 'ES' },
     movieParams: { 'vote_count.gte': '500' },
     tvParams: { 'vote_count.gte': '300' },
     sortBy: 'vote_average.desc',
     color: 'red',
-    icon: 'languages',
-    link: '/catalogo/fila/espanol',
+    icon: 'flag',
+    link: '/catalogo/fila/espana',
 };
+
+/** Países hispanohablantes de Latinoamérica (Brasil no: el idioma original manda, abajo). */
+const LATAM_COUNTRIES = 'MX|AR|CO|CL|PE|VE|UY|EC|BO|PY|CR|PA|DO|GT|HN|SV|NI|CU|PR';
+
+const LATAM: CatalogRowDef = {
+    key: 'latam',
+    title: 'De Latinoamérica',
+    subtitle: 'Lo mejor valorado en español de México, Argentina, Colombia, Chile…',
+    why: 'país de origen latinoamericano y en español, por nota',
+    media: 'movie',
+    params: { with_origin_country: LATAM_COUNTRIES, with_original_language: 'es' },
+    movieParams: { 'vote_count.gte': '500' },
+    tvParams: { 'vote_count.gte': '300' },
+    sortBy: 'vote_average.desc',
+    color: 'amber',
+    icon: 'earth',
+    link: '/catalogo/fila/latam',
+};
+
+/** Claves que ya no existen → la que las sustituye (enlaces viejos a `/catalogo/fila/{clave}`). */
+const RENAMED_ROWS: Record<string, string> = { espanol: 'espana' };
 
 /**
  * Lo mejor de una década, rotando. No pisa «Top de siempre», que es un ranking fijo y global: aquí el
@@ -279,12 +305,13 @@ export function curatedRowsFor(mode: CatalogMode, dayNum: number, freshSinceISO:
             TERMINADAS,
             forMedia(JOYAS, 'tv'),
             forMedia(decade, 'tv'),
-            forMedia(ESPANOL, 'tv'),
+            forMedia(ESPANA, 'tv'),
+            forMedia(LATAM, 'tv'),
             forMedia(fresh, 'tv'),
         ];
     }
     if (mode === 'movies') {
-        return [streaming, CORTAS, PALOMITAS, JOYAS, decade, ESPANOL, fresh];
+        return [streaming, CORTAS, PALOMITAS, JOYAS, decade, ESPANA, LATAM, fresh];
     }
     if (mode === 'all') {
         // En «Todo» solo caben las que valen para los dos tipos: una duración o un `with_type` no
@@ -293,7 +320,8 @@ export function curatedRowsFor(mode: CatalogMode, dayNum: number, freshSinceISO:
             forMedia(streaming, 'both'),
             forMedia(JOYAS, 'both'),
             forMedia(decade, 'both'),
-            forMedia(ESPANOL, 'both'),
+            forMedia(ESPANA, 'both'),
+            forMedia(LATAM, 'both'),
             forMedia(fresh, 'both'),
         ];
     }
@@ -321,8 +349,9 @@ export function findCuratedRow(
     const order: CatalogMode[] = preferred
         ? [preferred, ...(['movies', 'series', 'all'] as CatalogMode[]).filter((m) => m !== preferred)]
         : (['movies', 'series', 'all'] as CatalogMode[]);
+    const wanted = RENAMED_ROWS[key] ?? key;
     for (const mode of order) {
-        const found = curatedRowsFor(mode, dayNum, freshSinceISO, region).find((d) => d.key === key);
+        const found = curatedRowsFor(mode, dayNum, freshSinceISO, region).find((d) => d.key === wanted);
         if (found) return { def: found, mode };
     }
     return null;

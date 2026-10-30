@@ -16,7 +16,9 @@ export const prerender = false;
 
 // Solo permitimos params de contexto conocidos (el body viene del cliente).
 // `with_keywords` / `with_companies`: sin ellos el contador de /catalogo/keyword/{id} contaba todo el catálogo.
-const ALLOWED_BASE = new Set(['with_genres', 'with_watch_providers', 'watch_region', 'with_networks', 'with_keywords', 'with_companies', 'vote_count.gte']);
+// País e idioma de origen: los de «Hecho en España» y «De Latinoamérica» (E5); sin ellos el contador
+// de su vista ampliada contaba todo el catálogo.
+const ALLOWED_BASE = new Set(['with_genres', 'with_watch_providers', 'watch_region', 'with_networks', 'with_keywords', 'with_companies', 'vote_count.gte', 'with_origin_country', 'with_original_language']);
 
 function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
