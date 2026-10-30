@@ -1106,7 +1106,7 @@
 .aj-imp-src {
     font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .08em;
     color: var(--text-4); border: 1px solid var(--border-strong); border-radius: var(--r-full);
-    padding: 2px 8px;
+    padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
 }
 .aj-imp-steps { margin-top: 0; margin-bottom: 18px; }
 .aj-imp-dup { margin: 0 0 14px; }
@@ -1129,7 +1129,9 @@
 .aj-imp-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .25s; }
 .aj-imp-prog-d { margin: 8px 0 0; font-size: 12px; line-height: 1.45; color: var(--text-3); }
 
-.aj-imp-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.aj-imp-from { margin: 0 0 12px; font-family: var(--font-mono); font-size: 11px; color: var(--text-4); overflow-wrap: anywhere; }
+.aj-imp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 10px; }
+.aj-imp-stats > [hidden] { display: none; }
 .aj-imp-stats > div {
     display: flex; flex-direction: column; gap: 2px; padding: 12px;
     border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-tint);
@@ -1154,7 +1156,34 @@
 .aj-imp-done-t { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14.5px; font-weight: 600; color: var(--text); }
 .aj-imp-done-t svg { width: 18px; height: 18px; color: var(--stamp-green-ink); flex-shrink: 0; }
 .aj-imp-done-t + .aj-imp-prog-d:empty { display: none; }
+/* Dudosos (Letterboxd): una fila por película con sus candidatas; la elegida, con borde de acento. */
+.aj-imp-amb { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--border); }
+.aj-imp-amb .aj-imp-note { margin: 0 0 12px; }
+.aj-imp-amb-list { display: flex; flex-direction: column; gap: 14px; max-height: 520px; overflow-y: auto; }
+.aj-imp-amb-t { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--text); }
+.aj-imp-amb-opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.aj-imp-cand {
+    display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; column-gap: 9px;
+    align-items: center; width: 190px; max-width: 100%; padding: 6px; text-align: left;
+    border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-tint);
+    color: var(--text-2); font: inherit; cursor: pointer;
+}
+.aj-imp-cand:hover { border-color: var(--border-strong); }
+.aj-imp-cand[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); background: var(--bg-elev); }
+.aj-imp-cand img {
+    grid-row: 1 / 3; width: 34px; aspect-ratio: 2 / 3; object-fit: cover;
+    border-radius: var(--r-sm); background: var(--border);
+}
+.aj-imp-cand-t { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.25; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.aj-imp-cand-y { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-4); }
+.aj-imp-cand.is-none { display: inline-flex; width: auto; align-items: center; justify-content: center; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text-3); }
 @media (max-width: 560px) {
+    .aj-imp-cand { width: 100%; }
+    /* «Tus importaciones»: el botón baja bajo el texto en vez de estrujarlo. */
+    [data-imp-history] .aj-row { flex-wrap: wrap; }
+    [data-imp-history] .aj-row-text { flex-basis: calc(100% - 47px); }
+    [data-imp-history] .aj-row-title { overflow-wrap: anywhere; }
+    [data-imp-history] .aj-row .aj-btn { margin-left: 47px; }
     .aj-imp-stats { grid-template-columns: repeat(2, 1fr); }
     .aj-imp-actions .aj-btn { flex: 1; justify-content: center; height: 44px; }
 }

@@ -49,3 +49,77 @@ export async function resolveImdbIds(rows: { imdb: string; type: 'movie' | 'tv' 
         }
     }, CONCURRENCY);
 }
+
+// ---------------------------------------------------------------------------------------
+// Letterboxd (D3b): sin id, por título y año. Letterboxd usa el título en inglés, así que se busca en
+// inglés para comparar y, a la vez, en tu idioma para tener el título con el que se guarda en tus
+// colecciones (las colecciones pintan el título guardado).
+// ---------------------------------------------------------------------------------------
+
+export interface TitleCandidate { tmdb_id: number; title: string; year: number | null; poster_path: string | null }
+
+export type TitleMatch =
+    | { status: 'found'; media_type: 'movie'; tmdb_id: number; title: string; year: number | null; poster_path: string | null }
+    | { status: 'ambiguous'; candidates: TitleCandidate[] }
+    | { status: 'missing' }
+    | { status: 'error' };
+
+interface SearchHit { id: number; title?: string; original_title?: string; release_date?: string; poster_path?: string | null; popularity?: number }
+
+/** Título comparable: sin acentos, signos, «the/a/an» delante ni diferencias «&»/«and». */
+export function normTitle(t: string): string {
+    return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+        .replace(/&/g, ' and ').replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+        .replace(/^(the|a|an) /, '');
+}
+
+async function searchMovies(query: string, year: number | null, language: string): Promise<SearchHit[]> {
+    const params: Record<string, string> = { query, include_adult: 'false', language };
+    if (year) params.primary_release_year = String(year);
+    const r = await tmdbFetch<{ results?: SearchHit[] }>('/search/movie', params);
+    return r.results ?? [];
+}
+
+/**
+ * Cada película (título + año de Letterboxd) → encontrada, dudosa (hasta 3 candidatas para que elijas)
+ * o no encontrada. Se acepta sola si el título coincide (en inglés o el original) y el año es el mismo
+ * o ±1 (los estrenos en festivales cambian de año entre webs).
+ */
+export async function resolveByTitle(rows: { name: string; year: number | null }[], language: string): Promise<TitleMatch[]> {
+    return processBatch(rows, async ({ name, year }): Promise<TitleMatch> => {
+        try {
+            const want = normTitle(name);
+            const sameTitle = (h: SearchHit) => normTitle(h.title ?? '') === want || normTitle(h.original_title ?? '') === want;
+            const near = (h: SearchHit) => !year || (yearOf(h.release_date) !== null && Math.abs(yearOf(h.release_date)! - year) <= 1);
+
+            // Con el año exacto primero (lo normal); si no, sin año y con ±1.
+            let hits = year ? await searchMovies(name, year, 'en-US') : [];
+            let match = hits.find(sameTitle);
+            if (!match) {
+                hits = await searchMovies(name, null, 'en-US');
+                match = hits.find((h) => sameTitle(h) && near(h));
+            }
+
+            if (match) {
+                // El título en tu idioma (misma búsqueda; si no sale, el inglés).
+                let title = match.title ?? name;
+                if (!language.startsWith('en')) {
+                    const loc = await searchMovies(name, yearOf(match.release_date), language).catch(() => []);
+                    title = loc.find((h) => h.id === match!.id)?.title ?? title;
+                }
+                return { status: 'found', media_type: 'movie', tmdb_id: match.id, title, year: yearOf(match.release_date), poster_path: match.poster_path ?? null };
+            }
+            if (!hits.length) return { status: 'missing' };
+            // Dudosa: las 3 más cercanas en año, y a igualdad, las más populares.
+            const dist = (h: SearchHit) => (year && yearOf(h.release_date) !== null ? Math.abs(yearOf(h.release_date)! - year) : 99);
+            const candidates = [...hits]
+                .sort((a, b) => dist(a) - dist(b) || (b.popularity ?? 0) - (a.popularity ?? 0))
+                .slice(0, 3)
+                .map((h) => ({ tmdb_id: h.id, title: h.title ?? '', year: yearOf(h.release_date), poster_path: h.poster_path ?? null }));
+            return { status: 'ambiguous', candidates };
+        } catch (error) {
+            console.error(`[import] /search «${name}»:`, (error as Error).message);
+            return { status: 'error' };
+        }
+    }, CONCURRENCY);
+}
