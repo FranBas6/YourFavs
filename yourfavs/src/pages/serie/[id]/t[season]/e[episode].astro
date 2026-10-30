@@ -39,10 +39,13 @@ import {
     todayKey, watchedLabel, PROVIDER_KIND, TAG_STYLE,
 } from '../../../../utils/episodeView';
 
-const posInt = (v: string | undefined, min: number) => (v && /^\d{1,5}$/.test(v) && Number(v) >= min ? Number(v) : null);
-const id = posInt(Astro.params.id, 1);
-const season = posInt(Astro.params.season, 0);
-const episode = posInt(Astro.params.episode, 1);
+// Tope de cifras solo para no aceptar basura: los ids de serie de TMDB ya pasan de 100000 (Outer Banks
+// es 100757) y con 5 cifras daban 404 todas las series recientes. Temporadas y episodios, 4 cifras.
+const posInt = (v: string | undefined, min: number, digits: number) =>
+    (v && new RegExp(`^\\d{1,${digits}}$`).test(v) && Number(v) >= min ? Number(v) : null);
+const id = posInt(Astro.params.id, 1, 9);
+const season = posInt(Astro.params.season, 0, 4);
+const episode = posInt(Astro.params.episode, 1, 4);
 
 const user = Astro.locals.user;
 const result = id != null && season != null && episode != null
