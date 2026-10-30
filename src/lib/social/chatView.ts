@@ -213,7 +213,7 @@ export function titleMeta(r: TitleCardRef): string {
     return parts.join(' · ');
 }
 
-const ratingHtml = (score: number) => `<span class="rt">${icon('star', 'str')}${esc(formatScore(score))}</span>`;
+const ratingHtml = (score: number) => `<span class="msg-rt">${icon('star', 'str')}${esc(formatScore(score))}</span>`;
 const stampMini = (color: string, name: string) =>
     `<span class="tc-st" style="--sb:var(--stamp-${color});--si:var(--stamp-${color}-ink)" aria-hidden="true">${icon(name)}</span>`;
 
