@@ -22,6 +22,24 @@ export async function getSpoilerPref(serieId: string | number): Promise<boolean 
 }
 
 /**
+ * Los overrides de varias series en una consulta («Estás viendo»: una tarjeta por serie). Las que no
+ * tienen override no salen en el mapa (= seguir el global).
+ */
+export async function getSpoilerPrefs(serieIds: (string | number)[]): Promise<Map<number, boolean>> {
+    const out = new Map<number, boolean>();
+    const userId = getAuthId();
+    const ids = [...new Set(serieIds.map(Number).filter(Number.isInteger))];
+    if (!userId || !ids.length) return out;
+    try {
+        const { data, error } = await db().from('spoiler_prefs').select('tmdb_id, spoiler_free')
+            .eq('user_id', userId).in('tmdb_id', ids);
+        if (error) return out;
+        for (const r of data ?? []) if (typeof r.spoiler_free === 'boolean') out.set(r.tmdb_id, r.spoiler_free);
+    } catch { /* sin overrides: se sigue el global */ }
+    return out;
+}
+
+/**
  * Borra el override para que la serie vuelva a seguir el ajuste global.
  *
  * Hace falta porque un `false` explícito es indistinguible, de cara al usuario, de "no tengo

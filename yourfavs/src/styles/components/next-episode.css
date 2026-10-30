@@ -1,211 +1,162 @@
-/* Panel "Continuar viendo" — cards compactas de siguiente episodio.
-   Carrusel horizontal con snap (como el antiguo de pósters) para que 6 series
-   no coman vertical. Card navy fija (--card): igual en ambos temas. */
+/* «Estás viendo» / «Continuar viendo» — handoff `docs/design_handoff_estas_viendo` (`ev.css` es la
+   fuente de las medidas). Solo tokens: la tarjeta va sobre --bg-elev y sigue el tema (antes era el
+   --card navy fijo con blancos sueltos). El marcado sale de `lib/nextEpisodeView.ts`. */
 
-.nep-scroll {
-    display: flex;
-    gap: 14px;
-    overflow-x: auto;
-    padding: 2px 4px 10px;
-    scroll-snap-type: x mandatory;
-    /* Barra SIEMPRE visible (track incluido): es la pista de que hay más
-       cards. Tokens → se adapta sola al tema. */
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) var(--bg-tint);
+.nv-sec { position: relative; }
+
+/* Cabecera: el SectionHeader de siempre, con las flechas y «Mi seguimiento» a la derecha. */
+.nv-sec .yf-section-header { margin-bottom: 16px; padding-bottom: 12px; }
+.nv-sec .yf-sh-title { font-size: 20px; }
+.nv-sec .yf-stamp { --st-size: 34px; }
+.nv-h-r { position: absolute; top: 0; right: 0; height: 34px; display: flex; align-items: center; gap: 8px; }
+.nv-h-r > a { display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; font: 600 13px var(--font); color: var(--primary); text-decoration: none; white-space: nowrap; }
+.nv-h-r > a:hover { text-decoration: underline; }
+.nv-h-r > a svg { width: 14px; height: 14px; }
+.nv-arr {
+    width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-md);
+    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); cursor: pointer;
 }
+.nv-arr svg { width: 16px; height: 16px; }
+.nv-arr:hover:not([disabled]) { border-color: var(--text-3); }
+.nv-arr[disabled] { opacity: .4; cursor: default; }
+.nv-arr:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-.nep-scroll::-webkit-scrollbar { height: 8px; }
-.nep-scroll::-webkit-scrollbar-track {
-    background: var(--bg-tint);
-    border-radius: 4px;
+/* Carril: sin barra visible (el asomo y las flechas ya dicen que hay más). Sangra hasta el borde
+   derecho del <main>: su padding va en rem (px-3 / sm:px-6 / lg:px-8), así que el margen también. */
+.nv-row {
+    display: flex; gap: 16px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+    margin-right: -2rem; padding: 4px 2rem 6px 0; scroll-snap-type: x proximity;
 }
-.nep-scroll::-webkit-scrollbar-thumb {
-    background-color: var(--border-strong);
-    border-radius: 4px;
+.nv-row::-webkit-scrollbar { display: none; }
+
+/* ---- Tarjeta --------------------------------------------------------------------------------- */
+.nv {
+    flex: 0 0 280px; display: flex; flex-direction: column; position: relative; overflow: hidden;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); scroll-snap-align: start;
 }
-
-.nep-card {
-    flex: 0 0 auto;
-    width: 360px;
-    display: flex;
-    scroll-snap-align: start;
-    background: var(--card);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    overflow: hidden;
+/* Fotograma 16:9 (lleva al episodio) con el chip «T1 · E17» y FINAL / PARÓN encima. */
+.nv-m { position: relative; display: block; aspect-ratio: 16 / 9; background: var(--bg-tint); flex-shrink: 0; overflow: hidden; color: inherit; text-decoration: none; }
+.nv-m img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nv-m.none { display: flex; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px dashed var(--border-strong); color: var(--text-3); font: 500 12px var(--font); }
+.nv-m.none > svg { width: 16px; height: 16px; }
+.nv-m .se, .nv-chips .se {
+    position: absolute; left: 10px; top: 10px; z-index: 2; height: 22px; padding: 0 8px; border-radius: 6px;
+    display: inline-flex; align-items: center; white-space: nowrap;
+    background: var(--card); color: var(--card-text); font: 700 11px var(--font-mono); letter-spacing: .06em;
 }
-
-/* ---- póster de la serie (2:3) + barra de progreso ---- */
-.nep-poster {
-    position: relative;
-    width: 96px;
-    flex-shrink: 0;
-    background: var(--card-hover);
-    display: block;
+.nv-m.none .se { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border-strong); }
+.nv-m .etag { position: absolute; right: 10px; top: 10px; z-index: 2; }
+.nv-chips { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.nv-sp .yf-blur { display: block; width: 100%; height: 100%; }
+.nv-sp .yf-spoil-btn { height: 32px; padding: 0 12px; font-size: 12px; }
+/* Etiqueta de la ficha de episodio (aquí no se carga episodio.css). */
+.nv .etag {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px;
+    background: var(--sb); color: var(--si); font: 700 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
 }
+.nv .etag svg { width: 12px; height: 12px; }
 
-.nep-poster img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+/* Cuerpo: el póster 2:3 de la serie montado sobre el borde del fotograma, y el texto. */
+.nv-b { position: relative; flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 14px; }
+.nv-po {
+    position: absolute; left: 14px; top: -34px; z-index: 3; width: 46px; aspect-ratio: 2 / 3; overflow: hidden;
+    border-radius: 6px; background: var(--bg-tint); box-shadow: 0 0 0 3px var(--bg-elev), var(--sh-md);
 }
-
-.nep-poster .nep-poster-empty {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255, 255, 255, .25);
+.nv-po img, .nv .pp img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nv-ph { width: 100%; height: 100%; display: grid; place-items: center; color: var(--text-3); }
+.nv-ph svg { width: 18px; height: 18px; }
+.nv-sr { display: flex; align-items: center; padding-left: 58px; min-height: 26px; margin-bottom: 6px; }
+.nv-sr a { min-width: 0; font: 600 13px var(--font); color: var(--text-2); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nv-sr a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.nv-t {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em;
+    font: 600 15px/1.3 var(--font); color: var(--text); text-decoration: none;
 }
+.nv-t:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
+.nv-mt { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 4px; font: 500 12px var(--font); color: var(--text-3); }
+.nv-mt span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.nv-mt svg { width: 13px; height: 13px; }
+.nv-mt .nv-rt svg { color: var(--stamp-amber-ink); fill: var(--stamp-amber-ink); stroke: none; }
+.nv-mt .nv-rt b { color: var(--text-2); font-weight: 600; }
+.nv-mt .ok { color: var(--ok-ink); font-weight: 600; }
+.nv-pr { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.nv-pr .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.nv-pr .bar i { display: block; height: 100%; border-radius: 3px; background: var(--ok-ink); }
+.nv-pr b { font: 600 11.5px var(--font-mono); color: var(--text); white-space: nowrap; }
 
-.nep-progress {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 4px;
-    background: rgba(255, 255, 255, .15);
-    z-index: 1;
+/* Acciones al pie (todas las tarjetas igual de altas: el pie baja hasta abajo). */
+.nv-a { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; }
+.nv-mk {
+    flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px;
+    border-radius: var(--r-md); border: 1px solid var(--text); background: var(--text); color: var(--bg-elev);
+    font: 600 13.5px var(--font); white-space: nowrap; cursor: pointer;
 }
-
-.nep-progress i {
-    display: block;
-    height: 100%;
-    background: var(--accent);
+.nv-mk svg { width: 16px; height: 16px; }
+.nv-mk:hover { opacity: .9; }
+.nv-mk:focus-visible, .nv-go:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.nv-mk.busy { opacity: .7; cursor: progress; }
+.nv-mk.busy svg { animation: nv-spin 1s linear infinite; }
+@keyframes nv-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .nv-mk.busy svg { animation: none; } }
+.nv-go {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 38px; padding: 0 12px;
+    border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    font: 600 13px var(--font); white-space: nowrap; text-decoration: none;
 }
+.nv-go:hover { border-color: var(--text-3); }
+.nv-go svg { width: 15px; height: 15px; }
+.nv-go.ico { width: 38px; padding: 0; }
 
-/* ---- contenido ---- */
-.nep-body {
-    padding: 11px 14px 12px;
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
+/* Película: póster 2:3 de 96 px y el texto al lado, sin fotograma; mismo alto que una de serie. */
+.nv-pm { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 14px 14px 0; }
+.nv-pm .pp { display: block; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 8px; background: var(--bg-tint); box-shadow: var(--sh-md); }
+.nv-pm-t { min-width: 0; display: flex; flex-direction: column; }
+.nv-pm .k {
+    display: inline-flex; align-items: center; gap: 5px; width: fit-content; height: 22px; padding: 0 8px; border-radius: 6px;
+    background: var(--stamp-green); color: var(--stamp-green-ink); font: 700 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
 }
+.nv-pm .k svg { width: 12px; height: 12px; }
+.nv-pm .nv-t { margin-top: 8px; min-height: 0; }
+.nv-pm .nv-mt { flex-direction: column; align-items: flex-start; gap: 3px; }
+.nv-movie .nv-b { padding-top: 0; justify-content: flex-end; }
 
-.nep-kicker {
-    font-family: var(--font-mono);
-    font-size: 10px;
-    letter-spacing: .1em;
-    color: #93C5FD;
-    font-weight: 700;
-    margin: 0 0 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* Recién marcado: franja con Deshacer durante unos segundos. */
+.nv-just {
+    display: flex; align-items: center; gap: 7px; padding: 8px 12px; white-space: nowrap;
+    background: var(--ok-soft); color: var(--ok-ink); font: 600 12px var(--font); border-bottom: 1px solid var(--border);
 }
-
-.nep-title {
-    font-size: 13.5px;
-    font-weight: 700;
-    color: var(--card-text);
-    margin: 0 0 3px;
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+.nv-just > svg { width: 14px; height: 14px; }
+.nv-just button {
+    margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; border: 0; background: none;
+    font: 600 12px var(--font); color: var(--ok-ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
+.nv-just button svg { width: 13px; height: 13px; }
 
-.nep-meta {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--card-text-3);
-    margin: 0 0 6px;
+/* Al día / película terminada: mismo tamaño que la tarjeta. */
+.nv-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 22px 18px; text-align: center; }
+.nv-done .pp { position: relative; display: block; width: 64px; aspect-ratio: 2 / 3; border-radius: 7px; background: var(--bg-tint); box-shadow: var(--sh-md); }
+.nv-done .pp img { border-radius: 7px; }
+.nv-ck {
+    position: absolute; right: -8px; bottom: -8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+    background: var(--ok-ink); color: var(--bg-elev); box-shadow: 0 0 0 3px var(--bg-elev);
 }
+.nv-ck svg { width: 14px; height: 14px; }
+.nv-done b { font: 600 15px var(--font); color: var(--text); }
+.nv-done p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-2); max-width: 26ch; }
+.nv-done .nv-go { margin-top: 4px; }
 
-/* "Empezada el …" (pelis en Viendo) — verde acento como señal de sesión en curso */
-.nep-started {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: #2f7d52;
-    margin: 0 0 6px;
+/* ---- Tamaños ---------------------------------------------------------------------------------- */
+@media (max-width: 1023.98px) {
+    .nv-row { margin-right: -1.5rem; padding-right: 1.5rem; }
 }
-
-.nep-overview {
-    font-size: 11.5px;
-    color: var(--card-text-2);
-    line-height: 1.45;
-    margin: 0 0 10px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+@media (max-width: 639.98px) {
+    /* Móvil: tarjetas de 296 que encajan al deslizar, la siguiente asoma; sin flechas ni contador. */
+    .nv-sec .yf-sh-title { font-size: 16px; }
+    .nv-sec .yf-sh-count { display: none; }
+    .nv-arr { display: none; }
+    .nv-row { gap: 12px; margin-right: -0.75rem; padding-right: 0.75rem; scroll-snap-type: x mandatory; }
+    .nv { flex-basis: 296px; max-width: 82vw; }
+    .nv-mk, .nv-go { height: 44px; }
+    .nv-go.ico { width: 44px; }
+    .nv-pm { grid-template-columns: 104px minmax(0, 1fr); }
 }
-
-/* ---- acciones ---- */
-.nep-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: auto;
-}
-
-.nep-mark,
-.nep-ghost {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: var(--r-full);
-    font-size: 12px;
-    font-family: inherit;
-    cursor: pointer;
-    text-decoration: none;
-    white-space: nowrap;
-    transition: filter .15s ease, background .15s ease;
-}
-
-.nep-mark {
-    background: var(--accent);
-    color: #fff;
-    font-weight: 600;
-    border: none;
-}
-
-.nep-mark:hover { filter: brightness(1.1); }
-
-.nep-mark:disabled {
-    opacity: .6;
-    cursor: wait;
-    filter: none;
-}
-
-.nep-ghost {
-    background: rgba(255, 255, 255, .1);
-    color: #fff;
-    font-weight: 500;
-    border: 1px solid rgba(255, 255, 255, .15);
-}
-
-.nep-ghost:hover { background: rgba(255, 255, 255, .18); }
-
-/* ---- estado "al día" (tras marcar el último pendiente) ---- */
-.nep-done {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    min-height: 110px;
-    padding: 18px;
-    color: var(--card-text-2);
-    font-size: 13px;
-}
-
-.nep-done svg { color: var(--rating-high); flex-shrink: 0; }
-
-/* ---- responsive ---- */
-@media (max-width: 640px) {
-    /* Card ancha pero dejando ~10vw de asomo de la siguiente (affordance de
-       scroll, junto con la barra visible). Sinopsis a 3 líneas. */
-    .nep-card { width: min(82vw, 380px); }
-    .nep-overview { -webkit-line-clamp: 3; }
-}
-
-/* Enlaces dentro de la card (TMDB D4): el nombre de la serie va a su ficha y el título del episodio,
-   a la del episodio. Sin cambiar el aspecto: solo el subrayado al pasar por encima. */
-.nep-kicker a, .nep-title a { color: inherit; text-decoration: none; }
-.nep-kicker a:hover, .nep-title a:hover { text-decoration: underline; text-underline-offset: 2px; }
