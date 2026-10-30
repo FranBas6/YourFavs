@@ -1,0 +1,158 @@
+/* Ficha de episodio (TMDB D4) — handoff `docs/design_handoff_episodio` (`ep.css` es la fuente de las
+   medidas). Solo tokens: sin reglas de modo oscuro propias. Escritorio primero y móvil (< 768 px)
+   al final, que en el lienzo era el marco `.ph`. Los iconos son los SVG de astro-icon. */
+
+.ep { padding-bottom: 48px; }
+
+/* ---- Cabecera ------------------------------------------------------------------------------ */
+.eh { position: relative; overflow: hidden; background: var(--card); color: var(--card-text); }
+.eh-bg { position: absolute; inset: 0; background-size: cover; background-position: center top; opacity: .55; }
+.eh-bg::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, var(--card) 30%, transparent 75%), linear-gradient(0deg, var(--card) 0%, transparent 45%);
+}
+.eh-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 468px; gap: 40px; align-items: end; padding: 26px 48px 36px; }
+.eh-cr { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font: 500 13.5px var(--font); color: var(--card-text-2); margin-bottom: 28px; flex-wrap: wrap; }
+.eh-cr a { color: inherit; text-decoration: none; }
+.eh-cr a:hover { color: var(--card-text); }
+.eh-cr b { color: var(--card-text); font-weight: 600; }
+.eh-cr i { font-style: normal; color: var(--card-text-3); }
+.eh-sr { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; color: var(--card-text); text-decoration: none; }
+.eh-sr img { width: 30px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: var(--card-text-3); }
+.eh-sr b { font: 600 15px var(--font); }
+.eh-sr span { display: inline-flex; align-items: center; gap: 2px; font: 500 12.5px var(--font); color: var(--card-text-2); }
+.eh-sr:hover span { color: var(--card-text); }
+.eh-sr svg { width: 14px; height: 14px; }
+.eh-k { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 10px; }
+.eh-k .se { white-space: nowrap; font: 700 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--card-text-2); }
+.eh h1 { font: 700 44px/1.05 var(--font); letter-spacing: -.025em; color: var(--card-text); text-wrap: balance; margin: 0; }
+.eh h1 small { display: block; font: 500 15px var(--font); letter-spacing: 0; color: var(--card-text-3); margin-top: 8px; }
+.eh-m { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin-top: 16px; font: 500 14px var(--font); color: var(--card-text-2); }
+.eh-m > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.eh-m svg { width: 15px; height: 15px; color: var(--card-text-3); }
+.eh-m .sc { color: var(--card-text); font-weight: 600; }
+.eh-m .sc svg { color: var(--card-text); fill: var(--card-text); stroke: none; }
+.eh-m small { font-size: 12px; color: var(--card-text-3); white-space: nowrap; }
+
+/* Fotograma 16:9 y sus variantes (sin fotograma, cuenta atrás, oculto). */
+.st16 { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--card); box-shadow: var(--sh-card); }
+.st16 > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st16 .cnt {
+    position: absolute; right: 10px; bottom: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 5px;
+    height: 26px; padding: 0 10px; border-radius: var(--r-full); background: var(--card); color: var(--card-text);
+    font: 600 11.5px var(--font-mono); text-decoration: none;
+}
+.st16 .cnt svg { width: 13px; height: 13px; }
+.st16.none, .st16.cd {
+    border: 1.5px dashed var(--card-text-3); box-shadow: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+}
+.st16.none { gap: 8px; color: var(--card-text-3); font: 500 13px var(--font); }
+.st16.none img { width: 44px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 5px; }
+.st16.cd { gap: 4px; }
+.st16.cd .k { font: 700 11px var(--font-mono); letter-spacing: .14em; color: var(--card-text-3); }
+.st16.cd .n { font: 700 52px/1.05 var(--font-mono); color: var(--card-text); }
+.st16.cd .n small { font-size: 20px; color: var(--card-text-2); margin-left: 6px; }
+.st16.cd .d { font: 500 14px var(--font); color: var(--card-text-2); }
+.eh .yf-spoil { border-radius: 12px; overflow: hidden; box-shadow: var(--sh-card); }
+.eh .yf-spoil .st16 { box-shadow: none; border-radius: 0; }
+
+/* Etiquetas (stamp con icono y texto). */
+.etag {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px;
+    background: var(--sb); color: var(--si); font: 700 10.5px var(--font-mono); letter-spacing: .08em;
+    text-transform: uppercase; white-space: nowrap;
+}
+.etag svg { width: 12px; height: 12px; }
+
+/* ---- Navegación: anterior · tira · siguiente ------------------------------------------------- */
+.en { margin-top: 20px; display: grid; grid-template-columns: 270px minmax(0, 1fr) 270px; gap: 16px; align-items: stretch; }
+.enc {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-lg);
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--text); text-decoration: none; min-width: 0;
+}
+a.enc:hover { border-color: var(--border-strong); }
+.enc.nx { flex-direction: row-reverse; text-align: right; }
+.enc .th { width: 84px; flex-shrink: 0; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: var(--bg-tint); }
+.enc .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.enc .th.ph { border: 1px dashed var(--border-strong); }
+.enc .tx { min-width: 0; flex: 1; }
+.enc .k { display: flex; align-items: center; gap: 4px; font: 700 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.enc.nx .k { justify-content: flex-end; }
+.enc .k svg { width: 13px; height: 13px; }
+.enc b { display: block; font: 600 14px var(--font); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.enc .s { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 11.5px; color: var(--text-2); }
+.enc .s svg { width: 12px; height: 12px; color: var(--ok-ink); }
+.enc.off { opacity: .55; border-style: dashed; }
+
+.etr {
+    display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 10px 14px;
+    border-radius: var(--r-lg); background: var(--bg-elev); border: 1px solid var(--border); min-width: 0;
+}
+.etr-h { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); }
+.etr-h > span, .etr-h > a { white-space: nowrap; }
+.etr-h > a { margin-left: auto; font: 600 12px var(--font); color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
+.etr-h > a svg { width: 13px; height: 13px; }
+/* Selector de temporada: un <details> con su lista (sin JS). */
+.ssel { position: relative; }
+.ssel > summary {
+    list-style: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px 0 10px;
+    border-radius: var(--r-full); border: 1px solid var(--border-strong); font: 600 12px var(--font); color: var(--text); cursor: pointer;
+}
+.ssel > summary::-webkit-details-marker { display: none; }
+.ssel > summary svg { width: 13px; height: 13px; }
+.ssel ul {
+    position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 180px; max-height: 280px; overflow-y: auto;
+    list-style: none; margin: 0; padding: 6px; border-radius: var(--r-md); background: var(--bg-elev);
+    border: 1px solid var(--border); box-shadow: var(--sh-md);
+}
+.ssel li a { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 6px; font: 500 13px var(--font); color: var(--text); text-decoration: none; }
+.ssel li a:hover { background: var(--bg-tint); }
+.ssel li a[aria-current="true"] { font-weight: 700; }
+.ssel li a small { color: var(--text-3); font-size: 11.5px; }
+.etr ol { list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 0; padding: 2px; scrollbar-width: thin; }
+.etr li { flex: 0 0 32px; height: 32px; position: relative; }
+.etr li a {
+    width: 100%; height: 100%; display: grid; place-items: center; border-radius: 8px; text-decoration: none;
+    font: 600 12px var(--font-mono); color: var(--text-2); background: var(--bg-tint); border: 1px solid var(--border);
+}
+.etr li a:hover { border-color: var(--border-strong); }
+.etr li.w a { background: var(--ok-soft); border-color: transparent; color: var(--ok-ink); }
+.etr li.w a::after { content: ''; position: absolute; right: 3px; top: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--ok-ink); }
+.etr li.f a { box-shadow: inset 0 -3px 0 var(--stamp-amber-ink); }
+.etr li.u a { background: none; border-style: dashed; border-color: var(--border-strong); color: var(--text-4); }
+.etr li.cur a { background: var(--bg-elev); border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+.etr li.cur.w a { background: var(--ok-soft); }
+
+/* ---- 404 (estilo de 404.astro, con tokens) ------------------------------------------------------ */
+.ep-404 { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 72px 16px; min-height: 50vh; justify-content: center; }
+.ep-404-k { font: 600 12px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 0; }
+.ep-404 h1 { font: 700 30px/1.15 var(--font); color: var(--text); margin: 0; }
+.ep-404 p { font-size: 16px; color: var(--text-2); max-width: 46ch; margin: 0; }
+.ep-404-b { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 12px; }
+
+/* ---- Móvil ------------------------------------------------------------------------------------ */
+@media (max-width: 767.98px) {
+    /* Como la ficha de serie en móvil: una tarjeta con el margen del <main>, no a sangre (pegada a
+       la barra de la web, sus esquinas redondeadas dejaban asomar el fotograma), y sin el fondo de la
+       serie detrás (con el fotograma encima eran dos imágenes seguidas). */
+    .eh-bg { display: none; }
+    .eh-in { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 12px 12px 20px; }
+    .eh-fr { order: -1; }
+    .eh .st16, .eh .yf-spoil { border-radius: 10px; box-shadow: none; }
+    .eh-cr { display: none; }
+    .eh-tx { padding: 16px 4px 0; }
+    .eh-sr { margin-bottom: 12px; }
+    .eh h1 { font-size: 28px; }
+    .eh-m { font-size: 13px; gap: 4px 14px; margin-top: 12px; }
+    .st16.cd .n { font-size: 44px; }
+
+    .en { margin: 16px 0 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .en .etr { grid-column: 1 / -1; grid-row: 1; }
+    .enc { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+    .enc.nx { flex-direction: column; text-align: right; }
+    .enc .th { width: 100%; }
+    .enc b { font-size: 13px; }
+    .etr { padding: 10px 12px; }
+    .etr li { flex-basis: 40px; height: 40px; }
+}
