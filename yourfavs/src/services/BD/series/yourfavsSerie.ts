@@ -406,6 +406,32 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
     await bustYearStats();
 }
 
+/**
+ * Desmarca un episodio de forma IDEMPOTENTE (si no estaba visto, no hace nada). Como el toggle:
+ * quita también su última entrada del diario. Para la ficha de episodio (TMDB D4), que sabe en qué
+ * estado está y no debe invertir lo que no toca con un doble clic.
+ */
+export async function unmarkWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
+    const progress = await getWatchedProgress(serieId);
+    if (!progress?.watched_episodes.some((w) => w.season === season && w.episode === episode)) return;
+    await deleteEpisodes(serieId, { season, episode });
+    await unlogEpisode(serieId, season, episode);
+    await bustYearStats();
+}
+
+/**
+ * Marca varios episodios de una temporada (los que falten; los ya vistos se quedan con su fecha).
+ * «Tienes 2 anteriores sin ver · Marcarlos» de la ficha de episodio (TMDB D4).
+ */
+export async function markWatchedEpisodes(serieId: string, season: number, episodes: number[]): Promise<number> {
+    if (!episodes.length) return 0;
+    const inserted = await insertEpisodes(serieId, episodes.map((episode) => ({ season, episode })), new Date().toISOString());
+    if (!inserted.length) return 0;
+    await logSeasonEpisodes(serieId, inserted.map((r) => ({ season: r.season, episode: r.episode })));
+    await bustYearStats();
+    return inserted.length;
+}
+
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
     // Quitar los episodios de esta temporada que ya estén y reemplazar con todos (misma hora).
     await deleteEpisodes(serieId, { season });

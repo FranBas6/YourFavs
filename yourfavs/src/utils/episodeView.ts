@@ -117,3 +117,44 @@ export const epCode = (season: number, episode: number) => (season === 0 ? `Espe
 
 /** URL de la ficha de un episodio. */
 export const episodeHref = (seriesId: number | string, season: number, episode: number) => `/serie/${seriesId}/t${season}/e${episode}`;
+
+/** Un episodio de la temporada, lo justo para el progreso (servidor y navegador, D4b-2). */
+export interface SeasonEp { e: number; aired: boolean }
+
+/**
+ * La línea de progreso bajo «Visto»: barra (0-1) y textos. Mismo cálculo al pintar la página y al
+ * marcar o desmarcar sin recargar.
+ *   «Temporada 1 completa · 10 de 10» · «Vas por el E13 · 13 de 16 en la T5» · «Al día · 4 de 4
+ *   emitidos en la T38» (si este aún no se ha emitido), y «· 18 de 73 en total».
+ */
+export function progressLine(o: {
+    season: number;
+    current: number;
+    seasonEps: SeasonEp[];
+    watched: Set<number>;
+    seriesWatched: number;
+    seriesTotal: number;
+}): { pct: number; text: string; total: string } {
+    const where = o.season === 0 ? 'en los especiales' : `en la T${o.season}`;
+    const n = o.seasonEps.length;
+    const count = o.seasonEps.filter((x) => o.watched.has(x.e)).length;
+    const cur = o.seasonEps.find((x) => x.e === o.current);
+    const total = o.season > 0 && o.seriesTotal > 0 ? `· ${o.seriesWatched.toLocaleString('es-ES')} de ${o.seriesTotal.toLocaleString('es-ES')} en total` : '';
+
+    if (cur && !cur.aired) {
+        const aired = o.seasonEps.filter((x) => x.aired);
+        const seenAired = aired.filter((x) => o.watched.has(x.e)).length;
+        const lead = aired.length && seenAired === aired.length ? 'Al día · ' : '';
+        return { pct: aired.length ? seenAired / aired.length : 0, text: `${lead}${seenAired} de ${aired.length} emitidos ${where}`, total };
+    }
+    if (n && count === n) {
+        return { pct: 1, text: `${o.season === 0 ? 'Especiales completos' : `Temporada ${o.season} completa`} · ${n} de ${n}`, total };
+    }
+    const max = Math.max(0, ...o.seasonEps.filter((x) => o.watched.has(x.e)).map((x) => x.e));
+    const lead = max > 0 && !o.watched.has(o.current) ? `Vas por el E${max} · ` : '';
+    return { pct: n ? count / n : 0, text: `${lead}${count} de ${n} ${where}`, total };
+}
+
+/** Los anteriores a este en la temporada, ya emitidos y sin ver («Tienes 2 anteriores sin ver · Marcarlos»). */
+export const earlierUnseen = (current: number, seasonEps: SeasonEp[], watched: Set<number>) =>
+    seasonEps.filter((x) => x.e < current && x.aired && !watched.has(x.e)).map((x) => x.e);

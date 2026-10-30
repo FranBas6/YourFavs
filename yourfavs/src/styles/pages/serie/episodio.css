@@ -65,6 +65,68 @@
 }
 .etag svg { width: 12px; height: 12px; }
 
+/* ---- Barra de acciones (D4b-2) ---------------------------------------------------------------- */
+.ea { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 48px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+/* «Visto»: un botón con sus textos dentro; el estado decide cuál se ve. */
+.evb {
+    display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: var(--r-md);
+    border: 1px solid var(--text); background: var(--text); color: var(--bg-elev);
+    font: 600 14px var(--font); white-space: nowrap; flex-shrink: 0; cursor: pointer;
+}
+.evb > span { display: none; align-items: center; gap: 8px; }
+.evb svg { width: 18px; height: 18px; }
+.evb[aria-pressed="false"] .evb-off, .evb[aria-pressed="true"] .evb-on { display: inline-flex; }
+.evb[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok-ink); color: var(--ok-ink); }
+/* Visto + ratón encima o foco de teclado: «Desmarcar». En táctil no hay hover: pulsar desmarca y el
+   toast ofrece Deshacer. Recién pulsado (`.fresh`, hasta que el ratón sale) no: si no, el mismo clic
+   que marca enseñaría «Desmarcar» al instante. */
+@media (hover: hover) {
+    .evb[aria-pressed="true"]:not(.fresh):hover { background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+    .evb[aria-pressed="true"]:not(.fresh):hover .evb-on { display: none; }
+    .evb[aria-pressed="true"]:not(.fresh):hover .evb-un { display: inline-flex; }
+}
+.evb[aria-pressed="true"]:not(.fresh):focus-visible { background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+.evb[aria-pressed="true"]:not(.fresh):focus-visible .evb-on { display: none; }
+.evb[aria-pressed="true"]:not(.fresh):focus-visible .evb-un { display: inline-flex; }
+.evb:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.evb.busy { opacity: .75; cursor: progress; }
+.evb.busy > span { display: none !important; }
+.evb.busy .evb-busy { display: inline-flex !important; }
+.evb-busy svg { animation: ep-spin 1s linear infinite; }
+@keyframes ep-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .evb-busy svg { animation: none; } }
+/* Sin emitir: el aviso de estreno de la serie. */
+.evb.bell { gap: 8px; }
+.evb.bell[aria-pressed="true"] { background: var(--stamp-blue); border-color: var(--stamp-blue-ink); color: var(--stamp-blue-ink); }
+.evb.bell[aria-pressed="false"] { background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+.evb[disabled] { cursor: default; }
+
+.est { flex: 1 1 auto; min-width: 220px; display: flex; flex-direction: column; gap: 6px; }
+.est b { display: flex; align-items: center; gap: 6px; font: 600 13.5px var(--font); color: var(--text); }
+.est b svg { width: 15px; height: 15px; color: var(--ok-ink); flex-shrink: 0; }
+.est b.mu { font-weight: 500; color: var(--text-2); }
+.est b.mu svg { color: var(--text-3); }
+.est .eprog { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--text-2); }
+.est .bar { width: 120px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.est .bar i { display: block; height: 100%; background: var(--ok-ink); border-radius: 3px; }
+.est .eprog .t { color: var(--text-3); }
+.est .nx { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--font); color: var(--primary); text-decoration: none; }
+.est .nx:hover { text-decoration: underline; }
+.est .nx svg { width: 14px; height: 14px; }
+.ea-earlier { align-self: flex-start; background: none; border: 0; padding: 0; font: 500 12.5px var(--font); color: var(--text-2); cursor: pointer; }
+.ea-earlier u { color: var(--primary); text-decoration: none; font-weight: 600; }
+.ea-earlier:hover u { text-decoration: underline; }
+.ea-earlier[disabled] { opacity: .6; cursor: progress; }
+.ea-r { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.ea-r .pf-btn { height: 34px; }
+.imdb {
+    display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 8px;
+    background: var(--stamp-amber); color: var(--stamp-amber-ink); font: 800 12px var(--font); text-decoration: none;
+}
+.ea-err { flex-basis: 100%; display: flex; align-items: center; gap: 6px; margin: 0; font: 500 12.5px var(--font); color: var(--stamp-red-ink); }
+.ea-err[hidden] { display: none; }
+.ea-err svg { width: 14px; height: 14px; }
+
 /* ---- Navegación: anterior · tira · siguiente ------------------------------------------------- */
 .en { margin-top: 20px; display: grid; grid-template-columns: 270px minmax(0, 1fr) 270px; gap: 16px; align-items: stretch; }
 .enc {
@@ -110,8 +172,19 @@ a.enc:hover { border-color: var(--border-strong); }
 .ssel li a:hover { background: var(--bg-tint); }
 .ssel li a[aria-current="true"] { font-weight: 700; }
 .ssel li a small { color: var(--text-3); font-size: 11.5px; }
-.etr ol { list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 0; padding: 2px; scrollbar-width: thin; }
-.etr li { flex: 0 0 32px; height: 32px; position: relative; }
+.etr ol {
+    list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 0; padding: 4px 2px;
+    scrollbar-width: thin; scroll-snap-type: x proximity; scroll-padding-inline: 8px; overscroll-behavior-x: contain;
+}
+/* Hay más episodios por ese lado: el borde se difumina (lo pone el script según el desplazamiento).
+   Es una máscara de opacidad, no un color: vale igual en claro y en oscuro. */
+.etr ol.fade-r { -webkit-mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent); }
+.etr ol.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, black 28px); mask-image: linear-gradient(90deg, transparent, black 28px); }
+.etr ol.fade-l.fade-r {
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 28px, black calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, transparent, black 28px, black calc(100% - 28px), transparent);
+}
+.etr li { flex: 0 0 32px; height: 32px; position: relative; scroll-snap-align: center; }
 .etr li a {
     width: 100%; height: 100%; display: grid; place-items: center; border-radius: 8px; text-decoration: none;
     font: 600 12px var(--font-mono); color: var(--text-2); background: var(--bg-tint); border: 1px solid var(--border);
@@ -147,12 +220,25 @@ a.enc:hover { border-color: var(--border-strong); }
     .eh-m { font-size: 13px; gap: 4px 14px; margin-top: 12px; }
     .st16.cd .n { font-size: 44px; }
 
+    .ea { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+    .evb { height: 48px; justify-content: center; width: 100%; font-size: 15px; }
+    .est { min-width: 0; }
+    .ea-r { margin-left: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .ea-r .pf-btn { height: 44px; justify-content: center; padding: 0 8px; font-size: 12.5px; min-width: 0; }
+    .ea-r .imdb { display: none; } /* en móvil va con los datos del episodio (D4b-3) */
+    /* «Ver en {plataforma}» en su fila: los nombres largos («Movistar Plus+ Ficción Total») no caben en un tercio. */
+    .ea-r .ea-pv { grid-column: 1 / -1; }
+    .ea-r .ea-pv span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
     .en { margin: 16px 0 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     .en .etr { grid-column: 1 / -1; grid-row: 1; }
     .enc { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
     .enc.nx { flex-direction: column; text-align: right; }
     .enc .th { width: 100%; }
     .enc b { font-size: 13px; }
-    .etr { padding: 10px 12px; }
+    .etr { padding: 12px 12px 10px; gap: 10px; }
+    /* En táctil se desliza con el dedo: sin barra (el difuminado de los bordes ya dice que hay más). */
+    .etr ol { scrollbar-width: none; gap: 8px; }
+    .etr ol::-webkit-scrollbar { display: none; }
     .etr li { flex-basis: 40px; height: 40px; }
 }
