@@ -108,7 +108,7 @@ async function fetchWatchedEpisodeEvents(
             const serie = bucketFor(String(x.tmdb_id));
             if (serie.covered.has(`${x.season}:${x.episode}`)) continue; // ya cubierto por watched_at
             const loggedMs = getFirebaseTimestamp(x.logged_at);
-            const realHour = Boolean(loggedMs) && x.source !== 'backfill';
+            const realHour = Boolean(loggedMs) && x.source !== 'backfill' && x.source !== 'import';
             const ts = realHour
                 ? loggedMs
                 : (x.watched_on ? new Date(x.watched_on + 'T12:00:00Z').getTime() : loggedMs);

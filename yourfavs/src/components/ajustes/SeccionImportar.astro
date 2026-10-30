@@ -1,0 +1,194 @@
+---
+/**
+ * Ajustes → Importar (TMDB D3a IMDb, D3b Letterboxd, D3c cuenta de TMDB).
+ *
+ * Una sola zona para soltar: reconoce sola los CSV de IMDb o el ZIP (o los CSV) de Letterboxd. Todo
+ * pasa en el navegador hasta que dices «Añadir»: se lee aquí, se busca en TMDB por lotes
+ * (`/api/import/resolve`) y se enseña qué se ha encontrado, con los dudosos de Letterboxd para elegir.
+ * Al confirmar se abre la importación (`/api/import/jobs`) y se escribe por lotes
+ * (`/api/import/apply`). Cada importación queda abajo y se puede deshacer entera (`/api/import/undo`).
+ * La lógica está en `scripts/ajustes/importar.ts`.
+ */
+import { Icon } from 'astro-icon/components';
+import type { ImportJob } from '../../services/BD/import/importLibrary';
+import { tmdbAccountEnabled } from '../../services/API/shared/tmdbAccount';
+
+interface Props {
+    jobs: ImportJob[];
+}
+const { jobs } = Astro.props;
+// Sin `TMDB_READ_TOKEN` (variable de Netlify) no se puede pedir permiso: la opción sale como «Pronto».
+const tmdbOn = tmdbAccountEnabled();
+
+const SOURCE_LABEL: Record<string, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB' };
+const fmtDate = (iso: string) => new Intl.DateTimeFormat('es-ES', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid',
+}).format(new Date(iso));
+const n = (v: unknown) => Number(v) || 0;
+const count = (v: number, one: string, many: string) => `${v.toLocaleString('es-ES')} ${v === 1 ? one : many}`;
+
+function jobSummary(j: ImportJob): string {
+    const t = j.totals ?? {};
+    const parts = [count(n(t.added), 'añadido', 'añadidos')];
+    if (n(t.rated)) parts.push(count(n(t.rated), 'nota', 'notas'));
+    if (n(t.logged)) parts.push(count(n(t.logged), 'pase', 'pases'));
+    if (n(t.listed)) parts.push(`${n(t.listed).toLocaleString('es-ES')} en colecciones`);
+    if (n(t.missing)) parts.push(`${n(t.missing).toLocaleString('es-ES')} sin encontrar`);
+    return parts.join(' · ');
+}
+/** Una importación que no cambió nada no tiene nada que deshacer. */
+const changed = (j: ImportJob) => ['added', 'rated', 'removed', 'logged', 'listed'].some((k) => n(j.totals?.[k]) > 0);
+
+// Huellas de lo ya importado (y no deshecho): el script avisa si eliges el mismo fichero otra vez.
+const knownHashes = Object.fromEntries(
+    jobs.filter((j) => j.file_hash && !j.undone_at).map((j) => [j.file_hash, fmtDate(j.created_at)]),
+);
+---
+<div class="aj-card" data-imp data-known={JSON.stringify(knownHashes)}>
+    <div class="aj-card-head">
+        <div>
+            <h2>Desde IMDb o Letterboxd</h2>
+            <p>Lo que has visto, tus notas y tu watchlist. De Letterboxd, también Me gusta, favoritas, diario y listas.</p>
+        </div>
+        <span class="aj-imp-src">CSV · ZIP</span>
+    </div>
+
+    <!-- 1 · Elegir ficheros -->
+    <div class="aj-card-body" data-imp-stage="pick">
+        <div class="aj-steps aj-imp-steps">
+            <div>
+                <p class="aj-step-t">1 · Exporta</p>
+                <p class="aj-step-d"><b>IMDb:</b> en «Tus valoraciones» y «Tu watchlist», menú ⋯ → Exportar. <b>Letterboxd:</b> Settings → Data → Export your data.</p>
+            </div>
+            <div>
+                <p class="aj-step-t">2 · Súbelo aquí</p>
+                <p class="aj-step-d">Los CSV de IMDb o el ZIP de Letterboxd, tal cual. Se leen en tu navegador.</p>
+            </div>
+            <div>
+                <p class="aj-step-t">3 · Revisa y añade</p>
+                <p class="aj-step-d">Ves lo que se ha encontrado, eliges en lo dudoso y luego decides.</p>
+            </div>
+        </div>
+        <label class="aj-imp-drop" data-imp-drop>
+            <input type="file" accept=".csv,.zip,text/csv,application/zip" multiple data-imp-file class="sr-only" />
+            <Icon name="lucide:file-up" aria-hidden="true" />
+            <span class="aj-imp-drop-t">Elige o suelta tus ficheros</span>
+            <span class="aj-imp-drop-d">ratings.csv · WATCHLIST.csv · letterboxd-….zip</span>
+        </label>
+        <p class="aj-imp-msg" data-imp-pick-msg hidden></p>
+    </div>
+
+    <!-- 2 · Buscando en TMDB / guardando -->
+    <div class="aj-card-body" data-imp-stage="progress" hidden>
+        <p class="aj-imp-prog-t" data-imp-prog-t>Buscando en TMDB…</p>
+        <div class="aj-imp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-imp-bar>
+            <span data-imp-bar-fill></span>
+        </div>
+        <p class="aj-imp-prog-d" data-imp-prog-d></p>
+    </div>
+
+    <!-- 3 · Vista previa -->
+    <div class="aj-card-body" data-imp-stage="preview" hidden>
+        <div class="aj-priv aj-imp-dup" role="note" data-imp-dup hidden>
+            <Icon name="lucide:copy" aria-hidden="true" />
+            <span data-imp-dup-t></span>
+        </div>
+        <p class="aj-imp-from" data-imp-from></p>
+        <div class="aj-imp-stats">
+            <div><b data-imp-n="found">0</b><span>encontrados</span></div>
+            <div><b data-imp-n="have">0</b><span>ya en tus listas</span></div>
+            <div data-imp-stat-amb hidden><b data-imp-n="ambiguous">0</b><span>dudosos</span></div>
+            <div><b data-imp-n="missing">0</b><span>no encontrados</span></div>
+            <div><b data-imp-n="ignored">0</b><span>ignorados</span></div>
+        </div>
+        <ul class="aj-imp-dest" data-imp-dest></ul>
+        <div class="aj-imp-posters" data-imp-posters aria-hidden="true"></div>
+
+        <section class="aj-imp-amb" data-imp-amb hidden aria-labelledby="imp-amb-t">
+            <h3 id="imp-amb-t" class="aj-grpt">Dudosos · elige cuál es</h3>
+            <p class="aj-imp-note">No hay una coincidencia exacta de título y año. Pulsa la buena, o «Ninguna» y no se importa.</p>
+            <div class="aj-imp-amb-list" data-imp-amb-list></div>
+        </section>
+
+        <details class="aj-imp-missing" data-imp-missing hidden>
+            <summary>Ver los que no se han encontrado</summary>
+            <ul data-imp-missing-list></ul>
+        </details>
+        <p class="aj-imp-note">Lo que ya tienes no se toca: si está en Favoritos sigue en Favoritos, si la estás siguiendo sigue en Siguiendo y tus notas mandan sobre las importadas. Cada título entra con su fecha original.</p>
+        <div class="aj-imp-actions">
+            <button type="button" class="aj-btn" data-imp-cancel>Cancelar</button>
+            <button type="button" class="aj-btn is-inv" data-imp-apply><Icon name="lucide:check" aria-hidden="true" />Añadir a mis listas</button>
+        </div>
+    </div>
+
+    <!-- 4 · Hecho -->
+    <div class="aj-card-body" data-imp-stage="done" hidden>
+        <p class="aj-imp-done-t"><Icon name="lucide:circle-check" aria-hidden="true" /><span data-imp-done-t></span></p>
+        <p class="aj-imp-prog-d" data-imp-done-d></p>
+        <div class="aj-imp-actions">
+            <a class="aj-btn" href="/mislistas/vistos">Ver tus vistas</a>
+            <button type="button" class="aj-btn" data-imp-again>Importar otro fichero</button>
+        </div>
+    </div>
+</div>
+
+<div class="aj-card">
+    <div class:list={["aj-row", { "is-soon": !tmdbOn }]}>
+        <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:link" /></span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">Desde tu cuenta de TMDB {!tmdbOn && <span class="aj-soon">Pronto</span>}</span>
+            <p class="aj-row-desc">Favoritos, valoraciones, watchlist y listas. Das permiso en themoviedb.org, leemos tu cuenta y el permiso se retira al terminar.</p>
+        </span>
+        {tmdbOn && <a class="aj-btn" href="/api/import/tmdb/start" data-imp-tmdb><Icon name="lucide:link" aria-hidden="true" />Conectar</a>}
+    </div>
+</div>
+
+<div class="aj-card" data-imp-history hidden={jobs.length === 0}>
+    <div class="aj-card-head">
+        <div>
+            <h2>Tus importaciones</h2>
+            <p>Deshacer quita lo que añadió esa importación y devuelve lo que movió. Lo que hayas cambiado después, se queda.</p>
+        </div>
+    </div>
+    <div data-imp-jobs>
+        {jobs.map((j) => (
+            <div class="aj-row" data-job={j.id}>
+                <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:history" /></span>
+                <span class="aj-row-text">
+                    <span class="aj-row-title">{SOURCE_LABEL[j.source] ?? j.source}{j.label ? ` · ${j.label}` : ''}</span>
+                    <p class="aj-row-desc">
+                        {fmtDate(j.created_at)} · {j.undone_at ? `Deshecha el ${fmtDate(j.undone_at)}` : jobSummary(j)}
+                    </p>
+                </span>
+                {!j.undone_at && changed(j) && (
+                    <button type="button" class="aj-btn" data-imp-undo={j.id}><Icon name="lucide:undo-2" aria-hidden="true" />Deshacer</button>
+                )}
+            </div>
+        ))}
+    </div>
+    <!-- Fila de una importación recién hecha (la rellena el script sin recargar). -->
+    <template data-imp-job-tpl>
+        <div class="aj-row">
+            <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:history" /></span>
+            <span class="aj-row-text">
+                <span class="aj-row-title"></span>
+                <p class="aj-row-desc"></p>
+            </span>
+            <button type="button" class="aj-btn" data-imp-undo><Icon name="lucide:undo-2" aria-hidden="true" />Deshacer</button>
+        </div>
+    </template>
+</div>
+
+<dialog id="imp-undo-dlg" class="so-dlg" role="alertdialog" aria-labelledby="imp-undo-t" aria-describedby="imp-undo-d">
+    <span class="so-dlg-st" style="--sb: var(--stamp-amber); --si: var(--stamp-amber-ink)"><Icon name="lucide:undo-2" /></span>
+    <h3 id="imp-undo-t">¿Deshacer esta importación?</h3>
+    <p id="imp-undo-d">Se quitan los títulos, las notas, los pases del diario y las colecciones que añadió, y lo que sacó de Pendientes vuelve. Lo que hayas cambiado o añadido tú desde entonces se queda.</p>
+    <div class="so-dlg-f">
+        <button type="button" class="pf-btn" data-imp-undo-cancel>Cancelar</button>
+        <button type="button" class="pf-btn pri" data-imp-undo-confirm><Icon name="lucide:undo-2" />Deshacer</button>
+    </div>
+</dialog>
+
+<script>
+    import '../../scripts/ajustes/importar';
+</script>

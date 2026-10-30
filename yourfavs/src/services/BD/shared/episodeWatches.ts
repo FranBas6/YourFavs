@@ -43,12 +43,12 @@ export interface WatchLogRow {
 
 /**
  * Instante de una fila del diario: `logged_at` si es un marcado real, y si viene del
- * backfill (o no tiene hora), mediodía UTC de su `watched_on` — así ninguna zona horaria
- * puede moverle el día. Misma regla que usa el feed de Actividad.
+ * backfill o de una importación (o no tiene hora), mediodía UTC de su `watched_on` — así
+ * ninguna zona horaria puede moverle el día. Misma regla que usa el feed de Actividad.
  */
 export function watchLogInstant(x: WatchLogRow): { ts: number; synthetic: boolean } {
     const loggedMs = getFirebaseTimestamp(x.logged_at);
-    const realHour = Boolean(loggedMs) && x.source !== 'backfill';
+    const realHour = Boolean(loggedMs) && x.source !== 'backfill' && x.source !== 'import';
     if (realHour) return { ts: loggedMs, synthetic: false };
     const ts = x.watched_on ? new Date(x.watched_on + 'T12:00:00Z').getTime() : loggedMs;
     return { ts, synthetic: true };

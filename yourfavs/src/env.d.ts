@@ -63,6 +63,9 @@ interface Window {
 interface ImportMetaEnv {
     // Servidor (privadas)
     readonly TMDB_API_KEY: string;
+    // Token de lectura v4 (TMDB D3c): solo para «Importar desde tu cuenta de TMDB». Sin él, esa
+    // opción sale como «Pronto».
+    readonly TMDB_READ_TOKEN?: string;
     // Supabase (todas de servidor: el navegador no habla con Supabase)
     readonly SUPABASE_URL: string;
     readonly SUPABASE_PUBLISHABLE_KEY: string;
