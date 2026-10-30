@@ -11,6 +11,7 @@ import { posterUrl } from "../../services/API/shared/tmdbClient";
 import type { NextEpisodeItem } from "../../services/API/Series/nextEpisode";
 import type { ViendoMovie } from "../../services/API/Movies/viendoMovies";
 import Stamp from "../Stamp.astro";
+import { episodeHref } from "../../utils/episodeView";
 import '../../styles/components/next-episode.css';
 
 interface Props {
@@ -43,7 +44,8 @@ function fmtRuntime(min: number | null): string {
 }
 
 function posterSrc(item: NextEpisodeItem): string | null {
-    return item.poster_path ? posterUrl(item.poster_path, 'w154') : null;
+    // w342: el hueco es de 96 px de ancho y toda la altura de la card; con w154 se veía borroso en retina.
+    return item.poster_path ? posterUrl(item.poster_path, 'w342') : null;
 }
 
 function pct(item: NextEpisodeItem): number {
@@ -69,7 +71,7 @@ function pct(item: NextEpisodeItem): number {
                 <article class="nep-card" data-movie-id={mv.id}>
                     <a class="nep-poster" href={`/movie/${mv.id}`} aria-label={`Ver ficha de ${mv.title}`}>
                         {mv.poster_path ? (
-                            <img src={posterUrl(mv.poster_path, 'w154')} alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
+                            <img src={posterUrl(mv.poster_path, 'w342')} alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
                         ) : (
                             <span class="nep-poster-empty" aria-hidden="true">
                                 <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg>
@@ -99,7 +101,7 @@ function pct(item: NextEpisodeItem): number {
                     data-season={item.next_season}
                     data-episode={item.next_episode}
                 >
-                    <a class="nep-poster" href={`/serie/${item.id}#season-${item.next_season}`} aria-label={`Ver ficha de ${item.name}`}>
+                    <a class="nep-poster" href={`/serie/${item.id}#season-${item.next_season}`} aria-label={`Ver la ficha de ${item.name}`}>
                         {posterSrc(item) ? (
                             <img src={posterSrc(item)} alt="" loading="lazy" onerror="this.style.visibility='hidden'"/>
                         ) : (
@@ -110,8 +112,9 @@ function pct(item: NextEpisodeItem): number {
                         <span class="nep-progress" aria-hidden="true"><i style={`width:${pct(item)}%`}></i></span>
                     </a>
                     <div class="nep-body">
-                        <p class="nep-kicker">SIGUIENTE · {item.name.toUpperCase()}</p>
-                        <h3 class="nep-title">T{item.next_season} · E{item.next_episode} — {item.next_episode_name}</h3>
+                        {/* La serie lleva a su ficha (póster y nombre); el episodio, a la suya (título y «Ver episodio»). */}
+                        <p class="nep-kicker">SIGUIENTE · <a href={`/serie/${item.id}`}>{item.name.toUpperCase()}</a></p>
+                        <h3 class="nep-title"><a href={episodeHref(item.id, item.next_season, item.next_episode)}>T{item.next_season} · E{item.next_episode} — {item.next_episode_name}</a></h3>
                         <p class="nep-meta">
                             {fmtDate(item.air_date)}{item.vote_average != null && ` · ★ ${item.vote_average.toFixed(1)}`}
                         </p>
@@ -121,7 +124,7 @@ function pct(item: NextEpisodeItem): number {
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                                 Marcar visto
                             </button>
-                            <a class="nep-ghost" href={`/serie/${item.id}#season-${item.next_season}`}>Ver ficha</a>
+                            <a class="nep-ghost" href={episodeHref(item.id, item.next_season, item.next_episode)}>Ver episodio ›</a>
                         </div>
                     </div>
                 </article>
@@ -132,7 +135,7 @@ function pct(item: NextEpisodeItem): number {
 
 <script is:inline>
 (function () {
-    var IMG_BASE = 'https://image.tmdb.org/t/p/w154';
+    var IMG_BASE = 'https://image.tmdb.org/t/p/w342';
 
     function escapeHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -148,22 +151,23 @@ function pct(item: NextEpisodeItem): number {
     function cardHTML(it) {
         var poster = it.poster_path;
         var pct = it.total_count ? Math.min(100, Math.round((it.watched_count / it.total_count) * 100)) : 0;
-        var href = '/serie/' + it.id + '#season-' + it.next_season;
+        // TMDB D4: a la ficha del episodio (misma ruta que `episodeHref`).
+        var href = '/serie/' + it.id + '/t' + it.next_season + '/e' + it.next_episode;
         var meta = fmtDate(it.air_date) + (it.vote_average != null ? ' · ★ ' + it.vote_average.toFixed(1) : '');
 
-        var html = '<a class="nep-poster" href="' + href + '" aria-label="Ver ficha de ' + escapeHtml(it.name) + '">';
+        var html = '<a class="nep-poster" href="/serie/' + it.id + '#season-' + it.next_season + '" aria-label="Ver la ficha de ' + escapeHtml(it.name) + '">';
         html += poster
             ? '<img src="' + IMG_BASE + poster + '" alt="" onerror="this.style.visibility=\'hidden\'"/>'
             : '<span class="nep-poster-empty" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><polygon points="6 4 20 12 6 20"/></svg></span>';
         html += '<span class="nep-progress" aria-hidden="true"><i style="width:' + pct + '%"></i></span></a>';
         html += '<div class="nep-body">';
-        html += '<p class="nep-kicker">SIGUIENTE · ' + escapeHtml(it.name.toUpperCase()) + '</p>';
-        html += '<h3 class="nep-title">T' + it.next_season + ' · E' + it.next_episode + ' — ' + escapeHtml(it.next_episode_name) + '</h3>';
+        html += '<p class="nep-kicker">SIGUIENTE · <a href="/serie/' + it.id + '">' + escapeHtml(it.name.toUpperCase()) + '</a></p>';
+        html += '<h3 class="nep-title"><a href="' + href + '">T' + it.next_season + ' · E' + it.next_episode + ' — ' + escapeHtml(it.next_episode_name) + '</a></h3>';
         html += '<p class="nep-meta">' + escapeHtml(meta) + '</p>';
         if (it.overview) html += '<p class="nep-overview">' + escapeHtml(it.overview) + '</p>';
         html += '<div class="nep-actions">';
         html += '<button type="button" class="nep-mark"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg> Marcar visto</button>';
-        html += '<a class="nep-ghost" href="' + href + '">Ver ficha</a>';
+        html += '<a class="nep-ghost" href="' + href + '">Ver episodio ›</a>';
         html += '</div></div>';
         return html;
     }

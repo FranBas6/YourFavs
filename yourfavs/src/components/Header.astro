@@ -605,7 +605,7 @@ yfRegisterDropdown('account', 'account-btn');
         var html = '<div class="cal-detail-header"><span>' + dayName + '</span><button id="cal-detail-close" class="cal-detail-close" aria-label="Cerrar detalle del día">&times;</button></div>';
         events.forEach(function (ev) {
             var typeClass = ev.media_type === 'movie' ? 'cal-ev-movie' : (ev.event_type === 'season_premiere' ? 'cal-ev-season' : 'cal-ev-serie');
-            var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
+            var link = ev.href || (ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id); // TMDB D4: episodio → su ficha
             html += '<a href="' + link + '" class="cal-event ' + typeClass + '">';
             if (ev.poster_path) html += '<img src="' + ev.poster_path + '" alt="' + escapeAttr(ev.title) + '" class="cal-ev-poster"/>';
             html += '<div class="cal-ev-info"><span class="cal-ev-title">' + escapeAttr(ev.title) + '</span><span class="cal-ev-label">' + escapeAttr(ev.label) + '</span></div></a>';

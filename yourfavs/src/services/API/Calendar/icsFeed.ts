@@ -102,7 +102,8 @@ function releaseEvents(months: CalendarData[], baseUrl: string, dtstamp: string)
                 const uid = `${ev.media_type}-${ev.tmdb_id}-${day.date}@yourfavs`;
                 if (seen.has(uid)) continue;
                 seen.add(uid);
-                const linkPath = ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`;
+                // TMDB D4: un episodio enlaza a su ficha (si el evento lo trae); si no, al título.
+                const linkPath = ev.href ?? (ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`);
                 const summary = ev.media_type === 'movie' ? `🎬 ${ev.title}` : `📺 ${ev.title} — ${ev.label}`;
                 out.push([
                     'BEGIN:VEVENT',
