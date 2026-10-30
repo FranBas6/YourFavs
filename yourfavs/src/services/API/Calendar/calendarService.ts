@@ -3,7 +3,7 @@ import { getSeriesSiguiendo } from '../../BD/series/yourfavsSerie';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
 import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
 import { fetchSerieDetails } from '../Series/tmdbSeries';
-import { fetchMovieDetails } from '../Movies/tmdbMovies';
+import { getCurrentRegion } from '../../BD/shared/userScope';
 import { processBatch } from '../../../utils/processBatch';
 import { episodeTypeLabel } from '../../../utils/episodeType';
 import { episodeHref } from '../../../utils/episodeView';
@@ -48,6 +48,30 @@ function getMonthRange(year: number, month: number) {
     return { start, end };
 }
 
+/** «España», «México»… para las etiquetas (el código si el navegador/Node no lo conoce). */
+function countryName(region: string): string {
+    try { return new Intl.DisplayNames(['es'], { type: 'region' }).of(region) ?? region; } catch { return region; }
+}
+
+/**
+ * Estreno de una película en un país (TMDB E3): la fecha más temprana de cines (3), limitado (2) o
+ * digital (4) de `release_dates` — la misma regla que usa discover con `region` + `release_date`.
+ */
+function localReleaseOf(detail: any, region: string): string | null {
+    const entry = (detail?.release_dates?.results ?? []).find((r: any) => r.iso_3166_1 === region);
+    const dates = (entry?.release_dates ?? [])
+        .filter((r: any) => [2, 3, 4].includes(r.type) && r.release_date)
+        .map((r: any) => String(r.release_date).slice(0, 10))
+        .sort();
+    return dates[0] ?? null;
+}
+
+/** Popularidad mínima: baja para lo que aún no ha salido, estricta para lo ya estrenado. */
+const relevantMovie = (m: any) => {
+    const isUnreleased = m.release_date && new Date(m.release_date) > new Date();
+    return m.popularity >= (isUnreleased ? 5 : MIN_MOVIE_POPULARITY);
+};
+
 function isInMonth(dateStr: string | undefined, year: number, month: number): boolean {
     if (!dateStr) return false;
     const d = new Date(dateStr);
@@ -86,10 +110,21 @@ export async function getCalendarData(
     };
 
     const { start, end } = getMonthRange(year, month);
+    // E3: además del estreno mundial, el del país del perfil (si es otro día).
+    const region = getCurrentRegion();
+    const country = countryName(region);
+    const localMovies = (page: string) => tmdbFetchList<any>('/discover/movie', {
+        region,
+        'release_date.gte': start,
+        'release_date.lte': end,
+        with_release_type: '2|3|4',
+        sort_by: 'popularity.desc',
+        page,
+    });
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
 
     // Fetch en paralelo: películas, series populares en emisión, series siguiendo, suscripciones, estrenos de personas seguidas
-    const [upcomingMoviesP1, upcomingMoviesP2, popularSeriesP1, popularSeriesP2, followedSeriesIds, notifSubs, personUpcoming] = await Promise.all([
+    const [upcomingMoviesP1, upcomingMoviesP2, localMoviesP1, localMoviesP2, popularSeriesP1, popularSeriesP2, followedSeriesIds, notifSubs, personUpcoming] = await Promise.all([
         tmdbFetchList<any>('/discover/movie', {
             'primary_release_date.gte': start,
             'primary_release_date.lte': end,
@@ -102,6 +137,11 @@ export async function getCalendarData(
             sort_by: 'popularity.desc',
             page: '2',
         }),
+        // Estrenos en el país del perfil este mes. Con `region`, discover filtra por las fechas de ESE
+        // país y devuelve en `release_date` la del país (no la mundial): no hace falta pedir
+        // `release_dates` título a título.
+        localMovies('1'),
+        localMovies('2'),
         // Series populares en emisión (con air_date en el rango del mes)
         tmdbFetchList<any>('/discover/tv', {
             'air_date.gte': start,
@@ -121,11 +161,8 @@ export async function getCalendarData(
     ]);
 
     // Filtrar películas: umbral bajo para no estrenadas, estricto para estrenadas
-    const allUpcoming = [...upcomingMoviesP1, ...upcomingMoviesP2]
-        .filter((m: any) => {
-            const isUnreleased = m.release_date && new Date(m.release_date) > new Date();
-            return m.popularity >= (isUnreleased ? 5 : MIN_MOVIE_POPULARITY);
-        });
+    const allUpcoming = [...upcomingMoviesP1, ...upcomingMoviesP2].filter(relevantMovie);
+    const localUpcoming = [...localMoviesP1, ...localMoviesP2].filter(relevantMovie);
 
     // Filtrar series: umbral bajo para próximos episodios, estricto para ya emitidos
     const allPopularSeries = [...popularSeriesP1, ...popularSeriesP2]
@@ -156,7 +193,8 @@ export async function getCalendarData(
 
     const [seriesDetails, extraMovies] = await Promise.all([
         processBatch(allSerieIdsToFetch, (id) => fetchSerieDetails(id), 10),
-        processBatch(movieNotifIds, (id) => fetchMovieDetails(id), 10),
+        // Con `release_dates` en la misma llamada: de las que tienes aviso, la fecha en tu país.
+        processBatch(movieNotifIds, (id) => tmdbFetch<any>(`/movie/${id}`, { append_to_response: 'release_dates' }).catch(() => null), 10),
     ]);
 
     // Map de eventos por fecha — Set para evitar duplicados (serie puede aparecer en popular + seguida)
@@ -197,34 +235,49 @@ export async function getCalendarData(
         });
     }
 
-    // 1. Películas relevantes
+    // 1. Películas: estreno mundial (`release_date` de TMDB = el primero en cualquier país) y, si es
+    //    otro día, el estreno en tu país. Si coinciden, una sola entrada: la mundial, que lo dice.
+    const localDate = new Map<string, string>();
+    for (const m of localUpcoming) if (m.release_date) localDate.set(String(m.id), m.release_date);
+    for (const m of extraMovies) {
+        const d = m && localReleaseOf(m, region);
+        if (d) localDate.set(String(m.id), d);
+    }
+    const worldDate = new Map<string, string>();
+    const movieEvent = (movie: any, label: string, subscribed: boolean): CalendarEvent => ({
+        tmdb_id: String(movie.id),
+        media_type: 'movie',
+        title: movie.title,
+        poster_path: posterUrl(movie.poster_path),
+        event_type: 'movie_premiere',
+        label,
+        is_subscribed: subscribed,
+        is_following: false,
+    });
+    const worldLabel = (id: string, date: string) =>
+        localDate.get(id) === date ? `Estreno mundial · también en ${country}` : 'Estreno mundial';
+
     for (const movie of allUpcoming) {
         if (!movie.release_date || !isInMonth(movie.release_date, year, month)) continue;
-        addEvent(movie.release_date, {
-            tmdb_id: String(movie.id),
-            media_type: 'movie',
-            title: movie.title,
-            poster_path: posterUrl(movie.poster_path),
-            event_type: 'movie_premiere',
-            label: 'Estreno en cines',
-            is_subscribed: notifSet.has(`movie_${movie.id}`),
-            is_following: false,
-        });
+        worldDate.set(String(movie.id), movie.release_date);
+        addEvent(movie.release_date, movieEvent(movie, worldLabel(String(movie.id), movie.release_date), notifSet.has(`movie_${movie.id}`)));
     }
 
     // Películas suscritas extra (no en upcoming, sin filtro de popularidad)
     for (const movie of extraMovies) {
-        if (!movie || !movie.release_date || !isInMonth(movie.release_date, year, month)) continue;
-        addEvent(movie.release_date, {
-            tmdb_id: String(movie.id),
-            media_type: 'movie',
-            title: movie.title,
-            poster_path: posterUrl(movie.poster_path),
-            event_type: 'movie_premiere',
-            label: 'Estreno (suscrito)',
-            is_subscribed: true,
-            is_following: false,
-        });
+        if (!movie) continue;
+        if (movie.release_date) worldDate.set(String(movie.id), movie.release_date);
+        if (!movie.release_date || !isInMonth(movie.release_date, year, month)) continue;
+        addEvent(movie.release_date, movieEvent(movie, `${worldLabel(String(movie.id), movie.release_date)} (suscrito)`, true));
+    }
+
+    // Estreno en tu país, cuando no es el mismo día que el mundial (ese ya lo dice la mundial).
+    for (const movie of [...localUpcoming, ...extraMovies.filter(Boolean)]) {
+        const id = String(movie.id);
+        const date = localDate.get(id);
+        if (!date || !isInMonth(date, year, month) || worldDate.get(id) === date) continue;
+        const subscribed = notifSet.has(`movie_${movie.id}`);
+        addEvent(date, movieEvent(movie, `Estreno en ${country}${subscribed && !localUpcoming.includes(movie) ? ' (suscrito)' : ''}`, subscribed));
     }
 
     // 2. Series — siguiendo, suscritas y populares
