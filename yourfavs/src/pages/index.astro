@@ -35,7 +35,7 @@ import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
 import {posterUrl, backdropUrl} from "../services/API/shared/tmdbClient";
 import {safeFetch} from "../utils/safeFetch";
-import { fetchCatalogRow } from "../services/API/shared/catalogRows";
+import { fetchCatalogRow, markRowPlatforms } from "../services/API/shared/catalogRows";
 import { streamingRowDef } from "../utils/constants/catalogRows";
 import '../styles/components/catalog-row.css';
 import '../styles/pages/index.css';
@@ -97,7 +97,9 @@ const [
     safeFetch(readHooksDoc(), 'home/hooks', null),
     // «Nuevo en streaming» (D1): la misma fila que en /catalogo, con su caché diaria por región.
     safeFetch(
-        fetchCatalogRow({ ...streamingRowDef(Astro.locals.user?.region || 'ES'), media: 'both' }, { filters: {}, providers: '', region: Astro.locals.user?.region || 'ES', cacheable: true }),
+        // E2: con plataformas guardadas, las que están en ellas llevan «EN NETFLIX»… y van primero.
+        fetchCatalogRow({ ...streamingRowDef(Astro.locals.user?.region || 'ES'), media: 'both' }, { filters: {}, providers: '', region: Astro.locals.user?.region || 'ES', cacheable: true })
+            .then((row) => (row && Astro.locals.user?.platforms?.length ? markRowPlatforms(row, Astro.locals.user.platforms, Astro.locals.user.region || 'ES') : row)),
         'home/streaming', null,
     ),
 ]);
