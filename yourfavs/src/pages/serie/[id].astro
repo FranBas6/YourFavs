@@ -11,6 +11,8 @@ import { countSeriesPasses } from "../../services/BD/lists/watchLog";
 import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
+import '../../styles/shared/spoil.css'; // modo sin spoilers, compartido con la ficha de episodio (TMDB D4)
+import { episodeHref } from '../../utils/episodeView';
 import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
 } from "../../services/API/Series/InfoSeries";
@@ -1189,12 +1191,18 @@ const jsonLd = item ? {
                                                                 <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex-shrink-0" title={mark.title}>{mark.label}</span>
                                                             )}
                                                             <div class="flex-1 min-w-0">
-                                                                <p class="font-medium text-gray-800 text-sm truncate group-open:whitespace-normal group-open:overflow-visible">{episode.name}</p>
+                                                                {/* TMDB D4: el título lleva a la ficha del episodio; «Visto» sigue marcando sin salir. */}
+                                                                <p class="font-medium text-gray-800 text-sm truncate group-open:whitespace-normal group-open:overflow-visible"><a href={episodeHref(id, season.season_number, episode.episode_number)} class="ep-link hover:underline underline-offset-2">{episode.name}</a></p>
                                                                 <p class="text-xs text-gray-500 mt-0.5 truncate">
                                                                     {formatDate(episode.air_date)}{episode.runtime ? `  ·  ${formatRuntime(episode.runtime)}` : ''}
                                                                     {episode.vote_average > 0 && <span class="text-yellow-600">  ·  {episode.vote_average.toFixed(1)}</span>}
                                                                 </p>
                                                             </div>
+                                                            {/* TMDB D4: a la ficha del episodio, al lado de «Visto» y con su misma forma. */}
+                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class={`flex-shrink-0 flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition-colors whitespace-nowrap ${season.season_number === 0 ? 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100' : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}`} aria-label={`Abrir la ficha de «${episode.name}»`} onclick="event.stopPropagation()">
+                                                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg>
+                                                                <span class="hidden sm:inline">Ficha</span>
+                                                            </a>
                                                             <form method="POST" data-season={season.season_number} class="flex-shrink-0" onclick="event.stopPropagation()">
                                                                 <input type="hidden" name="actionType" value="watched_episode" />
                                                                 <input type="hidden" name="season" value={season.season_number} />
@@ -1254,6 +1262,10 @@ const jsonLd = item ? {
                                                                     </div>
                                                                 </div>
                                                             )}
+                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class={`mt-4 flex w-full items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg border transition-colors ${season.season_number === 0 ? 'border-purple-200 bg-white text-purple-700 hover:bg-purple-100' : 'border-blue-200 bg-white text-blue-700 hover:bg-blue-100'}`}>
+                                                                Abrir la ficha del episodio
+                                                                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                                                            </a>
                                                         </div>
                                                     </details>
                                                 </div>
@@ -1304,33 +1316,13 @@ const jsonLd = item ? {
     </article>
 </Layout>
 
-<style is:global>
-    /* Modo sin spoilers (§2): difumina el episodio no visto; «Mostrar» revela.
-       El blur es SELECTIVO (A3b): solo lo marcado con `.yf-blur`, que la ficha pone en el
-       fotograma y/o en la sinopsis según el desglose del perfil. Antes se difuminaba todo hijo
-       directo del contenedor, así que no había forma de tapar una cosa y dejar la otra. */
-    .yf-spoil { position: relative; }
-    .yf-spoil .yf-blur { filter: blur(15px); pointer-events: none; user-select: none; transition: filter .35s ease; }
-    .yf-spoil.revealed .yf-blur { filter: none; pointer-events: auto; user-select: auto; }
-    .yf-spoil-btn {
-        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2;
-        display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
-        background: rgba(17, 24, 39, .82); color: #fff; border: none; border-radius: 9px;
-        padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
-    }
-    .yf-spoil-btn:hover { background: rgba(17, 24, 39, .94); }
-    .yf-spoil.revealed .yf-spoil-btn { display: none; }
-    @media (prefers-reduced-motion: reduce) { .yf-spoil .yf-blur { transition: none; } }
-</style>
+<script>
+    // Modo sin spoilers (§2): «Mostrar» revela el episodio difuminado. El blur es SELECTIVO (A3b):
+    // solo lo marcado con `.yf-blur`. CSS y script compartidos con la ficha de episodio (TMDB D4):
+    // `styles/shared/spoil.css` y `scripts/shared/spoil.ts`.
+    import '../../scripts/shared/spoil';
+</script>
 <script is:inline>
-    // Revelar el episodio difuminado (§2 modo sin spoilers) al tocar «Mostrar».
-    document.addEventListener('click', function (e) {
-        var b = e.target.closest && e.target.closest('.yf-spoil-btn');
-        if (!b) return;
-        var host = b.closest('.yf-spoil');
-        if (host) host.classList.add('revealed');
-    });
-
     // Confirmación al cambiar el modo sin spoilers de esta serie (flag `sp` en la URL tras el POST).
     (function () {
         try {

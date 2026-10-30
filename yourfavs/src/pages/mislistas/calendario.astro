@@ -329,7 +329,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                                             </div>
                                         ))}
                                         {day.events.map(ev => {
-                                            const link = ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`;
+                                            const link = ev.href ?? (ev.media_type === 'movie' ? `/movie/${ev.tmdb_id}` : `/serie/${ev.tmdb_id}`);
                                             return (
                                                 <a href={link} class={`cal-row ${kindOf(ev)} flex items-center gap-3 p-2.5 rounded-xl border hover:shadow-md transition`}>
                                                     {ev.poster_path ? (
@@ -491,7 +491,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                     + '<a class="pf-btn sm" href="' + esc(p.chat) + '">' + CHAT + 'Abrir chat</a></div>';
             });
             events.forEach(function (ev) {
-                var link = ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id;
+                var link = ev.href || (ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id);
                 var kind = ev.event_type === 'person_release' ? 'cal-k-person' : ev.media_type === 'movie' ? 'cal-k-movie' : (ev.event_type === 'season_premiere' ? 'cal-k-season' : 'cal-k-ep');
                 html += '<a href="' + link + '" class="cal-bd ' + kind + ' flex items-center gap-3 p-3 bg-white rounded-xl border shadow-sm hover:shadow-md transition-all">';
                 if (ev.poster_path) {

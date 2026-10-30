@@ -21,6 +21,7 @@ import { tmdbFetch } from '../shared/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts } from '../../../utils/appTime';
 import { episodeTypeLabel } from '../../../utils/episodeType';
+import { episodeHref } from '../../../utils/episodeView';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
 import { getCurrentRegion } from '../../BD/shared/userScope';
@@ -95,7 +96,6 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
         const d = details[i];
         const id = ids[i];
         if (!d?.name) continue;
-        const href = `/serie/${id}`;
         const always = subbed.has(id) || undefined;
         const eps = [d.last_episode_to_air, d.next_episode_to_air].filter((e: any) => e?.air_date && e.season_number > 0);
 
@@ -108,7 +108,9 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
                 const kind = episodeTypeLabel(ep.episode_type); // B2b: final de temporada / parón
                 items.push({
                     id: `episode:${id}:${tag}`, type: 'new_episode', title: d.name,
-                    subtitle: `${tag}${kind ? ` · ${kind}` : ''} · ${sinceLabel(ep.air_date)}`, href, poster_path: d.poster_path ?? null, always,
+                    subtitle: `${tag}${kind ? ` · ${kind}` : ''} · ${sinceLabel(ep.air_date)}`,
+                    href: episodeHref(id, ep.season_number, ep.episode_number), // TMDB D4: a la ficha del episodio
+                    poster_path: d.poster_path ?? null, always,
                 });
             }
         }
@@ -124,7 +126,7 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
             items.push({
                 id: `season:tv:${id}:S${n}`, type: 'new_season', title: d.name,
                 subtitle: `Temporada ${n} · ${diff > 0 ? `se estrena ${whenLabel(ep.air_date)}` : sinceLabel(ep.air_date)}`,
-                href, poster_path: d.poster_path ?? null, always,
+                href: episodeHref(id, n, 1), poster_path: d.poster_path ?? null, always,
             });
         }
     }

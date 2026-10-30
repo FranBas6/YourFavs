@@ -1,0 +1,357 @@
+/* Ficha de episodio (TMDB D4) — handoff `docs/design_handoff_episodio` (`ep.css` es la fuente de las
+   medidas). Solo tokens: sin reglas de modo oscuro propias. Escritorio primero y móvil (< 768 px)
+   al final, que en el lienzo era el marco `.ph`. Los iconos son los SVG de astro-icon. */
+
+.ep { padding-bottom: 48px; }
+
+/* ---- Cabecera ------------------------------------------------------------------------------ */
+.eh { position: relative; overflow: hidden; background: var(--card); color: var(--card-text); }
+.eh-bg { position: absolute; inset: 0; background-size: cover; background-position: center top; opacity: .55; }
+.eh-bg::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, var(--card) 30%, transparent 75%), linear-gradient(0deg, var(--card) 0%, transparent 45%);
+}
+.eh-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 468px; gap: 40px; align-items: end; padding: 26px 48px 36px; }
+.eh-cr { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; font: 500 13.5px var(--font); color: var(--card-text-2); margin-bottom: 28px; flex-wrap: wrap; }
+.eh-cr a { color: inherit; text-decoration: none; }
+.eh-cr a:hover { color: var(--card-text); }
+.eh-cr b { color: var(--card-text); font-weight: 600; }
+.eh-cr i { font-style: normal; color: var(--card-text-3); }
+.eh-sr { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 16px; color: var(--card-text); text-decoration: none; }
+.eh-sr img { width: 30px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 4px; background: var(--card-text-3); }
+.eh-sr b { font: 600 15px var(--font); }
+.eh-sr span { display: inline-flex; align-items: center; gap: 2px; font: 500 12.5px var(--font); color: var(--card-text-2); }
+.eh-sr:hover span { color: var(--card-text); }
+.eh-sr svg { width: 14px; height: 14px; }
+.eh-k { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 10px; }
+.eh-k .se { white-space: nowrap; font: 700 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--card-text-2); }
+.eh h1 { font: 700 44px/1.05 var(--font); letter-spacing: -.025em; color: var(--card-text); text-wrap: balance; margin: 0; }
+.eh h1 small { display: block; font: 500 15px var(--font); letter-spacing: 0; color: var(--card-text-3); margin-top: 8px; }
+.eh-m { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin-top: 16px; font: 500 14px var(--font); color: var(--card-text-2); }
+.eh-m > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.eh-m svg { width: 15px; height: 15px; color: var(--card-text-3); }
+.eh-m .sc { color: var(--card-text); font-weight: 600; }
+.eh-m .sc svg { color: var(--card-text); fill: var(--card-text); stroke: none; }
+.eh-m small { font-size: 12px; color: var(--card-text-3); white-space: nowrap; }
+
+/* Fotograma 16:9 y sus variantes (sin fotograma, cuenta atrás, oculto). */
+.st16 { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; background: var(--card); box-shadow: var(--sh-card); }
+.st16 > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st16 .cnt {
+    position: absolute; right: 10px; bottom: 10px; z-index: 2; display: inline-flex; align-items: center; gap: 5px;
+    height: 26px; padding: 0 10px; border-radius: var(--r-full); background: var(--card); color: var(--card-text);
+    font: 600 11.5px var(--font-mono); text-decoration: none;
+}
+.st16 .cnt svg { width: 13px; height: 13px; }
+.st16.none, .st16.cd {
+    border: 1.5px dashed var(--card-text-3); box-shadow: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+}
+.st16.none { gap: 8px; color: var(--card-text-3); font: 500 13px var(--font); }
+.st16.none img { width: 44px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 5px; }
+.st16.cd { gap: 4px; }
+.st16.cd .k { font: 700 11px var(--font-mono); letter-spacing: .14em; color: var(--card-text-3); }
+.st16.cd .n { font: 700 52px/1.05 var(--font-mono); color: var(--card-text); }
+.st16.cd .n small { font-size: 20px; color: var(--card-text-2); margin-left: 6px; }
+.st16.cd .d { font: 500 14px var(--font); color: var(--card-text-2); }
+.eh .yf-spoil { border-radius: 12px; overflow: hidden; box-shadow: var(--sh-card); }
+.eh .yf-spoil .st16 { box-shadow: none; border-radius: 0; }
+
+/* Etiquetas (stamp con icono y texto). */
+.etag {
+    display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px;
+    background: var(--sb); color: var(--si); font: 700 10.5px var(--font-mono); letter-spacing: .08em;
+    text-transform: uppercase; white-space: nowrap;
+}
+.etag svg { width: 12px; height: 12px; }
+
+/* ---- Barra de acciones (D4b-2) ---------------------------------------------------------------- */
+.ea { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 48px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+/* «Visto»: un botón con sus textos dentro; el estado decide cuál se ve. */
+.evb {
+    display: inline-flex; align-items: center; height: 44px; padding: 0 18px; border-radius: var(--r-md);
+    border: 1px solid var(--text); background: var(--text); color: var(--bg-elev);
+    font: 600 14px var(--font); white-space: nowrap; flex-shrink: 0; cursor: pointer;
+}
+.evb > span { display: none; align-items: center; gap: 8px; }
+.evb svg { width: 18px; height: 18px; }
+.evb[aria-pressed="false"] .evb-off, .evb[aria-pressed="true"] .evb-on { display: inline-flex; }
+.evb[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok-ink); color: var(--ok-ink); }
+/* Visto + ratón encima o foco de teclado: «Desmarcar». En táctil no hay hover: pulsar desmarca y el
+   toast ofrece Deshacer. Recién pulsado (`.fresh`, hasta que el ratón sale) no: si no, el mismo clic
+   que marca enseñaría «Desmarcar» al instante. */
+@media (hover: hover) {
+    .evb[aria-pressed="true"]:not(.fresh):hover { background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+    .evb[aria-pressed="true"]:not(.fresh):hover .evb-on { display: none; }
+    .evb[aria-pressed="true"]:not(.fresh):hover .evb-un { display: inline-flex; }
+}
+.evb[aria-pressed="true"]:not(.fresh):focus-visible { background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+.evb[aria-pressed="true"]:not(.fresh):focus-visible .evb-on { display: none; }
+.evb[aria-pressed="true"]:not(.fresh):focus-visible .evb-un { display: inline-flex; }
+.evb:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.evb.busy { opacity: .75; cursor: progress; }
+.evb.busy > span { display: none !important; }
+.evb.busy .evb-busy { display: inline-flex !important; }
+.evb-busy svg { animation: ep-spin 1s linear infinite; }
+@keyframes ep-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .evb-busy svg { animation: none; } }
+/* Sin emitir: el aviso de estreno de la serie. */
+.evb.bell { gap: 8px; }
+.evb.bell[aria-pressed="true"] { background: var(--stamp-blue); border-color: var(--stamp-blue-ink); color: var(--stamp-blue-ink); }
+.evb.bell[aria-pressed="false"] { background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+.evb[disabled] { cursor: default; }
+
+.est { flex: 1 1 auto; min-width: 220px; display: flex; flex-direction: column; gap: 6px; }
+.est b { display: flex; align-items: center; gap: 6px; font: 600 13.5px var(--font); color: var(--text); }
+.est b svg { width: 15px; height: 15px; color: var(--ok-ink); flex-shrink: 0; }
+.est b.mu { font-weight: 500; color: var(--text-2); }
+.est b.mu svg { color: var(--text-3); }
+.est .eprog { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 12.5px; color: var(--text-2); }
+.est .bar { width: 120px; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.est .bar i { display: block; height: 100%; background: var(--ok-ink); border-radius: 3px; }
+.est .eprog .t { color: var(--text-3); }
+.est .nx { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--font); color: var(--primary); text-decoration: none; }
+.est .nx:hover { text-decoration: underline; }
+.est .nx svg { width: 14px; height: 14px; }
+.ea-earlier { align-self: flex-start; background: none; border: 0; padding: 0; font: 500 12.5px var(--font); color: var(--text-2); cursor: pointer; }
+.ea-earlier u { color: var(--primary); text-decoration: none; font-weight: 600; }
+.ea-earlier:hover u { text-decoration: underline; }
+.ea-earlier[disabled] { opacity: .6; cursor: progress; }
+.ea-r { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.ea-r .pf-btn { height: 34px; }
+.imdb {
+    display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 8px;
+    background: var(--stamp-amber); color: var(--stamp-amber-ink); font: 800 12px var(--font); text-decoration: none;
+}
+.ea-err { flex-basis: 100%; display: flex; align-items: center; gap: 6px; margin: 0; font: 500 12.5px var(--font); color: var(--stamp-red-ink); }
+.ea-err[hidden] { display: none; }
+.ea-err svg { width: 14px; height: 14px; }
+
+/* ---- Navegación: anterior · tira · siguiente ------------------------------------------------- */
+.en { margin-top: 20px; display: grid; grid-template-columns: 270px minmax(0, 1fr) 270px; gap: 16px; align-items: stretch; }
+.enc {
+    display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r-lg);
+    background: var(--bg-elev); border: 1px solid var(--border); color: var(--text); text-decoration: none; min-width: 0;
+}
+a.enc:hover { border-color: var(--border-strong); }
+.enc.nx { flex-direction: row-reverse; text-align: right; }
+.enc .th { width: 84px; flex-shrink: 0; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: var(--bg-tint); }
+.enc .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.enc .th.ph { border: 1px dashed var(--border-strong); }
+.enc .tx { min-width: 0; flex: 1; }
+.enc .k { display: flex; align-items: center; gap: 4px; font: 700 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.enc.nx .k { justify-content: flex-end; }
+.enc .k svg { width: 13px; height: 13px; }
+.enc b { display: block; font: 600 14px var(--font); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.enc .s { display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 11.5px; color: var(--text-2); }
+.enc .s svg { width: 12px; height: 12px; color: var(--ok-ink); }
+.enc.off { opacity: .55; border-style: dashed; }
+
+.etr {
+    display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 10px 14px;
+    border-radius: var(--r-lg); background: var(--bg-elev); border: 1px solid var(--border); min-width: 0;
+}
+.etr-h { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-2); }
+.etr-h > span, .etr-h > a { white-space: nowrap; }
+.etr-h > a { margin-left: auto; font: 600 12px var(--font); color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
+.etr-h > a svg { width: 13px; height: 13px; }
+/* Selector de temporada: un <details> con su lista (sin JS). */
+.ssel { position: relative; }
+.ssel > summary {
+    list-style: none; display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px 0 10px;
+    border-radius: var(--r-full); border: 1px solid var(--border-strong); font: 600 12px var(--font); color: var(--text); cursor: pointer;
+}
+.ssel > summary::-webkit-details-marker { display: none; }
+.ssel > summary svg { width: 13px; height: 13px; }
+.ssel ul {
+    position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 180px; max-height: 280px; overflow-y: auto;
+    list-style: none; margin: 0; padding: 6px; border-radius: var(--r-md); background: var(--bg-elev);
+    border: 1px solid var(--border); box-shadow: var(--sh-md);
+}
+.ssel li a { display: flex; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 6px; font: 500 13px var(--font); color: var(--text); text-decoration: none; }
+.ssel li a:hover { background: var(--bg-tint); }
+.ssel li a[aria-current="true"] { font-weight: 700; }
+.ssel li a small { color: var(--text-3); font-size: 11.5px; }
+.etr ol {
+    list-style: none; display: flex; gap: 6px; overflow-x: auto; margin: 0; padding: 4px 2px;
+    scrollbar-width: thin; scroll-snap-type: x proximity; scroll-padding-inline: 8px; overscroll-behavior-x: contain;
+}
+/* Hay más episodios por ese lado: el borde se difumina (lo pone el script según el desplazamiento).
+   Es una máscara de opacidad, no un color: vale igual en claro y en oscuro. */
+.etr ol.fade-r { -webkit-mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, black calc(100% - 28px), transparent); }
+.etr ol.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, black 28px); mask-image: linear-gradient(90deg, transparent, black 28px); }
+.etr ol.fade-l.fade-r {
+    -webkit-mask-image: linear-gradient(90deg, transparent, black 28px, black calc(100% - 28px), transparent);
+    mask-image: linear-gradient(90deg, transparent, black 28px, black calc(100% - 28px), transparent);
+}
+.etr li { flex: 0 0 32px; height: 32px; position: relative; scroll-snap-align: center; }
+.etr li a {
+    width: 100%; height: 100%; display: grid; place-items: center; border-radius: 8px; text-decoration: none;
+    font: 600 12px var(--font-mono); color: var(--text-2); background: var(--bg-tint); border: 1px solid var(--border);
+}
+.etr li a:hover { border-color: var(--border-strong); }
+.etr li.w a { background: var(--ok-soft); border-color: transparent; color: var(--ok-ink); }
+.etr li.w a::after { content: ''; position: absolute; right: 3px; top: 3px; width: 6px; height: 6px; border-radius: 50%; background: var(--ok-ink); }
+.etr li.f a { box-shadow: inset 0 -3px 0 var(--stamp-amber-ink); }
+.etr li.u a { background: none; border-style: dashed; border-color: var(--border-strong); color: var(--text-4); }
+.etr li.cur a { background: var(--bg-elev); border: 2px solid var(--text); color: var(--text); font-weight: 700; }
+.etr li.cur.w a { background: var(--ok-soft); }
+
+/* ---- Cuerpo (D4b-3) ----------------------------------------------------------------------------- */
+.eb { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 44px; padding: 40px 32px 0; }
+.eb-m { min-width: 0; display: flex; flex-direction: column; gap: 44px; }
+/* SectionHeader compacto (stamp de 34 y título de 20), sin tocar el componente. */
+.eb .yf-section-header { margin-bottom: 18px; padding-bottom: 14px; }
+.eb .yf-sh-title { font-size: 20px; }
+.eb .yf-stamp { --st-size: 34px; }
+.syn { font: 400 16px/1.7 var(--font); color: var(--text-2); max-width: 66ch; text-wrap: pretty; margin: 0; white-space: pre-line; }
+.syn-e { display: flex; align-items: center; gap: 10px; margin: 0; font: 500 14px var(--font); color: var(--text-3); }
+.syn-e svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+/* Reparto: habituales e invitados por separado; los que pasan del tope, ocultos hasta «Mostrar». */
+.cast-b + .cast-b { margin-top: 26px; }
+.cast-h { display: flex; align-items: baseline; gap: 8px; font: 600 14px var(--font); color: var(--text); margin: 0 0 12px; }
+.cast-h span { font: 500 12px var(--font); color: var(--text-3); }
+.pcg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.pcg.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.pc { display: flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; border-radius: var(--r-md); }
+.pc:hover b { color: var(--primary); }
+.pc img, .pc-ph { width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0; object-fit: cover; background: var(--bg-tint); }
+.pc-ph { display: grid; place-items: center; font: 700 15px var(--font); color: var(--text-3); }
+.pc-t { min-width: 0; }
+.pc b { display: block; font: 600 13px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc-t > span { display: block; font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+[data-cast]:not(.is-open) .pc.xtra { display: none; }
+.more {
+    display: inline-flex; align-items: center; gap: 6px; height: 34px; margin-top: 14px; padding: 0 14px;
+    border-radius: var(--r-full); border: 1px solid var(--border-strong); background: var(--bg-elev);
+    font: 600 12.5px var(--font); color: var(--text); cursor: pointer;
+}
+.more svg { width: 14px; height: 14px; }
+.more[hidden] { display: none; }
+/* Con los invitados ocultos por spoilers, «Mostrar las N» espera a que los destapes. */
+.yf-spoil:not(.revealed) + .more { display: none; }
+
+/* Fotogramas y vídeos. */
+.gal { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.gal .st16 { box-shadow: none; border-radius: 8px; }
+.gal .st16:hover img { opacity: .88; }
+.yf-spoil:has(> .gal) { border-radius: 8px; overflow: hidden; }
+.vids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.vid { margin: 0; }
+.vid .st16 { box-shadow: none; border-radius: 8px; }
+.vid iframe { width: 100%; height: 100%; border: 0; display: block; }
+.vid figcaption { margin-top: 8px; }
+.vid b { display: block; font: 600 13.5px var(--font); color: var(--text); }
+.vid span { font-size: 12px; color: var(--text-3); }
+
+/* Columna lateral. */
+.eb-s { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.esc { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px; }
+.esc h3 { font: 600 14px var(--font); color: var(--text); margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+.esc h3 small { margin-left: auto; font: 500 11.5px var(--font); color: var(--text-3); }
+.esc dl { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 9px 12px; font-size: 13px; margin: 0; }
+.esc dt { color: var(--text-3); }
+.esc dd { color: var(--text); font-weight: 500; min-width: 0; margin: 0; }
+.esc dd small { display: block; font-size: 11.5px; font-weight: 400; color: var(--text-3); }
+.esc dd a { color: inherit; text-decoration: none; }
+.esc dd a:hover { color: var(--primary); text-decoration: underline; }
+.esc dd .rt { display: inline-flex; align-items: center; gap: 4px; font: 600 13px var(--font); letter-spacing: 0; }
+.esc dd .rt svg { width: 13px; height: 13px; color: var(--stamp-amber-ink); fill: var(--stamp-amber-ink); stroke: none; }
+.esc .mu { color: var(--text-3); font-weight: 400; }
+.esc hr { border: 0; border-top: 1px solid var(--border); margin: 3px 0; grid-column: 1 / -1; }
+.prv { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; }
+.prv-r { display: flex; align-items: center; gap: 10px; font: 500 13px var(--font); color: var(--text); }
+.prv-r img, .prv-r .lg { width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0; object-fit: cover; }
+.prv-r .lg { display: grid; place-items: center; background: var(--card); color: var(--card-text); font: 800 10.5px var(--font); }
+.prv-r > span { min-width: 0; }
+.prv-r small { display: block; font-size: 11.5px; color: var(--text-3); }
+.prv-r .pf-btn { margin-left: auto; height: 30px; }
+.prv-e { margin: 0; font-size: 13px; color: var(--text-3); }
+.prv-jw { margin: 12px 0 0; font-size: 11px; color: var(--text-4); }
+.prv-jw a { color: inherit; }
+.lnk { display: flex; align-items: center; gap: 8px; font: 600 13px var(--font); color: var(--text); text-decoration: none; }
+.lnk:hover { border-color: var(--border-strong); }
+.lnk svg { width: 15px; height: 15px; color: var(--text-3); margin-left: auto; }
+.lnk .imdb { height: 24px; font-size: 11px; }
+.m-only { display: none; }
+
+/* Visor de fotogramas: la base (:target) es la .lightbox de detail-common.css. */
+.ep-lb { align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .85); }
+.ep-lb img { position: relative; max-width: min(1280px, 92vw); max-height: 88vh; object-fit: contain; border-radius: 8px; }
+.ep-lb-x { position: absolute; inset: 0; }
+.ep-lb-c { position: absolute; top: 14px; right: 18px; z-index: 2; font-size: 34px; line-height: 1; color: rgba(255, 255, 255, .85); text-decoration: none; }
+.ep-lb-p, .ep-lb-n { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; color: rgba(255, 255, 255, .8); }
+.ep-lb-p { left: 12px; }
+.ep-lb-n { right: 12px; }
+.ep-lb-p svg, .ep-lb-n svg { width: 36px; height: 36px; }
+
+/* ---- 404 (estilo de 404.astro, con tokens) ------------------------------------------------------ */
+.ep-404 { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 72px 16px; min-height: 50vh; justify-content: center; }
+.ep-404-k { font: 600 12px var(--font-mono); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); margin: 0; }
+.ep-404 h1 { font: 700 30px/1.15 var(--font); color: var(--text); margin: 0; }
+.ep-404 p { font-size: 16px; color: var(--text-2); max-width: 46ch; margin: 0; }
+.ep-404-b { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 12px; }
+
+/* ---- Móvil ------------------------------------------------------------------------------------ */
+@media (max-width: 767.98px) {
+    /* Como la ficha de serie en móvil: una tarjeta con el margen del <main>, no a sangre (pegada a
+       la barra de la web, sus esquinas redondeadas dejaban asomar el fotograma), y sin el fondo de la
+       serie detrás (con el fotograma encima eran dos imágenes seguidas). */
+    .eh-bg { display: none; }
+    .eh-in { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 12px 12px 20px; }
+    .eh-fr { order: -1; }
+    .eh .st16, .eh .yf-spoil { border-radius: 10px; box-shadow: none; }
+    .eh-cr { display: none; }
+    .eh-tx { padding: 16px 4px 0; }
+    .eh-sr { margin-bottom: 12px; }
+    .eh h1 { font-size: 28px; }
+    .eh-m { font-size: 13px; gap: 4px 14px; margin-top: 12px; }
+    .st16.cd .n { font-size: 44px; }
+
+    .ea { flex-direction: column; align-items: stretch; gap: 12px; padding: 16px; }
+    .evb { height: 48px; justify-content: center; width: 100%; font-size: 15px; }
+    .est { min-width: 0; }
+    .ea-r { margin-left: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .ea-r .pf-btn { height: 44px; justify-content: center; padding: 0 8px; font-size: 12.5px; min-width: 0; }
+    .ea-r .imdb { display: none; } /* en móvil va con los datos del episodio (D4b-3) */
+    /* «Ver en {plataforma}» en su fila: los nombres largos («Movistar Plus+ Ficción Total») no caben en un tercio. */
+    .ea-r .ea-pv { grid-column: 1 / -1; }
+    .ea-r .ea-pv span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .en { margin: 16px 0 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+
+    /* Cuerpo: una columna, la lateral al final; reparto y fotogramas en carriles que se deslizan. */
+    .eb { display: flex; flex-direction: column; gap: 32px; padding: 28px 0 0; }
+    .eb-m { gap: 32px; }
+    .eb .yf-section-header { padding-bottom: 10px; margin-bottom: 14px; }
+    .eb .yf-sh-title { font-size: 16px; }
+    .syn { font-size: 15px; }
+    /* Los carriles sangran hasta el borde derecho de la ventana (100% = ancho del bloque, a todo el <main>). */
+    .pcg, .pcg.g3 { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin-right: calc((100% - 100vw) / 2); padding-right: 12px; scroll-snap-type: x proximity; }
+    .pcg::-webkit-scrollbar { display: none; }
+    .pc { flex: 0 0 88px; flex-direction: column; text-align: center; gap: 6px; scroll-snap-align: start; }
+    .pc img, .pc-ph { width: 72px; height: 72px; }
+    .pc-t { width: 100%; }
+    .pc b { font-size: 12px; }
+    .pc-t > span { font-size: 11px; }
+    [data-cast]:not(.is-open) .pc.xtra { display: flex; } /* en el carril caben todos */
+    .more { display: none; }
+    .gal { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; margin-right: calc((100% - 100vw) / 2); padding-right: 12px; scroll-snap-type: x proximity; }
+    .gal::-webkit-scrollbar { display: none; }
+    .gal .st16 { flex: 0 0 250px; scroll-snap-align: start; }
+    .vids { grid-template-columns: 1fr; }
+    .esc dl { grid-template-columns: 90px minmax(0, 1fr); }
+    .m-only { display: block; }
+    .d-only { display: none; }
+    .en .etr { grid-column: 1 / -1; grid-row: 1; }
+    .enc { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
+    .enc.nx { flex-direction: column; text-align: right; }
+    .enc .th { width: 100%; }
+    .enc b { font-size: 13px; }
+    .etr { padding: 12px 12px 10px; gap: 10px; }
+    /* En táctil se desliza con el dedo: sin barra (el difuminado de los bordes ya dice que hay más). */
+    .etr ol { scrollbar-width: none; gap: 8px; }
+    .etr ol::-webkit-scrollbar { display: none; }
+    .etr li { flex-basis: 40px; height: 40px; }
+}

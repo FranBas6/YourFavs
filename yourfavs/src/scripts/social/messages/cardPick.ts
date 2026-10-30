@@ -44,6 +44,11 @@ interface State {
     pick: Title | null;
     // sendTo
     target: Title | null;
+    /**
+     * Comentario y spoiler ya rellenos (ficha de episodio, TMDB D4): `data-msg` y, si es de un
+     * episodio, `data-spoil-season` / `data-spoil-episode`. El usuario puede cambiarlos.
+     */
+    preset: { msg: string; season?: number; episode?: number } | null;
     dests: Dest[];
     dest: string | null;
     // spoiler
@@ -224,9 +229,11 @@ function renderAll(s: State) {
     const placeholder = s.mode === 'sendTo' ? 'Buscar conversación o amigo' : 'Buscar película o serie';
     // El comentario de una tarjeta se puede marcar como spoiler de ese mismo título (la película, o
     // la serie entera): se ve oculto para quien no la haya visto y la tarjeta se ve completa.
+    const pre = s.preset;
+    const spLabel = pre?.season ? `El comentario es spoiler de T${pre.season}·E${pre.episode}` : 'El comentario es spoiler de este título';
     const msg = s.mode === 'spoiler' || s.mode === 'plan' ? ''
-        : `<div class="rk-msg"><textarea data-ck-msg rows="2" maxlength="${MSG_MAX}" placeholder="Añade un comentario (opcional)" aria-label="Comentario opcional"></textarea>`
-            + `<label class="ck-sp"><input type="checkbox" data-ck-sp>${icon('shield')}<span>El comentario es spoiler de este título</span></label></div>`;
+        : `<div class="rk-msg"><textarea data-ck-msg rows="2" maxlength="${MSG_MAX}" placeholder="Añade un comentario (opcional)" aria-label="Comentario opcional">${pre ? esc(pre.msg) : ''}</textarea>`
+            + `<label class="ck-sp"><input type="checkbox" data-ck-sp${pre ? ' checked' : ''}>${icon('shield')}<span>${spLabel}</span></label></div>`;
     shell.innerHTML = headHtml(s)
         + `<div class="rk-s"><label class="rk-in">${icon('search')}<input type="search" data-ck-q placeholder="${placeholder}" autocomplete="off" spellcheck="false" aria-label="${placeholder}" value="${esc(s.q)}"></label>${tabs}</div>`
         + `<div class="rk-l" data-ck-list role="radiogroup" aria-label="${s.mode === 'sendTo' ? 'Conversaciones' : 'Resultados'}">${listHtml(s)}</div>`
@@ -279,7 +286,11 @@ export function openPick(opener: HTMLElement) {
         mode, opener, sheet: !isDesktop(),
         anchor: (d.anchor && document.querySelector<HTMLElement>(d.anchor)) || opener,
         conv: Number(d.conv) || 0, convTitle: d.convTitle || '', q: '', tab: 'all', hits: [], pick: null,
-        target, dests: [], dest: null, sugg: [], eps: null, season: 1, episode: 1, step: 'title',
+        target, preset: mode === 'sendTo' && d.msg ? {
+            msg: d.msg,
+            ...(Number(d.spoilSeason) >= 1 && Number(d.spoilEpisode) >= 1 ? { season: Number(d.spoilSeason), episode: Number(d.spoilEpisode) } : {}),
+        } : null,
+        dests: [], dest: null, sugg: [], eps: null, season: 1, episode: 1, step: 'title',
         loading: mode === 'sendTo' || mode === 'spoiler', sending: false, error: null,
     };
     st = s;
@@ -417,7 +428,10 @@ async function send() {
     const body = shell?.querySelector<HTMLTextAreaElement>('[data-ck-msg]')?.value.trim() ?? '';
     const card = { type: 'title', mediaType: title.type, tmdbId: title.id };
     const asSpoiler = Boolean(body && shell?.querySelector<HTMLInputElement>('[data-ck-sp]')?.checked);
-    const spoiler: SpoilerRef | null = asSpoiler ? { mediaType: title.type, tmdbId: title.id, title: title.title } : null;
+    const spoiler: SpoilerRef | null = asSpoiler ? {
+        mediaType: title.type, tmdbId: title.id, title: title.title,
+        ...(s.mode === 'sendTo' && s.preset?.season ? { season: s.preset.season, episode: s.preset.episode } : {}),
+    } : null;
     s.sending = true; s.error = null;
     part('[data-ck-foot]', footHtml(s));
     let res: Response | null = null;

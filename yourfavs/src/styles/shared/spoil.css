@@ -1,0 +1,22 @@
+/* Modo sin spoilers (§2), compartido por la ficha de serie y la de episodio (TMDB D4).
+   El blur es SELECTIVO (A3b): solo lo marcado con `.yf-blur` dentro de un `.yf-spoil`. «Mostrar»
+   (`.yf-spoil-btn`) añade `.revealed`. Lo difuminado lleva `aria-hidden` + `inert` hasta mostrarlo:
+   lo quita `scripts/shared/spoil.ts`. Solo tokens: el botón es una «card» (--card / --card-text),
+   oscura en los dos temas. */
+.yf-spoil { position: relative; }
+.yf-spoil .yf-blur { filter: blur(15px); pointer-events: none; user-select: none; transition: filter .35s ease; }
+.yf-spoil.revealed .yf-blur { filter: none; pointer-events: auto; user-select: auto; }
+.yf-spoil-btn {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3;
+    display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+    height: 36px; padding: 0 14px; border: 0; border-radius: var(--r-full);
+    background: var(--card); color: var(--card-text); box-shadow: var(--sh-md);
+    font: 600 12.5px var(--font); cursor: pointer;
+}
+.yf-spoil-btn svg { width: 15px; height: 15px; }
+.yf-spoil-btn:hover { opacity: .92; }
+.yf-spoil-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.yf-spoil.revealed .yf-spoil-btn { display: none; }
+/* Texto oculto (sinopsis): que el botón tenga sitio aunque el párrafo sea corto. */
+.yf-spoil.txt { min-height: 96px; }
+@media (prefers-reduced-motion: reduce) { .yf-spoil .yf-blur { transition: none; } }

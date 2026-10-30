@@ -1,0 +1,564 @@
+---
+/**
+ * Ficha de episodio (TMDB D4) — handoff `docs/design_handoff_episodio` (README §0 innegociable).
+ *
+ * `/serie/{id}/t{n}/e{m}`, también la temporada 0 (especiales). Un episodio que no existe da 404.
+ * Datos: `getEpisodeDetail` (2 llamadas a TMDB) + el progreso del usuario y su modo sin spoilers.
+ *
+ *   · Cabecera (`.eh`): fondo de la serie con el fotograma enmarcado (o sin fotograma, cuenta atrás si
+ *     no se ha emitido, u oculto por spoilers si no lo has visto).
+ *   · Barra de acciones (`.ea`, D4b-2): «Visto» sin recargar (`scripts/serie/episode.ts`), lo que
+ *     llevas visto, «Avisarme del estreno» si no se ha emitido, Recomendar / Enviar a… (la serie, con
+ *     el comentario y el spoiler de este episodio), IMDb y «Ver en {plataforma}».
+ *   · Navegación (`.en`): anterior y siguiente cruzando temporadas (la T0, aparte) y la tira de la
+ *     temporada, con visto / actual / final / sin emitir.
+ *   · Cuerpo (`.eb`, D4b-3): sinopsis, reparto (habituales e invitados por separado, con tope),
+ *     fotogramas (con su visor) y vídeos; al lado, «Este episodio», dónde verlo, amigos e IMDb.
+ *     Sin ver y con el modo sin spoilers: sinopsis, invitados y fotogramas ocultos hasta «Mostrar».
+ */
+import Layout from '../../../../layouts/Layout.astro';
+import { Icon } from 'astro-icon/components';
+import '../../../../styles/shared/spoil.css';
+import '../../../../styles/shared/detail-common.css';
+import SectionHeader from '../../../../components/SectionHeader.astro';
+import FriendsSeen from '../../../../components/detail/FriendsSeen.astro';
+import { SUPPORTED_COUNTRIES } from '../../../../services/API/shared/tmdbInfoService';
+import '../../../../styles/pages/serie/episodio.css';
+import { getEpisodeDetail, type EpisodeRef } from '../../../../services/API/Series/episodeDetail';
+import { getWatchedProgress } from '../../../../services/BD/series/yourfavsSerie';
+import { getSpoilerPref } from '../../../../services/BD/shared/spoilerPrefs';
+import { getCurrentRegion } from '../../../../services/BD/shared/userScope';
+import { getNotificationSub } from '../../../../services/BD/notifications/yourfavsNotifications';
+import { getSeasonWatchProviders } from '../../../../services/API/Series/InfoSeries';
+import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/shared/tmdbClient';
+import { safeFetch } from '../../../../utils/safeFetch';
+import {
+    airState, countdown, decimal, earlierUnseen, epCode, episodeCrew, episodeHref, episodeKind, episodeTags,
+    isPlaceholderTitle, longDate, mediumDate, progressLine, relativeAgo, runtimeLabel, shortDate, tinyDate,
+    todayKey, watchedLabel, PROVIDER_KIND, TAG_STYLE,
+} from '../../../../utils/episodeView';
+
+const posInt = (v: string | undefined, min: number) => (v && /^\d{1,5}$/.test(v) && Number(v) >= min ? Number(v) : null);
+const id = posInt(Astro.params.id, 1);
+const season = posInt(Astro.params.season, 0);
+const episode = posInt(Astro.params.episode, 1);
+
+const user = Astro.locals.user;
+const result = id != null && season != null && episode != null
+    ? await safeFetch(getEpisodeDetail(id, season, episode), `episodio/${id}/${season}/${episode}`, { missing: true as const, series: null, seasonExists: false })
+    : { missing: true as const, series: null, seasonExists: false };
+const missing = 'missing' in result ? result : null;
+const d = 'missing' in result ? null : result;
+if (missing) Astro.response.status = 404;
+
+// --- Lo del usuario: qué ha visto y su modo sin spoilers --------------------------------------
+const [progress, spoilerPref, notifSub, seasonProviders] = d
+    ? await Promise.all([
+        user ? safeFetch(getWatchedProgress(String(id)), `episodio/${id}/progreso`, null) : null,
+        user ? safeFetch(getSpoilerPref(id!), `episodio/${id}/spoilerpref`, null as boolean | null) : null,
+        user ? safeFetch(getNotificationSub('tv', String(id)), `episodio/${id}/aviso`, null) : null,
+        safeFetch(getSeasonWatchProviders(id!, season!), `episodio/${id}/t${season}/providers`, { providersByCountry: {}, linkByCountry: {} }),
+    ])
+    : [null, null, null, null];
+/** «T-E» → instante en que lo marcaste (o '' si no hay hora). */
+const watched = new Map<string, string>();
+for (const w of progress?.watched_episodes ?? []) watched.set(`${w.season}-${w.episode}`, (w as any).watched_at ?? '');
+const isWatched = (s: number, e: number) => watched.has(`${s}-${e}`);
+
+// Igual que la ficha de serie: la serie manda sobre el ajuste general, y solo con sesión.
+const spoilerFree = !!user && (spoilerPref !== null ? spoilerPref : user.spoilers?.enabled === true);
+const hideStills = spoilerFree && user?.spoilers?.hideStills !== false;
+const hideSynopsis = spoilerFree && user?.spoilers?.hideSynopsis !== false;
+
+// --- El episodio ---------------------------------------------------------------------------------
+const today = todayKey();
+const ep = d?.episode;
+const air = airState(ep?.air_date, today);
+const seenThis = d ? isWatched(season!, episode!) : false;
+const seriesName = d?.series.name ?? '';
+const isLastOfSeries = !!d && !d.next && season === d.series.last_season && season! > 0;
+const seriesEnded = ['Ended', 'Canceled'].includes(d?.series.status ?? '');
+const tags = d ? episodeTags({ season: season!, episodeType: ep.episode_type, isLastOfSeries, seriesEnded, air }) : [];
+
+const placeholder = d ? isPlaceholderTitle(ep.name, episode!) : false;
+const title = d ? (placeholder ? `Episodio ${episode}` : ep.name) : '';
+const titleSub = placeholder && air !== 'aired' ? 'Título aún sin anunciar' : '';
+const kicker = season === 0 ? `Especiales · Episodio ${episode}` : `Temporada ${season} · Episodio ${episode}`;
+
+const stills: string[] = d ? (ep.images?.stills ?? []).map((s: any) => s.file_path).filter(Boolean) : [];
+const still = ep?.still_path ?? stills[0] ?? null;
+// El marco: cuenta atrás si no se ha emitido (y, el día del estreno, si aún no hay fotograma).
+const frame: 'cd' | 'img' | 'none' = air === 'soon' || (air === 'today' && !still) ? 'cd' : still ? 'img' : 'none';
+const cd = ep?.air_date ? countdown(ep.air_date, today) : null;
+const blurStill = frame === 'img' && hideStills && !seenThis;
+
+const runtime = runtimeLabel(ep?.runtime);
+const votes = Number(ep?.vote_count) || 0;
+const score = air === 'aired' && votes > 0 && Number(ep?.vote_average) > 0 ? decimal(Number(ep.vote_average)) : null;
+
+// --- Navegación ----------------------------------------------------------------------------------
+function navInfo(ref: EpisodeRef | null, dir: 'prev' | 'next') {
+    if (!ref) return null;
+    const code = epCode(ref.season, ref.episode);
+    const name = isPlaceholderTitle(ref.name, ref.episode) ? `Episodio ${ref.episode}` : ref.name;
+    const seen = isWatched(ref.season, ref.episode);
+    let status = '';
+    if (seen) status = 'Visto';
+    else if (ref.season !== season) status = dir === 'next' ? `Empieza la temporada ${ref.season}` : `Final de la temporada ${ref.season}`;
+    else if (airState(ref.air_date, today) === 'soon') status = ref.air_date ? tinyDate(ref.air_date) : 'Sin fecha';
+    return {
+        href: episodeHref(id!, ref.season, ref.episode),
+        code, name, seen, status,
+        thumb: ref.still_path ? stillUrl(ref.still_path, 'w300') : null,
+        label: `${dir === 'next' ? 'Siguiente' : 'Anterior'} episodio: ${code}, ${name}`,
+    };
+}
+const prev = d ? navInfo(d.prev, 'prev') : null;
+const next = d ? navInfo(d.next, 'next') : null;
+
+const strip = (d?.seasonEpisodes ?? []).map((r) => {
+    const w = isWatched(r.season, r.episode);
+    const u = airState(r.air_date, today) === 'soon';
+    const f = r.episode_type === 'finale';
+    const cur = r.episode === episode;
+    const st = [w ? 'visto' : u ? 'sin emitir' : 'sin ver', f ? 'final' : '', cur ? 'estás aquí' : ''].filter(Boolean).join(', ');
+    return { n: r.episode, href: episodeHref(id!, r.season, r.episode), cls: [w && 'w', u && 'u', f && 'f', cur && 'cur'].filter(Boolean).join(' '), cur, label: `Episodio ${r.episode}, ${st}` };
+});
+const seasonLabel = (n: number) => (n === 0 ? 'Especiales' : `T${n}`);
+
+// --- Barra de acciones (D4b-2) ------------------------------------------------------------------
+const watchedAt = d ? watched.get(`${season}-${episode}`) || '' : '';
+const seasonEps = (d?.seasonEpisodes ?? []).map((r) => ({ e: r.episode, aired: airState(r.air_date, today) !== 'soon' }));
+const watchedInSeason = new Set((d?.seasonEpisodes ?? []).filter((r) => isWatched(r.season, r.episode)).map((r) => r.episode));
+const seriesWatched = [...watched.keys()].filter((k) => !k.startsWith('0-')).length;
+const seriesTotal = d?.series.number_of_episodes ?? 0;
+const prog = d ? progressLine({ season: season!, current: episode!, seasonEps, watched: watchedInSeason, seriesWatched, seriesTotal }) : null;
+// Solo donde se puede marcar: en uno sin emitir, la acción es el aviso de estreno.
+const earlier = d && !seenThis && air !== 'soon' ? earlierUnseen(episode!, seasonEps, watchedInSeason) : [];
+// «Visto» se puede marcar desde el día de emisión (00:00 de Madrid); antes, la acción es el aviso.
+const canMark = air !== 'soon';
+
+// «Ver en {plataforma}»: la suscripción de esta temporada en tu país, mejor si es una de las tuyas.
+const region = getCurrentRegion();
+const myPlatforms = new Set<number>(((user as any)?.platforms ?? []).map(Number));
+const regionProviders: any[] = (seasonProviders?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
+const provider = regionProviders.find((p) => myPlatforms.has(Number(p.provider_id))) ?? regionProviders[0] ?? null;
+const providerLink = seasonProviders?.linkByCountry?.[region] ?? null;
+const imdbId: string | null = ep?.external_ids?.imdb_id ?? null;
+
+// Para el script: lo que necesita para recalcular sin recargar.
+const clientData = d ? {
+    seriesId: id, season, episode, logged: !!user,
+    seasonEps, watched: [...watchedInSeason], seriesWatched, seriesTotal,
+    next: next ? { href: next.href, code: next.code, name: next.name, season: d.next!.season, episode: d.next!.episode } : null,
+} : null;
+// --- Cuerpo (D4b-3) ------------------------------------------------------------------------------
+interface Person { id: number; name: string; character: string; profile_path: string | null }
+const person = (p: any): Person => ({ id: p.id, name: p.name ?? '', character: p.character ?? '', profile_path: p.profile_path ?? null });
+const regulars: Person[] = (ep?.credits?.cast ?? []).map(person);
+const guests: Person[] = (ep?.guest_stars ?? ep?.credits?.guest_stars ?? []).map(person);
+const REG_CAP = 8, GUEST_CAP = 9;
+const isAnimation = (d?.series.genres ?? []).some((g) => g.id === 16);
+const crew = episodeCrew(ep?.crew ?? ep?.credits?.crew);
+const videos: { key: string; name: string; type: string }[] = (ep?.videos?.results ?? []).filter((v: any) => v.site === 'YouTube' && v.key);
+const unseenHidden = !seenThis;
+const blurSynopsis = hideSynopsis && unseenHidden;
+const blurGallery = hideStills && unseenHidden;
+const regionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === region)?.label ?? region;
+const allProviders: any[] = seasonProviders?.providersByCountry?.[region] ?? [];
+const originNotSpain = !(d?.series.origin_country ?? []).includes('ES');
+// Filas del equipo: si falta un dato, en uno sin emitir sale «Sin confirmar»; si ya se emitió, la fila no sale.
+const crewRows = ([
+    ['Dirección', crew.directors], ['Guion', crew.writers], ['Fotografía', crew.photo], ['Montaje', crew.editing], ['Música', crew.music],
+] as [string, string[]][]).filter(([label, names]) => names.length || (air === 'soon' && (label === 'Dirección' || label === 'Guion')));
+
+// «T1·E10 · Fuego y sangre», el comentario con que llega «Enviar a…».
+const sendMsg = d ? `${epCode(season!, episode!)} · ${title}` : '';
+
+const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` : 'Episodio no encontrado';
+---
+<Layout title={pageTitle} description={ep?.overview || undefined} ogImage={still || d?.series.backdrop_path || undefined}>
+    {missing ? (
+        <section class="ep-404">
+            <p class="ep-404-k">Error 404 · Episodio</p>
+            <h1>Este episodio no existe</h1>
+            <p>{missing.series ? `${missing.series.name} no tiene un episodio ${episode ?? ''} en ${season === 0 ? 'los especiales' : `la temporada ${season ?? ''}`}.` : 'No encontramos esta serie ni este episodio.'}</p>
+            <div class="ep-404-b">
+                {missing.series && <a class="pf-btn pri" href={`/serie/${missing.series.id}`}>Ver la serie</a>}
+                {missing.series && missing.seasonExists && <a class="pf-btn" href={`/serie/${missing.series.id}#season-${season}`}>Ver la temporada {season}</a>}
+                {!missing.series && <a class="pf-btn pri" href="/">Volver al inicio</a>}
+            </div>
+        </section>
+    ) : d && (
+        <article class="ep">
+            <!-- Cabecera -->
+            <header class="eh">
+                {d.series.backdrop_path && <div class="eh-bg" style={`background-image:url(${backdropUrl(d.series.backdrop_path, 'w1280')})`}></div>}
+                <div class="eh-in">
+                    <nav class="eh-cr" aria-label="Migas">
+                        <a href="/">Inicio</a><i>/</i>
+                        <a href="/catalogo/topseries">Series</a><i>/</i>
+                        <a href={`/serie/${id}`}>{seriesName}</a><i>/</i>
+                        <b>{season === 0 ? `Especial ${episode}` : `T${season} · E${episode}`}</b>
+                    </nav>
+                    <div class="eh-tx">
+                        <a class="eh-sr" href={`/serie/${id}`}>
+                            {d.series.poster_path && <img src={posterUrl(d.series.poster_path, 'w92')} alt="" width="30" height="45" />}
+                            <b>{seriesName}</b>
+                            <span>Ver la serie<Icon name="lucide:chevron-right" /></span>
+                        </a>
+                        <div class="eh-k">
+                            <span class="se">{kicker}</span>
+                            {tags.map((t) => (
+                                <span class="etag" style={`--sb:var(--stamp-${TAG_STYLE[t].color});--si:var(--stamp-${TAG_STYLE[t].color}-ink)`}>
+                                    <Icon name={`lucide:${TAG_STYLE[t].icon}`} aria-hidden="true" />{TAG_STYLE[t].label}
+                                </span>
+                            ))}
+                        </div>
+                        <h1>{title}{titleSub && <small>{titleSub}</small>}</h1>
+                        <div class="eh-m">
+                            {ep.air_date && <span><Icon name="lucide:calendar" aria-hidden="true" />{shortDate(ep.air_date)}</span>}
+                            {runtime && <span><Icon name="lucide:clock" aria-hidden="true" />{runtime}</span>}
+                            {score && <span class="sc"><Icon name="lucide:star" aria-hidden="true" />{score}<small>&nbsp;TMDB · {votes.toLocaleString('es-ES')} {votes === 1 ? 'voto' : 'votos'}</small></span>}
+                        </div>
+                    </div>
+                    <div class="eh-fr">
+                        {frame === 'cd' && (
+                            <div class="st16 cd" role="img" aria-label={cd ? `Se emite ${cd.n === 'hoy' || cd.n === 'mañana' ? cd.n : `en ${cd.label}`}, ${longDate(ep.air_date, today)}` : 'Fecha de emisión por anunciar'}>
+                                {cd ? (
+                                    <>
+                                        <span class="k">{cd.unit ? 'SE EMITE EN' : 'SE EMITE'}</span>
+                                        <span class="n">{cd.n}{cd.unit && <small>{cd.unit}</small>}</span>
+                                        <span class="d">{longDate(ep.air_date, today)}</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <span class="k">FECHA POR ANUNCIAR</span>
+                                        <span class="n">—</span>
+                                    </>
+                                )}
+                            </div>
+                        )}
+                        {frame === 'none' && (
+                            <div class="st16 none">
+                                {d.series.poster_path && <img src={posterUrl(d.series.poster_path, 'w92')} alt="" />}
+                                <span>Este episodio no tiene fotograma</span>
+                            </div>
+                        )}
+                        {frame === 'img' && (blurStill ? (
+                            <div class="yf-spoil">
+                                <div class="yf-blur" aria-hidden="true" inert>
+                                    <div class="st16"><img src={stillUrl(still, 'w780')} alt={`Fotograma de ${title}`} /></div>
+                                </div>
+                                <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar fotograma</button>
+                            </div>
+                        ) : (
+                            <div class="st16">
+                                <img src={stillUrl(still, 'w780')} alt={`Fotograma de ${title}`} />
+                                {stills.length > 1 && <a class="cnt" href="#still-0" aria-label={`Ver los ${stills.length} fotogramas`}><Icon name="lucide:image" aria-hidden="true" />1 / {stills.length}</a>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </header>
+
+            <!-- Barra de acciones: Visto (o el aviso de estreno) · lo que llevas · compartir y ver -->
+            <div class="ea" role="region" aria-label="Tu progreso" data-ep-bar>
+                {canMark ? (
+                    <button type="button" class="evb" aria-pressed={seenThis ? 'true' : 'false'} data-ep-watch>
+                        <span class="evb-off"><Icon name="lucide:eye" aria-hidden="true" />Marcar como visto</span>
+                        <span class="evb-on"><Icon name="lucide:check-check" aria-hidden="true" />Visto</span>
+                        <span class="evb-un"><Icon name="lucide:undo-2" aria-hidden="true" />Desmarcar</span>
+                        <span class="evb-busy"><Icon name="lucide:loader-circle" aria-hidden="true" />Guardando…</span>
+                    </button>
+                ) : (
+                    <button type="button" class="evb bell" aria-pressed={notifSub ? 'true' : 'false'} data-ep-bell>
+                        <Icon name="lucide:bell" aria-hidden="true" /><span>{notifSub ? 'Aviso de estreno activado' : 'Avisarme del estreno'}</span>
+                    </button>
+                )}
+                <div class="est" data-ep-state>
+                    {!user ? (
+                        <b class="mu"><Icon name="lucide:eye-off" aria-hidden="true" />Entra para llevar tu progreso</b>
+                    ) : !canMark ? (
+                        <b class="mu"><Icon name="lucide:calendar-clock" aria-hidden="true" />Lo podrás marcar cuando se emita</b>
+                    ) : seenThis ? (
+                        <b><Icon name="lucide:check" aria-hidden="true" />{watchedAt ? `Lo viste el ${watchedLabel(watchedAt)}` : 'Lo has visto'}</b>
+                    ) : (
+                        <b class="mu"><Icon name="lucide:eye-off" aria-hidden="true" />Aún no lo has visto</b>
+                    )}
+                    {user && prog && (
+                        <div class="eprog">
+                            <span class="bar" aria-hidden="true"><i style={`width:${Math.round(prog.pct * 100)}%`}></i></span>
+                            <span>{prog.text}</span>{prog.total && <span class="t">{prog.total}</span>}
+                        </div>
+                    )}
+                    {user && earlier.length > 0 && (
+                        <button type="button" class="ea-earlier" data-ep-earlier={earlier.join(',')}>
+                            Tienes {earlier.length} {earlier.length === 1 ? 'anterior' : 'anteriores'} sin ver · <u>{earlier.length === 1 ? 'Marcarlo' : 'Marcarlos'}</u>
+                        </button>
+                    )}
+                </div>
+                <div class="ea-r">
+                    {SOCIAL_PHASE.recommend && user && (
+                        <button type="button" class="pf-btn sm" data-recommend data-target-type="tv" data-target-id={id} data-title={seriesName} data-image={d.series.poster_path} aria-haspopup="dialog" aria-expanded="false">
+                            <Icon name="lucide:send" aria-hidden="true" />Recomendar
+                        </button>
+                    )}
+                    {SOCIAL_PHASE.messages && user && (
+                        <button type="button" class="pf-btn sm" data-send-to data-media-type="tv" data-tmdb-id={id} data-title={seriesName} data-image={d.series.poster_path}
+                            data-msg={sendMsg} data-spoil-season={season! > 0 ? season : undefined} data-spoil-episode={season! > 0 ? episode : undefined}
+                            aria-haspopup="dialog" aria-expanded="false">
+                            <Icon name="lucide:forward" aria-hidden="true" />Enviar a…
+                        </button>
+                    )}
+                    {imdbId && <a class="imdb" href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" aria-label="Este episodio en IMDb">IMDb</a>}
+                    {provider && providerLink && (
+                        <a class="pf-btn sm ea-pv" href={providerLink} target="_blank" rel="noopener">
+                            <Icon name="lucide:tv" aria-hidden="true" /><span>Ver en {provider.provider_name}</span>
+                        </a>
+                    )}
+                </div>
+                <p class="ea-err" role="alert" data-ep-err hidden><Icon name="lucide:circle-alert" aria-hidden="true" />No se ha podido guardar. Vuelve a intentarlo.</p>
+                <p class="sr-only" aria-live="polite" data-ep-live></p>
+            </div>
+            {clientData && <script type="application/json" id="ep-data" set:html={JSON.stringify(clientData)} />}
+
+            <!-- Navegación: anterior · tira de la temporada · siguiente -->
+            <div class="en">
+                {prev ? (
+                    <a class="enc" href={prev.href} aria-label={prev.label}>
+                        <span class:list={['th', { ph: !prev.thumb }]}>{prev.thumb && <img src={prev.thumb} alt="" loading="lazy" />}</span>
+                        <span class="tx">
+                            <span class="k"><Icon name="lucide:chevron-left" aria-hidden="true" />Anterior · {prev.code}</span>
+                            <b>{prev.name}</b>
+                            {prev.status && <span class="s">{prev.seen && <Icon name="lucide:check" aria-hidden="true" />}{prev.status}</span>}
+                        </span>
+                    </a>
+                ) : (
+                    <span class="enc off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Anterior</span><b>No hay más episodios</b></span></span>
+                )}
+
+                <nav class="etr" aria-label="Episodios de la temporada">
+                    <div class="etr-h">
+                        <details class="ssel">
+                            <summary aria-label={`Temporada: ${seasonLabel(season!)}. Cambiar de temporada`}>{seasonLabel(season!)}<Icon name="lucide:chevron-down" aria-hidden="true" /></summary>
+                            <ul>
+                                {d.series.seasons.map((s) => (
+                                    <li><a href={episodeHref(id!, s.season_number, 1)} aria-current={s.season_number === season ? 'true' : undefined}>
+                                        {s.season_number === 0 ? 'Especiales' : `Temporada ${s.season_number}`}<small>{s.episode_count} ep.</small>
+                                    </a></li>
+                                ))}
+                            </ul>
+                        </details>
+                        <span>{strip.length} {strip.length === 1 ? 'episodio' : 'episodios'}</span>
+                        <a href={`/serie/${id}#season-${season}`}>Ver temporada<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                    </div>
+                    <ol data-ep-strip>
+                        {strip.map((s) => (
+                            <li class={s.cls} aria-current={s.cur ? 'page' : undefined}><a href={s.href} aria-label={s.label}>{s.n}</a></li>
+                        ))}
+                    </ol>
+                </nav>
+
+                {next ? (
+                    <a class="enc nx" href={next.href} aria-label={next.label}>
+                        <span class:list={['th', { ph: !next.thumb }]}>{next.thumb && <img src={next.thumb} alt="" loading="lazy" />}</span>
+                        <span class="tx">
+                            <span class="k">Siguiente · {next.code}<Icon name="lucide:chevron-right" aria-hidden="true" /></span>
+                            <b>{next.name}</b>
+                            {next.status && <span class="s">{next.seen && <Icon name="lucide:check" aria-hidden="true" />}{next.status}</span>}
+                        </span>
+                    </a>
+                ) : (
+                    <span class="enc nx off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Siguiente</span><b>No hay más episodios</b></span></span>
+                )}
+            </div>
+
+            <!-- Cuerpo: lectura a la izquierda, consulta a la derecha -->
+            <div class="eb">
+                <div class="eb-m">
+                    <section aria-labelledby="ep-syn">
+                        <SectionHeader title="Sinopsis" icon="align-left" color="slate" headingId="ep-syn" />
+                        {ep.overview ? (blurSynopsis ? (
+                            <div class="yf-spoil txt">
+                                <p class="syn yf-blur" aria-hidden="true" inert>{ep.overview}</p>
+                                <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar sinopsis</button>
+                            </div>
+                        ) : <p class="syn">{ep.overview}</p>) : (
+                            <p class="syn-e"><Icon name="lucide:clock" aria-hidden="true" />{air === 'aired' ? 'No hay descripción disponible.' : 'Aún no hay sinopsis. Suele publicarse unos días antes del estreno.'}</p>
+                        )}
+                    </section>
+
+                    <section aria-labelledby="ep-cast">
+                        <SectionHeader title="Reparto" icon="users" color="blue" headingId="ep-cast" />
+                        {regulars.length > 0 && (
+                            <div class="cast-b" data-cast>
+                                <h3 class="cast-h">{isAnimation ? 'Voces habituales' : 'Habituales en este episodio'}<span>{regulars.length}</span></h3>
+                                <div class="pcg">
+                                    {regulars.map((p, i) => (
+                                        <a class:list={['pc', { xtra: i >= REG_CAP }]} href={`/actor/${p.id}`}>
+                                            {p.profile_path ? <img src={posterUrl(p.profile_path, 'w185')} alt="" loading="lazy" /> : <span class="pc-ph" aria-hidden="true">{p.name.charAt(0)}</span>}
+                                            <span class="pc-t"><b>{p.name}</b><span>{p.character}</span></span>
+                                        </a>
+                                    ))}
+                                </div>
+                                {regulars.length > REG_CAP && <button type="button" class="more" aria-expanded="false" data-more><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar los {regulars.length}</button>}
+                            </div>
+                        )}
+                        <div class="cast-b" data-cast>
+                            <h3 class="cast-h">Estrellas invitadas<span>{guests.length}</span></h3>
+                            {guests.length === 0 ? (
+                                <p class="syn-e"><Icon name="lucide:users" aria-hidden="true" />Sin estrellas invitadas anunciadas</p>
+                            ) : (
+                                <div class:list={[{ 'yf-spoil': blurSynopsis }]}>
+                                    <div class:list={['pcg g3', { 'yf-blur': blurSynopsis }]} aria-hidden={blurSynopsis ? 'true' : undefined} inert={blurSynopsis || undefined}>
+                                        {guests.map((p, i) => (
+                                            <a class:list={['pc', { xtra: i >= GUEST_CAP }]} href={`/actor/${p.id}`}>
+                                                {p.profile_path ? <img src={posterUrl(p.profile_path, 'w185')} alt="" loading="lazy" /> : <span class="pc-ph" aria-hidden="true">{p.name.charAt(0)}</span>}
+                                                <span class="pc-t"><b>{p.name}</b><span>{p.character}</span></span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                    {blurSynopsis && <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar invitados</button>}
+                                </div>
+                            )}
+                            {guests.length > GUEST_CAP && <button type="button" class="more" aria-expanded="false" data-more><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar las {guests.length}</button>}
+                        </div>
+                    </section>
+
+                    {stills.length > 1 && (
+                        <section aria-labelledby="ep-stills" id="fotogramas">
+                            <SectionHeader title="Fotogramas" icon="image" color="purple" cap={`${stills.length} fotogramas`} headingId="ep-stills" />
+                            <div class:list={[{ 'yf-spoil': blurGallery }]}>
+                                <div class:list={['gal', { 'yf-blur': blurGallery }]} aria-hidden={blurGallery ? 'true' : undefined} inert={blurGallery || undefined}>
+                                    {stills.map((p, i) => (
+                                        <a class="st16" href={`#still-${i}`} aria-label={`Fotograma ${i + 1} de ${stills.length}`}><img src={stillUrl(p, 'w300')} alt="" loading="lazy" /></a>
+                                    ))}
+                                </div>
+                                {blurGallery && <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar fotogramas</button>}
+                            </div>
+                        </section>
+                    )}
+
+                    {videos.length > 0 && (
+                        <section aria-labelledby="ep-vids">
+                            <SectionHeader title="Vídeos" icon="play" color="red" cap={`${videos.length} ${videos.length === 1 ? 'vídeo' : 'vídeos'}`} headingId="ep-vids" />
+                            <div class="vids">
+                                {videos.slice(0, 4).map((v) => (
+                                    <figure class="vid">
+                                        <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                        <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
+                                    </figure>
+                                ))}
+                            </div>
+                        </section>
+                    )}
+                </div>
+
+                <aside class="eb-s">
+                    <section class="esc" aria-labelledby="ep-info">
+                        <h3 id="ep-info">Este episodio</h3>
+                        <dl>
+                            <dt>Emisión</dt>
+                            <dd>{ep.air_date ? <>{mediumDate(ep.air_date)}<small>{relativeAgo(ep.air_date, today)}{originNotSpain ? ' · emisión original' : ''}</small></> : <span class="mu">Por anunciar</span>}</dd>
+                            {runtime && <><dt>Duración</dt><dd>{runtime}</dd></>}
+                            <dt>Nota TMDB</dt>
+                            <dd>{score ? <span class="rt"><Icon name="lucide:star" aria-hidden="true" />{score} · {votes.toLocaleString('es-ES')} {votes === 1 ? 'voto' : 'votos'}</span> : <span class="mu">{air === 'aired' ? 'Sin votos todavía' : 'Sin nota hasta que se emita'}</span>}</dd>
+                            <dt>Tipo</dt>
+                            <dd>{episodeKind(season!, ep.episode_type)}</dd>
+                            {crewRows.length > 0 && <hr />}
+                            {crewRows.map(([label, names]) => (
+                                <>
+                                    <dt>{label}</dt>
+                                    <dd>{names.length ? names.map((n, i) => <>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`}>{n}</a></>) : <span class="mu">Sin confirmar</span>}</dd>
+                                </>
+                            ))}
+                            {imdbId && <><dt class="m-only">IMDb</dt><dd class="m-only"><a class="imdb" href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener">IMDb</a></dd></>}
+                        </dl>
+                    </section>
+
+                    <section class="esc" aria-labelledby="ep-where">
+                        <h3 id="ep-where">Dónde ver {season === 0 ? 'los especiales' : `la T${season}`}<small>{regionLabel}</small></h3>
+                        {allProviders.length > 0 ? (
+                            <ul class="prv">
+                                {allProviders.slice(0, 6).map((p) => (
+                                    <li class="prv-r">
+                                        {p.logo_path ? <img src={posterUrl(p.logo_path, 'w92')} alt="" loading="lazy" /> : <span class="lg" aria-hidden="true">{p.provider_name.slice(0, 2)}</span>}
+                                        <span>{p.provider_name}<small>{PROVIDER_KIND[p.type] ?? ''}</small></span>
+                                        {providerLink && <a class="pf-btn sm" href={providerLink} target="_blank" rel="noopener" aria-label={`Ver en ${p.provider_name}`}>Ver</a>}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <p class="prv-e">No está en plataformas de {regionLabel} ahora mismo.</p>
+                        )}
+                        <p class="prv-jw">Disponibilidad por <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a></p>
+                    </section>
+
+                    <FriendsSeen mediaType="tv" tmdbId={id!} note="de la serie" />
+
+                    {imdbId && (
+                        <a class="esc lnk d-only" href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener">
+                            <span class="imdb">IMDb</span>Este episodio en IMDb<Icon name="lucide:external-link" aria-hidden="true" />
+                        </a>
+                    )}
+                </aside>
+            </div>
+
+            <!-- Visor de fotogramas (CSS :target de detail-common.css, como LightboxGallery) -->
+            {stills.length > 0 && stills.map((p, i) => (
+                <div id={`still-${i}`} class="lightbox ep-lb" role="dialog" aria-label={`Fotograma ${i + 1} de ${stills.length}`}>
+                    <a href="#_" class="ep-lb-x" aria-label="Cerrar"></a>
+                    <img src={stillUrl(p, 'original')} alt={`Fotograma ${i + 1} de ${title}`} loading="lazy" />
+                    <a href="#_" class="ep-lb-c" aria-label="Cerrar">&times;</a>
+                    {i > 0 && <a href={`#still-${i - 1}`} class="ep-lb-p" aria-label="Anterior"><Icon name="lucide:chevron-left" /></a>}
+                    {i < stills.length - 1 && <a href={`#still-${i + 1}`} class="ep-lb-n" aria-label="Siguiente"><Icon name="lucide:chevron-right" /></a>}
+                </div>
+            ))}
+        </article>
+    )}
+</Layout>
+
+<script>
+    import '../../../../scripts/shared/spoil';
+    import '../../../../scripts/serie/episode';
+
+    // La tira, centrada en el episodio actual (las temporadas largas se desplazan en horizontal).
+    const strip = document.querySelector<HTMLElement>('[data-ep-strip]');
+    const cur = strip?.querySelector<HTMLElement>('li[aria-current="page"]');
+    // Con posiciones en pantalla, no con `offsetLeft`: ese se mide desde el primer ancestro
+    // posicionado (no desde la tira), y llevaba siempre la tira casi al final.
+    if (strip && cur && strip.scrollWidth > strip.clientWidth) {
+        const delta = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left;
+        strip.scrollLeft += delta - (strip.clientWidth - cur.clientWidth) / 2;
+    }
+
+    // Difuminar el borde por donde quedan más episodios (y nada en el lado al que ya has llegado).
+    if (strip) {
+        const fades = () => {
+            const max = strip.scrollWidth - strip.clientWidth;
+            strip.classList.toggle('fade-l', strip.scrollLeft > 2);
+            strip.classList.toggle('fade-r', strip.scrollLeft < max - 2);
+        };
+        fades();
+        strip.addEventListener('scroll', fades, { passive: true });
+        window.addEventListener('resize', fades);
+    }
+
+    // «Mostrar los N» del reparto: despliega en el sitio.
+    document.querySelectorAll<HTMLButtonElement>('[data-more]').forEach((b) => {
+        b.addEventListener('click', () => {
+            const box = b.closest<HTMLElement>('[data-cast]');
+            const open = !box?.classList.contains('is-open');
+            box?.classList.toggle('is-open', open);
+            b.setAttribute('aria-expanded', String(open));
+            b.hidden = open;
+        });
+    });
+
+    // El selector de temporada se cierra al pulsar fuera o con Escape.
+    const sel = document.querySelector<HTMLDetailsElement>('.ssel');
+    document.addEventListener('click', (e) => { if (sel?.open && !sel.contains(e.target as Node)) sel.open = false; });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel?.open) { sel.open = false; sel.querySelector('summary')?.focus(); } });
+</script>

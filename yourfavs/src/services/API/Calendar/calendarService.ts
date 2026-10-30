@@ -6,6 +6,7 @@ import { fetchSerieDetails } from '../Series/tmdbSeries';
 import { fetchMovieDetails } from '../Movies/tmdbMovies';
 import { processBatch } from '../../../utils/processBatch';
 import { episodeTypeLabel } from '../../../utils/episodeType';
+import { episodeHref } from '../../../utils/episodeView';
 
 export interface CalendarEvent {
     tmdb_id: string;
@@ -18,6 +19,11 @@ export interface CalendarEvent {
     is_following: boolean;
     /** Solo person_release: a quién sigues que te trae este estreno. */
     person_name?: string;
+    /**
+     * A dónde lleva (TMDB D4): un episodio, a su ficha; una temporada entera, a esa temporada en la
+     * ficha de serie. Sin él, a la ficha del título (lo de siempre, y lo que traen las cachés viejas).
+     */
+    href?: string;
 }
 
 export interface CalendarDay {
@@ -259,6 +265,7 @@ export async function getCalendarData(
                             poster_path: posterUrl(serie.poster_path),
                             event_type: 'season_premiere',
                             label: `Temporada ${currentSeasonNum} completa (${episodes.length} eps)`,
+                            href: `/serie/${serieIdStr}#season-${currentSeasonNum}`,
                             is_subscribed: isSub,
                             is_following: isFollowing,
                         });
@@ -272,6 +279,7 @@ export async function getCalendarData(
                                 poster_path: posterUrl(serie.poster_path),
                                 event_type: 'episode',
                                 label: epLabel(ep.season_number, ep.episode_number, ep.name, ep.episode_type),
+                                href: episodeHref(serieIdStr, ep.season_number, ep.episode_number),
                                 is_subscribed: isSub,
                                 is_following: isFollowing,
                             });
@@ -292,6 +300,7 @@ export async function getCalendarData(
                 poster_path: posterUrl(serie.poster_path),
                 event_type: 'episode',
                 label: epLabel(nextEp.season_number, nextEp.episode_number, nextEp.name, nextEp.episode_type),
+                href: episodeHref(serieIdStr, nextEp.season_number, nextEp.episode_number),
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });
@@ -305,6 +314,7 @@ export async function getCalendarData(
                 poster_path: posterUrl(serie.poster_path),
                 event_type: 'episode',
                 label: epLabel(lastEp.season_number, lastEp.episode_number, lastEp.name, lastEp.episode_type),
+                href: episodeHref(serieIdStr, lastEp.season_number, lastEp.episode_number),
                 is_subscribed: isSub,
                 is_following: isFollowing,
             });
