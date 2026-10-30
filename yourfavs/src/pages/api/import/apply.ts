@@ -4,7 +4,7 @@
  * Body { job_id, items?, log?, list? }:
  *   items: [{ media_type, tmdb_id, kind: 'seen'|'liked'|'favorite'|'watchlist', rating?, date? }]  (≤ 200)
  *   log:   [{ media_type, tmdb_id, date, rewatch }]   pases del diario con su día real (≤ 300)
- *   list:  { id?, name, description, items: [{ media_type, tmdb_id, title, poster_path }] } (≤ 200)
+ *   list:  { id?, source, name, description, items: [{ media_type, tmdb_id, title, poster_path }] } (≤ 200)
  *          sin `id` se crea (o se reutiliza) la colección y se devuelve `list_id` para los lotes
  *          siguientes de la misma lista.
  * Las reglas (no bajar de nivel, tu nota manda, fecha original) están en
@@ -68,7 +68,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 id = (await createImportList(body.job_id, {
                     name: String(body.list.name ?? ''),
                     description: String(body.list.description ?? ''),
-                    suffix: 'Letterboxd',
+                    suffix: body.list.source === 'tmdb' ? 'TMDB' : 'Letterboxd',
                     cover: first ? { poster_path: first.poster_path!, tmdb_id: first.tmdb_id } : null,
                 })).id;
             }

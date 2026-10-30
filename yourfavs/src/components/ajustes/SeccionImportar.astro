@@ -1,6 +1,6 @@
 ---
 /**
- * Ajustes → Importar (TMDB D3a IMDb, D3b Letterboxd; la cuenta de TMDB llega en D3c).
+ * Ajustes → Importar (TMDB D3a IMDb, D3b Letterboxd, D3c cuenta de TMDB).
  *
  * Una sola zona para soltar: reconoce sola los CSV de IMDb o el ZIP (o los CSV) de Letterboxd. Todo
  * pasa en el navegador hasta que dices «Añadir»: se lee aquí, se busca en TMDB por lotes
@@ -11,11 +11,14 @@
  */
 import { Icon } from 'astro-icon/components';
 import type { ImportJob } from '../../services/BD/import/importLibrary';
+import { tmdbAccountEnabled } from '../../services/API/shared/tmdbAccount';
 
 interface Props {
     jobs: ImportJob[];
 }
 const { jobs } = Astro.props;
+// Sin `TMDB_READ_TOKEN` (variable de Netlify) no se puede pedir permiso: la opción sale como «Pronto».
+const tmdbOn = tmdbAccountEnabled();
 
 const SOURCE_LABEL: Record<string, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB' };
 const fmtDate = (iso: string) => new Intl.DateTimeFormat('es-ES', {
@@ -130,12 +133,13 @@ const knownHashes = Object.fromEntries(
 </div>
 
 <div class="aj-card">
-    <div class="aj-row is-soon">
+    <div class:list={["aj-row", { "is-soon": !tmdbOn }]}>
         <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:link" /></span>
         <span class="aj-row-text">
-            <span class="aj-row-title">Desde tu cuenta de TMDB <span class="aj-soon">Pronto</span></span>
-            <p class="aj-row-desc">Favoritos, watchlist, valoraciones y listas, dando permiso en themoviedb.org.</p>
+            <span class="aj-row-title">Desde tu cuenta de TMDB {!tmdbOn && <span class="aj-soon">Pronto</span>}</span>
+            <p class="aj-row-desc">Favoritos, valoraciones, watchlist y listas. Das permiso en themoviedb.org, leemos tu cuenta y el permiso se retira al terminar.</p>
         </span>
+        {tmdbOn && <a class="aj-btn" href="/api/import/tmdb/start" data-imp-tmdb><Icon name="lucide:link" aria-hidden="true" />Conectar</a>}
     </div>
 </div>
 

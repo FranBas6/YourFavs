@@ -2,7 +2,9 @@
  * Ajustes → «Importar» (TMDB D3): el navegador hace casi todo.
  *
  *   1 · Lee los ficheros: CSV de IMDb (`utils/import/imdb.ts`) o ZIP / CSV de Letterboxd
- *       (`utils/import/zip.ts` + `letterboxd.ts`). Se reconoce el origen solo.
+ *       (`utils/import/zip.ts` + `letterboxd.ts`). Se reconoce el origen solo. O, al volver de
+ *       aprobar el permiso en themoviedb.org (`?tmdb=ok`), lee la cuenta de TMDB página a página
+ *       (`/api/import/tmdb/fetch`) y revoca el permiso en cuanto termina (D3c).
  *   2 · Busca cada título UNA vez en TMDB, por lotes de 50 (`/api/import/resolve`): IMDb por id
  *       exacto; Letterboxd por título y año, con «dudosos» para elegir.
  *   3 · Vista previa: cifras, a qué lista va cada cosa, pósters, dudosos y no encontrados.
@@ -16,14 +18,14 @@ import { parseImdbExport, type ImdbRow } from '../../utils/import/imdb';
 import { isLetterboxdPath, looksLikeLetterboxd, parseLetterboxdExport, type LbExport, type LbFilm } from '../../utils/import/letterboxd';
 import { readZipTexts } from '../../utils/import/zip';
 
-type Source = 'imdb' | 'letterboxd';
+type Source = 'imdb' | 'letterboxd' | 'tmdb';
 
 const RESOLVE_BATCH = 50;
 const APPLY_BATCH = 200;
 const LOG_BATCH = 300;
 const MAX_ROWS = 10_000;
 const POSTER = 'https://image.tmdb.org/t/p/w92';
-const SOURCE_LABEL: Record<Source, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd' };
+const SOURCE_LABEL: Record<Source, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB' };
 
 const count = (v: number, one: string, many: string) => `${v.toLocaleString('es-ES')} ${v === 1 ? one : many}`;
 const num = (v: number) => v.toLocaleString('es-ES');
@@ -40,6 +42,16 @@ interface Resolved {
     poster_path?: string | null;
     have?: boolean;
     candidates?: Candidate[];
+}
+
+/** Lo leído de la cuenta de TMDB (D3c): un título por `media_type:id` y las listas. */
+interface TmdbTitle {
+    media_type: 'movie' | 'tv'; tmdb_id: number; title: string; year: number | null; poster_path: string | null;
+    have: boolean; favorite: boolean; watchlist: boolean; rating?: number; rated_on?: string;
+}
+interface TmdbAccount {
+    titles: Map<string, TmdbTitle>;
+    lists: { name: string; description: string; items: { media_type: 'movie' | 'tv'; tmdb_id: number; title: string; poster_path: string | null }[] }[];
 }
 
 /** El título ya elegido (encontrado, o candidata pulsada en un dudoso). */
@@ -63,6 +75,7 @@ function init(root: HTMLElement) {
     let ignored = 0;
     let imdbRows: ImdbRow[] = [];
     let lb: LbExport | null = null;
+    let tmdb: TmdbAccount | null = null;
     let lookups: Lookup[] = [];
     const results = new Map<string, Resolved>();
     /** Dudosos: clave → tmdb_id elegido (o null = «Ninguna»). */
@@ -163,6 +176,97 @@ function init(root: HTMLElement) {
         await resolveAll();
     }
 
+    // --- 1b · Leer la cuenta de TMDB (D3c) ------------------------------------------------
+    async function readTmdbAccount() {
+        show('progress');
+        const acc: TmdbAccount = { titles: new Map(), lists: [] };
+        const STEPS: [string, string][] = [
+            ['movie_favorites', 'favoritos'], ['tv_favorites', 'series favoritas'],
+            ['movie_rated', 'valoraciones'], ['tv_rated', 'series valoradas'],
+            ['movie_watchlist', 'watchlist'], ['tv_watchlist', 'series en tu watchlist'],
+        ];
+        let step = 0;
+        const total = STEPS.length + 1;
+        const title = (what: string) => `Leyendo tu cuenta de TMDB: ${what}…`;
+
+        /** Todas las páginas de algo. */
+        const all = async (kind: string, extra: Record<string, unknown> = {}) => {
+            const out: any[] = [];
+            let lists: any[] = [];
+            for (let page = 1, pages = 1; page <= pages; page++) {
+                const r = await post<any>('/api/import/tmdb/fetch', { kind, page, ...extra });
+                pages = Math.min(Number(r.total_pages) || 1, 500);
+                out.push(...(r.titles ?? []));
+                if (r.lists) lists = lists.concat(r.lists);
+            }
+            return { titles: out, lists };
+        };
+        const entry = (t: any): TmdbTitle => {
+            const k = `${t.media_type}:${t.tmdb_id}`;
+            const known = acc.titles.get(k);
+            if (known) return known;
+            // Solo los datos del título: la nota se apunta aparte, solo desde «valoradas».
+            const e: TmdbTitle = {
+                media_type: t.media_type, tmdb_id: t.tmdb_id, title: t.title, year: t.year,
+                poster_path: t.poster_path, have: !!t.have, favorite: false, watchlist: false,
+            };
+            acc.titles.set(k, e);
+            return e;
+        };
+
+        try {
+            for (const [kind, what] of STEPS) {
+                progress(title(what), step++, total);
+                const { titles } = await all(kind);
+                for (const t of titles) {
+                    const e = entry(t);
+                    if (kind.endsWith('favorites')) e.favorite = true;
+                    if (kind.endsWith('watchlist')) e.watchlist = true;
+                    if (kind.endsWith('rated') && t.rating) { e.rating = t.rating; e.rated_on = t.rated_on; }
+                }
+            }
+            progress(title('listas'), step++, total);
+            const { lists } = await all('lists');
+            for (const l of lists) {
+                const { titles } = await all('list', { list_id: l.id });
+                acc.lists.push({
+                    name: l.name, description: l.description,
+                    items: titles.map((t: any) => {
+                        entry(t); // para el «ya en tus listas» y los pósters
+                        return { media_type: t.media_type, tmdb_id: t.tmdb_id, title: t.title, poster_path: t.poster_path };
+                    }),
+                });
+            }
+        } catch (err) {
+            console.error('[importar] cuenta de TMDB', err);
+            await disconnectTmdb();
+            return pickError('No se ha podido leer tu cuenta de TMDB (la conexión dura 15 minutos). Vuelve a conectar.');
+        }
+        await disconnectTmdb();
+
+        if (!acc.titles.size) return pickError('Tu cuenta de TMDB no tiene favoritos, valoraciones, watchlist ni listas que importar.');
+        tmdb = acc;
+        source = 'tmdb';
+        label = 'Cuenta de TMDB';
+        hash = null;
+        ignored = 0;
+        imdbRows = [];
+        lb = null;
+        results.clear();
+        choices.clear();
+        lookups = [];
+        for (const [k, t] of acc.titles) {
+            lookups.push({ key: k, label: t.year ? `${t.title} (${t.year})` : t.title, req: {} });
+            results.set(k, { status: 'found', media_type: t.media_type, tmdb_id: t.tmdb_id, title: t.title, year: t.year, poster_path: t.poster_path, have: t.have });
+        }
+        renderPreview();
+    }
+
+    /** El permiso de TMDB no se queda vivo: se revoca en cuanto se ha leído (o si falla). */
+    async function disconnectTmdb() {
+        try { await fetch('/api/import/tmdb/disconnect', { method: 'POST' }); } catch { /* caduca en 15 min */ }
+    }
+
     // --- 2 · Buscar en TMDB por lotes (cada título una vez) --------------------------
     async function resolveAll() {
         show('progress');
@@ -229,7 +333,7 @@ function init(root: HTMLElement) {
         set('missing', missing.length);
         set('ignored', ignored);
         $('[data-imp-stat-amb]').hidden = !amb.length;
-        $('[data-imp-from]').textContent = `${SOURCE_LABEL[source]} · ${label}`;
+        $('[data-imp-from]').textContent = source === 'tmdb' ? 'Tu cuenta de TMDB' : `${SOURCE_LABEL[source]} · ${label}`;
 
         renderDest();
 
@@ -277,8 +381,12 @@ function init(root: HTMLElement) {
             el.append(b, document.createTextNode(` · ${detail}`));
             dest.append(el);
         };
-        if (by('favorite').length) li('Favoritos', count(by('favorite').length, 'película', 'películas'));
-        if (by('liked').length) li('Me gusta', count(by('liked').length, 'película', 'películas'));
+        // «películas» si lo son todas (Letterboxd); si hay series (cuenta de TMDB), «títulos».
+        const what = (list: PlanItem[]) => list.every((i) => i.media_type === 'movie')
+            ? count(list.length, 'película', 'películas')
+            : count(list.length, 'título', 'títulos');
+        if (by('favorite').length) li('Favoritos', what(by('favorite')));
+        if (by('liked').length) li('Me gusta', what(by('liked')));
         if (by('seen').length) li('Vistas', count(by('seen').length, 'título', 'títulos'));
         if (rated) li('Notas', `${num(rated)} (las tuyas mandan)`);
         if (by('watchlist').length) li('Pendientes', count(by('watchlist').length, 'título', 'títulos'));
@@ -366,6 +474,16 @@ function init(root: HTMLElement) {
             return { items, log, lists };
         }
 
+        // Cuenta de TMDB: ya viene un título por id; Favoritos > Vistas (valorada) > Pendientes.
+        if (source === 'tmdb') {
+            for (const t of tmdb!.titles.values()) {
+                const kind = t.favorite ? 'favorite' : t.rating ? 'seen' : t.watchlist ? 'watchlist' : null;
+                if (kind) items.push({ media_type: t.media_type, tmdb_id: t.tmdb_id, kind, ...opt(t.rating, kind === 'watchlist' ? undefined : t.rated_on) });
+            }
+            for (const l of tmdb!.lists) if (l.items.length) lists.push(l);
+            return { items, log, lists };
+        }
+
         // Letterboxd: una ficha por película → una sola lista (Favoritos > Me gusta > Vistas; Pendientes
         // solo si no está vista). Dos películas del fichero pueden ser la misma en TMDB: gana la más alta.
         const rank: Record<string, number> = { favorite: 3, liked: 2, seen: 1, watchlist: 0 };
@@ -449,7 +567,7 @@ function init(root: HTMLElement) {
             let listId = '';
             for (let i = 0; i < l.items.length; i += APPLY_BATCH) {
                 const batch = l.items.slice(i, i + APPLY_BATCH);
-                const r = await send({ list: { id: listId || undefined, name: l.name, description: l.description, items: batch } }, batch.length);
+                const r = await send({ list: { id: listId || undefined, source, name: l.name, description: l.description, items: batch } }, batch.length);
                 if (r?.list_id) listId = r.list_id;
                 else if (!listId) { failed += l.items.length - batch.length; break; } // sin colección no hay dónde seguir
             }
@@ -520,6 +638,15 @@ function init(root: HTMLElement) {
         drop.classList.remove('is-over');
         handleFiles([...(e.dataTransfer?.files ?? [])]);
     });
+    // Vuelta desde themoviedb.org: se lee la cuenta sola, o se dice por qué no.
+    const tmdbState = new URLSearchParams(location.search).get('tmdb');
+    if (tmdbState) {
+        history.replaceState(null, '', location.pathname);
+        if (tmdbState === 'ok') readTmdbAccount();
+        else if (tmdbState === 'denied') showToast('No se ha dado permiso en TMDB: no se ha leído nada.', 'error');
+        else showToast('No se ha podido conectar con TMDB. Inténtalo de nuevo en un rato.', 'error');
+    }
+
     $('[data-imp-cancel]').addEventListener('click', () => show('pick'));
     $('[data-imp-apply]').addEventListener('click', apply);
     $('[data-imp-again]').addEventListener('click', () => show('pick'));
