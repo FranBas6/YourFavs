@@ -1,5 +1,4 @@
-import { processBatch } from './processBatch';
-import { tmdbFetch } from '../services/API/shared/tmdbClient';
+import { getTitleDetails } from '../services/API/shared/tmdbTitleCache';
 import { getCached, setCached, invalidateCached } from './recsBlobCache';
 import { getCurrentUid } from '../services/BD/shared/userScope';
 import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
@@ -174,39 +173,21 @@ function collectSeeds(
 }
 
 /**
- * Resuelve los géneros (IDs TMDB) de cada semilla. Si el doc ya los trae
- * (los favs de PELÍCULAS guardan `genre_ids`), se usan directos → 0 fetch.
- * Solo se pide a TMDB lo que falta: títulos del onboarding y favs de SERIES
- * (sus docs no guardan géneros). Esto recorta drásticamente las llamadas en frío.
+ * Géneros (ids de TMDB) y título de cada semilla, en bloque y por `tmdb_cache` (la copia con la
+ * caducidad que manda TMDB, como las listas). Tus listas no guardan géneros, así que salen siempre de
+ * aquí; antes era una petición suelta y sin caché por semilla.
  */
 async function resolveGenres(
     seeds: Seed[],
-    preGenres: Map<string, number[]>,
     mediaType: 'movie' | 'tv',
 ): Promise<{ weight: number; genres: number[]; title?: string }[]> {
-    return processBatch(
-        seeds,
-        async (s: Seed) => {
-            const pre = preGenres.get(s.id);
-            if (pre && pre.length) return { weight: s.weight, genres: pre, title: s.title };
-            try {
-                const d = await tmdbFetch<any>(`/${mediaType}/${s.id}`);
-                const title = s.title || (mediaType === 'movie' ? d?.title : d?.name) || undefined;
-                return { weight: s.weight, genres: (d?.genres || []).map((g: any) => g.id as number), title };
-            } catch { return { weight: s.weight, genres: [] as number[], title: s.title }; }
-        },
-        10
-    );
-}
-
-/** Extrae genre_ids numéricos guardados en los docs (favs de pelis los traen). */
-function docGenreMap(items: any[]): Map<string, number[]> {
-    const m = new Map<string, number[]>();
-    for (const it of items) {
-        const g = (it?.genres || []).filter((x: any) => typeof x === 'number') as number[];
-        if (g.length) m.set(String(it.id), g);
-    }
-    return m;
+    const details = await getTitleDetails(mediaType, seeds.map((s) => s.id));
+    return seeds.map((s, i) => {
+        const d = details[i];
+        if (!d) return { weight: s.weight, genres: [] as number[], title: s.title };
+        const title = s.title || (mediaType === 'movie' ? d.title : d.name) || undefined;
+        return { weight: s.weight, genres: (d.genres || []).map((g: any) => g.id as number), title };
+    });
 }
 
 function aggregateGenres(
@@ -289,13 +270,10 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     movieAllSeeds.forEach((s) => libraryIds.movies.add(s.id));
     tvAllSeeds.forEach((s) => libraryIds.tv.add(s.id));
 
-    // Géneros ya guardados en los docs (hoy ninguno los trae; se piden a TMDB, y de paso el título).
-    const movieDocGenres = docGenreMap(movFavs as any[]);
-    const tvDocGenres = docGenreMap(tvFavs as any[]);
-
+    // Géneros y título de cada semilla (tus listas no los guardan): de TMDB, por `tmdb_cache`.
     const [movieDetails, tvDetails] = await Promise.all([
-        resolveGenres(movieSeeds, movieDocGenres, 'movie'),
-        resolveGenres(tvSeeds, tvDocGenres, 'tv'),
+        resolveGenres(movieSeeds, 'movie'),
+        resolveGenres(tvSeeds, 'tv'),
     ]);
 
     const movieGenresById: Record<string, number[]> = {};

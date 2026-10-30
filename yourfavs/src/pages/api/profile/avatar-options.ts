@@ -12,6 +12,10 @@ import { getActorsFav } from '../../../services/BD/actors/yourfavsActor';
 import { getMovieFav } from '../../../services/BD/movies/yourfavsMovie';
 import { getSerieFav } from '../../../services/BD/series/yourfavsSerie';
 import { processBatch } from '../../../utils/processBatch';
+import { getTitleDetails } from '../../../services/API/shared/tmdbTitleCache';
+
+/** Cuántos favoritos de cada tipo se miran para sacar pósters (luego se recorta a 24). */
+const POSTER_SOURCE = 18;
 
 export const prerender = false;
 
@@ -40,9 +44,15 @@ export const GET: APIRoute = async ({ locals }) => {
         );
         const actors = Array.from(new Set(perActor.flat().filter(Boolean))).slice(0, 24);
 
-        // Pósters de tus listas (poster_path ya viene en las colecciones).
-        const posterPaths = [...movies, ...series]
-            .map((m) => (m as { poster_path?: string }).poster_path)
+        // Pósters de tus favoritos: tus listas no guardan el póster, así que salen de TMDB por
+        // `tmdb_cache` (la copia con la caducidad de TMDB, como las listas). Los más recientes primero.
+        const ids = (list: { id: string }[]) => list.slice(0, POSTER_SOURCE).map((m) => m.id);
+        const [movieDetails, serieDetails] = await Promise.all([
+            getTitleDetails('movie', ids(movies)),
+            getTitleDetails('tv', ids(series)),
+        ]);
+        const posterPaths = [...movieDetails, ...serieDetails]
+            .map((d) => d?.poster_path as string | undefined)
             .filter((p): p is string => Boolean(p));
         const posters = Array.from(new Set(posterPaths.map((p) => posterUrl(p, 'w342')).filter(Boolean))).slice(0, 24);
 

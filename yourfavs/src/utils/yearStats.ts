@@ -1,9 +1,10 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
+import { getTitleDetails } from '../services/API/shared/tmdbTitleCache';
 import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
 import { appDateParts } from './appTime';
 import { getCurrentUid } from '../services/BD/shared/userScope';
-import { getLibrarySnapshot, type LibrarySnapshot } from '../services/BD/shared/librarySnapshot';
+import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import {
     unionEpisodeWatches, watchLogInstant,
     type EpisodeWatch, type WatchLogRow,
@@ -191,39 +192,6 @@ function buildRawMap(groups: { items: any[]; key: string }[]): Map<string, RawIt
 }
 
 /**
- * Título + póster de todo lo que hay en tus listas, sin pedirle nada a TMDB: los
- * documentos de lista ya los guardan. Es lo que permite que el mes a mes pinte pelis y
- * series a coste cero (antes hacía un `fetchSerieDetails` por serie del año).
- */
-type TitleMeta = { title: string; poster_path: string };
-function buildTitleIndex(s: LibrarySnapshot): Map<string, TitleMeta> {
-    const idx = new Map<string, TitleMeta>();
-    const add = (kind: 'movie' | 'tv', items: any[]) => {
-        for (const it of items || []) {
-            if (!it?.id) continue;
-            const k = `${kind}:${it.id}`;
-            const title = (kind === 'tv' ? it.name : it.title) || '';
-            const poster = it.poster_path || '';
-            const cur = idx.get(k);
-            if (cur) {
-                // Un título puede estar en varias listas y no todas las copias están igual
-                // de completas (las viejas pueden no tener póster): se rellenan huecos.
-                if (!cur.title && title) cur.title = title;
-                if (!cur.poster_path && poster) cur.poster_path = poster;
-                continue;
-            }
-            if (!title && !poster) continue;
-            idx.set(k, { title, poster_path: poster });
-        }
-    };
-    add('movie', s.movFavs); add('movie', s.movLike); add('movie', s.movVistos);
-    add('movie', s.movPend); add('movie', s.movVerPronto);
-    add('tv', s.tvFavs); add('tv', s.tvSig); add('tv', s.tvLike); add('tv', s.tvVistos);
-    add('tv', s.tvPend); add('tv', s.tvVerPronto); add('tv', s.tvAbandonadas);
-    return idx;
-}
-
-/**
  * Mes a mes de lo que viste de verdad.
  *
  * Una tarjeta es un VISIONADO, no un título: una serie sale en CADA mes en que viste algún
@@ -238,7 +206,6 @@ function buildTimeline(
     logRows: WatchLogRow[],
     /** `MoviesVistas`, para las pelis anteriores al diario (su única fecha es `added_at`). */
     moviesSeen: any[],
-    titles: Map<string, TitleMeta>,
     /** Series que constan como vistas en tus listas (Vistas ∪ Me gusta ∪ Favs). Ver `wholeSeries`. */
     seenSeries: Set<string>,
 ): MonthTimeline[] {
@@ -284,10 +251,10 @@ function buildTimeline(
             trackEpisode(cur, w.season, w.episode);
             continue;
         }
-        const meta = titles.get(`tv:${w.serieId}`);
+        // Título y póster se rellenan después (tus listas no los guardan; ver el final de `computeYearStats`).
         const entry: TimelineEntry = {
             id: w.serieId, kind: 'tv',
-            title: meta?.title || '', poster_path: meta?.poster_path || '',
+            title: '', poster_path: '',
             startTs: w.ts, endTs: w.ts, episodes: 1,
         };
         trackEpisode(entry, w.season, w.episode);
@@ -352,13 +319,12 @@ function buildTimeline(
         if (prev == null || ts < prev) days.set(day, ts);
     }
     for (const [id, days] of movieDays) {
-        const meta = titles.get(`movie:${id}`);
         const passes = Array.from(days.values()).sort((a, b) => a - b);
         passes.forEach((ts, i) => {
             if (appDateParts(ts).year !== year) return;
             entries.push({
                 id, kind: 'movie',
-                title: meta?.title || '', poster_path: meta?.poster_path || '',
+                title: '', poster_path: '',
                 startTs: ts, endTs: ts, episodes: 0,
                 ...(i > 0 ? { pass: i + 1 } : {}),
             });
@@ -372,10 +338,9 @@ function buildTimeline(
         if (!id || movieDays.has(id)) continue;
         const ts = getFirebaseTimestamp(m.added_at);
         if (!ts || appDateParts(ts).year !== year) continue;
-        const meta = titles.get(`movie:${id}`);
         entries.push({
             id, kind: 'movie',
-            title: m.title || meta?.title || '', poster_path: m.poster_path || meta?.poster_path || '',
+            title: '', poster_path: '',
             startTs: ts, endTs: ts, episodes: 0,
         });
     }
@@ -589,7 +554,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     // Mes a mes. Solo para un año concreto: de por vida no significa nada (¿el marzo de qué?).
     const timeline = year === 'all'
         ? []
-        : buildTimeline(year, watches, logRows, movVistos, buildTitleIndex(snapshot), seenSerieIds);
+        : buildTimeline(year, watches, logRows, movVistos, seenSerieIds);
 
     /**
      * «Tu mes más activo» y «tu día de la semana» salen del VISIONADO REAL, no de las altas en listas.
@@ -661,19 +626,19 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
             if (arr) arr.push(e); else movieMissing.set(k, [e]);
         }
     }
-    // Residuo de películas: lo que viste y ya no está en ninguna lista no tiene título ni póster, y lo
-    // que guardaste otro año no tiene duración. Una petición por película, solo de lo que falte.
+    // Residuo de películas: título, póster y duración de lo que falte, en bloque y por `tmdb_cache`
+    // (la misma copia, con la caducidad de TMDB, que usan las listas). Tus listas no guardan título.
     if (movieMissing.size > 0) {
-        await processBatch(Array.from(movieMissing.keys()), async (k: string) => {
-            try {
-                const d: any = await tmdbFetch<any>(`/movie/${k.slice(6)}`);
-                runtimeOf.set(k, d?.runtime || 0);
-                for (const e of movieMissing.get(k) || []) {
-                    if (!e.title) { e.title = d?.title || ''; e.poster_path = d?.poster_path || ''; }
-                }
-            } catch { /* sin título: la tarjeta sigue enlazando a su ficha */ }
-            return null;
-        }, 10);
+        const keys = Array.from(movieMissing.keys());
+        const details = await getTitleDetails('movie', keys.map((k) => k.slice(6)));
+        keys.forEach((k, i) => {
+            const d = details[i];
+            if (!d) return; // sin título: la tarjeta sigue enlazando a su ficha
+            runtimeOf.set(k, d.runtime || 0);
+            for (const e of movieMissing.get(k) || []) {
+                if (!e.title) { e.title = d.title || ''; e.poster_path = d.poster_path || ''; }
+            }
+        });
     }
     /** `serieId` → minutos de cada episodio (`T-E`) y la media de la serie para los que no lo digan. */
     const episodeMinutes = new Map<string, { eps: Map<string, number>; avg: number }>();
