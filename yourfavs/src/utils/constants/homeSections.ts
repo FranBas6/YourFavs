@@ -31,6 +31,7 @@ export const HOME_SECTIONS: HomeSectionDef[] = [
     { key: 'engancha', label: 'Enganchan desde el primer episodio', desc: 'Series cuyo piloto está mejor valorado que la propia serie.' },
     { key: 'tendencias', label: 'Tendencias de la semana', desc: 'Lo que está viendo todo el mundo ahora.' },
     { key: 'lanzamientos', label: 'Últimos lanzamientos', desc: 'Estrenos recientes en cine y plataformas.' },
+    { key: 'nuevo-streaming', label: 'Nuevo en streaming', desc: 'Películas recién llegadas a digital en tu país y series nuevas con episodio esta semana.' },
     { key: 'populares', label: 'Más populares', desc: 'Los títulos con más tirón de forma sostenida.' },
     { key: 'top-pelis', label: 'Top películas', desc: 'Las mejor valoradas de la historia.' },
     { key: 'top-series', label: 'Top series', desc: 'Las series mejor valoradas de la historia.' },

@@ -35,6 +35,8 @@ import {getGenreName} from "../utils/constants/genres";
 import {allCategories} from "../utils/constants/categories";
 import {posterUrl, backdropUrl} from "../services/API/shared/tmdbClient";
 import {safeFetch} from "../utils/safeFetch";
+import { fetchCatalogRow } from "../services/API/shared/catalogRows";
+import { streamingRowDef } from "../utils/constants/catalogRows";
 import '../styles/components/catalog-row.css';
 import '../styles/pages/index.css';
 
@@ -64,6 +66,7 @@ const [
     forYou,
     stalledSeries,
     hooksDoc,
+    streamingRow,
 ] = await Promise.all([
     safeFetch(getTrending<Movie>('movie', 'week'), 'home/trendingMovies', [] as Movie[]),
     safeFetch(getTrending<Serie>('tv', 'week'), 'home/trendingSeries', [] as Serie[]),
@@ -92,6 +95,11 @@ const [
     // "Enganchan desde el primer episodio": UNA lectura del documento global precalculado. También
     // para invitados (son datos públicos de TMDB). El filtrado personal se hace en memoria abajo.
     safeFetch(readHooksDoc(), 'home/hooks', null),
+    // «Nuevo en streaming» (D1): la misma fila que en /catalogo, con su caché diaria por región.
+    safeFetch(
+        fetchCatalogRow({ ...streamingRowDef(Astro.locals.user?.region || 'ES'), media: 'both' }, { filters: {}, providers: '', region: Astro.locals.user?.region || 'ES', cacheable: true }),
+        'home/streaming', null,
+    ),
 ]);
 
 // Si TMDB falla la fila sale vacía (y no se pinta) en vez de romper la portada.
@@ -165,6 +173,18 @@ const sections = [
         priority: 'high',
         color: 'green',
         lucide: 'sparkles'
+    },
+    {
+        key: 'nuevo-streaming',
+        title: "NUEVO EN STREAMING",
+        subtitle: streamingRow?.def.subtitle,
+        why: streamingRow?.def.why,
+        movies: streamingRow?.movies ?? [],
+        series: streamingRow?.series ?? [],
+        link: "/catalogo/fila/nuevo-streaming?type=all",
+        priority: 'high',
+        color: 'blue',
+        lucide: 'tv'
     },
     {
         key: 'populares',

@@ -62,7 +62,7 @@ const genreDefs = genreSlugsForDay(dayNum)
     })
     .filter((d): d is NonNullable<typeof d> => d !== null);
 
-const rowDefs = [...curatedRowsFor(type, dayNum, freshSinceISO()), ...genreDefs];
+const rowDefs = [...curatedRowsFor(type, dayNum, freshSinceISO(), myRegion), ...genreDefs];
 const rows = await fetchCatalogRows(rowDefs, {
     filters,
     providers: myProviders,
