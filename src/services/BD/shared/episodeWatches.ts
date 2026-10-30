@@ -16,7 +16,7 @@
  * falta — un revisionado completo re-marca las mismas claves y se comería el pase
  * original entero, que es justo el historial que queremos pintar.
  */
-import { getFirebaseTimestamp } from '../../../utils/constants/helpers/media-helpers';
+import { toTimestamp } from '../../../utils/constants/helpers/media-helpers';
 import { appDateParts } from '../../../utils/appTime';
 
 export interface EpisodeWatch {
@@ -47,7 +47,7 @@ export interface WatchLogRow {
  * ninguna zona horaria puede moverle el día. Misma regla que usa el feed de Actividad.
  */
 export function watchLogInstant(x: WatchLogRow): { ts: number; synthetic: boolean } {
-    const loggedMs = getFirebaseTimestamp(x.logged_at);
+    const loggedMs = toTimestamp(x.logged_at);
     const realHour = Boolean(loggedMs) && x.source !== 'backfill' && x.source !== 'import';
     if (realHour) return { ts: loggedMs, synthetic: false };
     const ts = x.watched_on ? new Date(x.watched_on + 'T12:00:00Z').getTime() : loggedMs;

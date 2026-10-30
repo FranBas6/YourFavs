@@ -1,7 +1,7 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/API/shared/tmdbClient';
 import { getTitleDetails } from '../services/API/shared/tmdbTitleCache';
-import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
+import { toTimestamp } from './constants/helpers/media-helpers';
 import { appDateParts } from './appTime';
 import { getCurrentUid } from '../services/BD/shared/userScope';
 import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
@@ -168,7 +168,7 @@ function buildRawMap(groups: { items: any[]; key: string }[]): Map<string, RawIt
     const map = new Map<string, RawItem>();
     for (const { items, key } of groups) {
         for (const item of items) {
-            const t = getFirebaseTimestamp(item.added_at);
+            const t = toTimestamp(item.added_at);
             if (!t) continue;
             const cur = map.get(item.id);
             if (cur) {
@@ -336,7 +336,7 @@ function buildTimeline(
     for (const m of moviesSeen || []) {
         const id = String(m?.id ?? '');
         if (!id || movieDays.has(id)) continue;
-        const ts = getFirebaseTimestamp(m.added_at);
+        const ts = toTimestamp(m.added_at);
         if (!ts || appDateParts(ts).year !== year) continue;
         entries.push({
             id, kind: 'movie',

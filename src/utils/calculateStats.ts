@@ -1,5 +1,5 @@
 import {getGenreName} from "./constants/genres";
-import {getFirebaseTimestamp} from "./constants/helpers/media-helpers";
+import {toTimestamp} from "./constants/helpers/media-helpers";
 
 interface StatsInput {
     seriesData: any[];
@@ -12,7 +12,7 @@ export function calculateStats({seriesData, moviesData, seriesDetails, moviesDet
     const currentYear = new Date().getFullYear();
 
     // Últimas series añadidas
-    const sortedSeries = [...seriesData].sort((a, b) => getFirebaseTimestamp(b.added_at) - getFirebaseTimestamp(a.added_at));
+    const sortedSeries = [...seriesData].sort((a, b) => toTimestamp(b.added_at) - toTimestamp(a.added_at));
     const latestSeries = sortedSeries.slice(0, 5).map(s => {
         const details = seriesDetails.find(sf => sf.id.toString() === s.id);
         return {
@@ -24,7 +24,7 @@ export function calculateStats({seriesData, moviesData, seriesDetails, moviesDet
     });
 
     // Últimas películas añadidas
-    const sortedMovies = [...moviesData].sort((a, b) => getFirebaseTimestamp(b.added_at) - getFirebaseTimestamp(a.added_at));
+    const sortedMovies = [...moviesData].sort((a, b) => toTimestamp(b.added_at) - toTimestamp(a.added_at));
     const latestMovies = sortedMovies.slice(0, 5).map(m => {
         const details = moviesDetails.find(mf => mf.id.toString() === m.id);
         return {

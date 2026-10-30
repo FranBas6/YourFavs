@@ -1,7 +1,7 @@
 import { getCurrentUid } from "./userScope";
 import type { LiveProgress, WatchLogRow } from "./episodeWatches";
 import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
-import { getFirebaseTimestamp, formatScore } from "../../../utils/constants/helpers/media-helpers";
+import { toTimestamp, formatScore } from "../../../utils/constants/helpers/media-helpers";
 
 export interface ActivityEvent {
     type: 'movie' | 'serie' | 'person';
@@ -107,7 +107,7 @@ async function fetchWatchedEpisodeEvents(
             if (x.media_type !== 'tv' || x.season == null || x.episode == null) continue;
             const serie = bucketFor(String(x.tmdb_id));
             if (serie.covered.has(`${x.season}:${x.episode}`)) continue; // ya cubierto por watched_at
-            const loggedMs = getFirebaseTimestamp(x.logged_at);
+            const loggedMs = toTimestamp(x.logged_at);
             const realHour = Boolean(loggedMs) && x.source !== 'backfill' && x.source !== 'import';
             const ts = realHour
                 ? loggedMs
@@ -201,7 +201,7 @@ async function fetchRewatchEvents(
             const isMovieRewatch = x.media_type === 'movie' && x.rewatch === true;
             const isSeriesPass = x.media_type === 'tv' && x.season == null;
             if (!isMovieRewatch && !isSeriesPass) continue;
-            let ts = getFirebaseTimestamp(x.logged_at);
+            let ts = toTimestamp(x.logged_at);
             if (!ts && x.watched_on) ts = new Date(x.watched_on + 'T12:00:00').getTime();
             if (!ts) continue;
             events.push({
@@ -228,8 +228,8 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
         const events: ActivityEvent[] = [];
         for (const x of await listRatings()) {
             if (!x.score) continue;
-            const updated = getFirebaseTimestamp(x.updated_at);
-            const created = getFirebaseTimestamp(x.created_at);
+            const updated = toTimestamp(x.updated_at);
+            const created = toTimestamp(x.created_at);
             const ts = updated || created;
             if (!ts) continue;
             const edited = created > 0 && updated > 0 && updated - created > 60_000; // >1min = edición real
@@ -261,7 +261,7 @@ async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
                 id: String(p.id),
                 collection: 'FollowPerson',
                 action: 'Avisos activados',
-                timestamp: getFirebaseTimestamp(p.added_at),
+                timestamp: toTimestamp(p.added_at),
                 name: p.name,
                 profile_path: p.profile_path ?? null,
             }))
@@ -284,7 +284,7 @@ async function fetchActorFavEvents(): Promise<ActivityEvent[]> {
         const events = await processBatch(
             favs,
             async (f: any): Promise<ActivityEvent | null> => {
-                const timestamp = getFirebaseTimestamp(f.added_at);
+                const timestamp = toTimestamp(f.added_at);
                 if (!timestamp) return null;
                 let name = 'Actor';
                 let profile_path: string | null = null;
@@ -324,7 +324,7 @@ async function fetchMutationEvents(): Promise<ActivityEvent[]> {
         const records = await listActivity();
         const out: ActivityEvent[] = [];
         for (const r of records) {
-            const timestamp = getFirebaseTimestamp(r.logged_at);
+            const timestamp = toTimestamp(r.logged_at);
             if (!timestamp) continue;
             const type: ActivityEvent['type'] = r.media_type === 'person' ? 'person' : r.media_type === 'movie' ? 'movie' : 'serie';
             const id = String(r.tmdb_id);
@@ -402,7 +402,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
                 id: String(d.id),
                 collection: c.name,
                 action: c.action,
-                timestamp: getFirebaseTimestamp(d.added_at),
+                timestamp: toTimestamp(d.added_at),
             }))
             .filter(e => e.timestamp > 0)
             .filter(e => !(e.collection === 'SeriesSiguiendo' && resumedSerieIds.has(e.id)))

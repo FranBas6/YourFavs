@@ -9,7 +9,7 @@
 import { getMoviesViendo } from '../../BD/movies/yourfavsMovie';
 import { tmdbFetch } from '../shared/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
-import { getFirebaseTimestamp } from '../../../utils/constants/helpers/media-helpers';
+import { toTimestamp } from '../../../utils/constants/helpers/media-helpers';
 
 export interface ViendoMovie {
     id: string;
@@ -39,7 +39,7 @@ export async function getMoviesViendoDetailed(): Promise<ViendoMovie[]> {
                     year: d?.release_date ? String(d.release_date).slice(0, 4) : '',
                     overview: d?.overview || '',
                     runtime: typeof d?.runtime === 'number' && d.runtime > 0 ? d.runtime : null,
-                    started_at: getFirebaseTimestamp(m.added_at) || 0,
+                    started_at: toTimestamp(m.added_at) || 0,
                 };
             } catch {
                 return null;
