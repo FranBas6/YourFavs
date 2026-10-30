@@ -36,7 +36,8 @@ const dayNum = appDateParts(Date.now()).dayNum;
 // El modo desde el que se pulsó «Ver más» decide el MEDIO de la fila: `joyas` es cine en Películas, TV
 // en Series y las dos en Todo. Sin esto salía siempre cine.
 const requestedMode = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
-const found = findCuratedRow(key, dayNum, freshSinceISO(), requestedMode);
+// La región del perfil entra en el criterio de «Nuevo en streaming» (fechas y plataformas del país).
+const found = findCuratedRow(key, dayNum, freshSinceISO(), requestedMode, Astro.locals.user?.region || 'ES');
 // Clave inventada → al catálogo, que es de donde se llega aquí.
 if (!found) return Astro.redirect('/catalogo');
 const { def, mode } = found;

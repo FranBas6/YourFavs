@@ -209,6 +209,46 @@ export function freshRowDef(sinceISO: string): CatalogRowDef {
     };
 }
 
+/**
+ * «Nuevo en streaming» (D1, 2026-10-30): lo que ACABA de llegar a las plataformas en el país del perfil.
+ *
+ *   · Películas: estreno DIGITAL (tipo 4 de `release_dates`) en ese país en los últimos 30 días. Con
+ *     `region`, TMDB usa las fechas del país. Con 14 días salían 3-4 títulos: poca fila.
+ *   · Series: estrenadas hace menos de dos meses que tienen episodio esta semana en alguna suscripción
+ *     del país. Sin el «estrenadas hace poco» la fila se llenaba de Anatomía de Grey y Los Simpson, que
+ *     emiten siempre. Fuera noticias, realities, culebrones y tertulias (emiten a diario).
+ *
+ * Las fechas van en los params, así que la caché (que ya lleva día y región en la clave) caduca sola.
+ */
+export function streamingRowDef(region: string, now: number = Date.now()): CatalogRowDef {
+    const daysAgo = (n: number) => new Date(now - n * 86_400_000).toISOString().slice(0, 10);
+    const today = daysAgo(0);
+    return {
+        key: 'nuevo-streaming',
+        title: 'Nuevo en streaming',
+        subtitle: 'Películas que acaban de llegar a digital en tu país y series nuevas con episodio esta semana.',
+        why: 'digital en tu país · últimos 30 días',
+        media: 'movie',
+        params: {},
+        movieParams: {
+            region, with_release_type: '4',
+            'release_date.gte': daysAgo(30), 'release_date.lte': today,
+            'vote_count.gte': '10',
+        },
+        tvParams: {
+            watch_region: region, with_watch_monetization_types: 'flatrate',
+            'air_date.gte': daysAgo(7), 'air_date.lte': today,
+            'first_air_date.gte': daysAgo(60),
+            without_genres: '10763,10764,10766,10767',
+            'vote_count.gte': '5',
+        },
+        sortBy: 'popularity.desc',
+        color: 'blue',
+        icon: 'tv',
+        link: '/catalogo/fila/nuevo-streaming',
+    };
+}
+
 /** Décadas que rotan. La actual queda fuera: aún no ha dado su mejor cine. */
 const ROTATING_DECADES = [2010, 2000, 1990, 1980, 1970];
 
@@ -226,13 +266,15 @@ export function freshSinceISO(now: number = Date.now()): string {
  * Filas curadas del modo, en orden. Recibe el día para las que rotan, y así el resultado es estable
  * durante toda la jornada (la caché sirve y recargar no baila).
  */
-export function curatedRowsFor(mode: CatalogMode, dayNum: number, freshSinceISO: string): CatalogRowDef[] {
+export function curatedRowsFor(mode: CatalogMode, dayNum: number, freshSinceISO: string, region: string = 'ES'): CatalogRowDef[] {
     const decade = decadeRowDef(ROTATING_DECADES[dayNum % ROTATING_DECADES.length]);
     const fresh = freshRowDef(freshSinceISO);
+    const streaming = streamingRowDef(region);
     const forMedia = (d: CatalogRowDef, media: CatalogRowDef['media']): CatalogRowDef => ({ ...d, media });
 
     if (mode === 'series') {
         return [
+            forMedia(streaming, 'tv'),
             MINISERIES,
             TERMINADAS,
             forMedia(JOYAS, 'tv'),
@@ -242,12 +284,13 @@ export function curatedRowsFor(mode: CatalogMode, dayNum: number, freshSinceISO:
         ];
     }
     if (mode === 'movies') {
-        return [CORTAS, PALOMITAS, JOYAS, decade, ESPANOL, fresh];
+        return [streaming, CORTAS, PALOMITAS, JOYAS, decade, ESPANOL, fresh];
     }
     if (mode === 'all') {
         // En «Todo» solo caben las que valen para los dos tipos: una duración o un `with_type` no
         // significan nada mezclando cine y televisión.
         return [
+            forMedia(streaming, 'both'),
             forMedia(JOYAS, 'both'),
             forMedia(decade, 'both'),
             forMedia(ESPANOL, 'both'),
@@ -273,12 +316,13 @@ export function findCuratedRow(
     dayNum: number,
     freshSinceISO: string,
     preferred?: CatalogMode,
+    region: string = 'ES',
 ): { def: CatalogRowDef; mode: CatalogMode } | null {
     const order: CatalogMode[] = preferred
         ? [preferred, ...(['movies', 'series', 'all'] as CatalogMode[]).filter((m) => m !== preferred)]
         : (['movies', 'series', 'all'] as CatalogMode[]);
     for (const mode of order) {
-        const found = curatedRowsFor(mode, dayNum, freshSinceISO).find((d) => d.key === key);
+        const found = curatedRowsFor(mode, dayNum, freshSinceISO, region).find((d) => d.key === key);
         if (found) return { def: found, mode };
     }
     return null;
