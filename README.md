@@ -15,6 +15,7 @@
 </p>
 
 <p align="center">
+  <a href="https://yourfavs.netlify.app/"><img alt="Netlify Status" src="https://api.netlify.com/api/v1/badges/e187c888-8d02-4d6f-8adc-69cc21cb79e8/deploy-status" /></a>
   <img alt="Astro 5" src="https://img.shields.io/badge/Astro-5%20SSR-3B82F6?style=flat-square&logo=astro&logoColor=white" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3B82F6?style=flat-square&logo=typescript&logoColor=white" />
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3B82F6?style=flat-square&logo=supabase&logoColor=white" />
@@ -155,7 +156,7 @@ Spanish; it is the one I use every day.
   social layer, messages…) with steps, decisions and what to check in each. The plan stays alive:
   each step records its commit and any deviation.
 - **Design before code.** New screens are designed first with Claude Design, using only the
-  existing tokens (11 design handoffs so far). Whatever the design does not cover is decided and
+  existing tokens. Whatever the design does not cover is decided and
   written down, not improvised.
 - **Small, verified steps.** One branch per batch, one commit per step, and nothing is committed
   without a visual check: type check, then the change running in a real browser, light and dark,
@@ -166,9 +167,9 @@ Spanish; it is the one I use every day.
 
 ### By the numbers
 
-| Commits | Pages | API routes | Migrations | Design handoffs | Database tests |
-| :-----: | :---: | :--------: | :--------: | :-------------: | :------------: |
-|   327   |  48   |    113     |     23     |       11        |      344       |
+| Commits | Pages | API routes | Migrations | Database tests |
+| :-----: | :---: | :--------: | :--------: | :------------: |
+|   327   |  48   |    113     |     23     |      344       |
 
 ## Tech stack
 
@@ -180,19 +181,6 @@ Spanish; it is the one I use every day.
 | Content   | TMDB API (films, series, people, availability by JustWatch)                          |
 | App       | PWA with its own service worker, web manifest and private `.ics` calendar feed      |
 | Quality   | pgTAP, TypeScript type checking, browser checks with headless Chrome (Puppeteer)    |
-
-## Running it locally
-
-You need Node 22 (see `.nvmrc`), Docker and the Supabase CLI.
-
-```sh
-npm install
-cp .env.example .env      # fill in the TMDB token and the keys printed by the next command
-npm run db:start          # local Supabase: applies the migrations
-npm run dev               # http://localhost:4321
-```
-
-The database tests run with `npx supabase test db`.
 
 ---
 

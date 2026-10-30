@@ -15,6 +15,7 @@
 </p>
 
 <p align="center">
+  <a href="https://yourfavs.netlify.app/"><img alt="Netlify Status" src="https://api.netlify.com/api/v1/badges/e187c888-8d02-4d6f-8adc-69cc21cb79e8/deploy-status" /></a>
   <img alt="Astro 5" src="https://img.shields.io/badge/Astro-5%20SSR-3B82F6?style=flat-square&logo=astro&logoColor=white" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-3B82F6?style=flat-square&logo=typescript&logoColor=white" />
   <img alt="Supabase" src="https://img.shields.io/badge/Supabase-Postgres%20%2B%20RLS-3B82F6?style=flat-square&logo=supabase&logoColor=white" />
@@ -156,7 +157,7 @@ renderizada en el servidor que se instala como una app. Está en español; es la
   TMDB, la capa social, los mensajes…) con sus pasos, sus decisiones y qué comprobar en cada uno.
   El plan sigue vivo: cada paso apunta su commit y cualquier desviación.
 - **Diseño antes que código.** Las pantallas nuevas se diseñan primero con Claude Design, solo con
-  los tokens que ya existen (11 entregas de diseño hasta ahora). Lo que el diseño no cubre se
+  los tokens que ya existen. Lo que el diseño no cubre se
   decide y se apunta, no se improvisa.
 - **Pasos pequeños y comprobados.** Una rama por lote, un commit por paso, y nada se sube sin
   comprobarlo a la vista: chequeo de tipos y el cambio funcionando en un navegador de verdad, en
@@ -168,9 +169,9 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 
 ### En números
 
-| Commits | Páginas | Rutas de API | Migraciones | Entregas de diseño | Tests de base de datos |
-| :-----: | :-----: | :----------: | :---------: | :----------------: | :--------------------: |
-|   327   |   48    |     113      |     23      |         11         |          344           |
+| Commits | Páginas | Rutas de API | Migraciones | Tests de base de datos |
+| :-----: | :-----: | :----------: | :---------: | :--------------------: |
+|   327   |   48    |     113      |     23      |          344           |
 
 ## Stack
 
@@ -182,19 +183,6 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 | Contenido | API de TMDB (películas, series, personas; disponibilidad de JustWatch)                |
 | App       | PWA con service worker propio, manifest y feed de calendario `.ics` privado          |
 | Calidad   | pgTAP, chequeo de tipos de TypeScript, comprobaciones en Chrome sin interfaz (Puppeteer) |
-
-## Arrancarlo en local
-
-Hace falta Node 22 (ver `.nvmrc`), Docker y el CLI de Supabase.
-
-```sh
-npm install
-cp .env.example .env      # rellena el token de TMDB y las claves que imprime el siguiente comando
-npm run db:start          # Supabase local: aplica las migraciones
-npm run dev               # http://localhost:4321
-```
-
-Los tests de base de datos se lanzan con `npx supabase test db`.
 
 ---
 
