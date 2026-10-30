@@ -6,7 +6,7 @@
  * duplicar lógica. Espejo de `/api/movie/[id]` y `/api/serie/[id]`.
  *
  * NO incluye estado personal (favoritos, seguir persona, avisos): la app lo lee
- * directo de Firestore. Público.
+ * por las rutas con sesión. Público.
  *
  * Las producciones (cast: `movies`/`series`) van normalizadas con `toItem`
  * (mismo shape de card que summary/catalog) + `character` y `popularity`.

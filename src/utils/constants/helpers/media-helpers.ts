@@ -186,35 +186,6 @@ export const providerLinks: Record<string, string> = {
     'Cinepolis Klic': 'https://www.cinepolisklic.com/'
 };
 
-export function formatFirebaseDate(dateValue: any): string {
-    if (!dateValue) return 'Fecha desconocida';
-
-    // Timestamp de Firebase (objeto con seconds y nanoseconds)
-    if (dateValue && typeof dateValue === 'object' && 'seconds' in dateValue) {
-        try {
-            const date = new Date(dateValue.seconds * 1000);
-            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-        } catch { /* ignore */ }
-    }
-
-    // String con formato Firebase ("6 de octubre de 2025 a las...")
-    if (typeof dateValue === 'string') {
-        const match = dateValue.match(/^(.+?)\s+a las/);
-        if (match) return match[1];
-        return dateValue;
-    }
-
-    // Date o número
-    try {
-        const date = new Date(dateValue);
-        if (!isNaN(date.getTime())) {
-            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
-        }
-    } catch { /* ignore */ }
-
-    return 'Fecha desconocida';
-}
-
 /** Escala de notas del usuario: 0,5-10 en pasos de medio punto (20 valores posibles). */
 export const RATING_STEP = 0.5;
 export const RATING_MIN = 0.5;
@@ -225,7 +196,7 @@ export const RATING_MAX = 10;
  * La escala pasó de enteros a medios puntos (poder poner un 7,5); cuantizar impide que
  * entren decimales arbitrarios (7,37) por un input manipulado o un redondeo del navegador.
  * Devuelve `null` si no hay número válido → el handler entonces no escribe nada.
- * Vive aquí (y no en `BD/lists/ratings.ts`) por ser pura: así no arrastra firebase-admin.
+ * Vive aquí (y no en `BD/lists/ratings.ts`) por ser pura: así no arrastra el cliente de la base de datos.
  */
 export function normalizeScore(raw: unknown): number | null {
     const n = Number(raw);
@@ -249,14 +220,9 @@ export function formatScore(score: number | string | null | undefined): string {
     return n.toLocaleString('es-ES', { maximumFractionDigits: 1 });
 }
 
-export function getFirebaseTimestamp(dateValue: any): number {
+/** Fecha de la base de datos (ISO, Date o milisegundos) → milisegundos; 0 si falta o no es válida. */
+export function toTimestamp(dateValue: any): number {
     if (!dateValue) return 0;
-    if (dateValue && typeof dateValue === 'object' && 'seconds' in dateValue) {
-        return dateValue.seconds * 1000;
-    }
-    try {
-        return new Date(dateValue).getTime();
-    } catch {
-        return 0;
-    }
+    const ms = new Date(dateValue).getTime();
+    return Number.isNaN(ms) ? 0 : ms;
 }

@@ -4,7 +4,7 @@
  * GET → { ok, counts: { favoritos, megusta, vistos, pendientes, verpronto, siguiendo, colecciones } }
  *
  * Lo consume la hoja "Mis listas" del tab bar móvil, en LAZY (fetch al abrir),
- * para no añadir lecturas Firestore en el SSR de cada página. Reutiliza
+ * para no añadir consultas en el SSR de cada página. Reutiliza
  * `getLibrarySnapshot()` (cacheado por uid) → coste casi nulo en caliente.
  * Invitado → 401. El uid sale SIEMPRE de la sesión (locals.user).
  */

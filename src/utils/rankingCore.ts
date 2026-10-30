@@ -1,9 +1,9 @@
 /**
  * La lógica PURA del ranking semanal: la clave del documento y el cálculo del movimiento.
  *
- * Vive aparte de `services/API/shared/weeklyRanking.ts` a propósito: ese módulo importa el Admin SDK, y
- * arrastrarlo solo para calcular un delta hace que nada de esto se pueda probar sin credenciales ni
- * Firestore. Aquí no hay más dependencias que los tipos.
+ * Vive aparte de `services/API/shared/weeklyRanking.ts` a propósito: ese módulo habla con la base de
+ * datos (`app_state`) y con TMDB, y arrastrarlo solo para calcular un delta haría que nada de esto se
+ * pudiera probar sin credenciales. Aquí no hay más dependencias que los tipos.
  */
 
 export interface RankingItem {

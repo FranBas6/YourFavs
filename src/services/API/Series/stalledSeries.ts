@@ -2,7 +2,7 @@
  * "Rescatar series a medias" (§1) — series EN SEGUIMIENTO con progreso pero inactivas
  * (>4 semanas sin marcar un episodio). Alimenta el bloque "¿Retomamos alguna?" de la Home.
  *
- * Coste: Firestore (Siguiendo + progreso por serie) + 1 fetch TMDB SOLO por candidato
+ * Coste: base de datos (Siguiendo + progreso de esas series, en lote) + 1 fetch TMDB SOLO por candidato
  * inactivo (que son pocos), para nombre/póster y descartar las "a un paso de terminar".
  * Al abandonar (§1.1) la serie sale de Siguiendo → deja de aparecer aquí automáticamente.
  */

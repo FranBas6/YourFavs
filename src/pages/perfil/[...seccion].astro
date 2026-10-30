@@ -91,8 +91,8 @@ if (Astro.request.method === 'POST') {
         switch (target) {
             case 'perfil':
                 // Vacío = volver al nombre de Google (el middleware solo lo usa si hay valor).
-                // Ojo: NO puede ser `undefined` — Firestore rechaza undefined sin
-                // `ignoreUndefinedProperties`, y así vaciar el campo devolvía un 500.
+                // Ojo: cadena vacía, NO `undefined`: un campo `undefined` no viaja en el UPDATE
+                // y el nombre no se podría vaciar (con Firestore, además, daba un 500).
                 patch.display_name = String(fd.get('display_name') || '').trim().slice(0, 60);
                 break;
 

@@ -1,4 +1,4 @@
-// Tipos de documentos Firebase para series.
+// Tipos de las filas de series de la biblioteca (antes, documentos de Firestore).
 // Antes vivían dentro de src/services/BD/series/yourfavsSerie.ts (R12).
 
 interface TmdbSeasonRef {

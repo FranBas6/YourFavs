@@ -3,7 +3,7 @@ import { processBatch } from "../../../utils/processBatch";
 import { getMovieCollectionInfo, type MovieCollectionInfo } from "../Movies/InfoMovies";
 import { getLibrarySnapshot } from "../../BD/shared/librarySnapshot";
 import { getCurrentUid } from "../../BD/shared/userScope";
-import { getFirebaseTimestamp } from "../../../utils/constants/helpers/media-helpers";
+import { toTimestamp } from "../../../utils/constants/helpers/media-helpers";
 import { SEED_COLLECTION_IDS } from "../../../utils/constants/featuredCollections";
 
 interface CacheEntry<T> { data: T; expires: number }
@@ -105,7 +105,7 @@ export async function getUserCollections(): Promise<MovieCollectionInfo[]> {
         // Dedup por id y quedarnos con el added_at más reciente de cada peli
         const byId = new Map<string, { id: string; ts: number }>();
         for (const m of [...favs, ...vistas, ...liked, ...pendientes, ...verPronto]) {
-            const ts = getFirebaseTimestamp((m as any).added_at);
+            const ts = toTimestamp((m as any).added_at);
             const prev = byId.get(m.id);
             if (!prev || ts > prev.ts) byId.set(m.id, { id: m.id, ts });
         }

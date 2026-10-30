@@ -29,7 +29,7 @@ export interface PersonalPageData {
     sort: string;
     pageUrl: URL;
     itemsPerPage: number;
-    // Raw Firestore data
+    // Filas de la biblioteca tal cual (ver `services/BD/shared/library.ts`)
     seriesData: any[];
     moviesData: any[];
     // TMDB details (all fetched, non-null)
@@ -97,7 +97,7 @@ export async function fetchPersonalPageData(
         moviesItems = moviesResults.filter((m) => m !== null);
 
         // Los detalles vienen de TMDB sin la nota personal: reinyectarla desde
-        // los docs crudos de Firestore (campo `rating`, 1-10) para cards y sort.
+        // las filas de la biblioteca (campo `rating`, 0,5-10) para cards y sort.
         const seriesRatingById = new Map(seriesData.map((s) => [String(s.id), s.rating]));
         const moviesRatingById = new Map(moviesData.map((m) => [String(m.id), m.rating]));
         seriesItems.forEach((s: any) => { s.userRating = seriesRatingById.get(String(s.id)) ?? null; });

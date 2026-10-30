@@ -7,7 +7,7 @@
  * número de temporadas/episodios, cadenas, creadores, próximo/último episodio).
  *
  * NO incluye estado personal (listas, rating, tags, episodios vistos, seguir,
- * notificaciones): la app lo lee directo de Firestore. Público.
+ * notificaciones): eso va por las rutas con sesión. Público.
  *
  * Las **temporadas** van con metadatos (sin la lista de episodios): los episodios
  * se piden aparte y en diferido con `GET /api/serie/[id]/season/[n]`.

@@ -20,7 +20,7 @@ let errorMessage = "";
 let isWarming = false; // true si timeout SSR → render shell con auto-reintento
 
 // Timeout duro: Netlify Starter mata Lambdas a los 10s (max_duration solo aplica en Pro).
-// Cold-start boot (Astro+Firebase+TMDB) come 2-4s antes de que corra nada del frontmatter,
+// Cold-start boot (Astro+Supabase+TMDB) come 2-4s antes de que corra nada del frontmatter,
 // así que el timeout interno debe firar dentro de los ~6s útiles que quedan para que el
 // catch alcance a renderizar el shell de warming antes del corte de Netlify.
 const SSR_TIMEOUT_MS = 5500;
@@ -32,7 +32,7 @@ try {
     ]);
 } catch (error) {
     if (isTimeout(error)) {
-        // Cold start: Lambda+Firebase lentos. Servimos shell con auto-reintento.
+        // Cold start: Lambda y conexiones en frío lentas. Servimos shell con auto-reintento.
         // El segundo hit pega a Lambda warm (L1/L2 cache caliente) y cabe en timeout.
         isWarming = true;
         console.warn("[recos] SSR timeout, sirviendo shell de warming:", (error as Error).message);

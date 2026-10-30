@@ -5,7 +5,7 @@ import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import { getUserTaste } from '../services/BD/profile/userTaste';
 import { getCustomLists, getListItems } from '../services/BD/lists/customLists';
 import { listRatings } from '../services/BD/lists/ratings';
-import { getFirebaseTimestamp } from './constants/helpers/media-helpers';
+import { toTimestamp } from './constants/helpers/media-helpers';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
 // que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).
@@ -147,7 +147,7 @@ function mergeSignal(
 ) {
     for (const it of items) {
         const id = String(it.id);
-        const at = getFirebaseTimestamp(it.added_at) || 0;
+        const at = toTimestamp(it.added_at) || 0;
         const ageDays = at ? Math.max(0, (now - at) / DAY_MS) : RECENCY_DAYS;
         const s = scale(ageDays);
         if (s <= 0) continue;
