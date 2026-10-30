@@ -38,7 +38,7 @@ function buildPatch(body: Record<string, unknown>): { patch: Partial<UserProfile
 
     if (typeof body.display_name === 'string') {
         // Vacío es válido: significa "vuelve al nombre de Google" (el middleware solo usa
-        // display_name si tiene valor). Nunca `undefined` — Firestore lo rechaza.
+        // display_name si tiene valor). Nunca `undefined`: no viajaría en el UPDATE y no se vaciaría.
         patch.display_name = body.display_name.trim().slice(0, 60);
     }
 

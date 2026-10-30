@@ -8,7 +8,7 @@ import {
 } from '../series/yourfavsSerie';
 
 /**
- * Snapshot compartido de la biblioteca (optimización de lecturas Firestore).
+ * Snapshot compartido de la biblioteca (una sola lectura de las listas por petición).
  *
  * Antes, cada feature pesada (`yearStats`, `personalIndex`, `topActorsLibrary`,
  * `activityFeed`) leía por su cuenta las 11 colecciones de listas → en una sesión

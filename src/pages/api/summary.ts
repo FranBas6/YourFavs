@@ -2,9 +2,9 @@
  * GET /api/summary?type=movie&ids=550,603,...
  *
  * Hidratación LIGERA de un lote de tmdbId → resumen para tarjetas (título,
- * póster, nota, año, géneros). Pensado para la app móvil: las listas viven en
- * Firestore como `{ id }` (sin datos TMDB), así que el cliente lee los IDs
- * directo de Firestore y pide aquí solo lo necesario para pintar el grid
+ * póster, nota, año, géneros). Pensado para la app móvil: las listas guardan
+ * solo el `tmdb_id` (sin datos TMDB), así que el cliente, que ya tiene los ids,
+ * pide aquí solo lo necesario para pintar el grid
  * (evita traer la ficha pesada de `/api/movie/[id]` por cada título).
  *
  * Réplica del patrón web (`personalPageHelper` hidrata cada id con TMDB en

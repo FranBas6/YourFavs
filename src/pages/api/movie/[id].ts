@@ -6,8 +6,8 @@
  * `InfoMovies.ts` / `tmdbInfoService.ts`, sin duplicar lógica).
  *
  * NO incluye el estado personal (en qué listas está, rating, tags, veces vista,
- * notificaciones): la app lo lee DIRECTO de Firestore (arquitectura híbrida,
- * ver CLAUDE.md), no por aquí. Por eso el endpoint es público (no usa locals.user).
+ * notificaciones): eso vive en Supabase y se sirve por las rutas con sesión, no
+ * por aquí. Por eso el endpoint es público (no usa locals.user).
  *
  * Notas de imágenes (igual que la web): el núcleo (`poster_path`, `backdrop_path`,
  * `cast[].profile_path`, `providers[].logo_path`) va en RUTA CRUDA; `posters[]`,

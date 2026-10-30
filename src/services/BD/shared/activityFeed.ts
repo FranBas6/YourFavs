@@ -383,7 +383,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     ]);
     // Los episodios se agrupan AL FINAL: necesitan conocer el resto de eventos para poder
     // cortar la sesión cuando entre dos episodios ocurrió otra cosa. El builder de episodios
-    // no lee Firestore (recibe los docs), así que sacarlo del Promise.all no cuesta nada.
+    // no consulta la base de datos (recibe las filas), así que sacarlo del Promise.all no cuesta nada.
     const [rewatchEvents, ratingEvents, personEvents, favPersonEvents, mutationEvents] = await Promise.all([
         fetchRewatchEvents(logRows),
         fetchRatingEvents(),

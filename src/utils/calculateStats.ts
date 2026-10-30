@@ -115,7 +115,7 @@ export function calculateStats({seriesData, moviesData, seriesDetails, moviesDet
         .slice(0, 5)
         .map(([code, count]) => ({code, count}));
 
-    // Opiniones (de Firebase data)
+    // Opiniones (campo `opinion` de las filas de la biblioteca)
     const allData = [...seriesData, ...moviesData];
     const withOpinion = allData.filter(d => d.opinion && d.opinion.trim().length > 0);
     const opinionStats = {

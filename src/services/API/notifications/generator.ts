@@ -54,7 +54,8 @@ const TYPE_TO_PREF: Record<NotifType, string> = {
     plan_today: 'social',
 };
 
-// Firestore no admite '/' en el id de documento.
+// Heredado de Firestore, que no admitía '/' en los ids: se mantiene para que los ids de los
+// avisos ya guardados sigan coincidiendo.
 function safeId(s: string): string {
     return s.replace(/\//g, ':');
 }

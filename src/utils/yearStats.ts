@@ -376,7 +376,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     const cached = cache.get(key);
     if (cached && cached.expires > now) return cached.data;
 
-    // Lectura compartida de la biblioteca (dedupe de lecturas Firestore).
+    // Lectura compartida de la biblioteca (una sola consulta por petición).
     const snapshot = await getLibrarySnapshot();
     const {
         movFavs, movPend, movVistos, movLike, movVerPronto,
