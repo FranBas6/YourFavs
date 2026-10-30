@@ -55,6 +55,10 @@ export interface AdvancedFilters {
     status?: string;       // solo series: '0' returning, '3' ended, '4' canceled
     cert?: string;         // certificación máxima (solo movies, país ES): 'APTA','7','12','16','18'
     sort?: string;         // orden abstracto: 'popular' | 'rating' | 'recent'
+    // D2 (2026-10-30)
+    origin?: string;       // país de producción ISO-3166 ('ES'): «Hecho en {país}» (with_origin_country)
+    epRuntime?: 'short' | 'medium' | 'long'; // solo series: duración del episodio
+    airing?: 'week';       // solo series: con algún episodio esta semana
 }
 
 /** Mapea un orden abstracto al sort_by correcto de TMDB según el tipo de medio. */
@@ -81,6 +85,9 @@ export function parseAdvancedFilters(params: URLSearchParams): AdvancedFilters {
     const status = params.get('status');
     const cert = params.get('cert');
     const sort = params.get('sort');
+    const origin = params.get('origin');
+    const epRuntime = params.get('epRuntime');
+    const airing = params.get('airing');
     if (decade) f.decade = decade;
     if (year) f.year = year;
     if (yearFrom) f.yearFrom = yearFrom;
@@ -91,12 +98,16 @@ export function parseAdvancedFilters(params: URLSearchParams): AdvancedFilters {
     if (status) f.status = status;
     if (cert) f.cert = cert;
     if (sort) f.sort = sort;
+    if (origin && /^[A-Z]{2}$/.test(origin)) f.origin = origin;
+    if (epRuntime === 'short' || epRuntime === 'medium' || epRuntime === 'long') f.epRuntime = epRuntime;
+    if (airing === 'week') f.airing = 'week';
     return f;
 }
 
 // 'sort' es un orden, no un filtro que reduzca resultados → no cuenta como activo.
 export function hasActiveFilters(f: AdvancedFilters): boolean {
-    return !!(f.decade || f.year || f.yearFrom || f.yearTo || f.rating || f.runtime || f.language || f.status || f.cert);
+    return !!(f.decade || f.year || f.yearFrom || f.yearTo || f.rating || f.runtime || f.language || f.status || f.cert
+        || f.origin || f.epRuntime || f.airing);
 }
 
 /**
@@ -153,6 +164,29 @@ function buildDiscoverParams(f: AdvancedFilters, mediaType: MediaType): Record<s
     if (mediaType === 'movie' && f.cert) {
         out['certification_country'] = 'ES';
         out['certification.lte'] = f.cert;
+    }
+
+    // D2: «Hecho en {país}» — país de PRODUCCIÓN, no idioma (en español hay mucho de fuera de España).
+    if (f.origin) {
+        out['with_origin_country'] = f.origin;
+    }
+
+    // D2: duración del episodio (series). TMDB filtra por `episode_run_time`. Suelo de 1 min en «cortos»
+    // para dejar fuera las series sin duración conocida (TMDB las da como 0).
+    if (mediaType === 'tv' && f.epRuntime) {
+        if (f.epRuntime === 'short') { out['with_runtime.gte'] = '1'; out['with_runtime.lte'] = '30'; }
+        else if (f.epRuntime === 'medium') { out['with_runtime.gte'] = '31'; out['with_runtime.lte'] = '54'; }
+        else out['with_runtime.gte'] = '55';
+    }
+
+    // D2: series con algún episodio esta semana (de hace 2 días a dentro de 6, hora de Madrid). Fuera
+    // noticias y tertulias, que emiten a diario y taparían todo lo demás.
+    if (mediaType === 'tv' && f.airing === 'week') {
+        const day = (n: number) => new Date(Date.now() + n * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
+        out['air_date.gte'] = day(-2);
+        out['air_date.lte'] = day(6);
+        out['timezone'] = 'Europe/Madrid';
+        out['without_genres'] = '10763,10767';
     }
 
     return out;

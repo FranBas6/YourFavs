@@ -32,6 +32,9 @@ const MODE_ONLY_FILTERS: Record<string, CatalogMode> = {
     runtime: 'movies',
     cert: 'movies',
     status: 'series',
+    // D2: solo de series (duración del episodio, «emiten esta semana»).
+    epRuntime: 'series',
+    airing: 'series',
 };
 
 export function isCatalogMode(v: unknown): v is CatalogMode {

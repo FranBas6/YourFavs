@@ -1,5 +1,6 @@
 ---
 import type { AdvancedFilters } from "../services/API/shared/tmdbDiscoverService";
+import { SUPPORTED_COUNTRIES } from "../services/API/shared/tmdbInfoService";
 
 interface Props {
     filters: AdvancedFilters;
@@ -29,9 +30,18 @@ interface Props {
     mineDefault?: boolean;
     myPlatforms?: number[];
     region?: string;
+    /**
+     * «Hecho en {país}» (D2). Por defecto sí; `false` donde los resultados no salen de discover y el
+     * filtro no se puede aplicar (Tendencias filtra en memoria y las listas no traen el país).
+     */
+    showOrigin?: boolean;
 }
 
-const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [], mine = false, mineDefault = false, myPlatforms = [], region = 'ES' } = Astro.props;
+const { filters, buildUrl, showRuntime = true, showStatus = false, hideCoreFilters = false, showCert = false, sortOptions = [], order, countCtx = [], mine = false, mineDefault = false, myPlatforms = [], region = 'ES', showOrigin = true } = Astro.props;
+// D2: los dos filtros solo de series van con el mismo interruptor que «Estado de la serie», que es el
+// que las páginas ya encienden en modo Series.
+const showSeriesExtras = showStatus;
+const regionName = SUPPORTED_COUNTRIES.find((c) => c.code === region)?.label ?? region;
 
 // «Mis plataformas» solo cuenta como filtro activo si ESTRECHA respecto a tu norma: con el
 // ajuste del perfil encendido es tu línea base, y apagarlo ensancha los resultados.
@@ -54,6 +64,12 @@ const STATUSES = [
     { value: '0', label: 'En emisión' }, { value: '3', label: 'Finalizada' }, { value: '4', label: 'Cancelada' },
 ];
 // Certificación por edad (España). label visible → valor TMDB (certification.lte).
+// D2: duración del episodio (series).
+const EP_RUNTIMES = [
+    { value: 'short', label: 'Hasta 30 min' },
+    { value: 'medium', label: '31–54 min' },
+    { value: 'long', label: '55 min o más' },
+];
 const CERTS = [
     { value: 'APTA', label: 'TP' }, { value: '7', label: '+7' }, { value: '12', label: '+12' },
     { value: '16', label: '+16' }, { value: '18', label: '+18' },
@@ -70,6 +86,7 @@ const activeCount = [
     filters.rating, (showRuntime && filters.runtime), filters.language, (showStatus && filters.status),
     (showCert && filters.cert),
     (showMine && mineNarrows),
+    (showOrigin && filters.origin), (showSeriesExtras && filters.epRuntime), (showSeriesExtras && filters.airing),
 ].filter(Boolean).length;
 // Orden actual (sort seleccionado o el por defecto de la página).
 const currentOrderLabel = sortOptions.find((o) => o.value === filters.sort)?.label || order;
@@ -87,11 +104,14 @@ if (showRuntime && filters.runtime) activeChips.push({ label: String(labelOf(RUN
 if (filters.language) activeChips.push({ label: String(labelOf(LANGUAGES, filters.language)), remove: { language: null } });
 if (showStatus && filters.status) activeChips.push({ label: String(labelOf(STATUSES, filters.status)), remove: { status: null } });
 if (showCert && filters.cert) activeChips.push({ label: String(labelOf(CERTS, filters.cert)), remove: { cert: null } });
+if (showOrigin && filters.origin) activeChips.push({ label: `Hecho en ${SUPPORTED_COUNTRIES.find((c) => c.code === filters.origin)?.label ?? filters.origin}`, remove: { origin: null } });
+if (showSeriesExtras && filters.epRuntime) activeChips.push({ label: `Episodios: ${labelOf(EP_RUNTIMES, filters.epRuntime)}`, remove: { epRuntime: null } });
+if (showSeriesExtras && filters.airing) activeChips.push({ label: 'Emiten esta semana', remove: { airing: null } });
 // Al quitarlo hay que escribir `mine=0`, no borrar el parámetro: con el ajuste del perfil
 // encendido, borrarlo lo dejaría igual de activo.
 if (showMine && mineNarrows) activeChips.push({ label: 'Mis plataformas', remove: { mine: '0' } });
 
-const clearAll = { decade: null, year: null, yearFrom: null, yearTo: null, rating: null, runtime: null, language: null, status: null, cert: null, mine: null };
+const clearAll = { decade: null, year: null, yearFrom: null, yearTo: null, rating: null, runtime: null, language: null, status: null, cert: null, mine: null, origin: null, epRuntime: null, airing: null };
 const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
 ---
 <div class="yf-adv-wrap" data-adv data-count-ctx={countCtx.length ? JSON.stringify(countCtx) : undefined}
@@ -202,6 +222,35 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                         </div>
                     </div>
 
+                    {showOrigin && (
+                        <div class="yf-filter-group">
+                            <p class="yf-group-label">Origen</p>
+                            <div class="yf-chips">
+                                <a href={buildUrl({ origin: filters.origin === region ? null : region })} class={chipClass(filters.origin === region)} data-fkey="origin" data-fval={region}>Hecho en {regionName}</a>
+                            </div>
+                        </div>
+                    )}
+
+                    {showSeriesExtras && (
+                        <div class="yf-filter-group">
+                            <p class="yf-group-label">Duración del episodio</p>
+                            <div class="yf-chips">
+                                {EP_RUNTIMES.map((r) => (
+                                    <a href={buildUrl({ epRuntime: filters.epRuntime === r.value ? null : r.value })} class={chipClass(filters.epRuntime === r.value)} data-fkey="epRuntime" data-fval={r.value}>{r.label}</a>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {showSeriesExtras && (
+                        <div class="yf-filter-group">
+                            <p class="yf-group-label">Emisión</p>
+                            <div class="yf-chips">
+                                <a href={buildUrl({ airing: filters.airing === 'week' ? null : 'week' })} class={chipClass(filters.airing === 'week')} data-fkey="airing" data-fval="week">Emiten esta semana</a>
+                            </div>
+                        </div>
+                    )}
+
                     {showStatus && (
                         <div class="yf-filter-group">
                             <p class="yf-group-label">Estado de la serie</p>
@@ -250,7 +299,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         var applyBtn = root.querySelector('[data-adv-apply]');
         var countCtx = []; try { countCtx = JSON.parse(root.getAttribute('data-count-ctx') || '[]'); } catch (e) {}
         var countTimer = null, countAbort = null;
-        var FILTER_KEYS = ['decade','year','yearFrom','yearTo','rating','runtime','language','status','cert','sort','mine'];
+        var FILTER_KEYS = ['decade','year','yearFrom','yearTo','rating','runtime','language','status','cert','sort','mine','origin','epRuntime','airing'];
         var pending = {};
 
         // Contador en vivo (2.3b): pregunta a /api/discover/count cuántos resultados daría
@@ -262,7 +311,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
                 if (countAbort) countAbort.abort();
                 countAbort = new AbortController();
                 var f = {};
-                ['year','yearFrom','yearTo','decade','rating','runtime','language','status','cert'].forEach(function (k) { if (pending[k] != null) f[k] = pending[k]; });
+                ['year','yearFrom','yearTo','decade','rating','runtime','language','status','cert','origin','epRuntime','airing'].forEach(function (k) { if (pending[k] != null) f[k] = pending[k]; });
                 // "Solo en mis plataformas" no es un filtro discover normal: si está activo,
                 // inyectamos with_watch_providers en cada query del contador.
                 var qs = countCtx;
