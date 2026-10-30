@@ -1,6 +1,8 @@
 /* «Estás viendo» / «Continuar viendo» — handoff `docs/design_handoff_estas_viendo` (`ev.css` es la
-   fuente de las medidas). Solo tokens: la tarjeta va sobre --bg-elev y sigue el tema (antes era el
-   --card navy fijo con blancos sueltos). El marcado sale de `lib/nextEpisodeView.ts`. */
+   fuente de las medidas). Solo tokens. La tarjeta es la «card» azul marino (--card y --card-text*),
+   igual en los dos temas: Fran la prefirió a la superficie clara del diseño (sobre el fondo claro de
+   la portada, blanca sobre blanco se perdía). Los verdes, en --ok (el --ok-ink no se lee sobre
+   marino). El marcado sale de `lib/nextEpisodeView.ts`. */
 
 .nv-sec { position: relative; }
 
@@ -32,19 +34,19 @@
 /* ---- Tarjeta --------------------------------------------------------------------------------- */
 .nv {
     flex: 0 0 280px; display: flex; flex-direction: column; position: relative; overflow: hidden;
-    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); scroll-snap-align: start;
+    background: var(--card); border: 1px solid var(--card-border); border-radius: var(--r-lg); scroll-snap-align: start;
 }
 /* Fotograma 16:9 (lleva al episodio) con el chip «T1 · E17» y FINAL / PARÓN encima. */
-.nv-m { position: relative; display: block; aspect-ratio: 16 / 9; background: var(--bg-tint); flex-shrink: 0; overflow: hidden; color: inherit; text-decoration: none; }
+.nv-m { position: relative; display: block; aspect-ratio: 16 / 9; background: var(--card-hover); flex-shrink: 0; overflow: hidden; color: inherit; text-decoration: none; }
 .nv-m img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.nv-m.none { display: flex; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px dashed var(--border-strong); color: var(--text-3); font: 500 12px var(--font); }
+.nv-m.none { display: flex; align-items: center; justify-content: center; gap: 6px; border-bottom: 1px dashed var(--card-border-h); color: var(--card-text-3); font: 500 12px var(--font); }
 .nv-m.none > svg { width: 16px; height: 16px; }
 .nv-m .se, .nv-chips .se {
     position: absolute; left: 10px; top: 10px; z-index: 2; height: 22px; padding: 0 8px; border-radius: 6px;
     display: inline-flex; align-items: center; white-space: nowrap;
     background: var(--card); color: var(--card-text); font: 700 11px var(--font-mono); letter-spacing: .06em;
 }
-.nv-m.none .se { background: var(--bg-elev); color: var(--text); border: 1px solid var(--border-strong); }
+.nv-m.none .se { background: var(--card); color: var(--card-text); border: 1px solid var(--card-border-h); }
 .nv-m .etag { position: absolute; right: 10px; top: 10px; z-index: 2; }
 .nv-chips { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .nv-sp .yf-blur { display: block; width: 100%; height: 100%; }
@@ -60,35 +62,35 @@
 .nv-b { position: relative; flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 12px 14px 14px; }
 .nv-po {
     position: absolute; left: 14px; top: -34px; z-index: 3; width: 46px; aspect-ratio: 2 / 3; overflow: hidden;
-    border-radius: 6px; background: var(--bg-tint); box-shadow: 0 0 0 3px var(--bg-elev), var(--sh-md);
+    border-radius: 6px; background: var(--card-hover); box-shadow: 0 0 0 3px var(--card), var(--sh-md);
 }
 .nv-po img, .nv .pp img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.nv-ph { width: 100%; height: 100%; display: grid; place-items: center; color: var(--text-3); }
+.nv-ph { width: 100%; height: 100%; display: grid; place-items: center; color: var(--card-text-3); }
 .nv-ph svg { width: 18px; height: 18px; }
 .nv-sr { display: flex; align-items: center; padding-left: 58px; min-height: 26px; margin-bottom: 6px; }
-.nv-sr a { min-width: 0; font: 600 13px var(--font); color: var(--text-2); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nv-sr a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.nv-sr a { min-width: 0; font: 600 13px var(--font); color: var(--card-text-2); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nv-sr a:hover { color: var(--card-text); text-decoration: underline; text-underline-offset: 2px; }
 .nv-t {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em;
-    font: 600 15px/1.3 var(--font); color: var(--text); text-decoration: none;
+    font: 600 15px/1.3 var(--font); color: var(--card-text); text-decoration: none;
 }
-.nv-t:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
-.nv-mt { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 4px; font: 500 12px var(--font); color: var(--text-3); }
+.nv-t:hover { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--card-border-h); }
+.nv-mt { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; margin-top: 4px; font: 500 12px var(--font); color: var(--card-text-3); }
 .nv-mt span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
 .nv-mt svg { width: 13px; height: 13px; }
-.nv-mt .nv-rt svg { color: var(--stamp-amber-ink); fill: var(--stamp-amber-ink); stroke: none; }
-.nv-mt .nv-rt b { color: var(--text-2); font-weight: 600; }
-.nv-mt .ok { color: var(--ok-ink); font-weight: 600; }
+.nv-mt .nv-rt svg { color: var(--stamp-amber); fill: var(--stamp-amber); stroke: none; }
+.nv-mt .nv-rt b { color: var(--card-text-2); font-weight: 600; }
+.nv-mt .ok { color: var(--ok); font-weight: 600; }
 .nv-pr { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
-.nv-pr .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
-.nv-pr .bar i { display: block; height: 100%; border-radius: 3px; background: var(--ok-ink); }
-.nv-pr b { font: 600 11.5px var(--font-mono); color: var(--text); white-space: nowrap; }
+.nv-pr .bar { flex: 1; height: 6px; border-radius: 3px; background: var(--card-border); overflow: hidden; }
+.nv-pr .bar i { display: block; height: 100%; border-radius: 3px; background: var(--ok); }
+.nv-pr b { font: 600 11.5px var(--font-mono); color: var(--card-text); white-space: nowrap; }
 
 /* Acciones al pie (todas las tarjetas igual de altas: el pie baja hasta abajo). */
 .nv-a { display: flex; gap: 8px; margin-top: auto; padding-top: 14px; }
 .nv-mk {
     flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 38px;
-    border-radius: var(--r-md); border: 1px solid var(--text); background: var(--text); color: var(--bg-elev);
+    border-radius: var(--r-md); border: 1px solid var(--card-text); background: var(--card-text); color: var(--card);
     font: 600 13.5px var(--font); white-space: nowrap; cursor: pointer;
 }
 .nv-mk svg { width: 16px; height: 16px; }
@@ -100,16 +102,16 @@
 @media (prefers-reduced-motion: reduce) { .nv-mk.busy svg { animation: none; } }
 .nv-go {
     display: inline-flex; align-items: center; justify-content: center; gap: 5px; height: 38px; padding: 0 12px;
-    border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    border-radius: var(--r-md); border: 1px solid var(--card-border-h); background: var(--card); color: var(--card-text);
     font: 600 13px var(--font); white-space: nowrap; text-decoration: none;
 }
-.nv-go:hover { border-color: var(--text-3); }
+.nv-go:hover { border-color: var(--card-text-3); }
 .nv-go svg { width: 15px; height: 15px; }
 .nv-go.ico { width: 38px; padding: 0; }
 
 /* Película: póster 2:3 de 96 px y el texto al lado, sin fotograma; mismo alto que una de serie. */
 .nv-pm { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; padding: 14px 14px 0; }
-.nv-pm .pp { display: block; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 8px; background: var(--bg-tint); box-shadow: var(--sh-md); }
+.nv-pm .pp { display: block; aspect-ratio: 2 / 3; overflow: hidden; border-radius: 8px; background: var(--card-hover); box-shadow: var(--sh-md); }
 .nv-pm-t { min-width: 0; display: flex; flex-direction: column; }
 .nv-pm .k {
     display: inline-flex; align-items: center; gap: 5px; width: fit-content; height: 22px; padding: 0 8px; border-radius: 6px;
@@ -123,26 +125,26 @@
 /* Recién marcado: franja con Deshacer durante unos segundos. */
 .nv-just {
     display: flex; align-items: center; gap: 7px; padding: 8px 12px; white-space: nowrap;
-    background: var(--ok-soft); color: var(--ok-ink); font: 600 12px var(--font); border-bottom: 1px solid var(--border);
+    background: var(--ok-soft); color: var(--ok); font: 600 12px var(--font); border-bottom: 1px solid var(--card-border);
 }
 .nv-just > svg { width: 14px; height: 14px; }
 .nv-just button {
     margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 4px 2px; border: 0; background: none;
-    font: 600 12px var(--font); color: var(--ok-ink); text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+    font: 600 12px var(--font); color: var(--ok); text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
 }
 .nv-just button svg { width: 13px; height: 13px; }
 
 /* Al día / película terminada: mismo tamaño que la tarjeta. */
 .nv-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 22px 18px; text-align: center; }
-.nv-done .pp { position: relative; display: block; width: 64px; aspect-ratio: 2 / 3; border-radius: 7px; background: var(--bg-tint); box-shadow: var(--sh-md); }
+.nv-done .pp { position: relative; display: block; width: 64px; aspect-ratio: 2 / 3; border-radius: 7px; background: var(--card-hover); box-shadow: var(--sh-md); }
 .nv-done .pp img { border-radius: 7px; }
 .nv-ck {
     position: absolute; right: -8px; bottom: -8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
-    background: var(--ok-ink); color: var(--bg-elev); box-shadow: 0 0 0 3px var(--bg-elev);
+    background: var(--ok); color: var(--card); box-shadow: 0 0 0 3px var(--card);
 }
 .nv-ck svg { width: 14px; height: 14px; }
-.nv-done b { font: 600 15px var(--font); color: var(--text); }
-.nv-done p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-2); max-width: 26ch; }
+.nv-done b { font: 600 15px var(--font); color: var(--card-text); }
+.nv-done p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--card-text-2); max-width: 26ch; }
 .nv-done .nv-go { margin-top: 4px; }
 
 /* ---- Tamaños ---------------------------------------------------------------------------------- */
