@@ -292,7 +292,9 @@ const jsonLd = item ? {
     ogType="video.movie"
 >
     {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
-    <article class="bg-gray-50">
+    <!-- Sin fondo propio: va sobre el gris de la página, como la ficha de episodio y el resto de la web
+         (antes `bg-gray-50` hacía un «doble fondo», un panel más claro con franjas a los lados). -->
+    <article>
         <!-- Hero inmersivo -->
         <div class="relative w-full min-h-[70vh] bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}>
             <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/70 to-gray-900/40"></div>
