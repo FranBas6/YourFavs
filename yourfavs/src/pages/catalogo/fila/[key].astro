@@ -20,7 +20,7 @@ import HoverPreview from "../../../components/HoverPreview.astro";
 import Pagination from "../../../components/Pagination.astro";
 import EmptyState from "../../../components/EmptyState.astro";
 import { parseAdvancedFilters, hasActiveFilters } from "../../../services/API/shared/tmdbDiscoverService";
-import { fetchCatalogRow } from "../../../services/API/shared/catalogRows";
+import { fetchCatalogRow, markRowPlatforms } from "../../../services/API/shared/catalogRows";
 import { findCuratedRow, freshSinceISO } from "../../../utils/constants/catalogRows";
 import { catalogUrls, resolveCatalogMode } from "../../../utils/catalogUrl";
 import { resolveMineFilter } from "../../../utils/platformFilter";
@@ -52,13 +52,18 @@ const { mine, mineDefault } = resolveMineFilter(urlParams, Astro.locals.user);
 const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
 const myRegion = Astro.locals.user?.region || 'ES';
 
-const row = await fetchCatalogRow(def, {
+const baseRow = await fetchCatalogRow(def, {
     filters,
     providers: myProviders,
     region: myRegion,
     cacheable: !filtersActive && !filters.sort,
     page: pageStr,
 });
+// E2: en «Nuevo en streaming», las de tus plataformas llevan «EN NETFLIX»… y van primero en la página.
+// Las páginas 1..N de cada plataforma cubren la N de la fila (ver `markRowPlatforms`).
+const row = baseRow && key === 'nuevo-streaming' && !filtersActive && Astro.locals.user?.platforms?.length
+    ? await markRowPlatforms(baseRow, Astro.locals.user.platforms, myRegion, page)
+    : baseRow;
 const movies = row?.movies ?? [];
 const series = row?.series ?? [];
 
@@ -143,6 +148,7 @@ const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                             title={item.title}
+                                            platform={item._platform}
                                             vote_average={item.vote_average}
                                             overview={item.overview}
                                             release_date={item.release_date}
@@ -166,6 +172,7 @@ const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                             name={item.name}
+                                            platform={item._platform}
                                             vote_average={item.vote_average}
                                             overview={item.overview}
                                             first_air_date={item.first_air_date}

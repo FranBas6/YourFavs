@@ -19,9 +19,11 @@ interface Props {
     /** F4 social: «Recomendada por Ana» en /mislistas/pendientes, si la añadiste desde una recomendación.
      *  Excluyente con `seedTitle` (gana esta). */
     recommendedBy?: { name: string; more: number };
+    /** E2 · «Nuevo en streaming»: la plataforma TUYA donde está («Netflix») → etiqueta «EN NETFLIX». */
+    platform?: string;
 }
 
-const { id, title, img, vote_average, overview, release_date, genres, character, userRating, seedTitle, recommendedBy } = Astro.props;
+const { id, title, img, vote_average, overview, release_date, genres, character, userRating, seedTitle, recommendedBy, platform } = Astro.props;
 
 const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(release_date);
@@ -40,9 +42,14 @@ const showSaveBtn = !_p.startsWith('/mislistas') || _p.startsWith('/mislistas/re
        class="flex flex-col rounded-xl overflow-hidden bg-midnight-blue hover:bg-dark-blue transition-all duration-300 h-full border border-white/5 hover:border-white/15 relative">
 
         <!-- Badges -->
-        {(isNew || isTrending) && (
+        {(isNew || isTrending || platform) && (
             <div class="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
-                {isNew && <span class="top-badge bg-teal-500 text-white">NUEVO</span>}
+                {/* En tu plataforma ya dice que es nuevo (solo sale en «Nuevo en streaming»): NUEVO sobraría. */}
+                {platform ? (
+                    <span class="top-badge badge-platform" title={`En ${platform}, una de tus plataformas`}><span>EN {platform.toUpperCase()}</span></span>
+                ) : (
+                    isNew && <span class="top-badge bg-teal-500 text-white">NUEVO</span>
+                )}
                 {isTrending && <span class="top-badge badge-accent">TRENDING</span>}
             </div>
         )}

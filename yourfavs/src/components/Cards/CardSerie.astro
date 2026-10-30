@@ -37,9 +37,11 @@ interface Props {
     /** F4 social: «Recomendada por Ana» en /mislistas/pendientes, si la añadiste desde una recomendación.
      *  Excluyente con `seedTitle` (gana esta). */
     recommendedBy?: { name: string; more: number };
+    /** E2 · «Nuevo en streaming»: la plataforma TUYA donde está («Netflix») → etiqueta «EN NETFLIX». */
+    platform?: string;
 }
 
-const { id, name, img, vote_average, overview, first_air_date, seasons, last_episode_to_air, next_episode_to_air, genres, status, character, favoriteNumber, watchedEpisodes, followed, userRating, seedTitle, recommendedBy } = Astro.props;
+const { id, name, img, vote_average, overview, first_air_date, seasons, last_episode_to_air, next_episode_to_air, genres, status, character, favoriteNumber, watchedEpisodes, followed, userRating, seedTitle, recommendedBy, platform } = Astro.props;
 
 const placeholderImg = "/placeholder.jpg";
 const isNew = isRecentRelease(first_air_date);
@@ -93,6 +95,8 @@ if (followed && next_episode_to_air?.air_date) {
         <div class="absolute top-2 left-2 z-10 flex flex-col gap-1 items-start">
             {countdownLabel ? (
                 <span class="top-badge badge-accent font-mono tracking-wide">{countdownLabel}</span>
+            ) : platform ? (
+                <span class="top-badge badge-platform" title={`En ${platform}, una de tus plataformas`}><span>EN {platform.toUpperCase()}</span></span>
             ) : (
                 isNew && <span class="top-badge bg-teal-500 text-white">NUEVO</span>
             )}

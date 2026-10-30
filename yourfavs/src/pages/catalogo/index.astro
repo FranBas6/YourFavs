@@ -17,7 +17,7 @@ import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import CatalogRow from "../../components/Sections/CatalogRow.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import { parseAdvancedFilters, hasActiveFilters } from "../../services/API/shared/tmdbDiscoverService";
-import { fetchCatalogRows } from "../../services/API/shared/catalogRows";
+import { fetchCatalogRows, markRowPlatforms } from "../../services/API/shared/catalogRows";
 import { catalogUrls, resolveCatalogMode, withMode } from "../../utils/catalogUrl";
 import {
     curatedRowsFor, freshSinceISO, genreRowDef, genreSlugsForDay,
@@ -69,7 +69,12 @@ const rows = await fetchCatalogRows(rowDefs, {
     region: myRegion,
     // Con filtros del usuario no se cachea: las combinaciones son infinitas.
     cacheable: !filtersActive && !filters.sort,
-});
+}).then((list) => Promise.all(list.map((row) =>
+    // E2: «Nuevo en streaming» marca las de tus plataformas («EN NETFLIX») y las pone primero.
+    // Con filtros del usuario no: la fila ya no es la del día y las marcas no casarían.
+    row.def.key === 'nuevo-streaming' && !filtersActive && Astro.locals.user?.platforms?.length
+        ? markRowPlatforms(row, Astro.locals.user.platforms, myRegion)
+        : row)));
 
 /**
  * A dónde lleva el «Ver más» de cada fila.

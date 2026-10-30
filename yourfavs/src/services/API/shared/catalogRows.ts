@@ -12,6 +12,7 @@
 import { discoverContent, type AdvancedFilters } from './tmdbDiscoverService';
 import { getCached, setCached } from '../../../utils/recsBlobCache';
 import { appDateParts } from '../../../utils/appTime';
+import { resolveProviderNames } from './watchProviders';
 import type { Movie } from '../../../types/ApiMovie';
 import type { Serie } from '../../../types/ApiSerie';
 import type { CatalogRowDef } from '../../../utils/constants/catalogRows';
@@ -48,10 +49,13 @@ export function dedupeFranchises<T extends { title?: string; name?: string }>(it
     return out;
 }
 
+/** `_platform`: la plataforma tuya donde está (solo tras `markRowPlatforms`). */
+type Marked<T> = T & { _platform?: string };
+
 export interface CatalogRowResult {
     def: CatalogRowDef;
-    movies: Movie[];
-    series: Serie[];
+    movies: Marked<Movie>[];
+    series: Marked<Serie>[];
 }
 
 interface FetchContext {
@@ -137,6 +141,70 @@ export async function fetchCatalogRow(def: CatalogRowDef, ctx: FetchContext): Pr
         // Una fila que falla no puede tumbar la página: desaparece y las demás siguen.
         console.warn(`[catalogRows] ${def.key} falló:`, (err as Error).message);
         return null;
+    }
+}
+
+/** Nombre corto para una etiqueta de tarjeta: «Amazon Prime Video» → «Prime Video», «Disney Plus» → «Disney+». */
+function shortPlatformName(name: string): string {
+    return name.replace(/^Amazon Prime Video\b/, 'Prime Video').replace(/ Plus$/, '+');
+}
+
+/** Plataformas que se miran como mucho para marcar una fila (cada una son 2 discover al día). */
+const MAX_MARKED_PLATFORMS = 8;
+
+/**
+ * «Nuevo en streaming» con TUS plataformas (E2): cada título que está en una de ellas lleva
+ * `_platform` con su nombre («Netflix») y esos van primero; el resto conserva su orden.
+ *
+ * Discover no dice en qué plataforma está cada resultado, así que por plataforma se pide la misma
+ * fila filtrada a ella (`with_watch_providers` + suscripción). La filtrada sigue el mismo orden que la
+ * general, así que todo título de las páginas 1..N de la general que esté en esa plataforma sale en
+ * sus páginas 1..N. Cada filtrada pasa por la caché de `fetchOne` (por plataforma, región y día): la
+ * comparten todos los que tienen esa plataforma. Si un título está en varias, gana la primera en el
+ * orden en que el usuario las guardó.
+ */
+export async function markRowPlatforms(
+    row: CatalogRowResult,
+    platformIds: number[],
+    region: string,
+    pages = 1,
+): Promise<CatalogRowResult> {
+    const ids = platformIds.slice(0, MAX_MARKED_PLATFORMS);
+    if (!ids.length) return row;
+    const flatrate = { with_watch_monetization_types: 'flatrate' };
+    const def: CatalogRowDef = {
+        ...row.def,
+        movieParams: { ...row.def.movieParams, ...flatrate },
+        tvParams: { ...row.def.tvParams, ...flatrate },
+    };
+    const pageList = Array.from({ length: Math.max(1, Math.min(pages, 3)) }, (_, i) => String(i + 1));
+
+    try {
+        const [names, perPlatform] = await Promise.all([
+            resolveProviderNames(ids, region),
+            Promise.all(ids.map(async (id) => {
+                const ctx: FetchContext = { filters: {}, providers: String(id), region, cacheable: true };
+                const [movies, series] = await Promise.all([
+                    row.movies.length ? Promise.all(pageList.map((page) => fetchOne<Movie>(def, 'movie', { ...ctx, page }))) : [],
+                    row.series.length ? Promise.all(pageList.map((page) => fetchOne<Serie>(def, 'tv', { ...ctx, page }))) : [],
+                ]);
+                return { id, movies: new Set(movies.flat().map((m) => m.id)), series: new Set(series.flat().map((s) => s.id)) };
+            })),
+        ]);
+        const label = (id: number) => shortPlatformName(names.get(id)?.base || names.get(id)?.name || '');
+        const mark = <T extends { id: number }>(items: T[], pick: (p: typeof perPlatform[number]) => Set<number>) => {
+            const out = items.map((it) => {
+                const hit = perPlatform.find((p) => pick(p).has(it.id));
+                return hit ? { ...it, _platform: label(hit.id) } : it;
+            });
+            // Orden estable: primero las tuyas, cada grupo como venía.
+            return [...out.filter((it) => '_platform' in it), ...out.filter((it) => !('_platform' in it))];
+        };
+        return { ...row, movies: mark(row.movies, (p) => p.movies), series: mark(row.series, (p) => p.series) };
+    } catch (err) {
+        // Sin marcas la fila sigue sirviendo: se pinta tal cual.
+        console.warn(`[catalogRows] marcas de ${row.def.key} fallaron:`, (err as Error).message);
+        return row;
     }
 }
 

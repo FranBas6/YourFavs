@@ -1,10 +1,19 @@
 import { getCurrentLanguage } from '../../BD/shared/userScope';
 
 export const API_KEY = import.meta.env.TMDB_API_KEY;
+/**
+ * Token de lectura v4 (E4). Es lo que recomienda TMDB: va en la cabecera `Authorization: Bearer`,
+ * así la clave no viaja en la URL (que acaba en logs de CDN, proxies y del medidor de dev). Sin
+ * token, o si TMDB lo rechaza (401), se usa `api_key` como hasta ahora.
+ */
+const READ_TOKEN = import.meta.env.TMDB_READ_TOKEN;
 
-if (!API_KEY) {
-    throw new Error("🚨 No se encontró la clave de API de TMDB. Asegúrate de definir TMDB_API_KEY en tu .env");
+if (!API_KEY && !READ_TOKEN) {
+    throw new Error("🚨 No se encontró la clave de API de TMDB. Define TMDB_READ_TOKEN (o TMDB_API_KEY) en tu .env");
 }
+
+/** Token rechazado una vez → el resto de la vida del proceso, con `api_key` (sin un 401 por llamada). */
+let bearerRejected = false;
 
 export const BASE_URL = "https://api.themoviedb.org/3";
 export const IMAGE_BASE = "https://image.tmdb.org/t/p";
@@ -32,7 +41,8 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Fetch genérico a la API de TMDB con manejo de errores centralizado.
- * Añade api_key y el idioma del usuario (perfil → contexto ALS; default es-ES).
+ * Se autentica con el token (cabecera) o `api_key`, y añade el idioma del usuario (perfil →
+ * contexto ALS; default es-ES).
  * Un `language` explícito en `params` sigue teniendo prioridad.
  *
  * Cada intento tiene TIMEOUT (AbortController): si TMDB se cuelga, cortamos rápido en vez
@@ -66,7 +76,6 @@ export async function tmdbFetchWithFreshness<T>(
 /** Petición a TMDB con idioma, timeout y un reintento; devuelve la respuesta OK o lanza. */
 async function tmdbRequest(path: string, params: Record<string, string>): Promise<Response> {
     const allParams = new URLSearchParams({
-        api_key: API_KEY,
         language: getCurrentLanguage(),
         ...params,
     });
@@ -74,14 +83,21 @@ async function tmdbRequest(path: string, params: Record<string, string>): Promis
     // `language` devuelve todas las imágenes y con `language=` vacío se deja algunas (C1).
     if (params.language === '') allParams.delete('language');
 
-    const url = `${BASE_URL}${path}?${allParams.toString()}`;
+    let useBearer = Boolean(READ_TOKEN) && !bearerRejected;
+    const request = () => {
+        if (useBearer) return { url: `${BASE_URL}${path}?${allParams.toString()}`, headers: { Authorization: `Bearer ${READ_TOKEN}` } };
+        const withKey = new URLSearchParams(allParams);
+        withKey.set('api_key', API_KEY);
+        return { url: `${BASE_URL}${path}?${withKey.toString()}`, headers: undefined };
+    };
 
     for (let attempt = 0; ; attempt++) {
+        const { url, headers } = request();
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
         let res: Response;
         try {
-            res = await fetch(url, { signal: ctrl.signal });
+            res = await fetch(url, { signal: ctrl.signal, headers });
         } catch (err) {
             clearTimeout(timer);
             const aborted = (err as Error)?.name === 'AbortError';
@@ -94,6 +110,17 @@ async function tmdbRequest(path: string, params: Record<string, string>): Promis
         clearTimeout(timer);
 
         if (res.ok) return res;
+
+        // Token caducado o mal copiado: no tumbar la web. Se pasa a `api_key` (si hay) y se avisa
+        // una vez en el log; este reintento no cuenta como uno de los de red.
+        if (res.status === 401 && useBearer && API_KEY) {
+            await res.body?.cancel().catch(() => {});
+            if (!bearerRejected) console.warn('⚠️ TMDB rechaza TMDB_READ_TOKEN (401): se sigue con TMDB_API_KEY. Revisa la variable.');
+            bearerRejected = true;
+            useBearer = false;
+            attempt--;
+            continue;
+        }
 
         if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
             await res.body?.cancel().catch(() => {}); // libera la conexión antes de reintentar

@@ -55,6 +55,8 @@ interface CastMember {
     name: string;
     character: string;
     profile_path?: string;
+    /** E6: episodios en los que sale en toda la serie (`aggregate_credits`). */
+    episodes?: number;
 }
 
 export async function getEpisodesBySeasonNumber(serieId: number | string, seasonNumber: number): Promise<any[]> {
@@ -135,7 +137,9 @@ const seasonSubs = (n: number, withCredits: boolean) =>
  * reparto (Juego de Tronos 75 llamadas, Padre de familia 139 y 6,4 s en frío).
  *
  * 1) Llamada principal: los 9 sub-recursos fijos + las temporadas 0, 1 y 2 a ciegas, y en paralelo
- *    las reseñas inglesas (dentro del append heredarían el idioma del perfil).
+ *    las reseñas inglesas (dentro del append heredarían el idioma del perfil) y `aggregate_credits`
+ *    (E6: episodios por actor; aparte porque pesa 300-500 KB en series largas y retrasaría la
+ *    principal; si falla, el reparto sale sin el número).
  * 2) Con la lista real de temporadas, lo que falte se pide en bloques de 20 sub-recursos, todos a
  *    la vez (Juego de Tronos: 1 bloque; Padre de familia: 3).
  *
@@ -156,12 +160,14 @@ export async function getSeriesBundle(seriesId: string | number): Promise<Series
 
     let data: any;
     let enReviews: { results?: any[] };
+    let aggregate: { cast?: { id: number; total_episode_count?: number }[] };
     try {
-        [data, enReviews] = await Promise.all([
+        [data, enReviews, aggregate] = await Promise.all([
             tmdbFetch<any>(`/tv/${seriesId}`, { ...params, append_to_response: firstSubs.join(',') }),
             own === 'en'
                 ? Promise.resolve({ results: [] })
                 : tmdbFetch<{ results: any[] }>(`/tv/${seriesId}/reviews`, { language: 'en-US' }).catch(() => ({ results: [] })),
+            tmdbFetch<any>(`/tv/${seriesId}/aggregate_credits`).catch(() => ({ cast: [] })),
         ]);
     } catch (error) {
         console.error(`❌ Error al obtener la ficha de la serie ${seriesId}:`, error);
@@ -203,6 +209,7 @@ export async function getSeriesBundle(seriesId: string | number): Promise<Series
     };
 
     // Reparto: el primero que aparece manda (temporada 1 antes que la 2…), como `getSeriesCast`.
+    const episodesById = new Map((aggregate?.cast || []).map((a) => [a.id, a.total_episode_count || 0]));
     const allCast = new Map<number, CastMember>();
     for (const n of creditSeasons) {
         for (const actor of seasonParts[`season/${n}/credits`]?.cast || []) {
@@ -212,6 +219,7 @@ export async function getSeriesBundle(seriesId: string | number): Promise<Series
                     name: actor.name,
                     character: actor.character || '',
                     profile_path: actor.profile_path || null,
+                    episodes: episodesById.get(actor.id) || undefined,
                 });
             }
         }
