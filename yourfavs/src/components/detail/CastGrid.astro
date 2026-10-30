@@ -6,6 +6,8 @@ interface CastMember {
     name: string;
     character?: string;
     profile_path?: string | null;
+    /** Solo series (E6): episodios en los que sale. */
+    episodes?: number;
 }
 
 interface Props {
@@ -33,6 +35,9 @@ const { cast, title = "Reparto Principal", seenWith } = Astro.props;
                     <div class="min-w-0">
                         <p class="text-sm sm:text-base font-medium text-gray-800 truncate">{actor.name}</p>
                         {actor.character && <p class="text-xs sm:text-sm text-gray-500 truncate">{actor.character}</p>}
+                        {actor.episodes ? (
+                            <p class="text-xs text-gray-400">{`${actor.episodes} ${actor.episodes === 1 ? 'episodio' : 'episodios'}`}</p>
+                        ) : null}
                         {seenWith && seenWith.get(actor.id) ? (
                             <span class="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium"
                                   title={`Has visto ${seenWith.get(actor.id)} ${seenWith.get(actor.id) === 1 ? 'título' : 'títulos'} con ${actor.name}`}>
