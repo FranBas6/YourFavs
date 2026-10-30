@@ -1,0 +1,524 @@
+---
+/**
+ * Ajustes → Importar (TMDB D3a: IMDb; Letterboxd y la cuenta de TMDB llegan en D3b/D3c).
+ *
+ * Todo pasa en el navegador hasta que dices «Añadir»: se lee el CSV aquí, se buscan los ids en TMDB
+ * por lotes de 50 (`/api/import/resolve`) y se enseña qué se ha encontrado. Al confirmar se abre la
+ * importación (`/api/import/jobs`) y se escribe por lotes (`/api/import/apply`). Cada importación
+ * queda en la lista de abajo y se puede deshacer entera (`/api/import/undo`).
+ */
+import { Icon } from 'astro-icon/components';
+import type { ImportJob } from '../../services/BD/import/importLibrary';
+
+interface Props {
+    jobs: ImportJob[];
+}
+const { jobs } = Astro.props;
+
+const SOURCE_LABEL: Record<string, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB' };
+const fmtDate = (iso: string) => new Intl.DateTimeFormat('es-ES', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid',
+}).format(new Date(iso));
+const n = (v: unknown) => Number(v) || 0;
+const count = (v: number, one: string, many: string) => `${v.toLocaleString('es-ES')} ${v === 1 ? one : many}`;
+
+function jobSummary(j: ImportJob): string {
+    const t = j.totals ?? {};
+    const parts = [count(n(t.added), 'añadido', 'añadidos')];
+    if (n(t.rated)) parts.push(count(n(t.rated), 'nota', 'notas'));
+    if (n(t.missing)) parts.push(`${n(t.missing).toLocaleString('es-ES')} sin encontrar`);
+    return parts.join(' · ');
+}
+/** Una importación que no cambió nada no tiene nada que deshacer. */
+const changed = (j: ImportJob) => n(j.totals?.added) + n(j.totals?.rated) + n(j.totals?.removed) > 0;
+
+// Huellas de lo ya importado (y no deshecho): el script avisa si eliges el mismo fichero otra vez.
+const knownHashes = Object.fromEntries(
+    jobs.filter((j) => j.file_hash && !j.undone_at).map((j) => [j.file_hash, fmtDate(j.created_at)]),
+);
+---
+<div class="aj-card" data-imp data-known={JSON.stringify(knownHashes)}>
+    <div class="aj-card-head">
+        <div>
+            <h2>Desde IMDb</h2>
+            <p>Tus valoraciones pasan a Vistas con su nota; tu watchlist, a Pendientes.</p>
+        </div>
+        <span class="aj-imp-src">CSV</span>
+    </div>
+
+    <!-- 1 · Elegir ficheros -->
+    <div class="aj-card-body" data-imp-stage="pick">
+        <div class="aj-steps aj-imp-steps">
+            <div>
+                <p class="aj-step-t">1 · Exporta en IMDb</p>
+                <p class="aj-step-d">En «Tus valoraciones» y en «Tu watchlist», menú ⋯ → Exportar. Lo descargas desde «Exportaciones».</p>
+            </div>
+            <div>
+                <p class="aj-step-t">2 · Súbelo aquí</p>
+                <p class="aj-step-d">Puedes elegir los dos ficheros a la vez. Se leen en tu navegador.</p>
+            </div>
+            <div>
+                <p class="aj-step-t">3 · Revisa y añade</p>
+                <p class="aj-step-d">Ves lo que se ha encontrado antes de tocar nada.</p>
+            </div>
+        </div>
+        <label class="aj-imp-drop" data-imp-drop>
+            <input type="file" accept=".csv,text/csv" multiple data-imp-file class="sr-only" />
+            <Icon name="lucide:file-up" aria-hidden="true" />
+            <span class="aj-imp-drop-t">Elige o suelta tus CSV de IMDb</span>
+            <span class="aj-imp-drop-d">ratings.csv · WATCHLIST.csv</span>
+        </label>
+        <p class="aj-imp-msg" data-imp-pick-msg hidden></p>
+    </div>
+
+    <!-- 2 · Buscando en TMDB / guardando -->
+    <div class="aj-card-body" data-imp-stage="progress" hidden>
+        <p class="aj-imp-prog-t" data-imp-prog-t>Buscando en TMDB…</p>
+        <div class="aj-imp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-imp-bar>
+            <span data-imp-bar-fill></span>
+        </div>
+        <p class="aj-imp-prog-d" data-imp-prog-d></p>
+    </div>
+
+    <!-- 3 · Vista previa -->
+    <div class="aj-card-body" data-imp-stage="preview" hidden>
+        <div class="aj-priv aj-imp-dup" role="note" data-imp-dup hidden>
+            <Icon name="lucide:copy" aria-hidden="true" />
+            <span data-imp-dup-t></span>
+        </div>
+        <div class="aj-imp-stats">
+            <div><b data-imp-n="found">0</b><span>encontrados</span></div>
+            <div><b data-imp-n="have">0</b><span>ya en tus listas</span></div>
+            <div><b data-imp-n="missing">0</b><span>no encontrados</span></div>
+            <div><b data-imp-n="ignored">0</b><span>ignorados</span></div>
+        </div>
+        <ul class="aj-imp-dest" data-imp-dest></ul>
+        <div class="aj-imp-posters" data-imp-posters aria-hidden="true"></div>
+        <details class="aj-imp-missing" data-imp-missing hidden>
+            <summary>Ver los que no se han encontrado</summary>
+            <ul data-imp-missing-list></ul>
+        </details>
+        <p class="aj-imp-note">Lo que ya tienes no se toca: si está en Favoritos sigue en Favoritos, si la estás siguiendo sigue en Siguiendo y tus notas mandan sobre las de IMDb. Cada título entra con la fecha en que lo valoraste.</p>
+        <div class="aj-imp-actions">
+            <button type="button" class="aj-btn" data-imp-cancel>Cancelar</button>
+            <button type="button" class="aj-btn is-inv" data-imp-apply><Icon name="lucide:check" aria-hidden="true" />Añadir a mis listas</button>
+        </div>
+    </div>
+
+    <!-- 4 · Hecho -->
+    <div class="aj-card-body" data-imp-stage="done" hidden>
+        <p class="aj-imp-done-t"><Icon name="lucide:circle-check" aria-hidden="true" /><span data-imp-done-t></span></p>
+        <p class="aj-imp-prog-d" data-imp-done-d></p>
+        <div class="aj-imp-actions">
+            <a class="aj-btn" href="/mislistas/vistos">Ver tus vistas</a>
+            <button type="button" class="aj-btn" data-imp-again>Importar otro fichero</button>
+        </div>
+    </div>
+</div>
+
+<div class="aj-card">
+    <div class="aj-row is-soon">
+        <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:clapperboard" /></span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">Desde Letterboxd <span class="aj-soon">Pronto</span></span>
+            <p class="aj-row-desc">Vistas, notas, watchlist, diario y listas, desde el ZIP que te da Letterboxd.</p>
+        </span>
+    </div>
+    <div class="aj-row is-soon">
+        <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:link" /></span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">Desde tu cuenta de TMDB <span class="aj-soon">Pronto</span></span>
+            <p class="aj-row-desc">Favoritos, watchlist, valoraciones y listas, dando permiso en themoviedb.org.</p>
+        </span>
+    </div>
+</div>
+
+<div class="aj-card" data-imp-history hidden={jobs.length === 0}>
+    <div class="aj-card-head">
+        <div>
+            <h2>Tus importaciones</h2>
+            <p>Deshacer quita lo que añadió esa importación y devuelve lo que movió. Lo que hayas cambiado después, se queda.</p>
+        </div>
+    </div>
+    <div data-imp-jobs>
+        {jobs.map((j) => (
+            <div class="aj-row" data-job={j.id}>
+                <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:history" /></span>
+                <span class="aj-row-text">
+                    <span class="aj-row-title">{SOURCE_LABEL[j.source] ?? j.source}{j.label ? ` · ${j.label}` : ''}</span>
+                    <p class="aj-row-desc">
+                        {fmtDate(j.created_at)} · {j.undone_at ? `Deshecha el ${fmtDate(j.undone_at)}` : jobSummary(j)}
+                    </p>
+                </span>
+                {!j.undone_at && changed(j) && (
+                    <button type="button" class="aj-btn" data-imp-undo={j.id}><Icon name="lucide:undo-2" aria-hidden="true" />Deshacer</button>
+                )}
+            </div>
+        ))}
+    </div>
+    <!-- Fila de una importación recién hecha (la rellena el script sin recargar). -->
+    <template data-imp-job-tpl>
+        <div class="aj-row">
+            <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:history" /></span>
+            <span class="aj-row-text">
+                <span class="aj-row-title"></span>
+                <p class="aj-row-desc"></p>
+            </span>
+            <button type="button" class="aj-btn" data-imp-undo><Icon name="lucide:undo-2" aria-hidden="true" />Deshacer</button>
+        </div>
+    </template>
+</div>
+
+<dialog id="imp-undo-dlg" class="so-dlg" role="alertdialog" aria-labelledby="imp-undo-t" aria-describedby="imp-undo-d">
+    <span class="so-dlg-st" style="--sb: var(--stamp-amber); --si: var(--stamp-amber-ink)"><Icon name="lucide:undo-2" /></span>
+    <h3 id="imp-undo-t">¿Deshacer esta importación?</h3>
+    <p id="imp-undo-d">Se quitan los títulos y las notas que añadió, y lo que sacó de Pendientes vuelve. Lo que hayas puesto en Favoritos o Me gusta desde entonces se queda.</p>
+    <div class="so-dlg-f">
+        <button type="button" class="pf-btn" data-imp-undo-cancel>Cancelar</button>
+        <button type="button" class="pf-btn pri" data-imp-undo-confirm><Icon name="lucide:undo-2" />Deshacer</button>
+    </div>
+</dialog>
+
+<script>
+    import { showToast } from '../../scripts/social/toast';
+    import { fileHash } from '../../utils/import/csv';
+    import { parseImdbExport, type ImdbRow } from '../../utils/import/imdb';
+
+    const RESOLVE_BATCH = 50;
+    const count = (v: number, one: string, many: string) => `${v.toLocaleString('es-ES')} ${v === 1 ? one : many}`;
+    const APPLY_BATCH = 200;
+    const MAX_ROWS = 10_000;
+
+    interface Found {
+        row: ImdbRow;
+        media_type: 'movie' | 'tv';
+        tmdb_id: number;
+        title: string;
+        year: number | null;
+        poster_path: string | null;
+        have: boolean;
+    }
+
+    const root = document.querySelector<HTMLElement>('[data-imp]');
+    if (root) init(root);
+
+    function init(root: HTMLElement) {
+        const known: Record<string, string> = JSON.parse(root.dataset.known || '{}');
+        const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
+        const input = $<HTMLInputElement>('[data-imp-file]');
+        const drop = $<HTMLLabelElement>('[data-imp-drop]');
+        const pickMsg = $<HTMLParagraphElement>('[data-imp-pick-msg]');
+
+        let found: Found[] = [];
+        let label = '';
+        let hash: string | null = null;
+        let totals = { rows: 0, found: 0, missing: 0, ignored: 0 };
+
+        const show = (stage: string) => {
+            root.querySelectorAll<HTMLElement>('[data-imp-stage]').forEach((el) => { el.hidden = el.dataset.impStage !== stage; });
+        };
+        const progress = (title: string, done: number, total: number, detail = '') => {
+            $('[data-imp-prog-t]').textContent = title;
+            const pct = total ? Math.round((done / total) * 100) : 0;
+            $<HTMLElement>('[data-imp-bar-fill]').style.width = `${pct}%`;
+            $('[data-imp-bar]').setAttribute('aria-valuenow', String(pct));
+            $('[data-imp-prog-d]').textContent = detail || `${done.toLocaleString('es-ES')} de ${total.toLocaleString('es-ES')}`;
+        };
+        const pickError = (msg: string) => { pickMsg.textContent = msg; pickMsg.hidden = false; show('pick'); };
+
+        async function post<T>(url: string, body: unknown): Promise<T> {
+            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const j = await r.json().catch(() => null);
+            if (!r.ok || !j?.ok) throw new Error(j?.error || String(r.status));
+            return j as T;
+        }
+
+        // --- 1 · Leer los ficheros -------------------------------------------------
+        // Nunca falla en silencio: sin ficheros (arrastrados desde el editor, que solo pasa la ruta)
+        // o con un error inesperado, se dice qué ha pasado bajo la zona de soltar.
+        async function handleFiles(files: File[]) {
+            pickMsg.hidden = true;
+            if (!files.length) {
+                return pickError('No ha llegado ningún fichero. Arrástralo desde el Finder (desde un editor no funciona) o pulsa en el recuadro para elegirlo.');
+            }
+            try {
+                await readFiles(files);
+            } catch (err) {
+                console.error('[importar]', err);
+                pickError('No se ha podido leer el fichero. Prueba otra vez o elígelo pulsando en el recuadro.');
+            }
+        }
+
+        async function readFiles(files: File[]) {
+            const rows: ImdbRow[] = [];
+            const names: string[] = [];
+            const texts: string[] = [];
+            let ignored = 0;
+            for (const f of files) {
+                const text = await f.text();
+                const parsed = parseImdbExport(text, f.name);
+                if (parsed.kind === 'list') {
+                    return pickError(`«${f.name}» es una lista de IMDb. Las listas llegarán con el siguiente paso; por ahora, valoraciones y watchlist.`);
+                }
+                if (parsed.kind === 'unknown') {
+                    return pickError(`«${f.name}» no parece una exportación de IMDb. Busca ratings.csv o WATCHLIST.csv.`);
+                }
+                rows.push(...parsed.rows);
+                ignored += parsed.ignored + parsed.invalid;
+                names.push(f.name);
+                texts.push(text);
+            }
+            if (!rows.length) return pickError('No hay películas ni series en esos ficheros.');
+            if (rows.length > MAX_ROWS) return pickError(`Son ${rows.length.toLocaleString('es-ES')} filas; el máximo es ${MAX_ROWS.toLocaleString('es-ES')}.`);
+
+            label = names.join(' + ');
+            hash = await fileHash(texts.join('\n'));
+            totals = { rows: rows.length + ignored, found: 0, missing: 0, ignored };
+            await resolveAll(rows);
+        }
+
+        // --- 2 · Buscar en TMDB por lotes -------------------------------------------
+        // Cada id se busca una vez aunque venga en los dos ficheros (valorada y en la watchlist).
+        async function resolveAll(rows: ImdbRow[]) {
+            show('progress');
+            const ids = [...new Map(rows.map((r) => [r.imdb, r])).values()];
+            const results = new Map<string, any>();
+            let pending: ImdbRow[] = [];
+            let done = 0;
+            progress('Buscando en TMDB…', 0, ids.length);
+
+            const runBatch = async (batch: ImdbRow[]) => {
+                const res = await post<{ results: any[] }>('/api/import/resolve', {
+                    source: 'imdb', rows: batch.map((r) => ({ imdb: r.imdb, type: r.type })),
+                });
+                const byImdb = new Map(res.results.map((x) => [x.imdb, x]));
+                for (const row of batch) {
+                    const x = byImdb.get(row.imdb);
+                    if (x?.status === 'found' || x?.status === 'missing') results.set(row.imdb, x);
+                    else pending.push(row); // error o sin respuesta: se reintenta al final
+                }
+            };
+
+            for (let i = 0; i < ids.length; i += RESOLVE_BATCH) {
+                const batch = ids.slice(i, i + RESOLVE_BATCH);
+                try { await runBatch(batch); } catch { pending.push(...batch); }
+                done = Math.min(ids.length, i + RESOLVE_BATCH);
+                progress('Buscando en TMDB…', done, ids.length);
+            }
+            // Un reintento para lo que falló (TMDB a veces devuelve un 5xx suelto).
+            if (pending.length) {
+                const retry = pending;
+                pending = [];
+                progress('Reintentando algunos…', done, ids.length);
+                for (let i = 0; i < retry.length; i += RESOLVE_BATCH) {
+                    const batch = retry.slice(i, i + RESOLVE_BATCH);
+                    try { await runBatch(batch); } catch { pending.push(...batch); }
+                }
+            }
+            if (pending.length === ids.length) return pickError('No se ha podido conectar con TMDB. Inténtalo de nuevo en un rato.');
+
+            // Lo que sigue fallando cuenta como no encontrado (volver a importar el fichero lo completa).
+            found = [];
+            const missing: ImdbRow[] = [];
+            const once = new Set<string>();
+            for (const row of rows) {
+                const x = results.get(row.imdb);
+                if (x?.status !== 'found') {
+                    if (!once.has(row.imdb)) missing.push(row);
+                    once.add(row.imdb);
+                    continue;
+                }
+                found.push({ row, media_type: x.media_type, tmdb_id: x.tmdb_id, title: x.title, year: x.year, poster_path: x.poster_path, have: x.have });
+            }
+            totals.found = new Set(found.map((f) => `${f.media_type}:${f.tmdb_id}`)).size;
+            totals.missing = missing.length;
+            renderPreview(missing);
+        }
+
+        // --- 3 · Vista previa ------------------------------------------------------
+        function renderPreview(missing: ImdbRow[]) {
+            const set = (k: string, v: number) => { $(`[data-imp-n="${k}"]`).textContent = v.toLocaleString('es-ES'); };
+            // Títulos distintos (uno valorado y en la watchlist cuenta una vez).
+            const titles = new Map(found.map((f) => [`${f.media_type}:${f.tmdb_id}`, f]));
+            set('found', titles.size);
+            set('have', [...titles.values()].filter((f) => f.have).length);
+            set('missing', missing.length);
+            set('ignored', totals.ignored);
+
+            const seen = found.filter((f) => f.row.kind === 'seen');
+            const rated = seen.filter((f) => f.row.rating).length;
+            const watch = found.filter((f) => f.row.kind === 'watchlist');
+            const dest = $('[data-imp-dest]');
+            dest.innerHTML = '';
+            const li = (title: string, detail: string) => {
+                const el = document.createElement('li');
+                const b = document.createElement('b');
+                b.textContent = title;
+                el.append(b, document.createTextNode(` · ${detail}`));
+                dest.append(el);
+            };
+            if (seen.length) li('Vistas', `${seen.length.toLocaleString('es-ES')} títulos${rated ? `, ${rated.toLocaleString('es-ES')} con nota` : ''}`);
+            if (watch.length) li('Pendientes', `${watch.length.toLocaleString('es-ES')} títulos`);
+
+            const posters = $('[data-imp-posters]');
+            posters.innerHTML = '';
+            for (const f of [...titles.values()].filter((x) => !x.have && x.poster_path).slice(0, 14)) {
+                const img = document.createElement('img');
+                img.src = `https://image.tmdb.org/t/p/w92${f.poster_path}`;
+                img.alt = '';
+                img.loading = 'lazy';
+                posters.append(img);
+            }
+
+            const miss = $<HTMLDetailsElement>('[data-imp-missing]');
+            const list = $('[data-imp-missing-list]');
+            list.innerHTML = '';
+            miss.hidden = !missing.length;
+            for (const m of missing.slice(0, 200)) {
+                const el = document.createElement('li');
+                el.textContent = m.year ? `${m.title} (${m.year})` : m.title;
+                list.append(el);
+            }
+
+            const dup = $('[data-imp-dup]');
+            const prev = hash ? known[hash] : undefined;
+            dup.hidden = !prev;
+            if (prev) $('[data-imp-dup-t]').textContent = `Ya importaste estos mismos ficheros el ${prev}. Si sigues, solo se añade lo que falte.`;
+
+            const btn = $<HTMLButtonElement>('[data-imp-apply]');
+            btn.disabled = !found.length;
+            show('preview');
+        }
+
+        // --- 4 · Aplicar -------------------------------------------------------------
+        async function apply() {
+            const items = found.map((f) => ({
+                media_type: f.media_type, tmdb_id: f.tmdb_id, kind: f.row.kind,
+                ...(f.row.rating ? { rating: f.row.rating } : {}),
+                ...(f.row.date ? { date: f.row.date } : {}),
+            }));
+            show('progress');
+            progress('Añadiendo a tus listas…', 0, items.length);
+            let jobId: string;
+            try {
+                jobId = (await post<{ id: string }>('/api/import/jobs', { source: 'imdb', label, file_hash: hash, totals })).id;
+            } catch {
+                show('preview');
+                return showToast('No se ha podido empezar. Inténtalo de nuevo.', 'error');
+            }
+
+            const sum = { added: 0, removed: 0, rated: 0 };
+            let failed = 0;
+            for (let i = 0; i < items.length; i += APPLY_BATCH) {
+                const batch = items.slice(i, i + APPLY_BATCH);
+                let ok = false;
+                for (let attempt = 0; attempt < 2 && !ok; attempt++) {
+                    try {
+                        const r = await post<typeof sum>('/api/import/apply', { job_id: jobId, items: batch });
+                        sum.added += r.added; sum.removed += r.removed; sum.rated += r.rated;
+                        ok = true;
+                    } catch { /* un reintento */ }
+                }
+                if (!ok) failed += batch.length;
+                progress('Añadiendo a tus listas…', Math.min(items.length, i + APPLY_BATCH), items.length);
+            }
+
+            const parts: string[] = [];
+            if (sum.added) parts.push(count(sum.added, 'título añadido', 'títulos añadidos'));
+            if (sum.rated) parts.push(count(sum.rated, 'nota', 'notas'));
+            $('[data-imp-done-t]').textContent = parts.length ? `Hecho: ${parts.join(' y ')}.` : 'No había nada nuevo que añadir.';
+            const details: string[] = [];
+            if (sum.removed) details.push(`${count(sum.removed, 'salió', 'salieron')} de Pendientes al marcarse como ${sum.removed === 1 ? 'visto' : 'vistos'}.`);
+            const skipped = items.length - failed - sum.added;
+            if (skipped > 0) details.push(`${count(skipped, 'ya estaba', 'ya estaban')} en tus listas.`);
+            if (failed) details.push(`${count(failed, 'no se ha', 'no se han')} podido guardar; vuelve a importar el fichero para completarlo.`);
+            $('[data-imp-done-d]').textContent = details.join(' ');
+            show('done');
+            prependJob(jobId, sum);
+            if (hash) known[hash] = 'hoy';
+        }
+
+        // La fila nueva en «Tus importaciones», sin recargar.
+        function prependJob(id: string, sum: { added: number; rated: number; removed: number }) {
+            const hist = document.querySelector<HTMLElement>('[data-imp-history]');
+            const list = document.querySelector<HTMLElement>('[data-imp-jobs]');
+            const tpl = document.querySelector<HTMLTemplateElement>('[data-imp-job-tpl]');
+            if (!hist || !list || !tpl) return;
+            const row = (tpl.content.firstElementChild as HTMLElement).cloneNode(true) as HTMLElement;
+            row.dataset.job = id;
+            row.querySelector('.aj-row-title')!.textContent = `IMDb · ${label}`;
+            const bits = [count(sum.added, 'añadido', 'añadidos')];
+            if (sum.rated) bits.push(count(sum.rated, 'nota', 'notas'));
+            if (totals.missing) bits.push(`${totals.missing.toLocaleString('es-ES')} sin encontrar`);
+            row.querySelector('.aj-row-desc')!.textContent = `Hoy · ${bits.join(' · ')}`;
+            const undo = row.querySelector<HTMLButtonElement>('[data-imp-undo]')!;
+            if (sum.added + sum.rated + sum.removed > 0) undo.dataset.impUndo = id;
+            else undo.remove();
+            list.prepend(row);
+            hist.hidden = false;
+        }
+
+        input.addEventListener('change', () => { handleFiles([...(input.files ?? [])]); input.value = ''; });
+        // Se puede soltar en cualquier parte de la página mientras se está eligiendo: si no, un fichero
+        // que cae un poco fuera del recuadro lo abre o lo descarga el navegador.
+        const picking = () => !root.querySelector<HTMLElement>('[data-imp-stage="pick"]')!.hidden;
+        let dragDepth = 0;
+        document.addEventListener('dragenter', (e) => {
+            if (!picking()) return;
+            e.preventDefault();
+            dragDepth++;
+            drop.classList.add('is-over');
+        });
+        document.addEventListener('dragleave', () => {
+            dragDepth = Math.max(0, dragDepth - 1);
+            if (!dragDepth) drop.classList.remove('is-over');
+        });
+        document.addEventListener('dragover', (e) => { if (picking()) e.preventDefault(); });
+        document.addEventListener('drop', (e) => {
+            if (!picking()) return;
+            e.preventDefault();
+            dragDepth = 0;
+            drop.classList.remove('is-over');
+            handleFiles([...(e.dataTransfer?.files ?? [])]);
+        });
+        $('[data-imp-cancel]').addEventListener('click', () => { found = []; show('pick'); });
+        $('[data-imp-apply]').addEventListener('click', apply);
+        $('[data-imp-again]').addEventListener('click', () => { found = []; show('pick'); });
+    }
+
+    // --- Deshacer una importación ----------------------------------------------------
+    const dlg = document.getElementById('imp-undo-dlg') as HTMLDialogElement | null;
+    const okBtn = dlg?.querySelector<HTMLButtonElement>('[data-imp-undo-confirm]');
+    let undoId: string | null = null;
+
+    document.addEventListener('click', (e) => {
+        const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-imp-undo]');
+        if (!b || !dlg) return;
+        undoId = b.dataset.impUndo || null;
+        dlg.showModal();
+    });
+    dlg?.querySelector('[data-imp-undo-cancel]')?.addEventListener('click', () => dlg.close());
+    dlg?.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+    okBtn?.addEventListener('click', async () => {
+        if (!undoId) return;
+        okBtn.disabled = true;
+        try {
+            const r = await fetch('/api/import/undo', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job_id: undoId }),
+            });
+            const j = await r.json().catch(() => null);
+            if (!r.ok || !j?.ok) throw new Error(String(r.status));
+            const row = document.querySelector<HTMLElement>(`[data-job="${undoId}"]`);
+            row?.querySelector('[data-imp-undo]')?.remove();
+            const desc = row?.querySelector('.aj-row-desc');
+            if (desc) desc.textContent = `${desc.textContent?.split(' · ')[0]} · Deshecha hoy`;
+            dlg?.close();
+            showToast(`Importación deshecha: ${count(Number(j.removed) || 0, 'título quitado', 'títulos quitados')}.`);
+        } catch {
+            dlg?.close();
+            showToast('No se ha podido deshacer. Inténtalo de nuevo.', 'error');
+        } finally {
+            okBtn.disabled = false;
+        }
+    });
+</script>

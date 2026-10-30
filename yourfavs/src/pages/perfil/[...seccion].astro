@@ -40,6 +40,8 @@ import SeccionContenido from "../../components/ajustes/SeccionContenido.astro";
 import SeccionApariencia from "../../components/ajustes/SeccionApariencia.astro";
 import SeccionCalendario from "../../components/ajustes/SeccionCalendario.astro";
 import SeccionCuenta from "../../components/ajustes/SeccionCuenta.astro";
+import SeccionImportar from "../../components/ajustes/SeccionImportar.astro";
+import { listImportJobs, type ImportJob } from "../../services/BD/import/importLibrary";
 
 // Protegida por el middleware (`/perfil*` sin sesión → redirige a /). Aquí ya hay user.
 const user = Astro.locals.user!;
@@ -183,6 +185,15 @@ if (activeKey === 'calendario') {
         console.error('Error al leer la dirección del calendario:', error);
     }
 }
+// Importar (TMDB D3): tus importaciones anteriores, para avisar de repetidas y poder deshacerlas.
+let importJobs: ImportJob[] = [];
+if (activeKey === 'importar') {
+    try {
+        importJobs = await listImportJobs();
+    } catch (error) {
+        console.error('Error al leer tus importaciones:', error);
+    }
+}
 ---
 <Layout title={`${section.title} — Ajustes · YourFavs`}>
     <div class:list={["aj-root", { "is-index": isIndex }]} data-autosave>
@@ -222,6 +233,7 @@ if (activeKey === 'calendario') {
                     {activeKey === 'contenido' && <SeccionContenido profile={profile} />}
                     {activeKey === 'apariencia' && <SeccionApariencia profile={profile} />}
                     {activeKey === 'calendario' && <SeccionCalendario icsUrl={icsUrl} icsPlans={(profile as UserProfile).icsPlans !== false} />}
+                    {activeKey === 'importar' && <SeccionImportar jobs={importJobs} />}
                     {activeKey === 'cuenta' && <SeccionCuenta user={user} />}
                 </div>
             </div>

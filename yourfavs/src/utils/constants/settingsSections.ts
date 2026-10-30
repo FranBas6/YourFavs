@@ -77,6 +77,12 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
         description: 'Lleva tus estrenos y tus planes a tu app de calendario de siempre.',
     },
     {
+        // TMDB D3: traer lo que ya tienes en IMDb (Letterboxd y la cuenta de TMDB, después).
+        key: 'importar', label: 'Importar', group: 'cuenta', icon: 'upload',
+        title: 'Importar tu biblioteca',
+        description: 'Trae lo que ya tienes valorado o apuntado en otra app. No se borra nada tuyo y puedes deshacerlo.',
+    },
+    {
         key: 'cuenta', label: 'Cuenta y datos', group: 'cuenta', icon: 'shield',
         title: 'Cuenta y datos',
         description: 'Tu sesión y las opciones que no se pueden deshacer.',

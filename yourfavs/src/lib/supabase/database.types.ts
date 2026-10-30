@@ -191,6 +191,38 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"import_job_changes": {
+                  Row: {
+                    "collection": string | null,"job_id": string,"kind": string,"media_type": Database["public"]['Enums']["media_type"],"prev": Json | null,"tmdb_id": number,"user_id": string
+                  }
+                  Insert: {
+                    "collection"?: string | null,"job_id": string,"kind": string,"media_type": Database["public"]['Enums']["media_type"],"prev"?: Json | null,"tmdb_id": number,"user_id"?: string
+                  }
+                  Update: {
+                    "collection"?: string | null,"job_id"?: string,"kind"?: string,"media_type"?: Database["public"]['Enums']["media_type"],"prev"?: Json | null,"tmdb_id"?: number,"user_id"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "import_job_changes_job_id_fkey"
+      columns: ["job_id"]
+isOneToOne: false
+      referencedRelation: "import_jobs"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"import_jobs": {
+                  Row: {
+                    "created_at": string,"file_hash": string | null,"id": string,"label": string,"source": string,"totals": NonNullable<Json>,"undone_at": string | null,"user_id": string
+                  }
+                  Insert: {
+                    "created_at"?: string,"file_hash"?: string | null,"id"?: string,"label"?: string,"source": string,"totals"?: NonNullable<Json>,"undone_at"?: string | null,"user_id"?: string
+                  }
+                  Update: {
+                    "created_at"?: string,"file_hash"?: string | null,"id"?: string,"label"?: string,"source"?: string,"totals"?: NonNullable<Json>,"undone_at"?: string | null,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"library_items": {
                   Row: {
                     "added_at": string,"collection": string,"media_type": Database["public"]['Enums']["media_type"],"opinion": string | null,"position": number | null,"rating": number | null,"tmdb_id": number,"user_id": string
@@ -483,6 +515,12 @@ isOneToOne: true
                            },
 "ics_token_rotate":
 { Args: { "p_me": string }; Returns: string
+                           },
+"import_apply":
+{ Args: { "p_job": string,"p_ops": Json }; Returns: Json
+                           },
+"import_undo":
+{ Args: { "p_job": string }; Returns: Json
                            },
 "msg_add_members":
 { Args: { "p_conv": number,"p_ids": (string)[],"p_me": string }; Returns: Json
