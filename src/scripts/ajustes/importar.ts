@@ -74,6 +74,8 @@ function init(root: HTMLElement) {
     let hash: string | null = null;
     let ignored = 0;
     let imdbRows: ImdbRow[] = [];
+    /** Listas propias de IMDb (F1), una colección por fichero. */
+    let imdbLists: { name: string; items: ImdbRow[] }[] = [];
     let lb: LbExport | null = null;
     let tmdb: TmdbAccount | null = null;
     let lookups: Lookup[] = [];
@@ -141,23 +143,24 @@ function init(root: HTMLElement) {
 
     async function readImdb(texts: Map<string, string>) {
         const rows: ImdbRow[] = [];
+        const lists: { name: string; items: ImdbRow[] }[] = [];
         ignored = 0;
         for (const [name, text] of texts) {
             const parsed = parseImdbExport(text, name);
-            if (parsed.kind === 'list') {
-                return pickError(`«${name}» es una lista de IMDb. Por ahora se importan valoraciones y watchlist (las listas, desde Letterboxd).`);
-            }
+            if (parsed.list?.items.length) lists.push(parsed.list);
             if (parsed.kind === 'unknown') {
                 return pickError(`«${name}» no parece una exportación de IMDb ni de Letterboxd. Busca ratings.csv, WATCHLIST.csv o el ZIP de Letterboxd.`);
             }
             rows.push(...parsed.rows);
             ignored += parsed.ignored + parsed.invalid;
         }
-        if (!rows.length) return pickError('No hay películas ni series en esos ficheros.');
-        if (rows.length > MAX_ROWS) return pickError(`Son ${num(rows.length)} filas; el máximo es ${num(MAX_ROWS)}.`);
+        const all = [...rows, ...lists.flatMap((l) => l.items)];
+        if (!all.length) return pickError('No hay películas ni series en esos ficheros.');
+        if (all.length > MAX_ROWS) return pickError(`Son ${num(all.length)} filas; el máximo es ${num(MAX_ROWS)}.`);
         imdbRows = rows;
+        imdbLists = lists;
         lb = null;
-        lookups = [...new Map(rows.map((r) => [r.imdb, r])).values()].map((r) => ({
+        lookups = [...new Map(all.map((r) => [r.imdb, r])).values()].map((r) => ({
             key: r.imdb, label: r.year ? `${r.title} (${r.year})` : r.title, req: { imdb: r.imdb, type: r.type },
         }));
         await resolveAll();
@@ -169,6 +172,7 @@ function init(root: HTMLElement) {
         if (parsed.films.size > MAX_ROWS) return pickError(`Son ${num(parsed.films.size)} películas; el máximo es ${num(MAX_ROWS)}.`);
         lb = parsed;
         imdbRows = [];
+        imdbLists = [];
         ignored = parsed.favoritesUnmatched;
         lookups = [...parsed.films.values()].map((f) => ({
             key: f.key, label: f.year ? `${f.name} (${f.year})` : f.name, req: { key: f.key, name: f.name, year: f.year },
@@ -251,6 +255,7 @@ function init(root: HTMLElement) {
         hash = null;
         ignored = 0;
         imdbRows = [];
+        imdbLists = [];
         lb = null;
         results.clear();
         choices.clear();
@@ -393,7 +398,10 @@ function init(root: HTMLElement) {
         if (plan.log.length) li('Diario', count(plan.log.length, 'pase con su fecha', 'pases con su fecha'));
         if (plan.lists.length) {
             const items = plan.lists.reduce((s, l) => s + l.items.length, 0);
-            li('Colecciones', `${count(plan.lists.length, 'lista', 'listas')} con ${count(items, 'título', 'títulos')}`);
+            // Con los nombres: en IMDb salen del fichero y conviene verlos antes de aplicar.
+            const names = plan.lists.slice(0, 4).map((l) => `«${l.name}» (${num(l.items.length)})`).join(', ')
+                + (plan.lists.length > 4 ? ` y ${count(plan.lists.length - 4, 'más', 'más')}` : '');
+            li('Colecciones', `${count(plan.lists.length, 'lista', 'listas')} con ${count(items, 'título', 'títulos')}: ${names}`);
         }
         $<HTMLButtonElement>('[data-imp-apply]').disabled = !plan.items.length && !plan.log.length && !plan.lists.length;
     }
@@ -470,6 +478,17 @@ function init(root: HTMLElement) {
                 if (seen.has(k)) continue;
                 seen.add(k);
                 items.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, kind: row.kind, ...opt(row.rating, row.date) });
+            }
+            for (const l of imdbLists) {
+                const ids = new Set<string>();
+                const its: PlanList['items'] = [];
+                for (const row of l.items) {
+                    const p = pickFor(row.imdb);
+                    if (!p || ids.has(`${p.media_type}:${p.tmdb_id}`)) continue;
+                    ids.add(`${p.media_type}:${p.tmdb_id}`);
+                    its.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, title: p.title, poster_path: p.poster_path });
+                }
+                if (its.length) lists.push({ name: l.name, description: '', items: its });
             }
             return { items, log, lists };
         }

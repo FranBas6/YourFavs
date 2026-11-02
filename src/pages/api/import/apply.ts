@@ -68,7 +68,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 id = (await createImportList(body.job_id, {
                     name: String(body.list.name ?? ''),
                     description: String(body.list.description ?? ''),
-                    suffix: body.list.source === 'tmdb' ? 'TMDB' : 'Letterboxd',
+                    suffix: ({ tmdb: 'TMDB', imdb: 'IMDb' } as Record<string, string>)[body.list.source] ?? 'Letterboxd',
                     cover: first ? { poster_path: first.poster_path!, tmdb_id: first.tmdb_id } : null,
                 })).id;
             }
