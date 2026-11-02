@@ -87,13 +87,13 @@ export async function revokeToken(token: string): Promise<void> {
 
 /** Qué se lee. Las listas: primero el índice (`lists`) y luego cada una (`list`). */
 export type TraktKind =
-    | 'watched_movies' | 'history_movies'
+    | 'watched_movies' | 'history_movies' | 'watched_shows'
     | 'ratings_movies' | 'ratings_shows'
     | 'watchlist_movies' | 'watchlist_shows'
     | 'favorites_movies' | 'favorites_shows'
     | 'lists' | 'list';
 export const TRAKT_KINDS: TraktKind[] = [
-    'watched_movies', 'history_movies', 'ratings_movies', 'ratings_shows',
+    'watched_movies', 'history_movies', 'watched_shows', 'ratings_movies', 'ratings_shows',
     'watchlist_movies', 'watchlist_shows', 'favorites_movies', 'favorites_shows', 'lists', 'list',
 ];
 
@@ -107,6 +107,10 @@ export interface TraktTitle {
     date?: string;
     /** 1-10 (Trakt solo da enteros). */
     rating?: number;
+    /** Solo `watched_shows` (F3): [temporada, episodio, ISO de cuándo lo viste]. */
+    episodes?: [number, number, string][];
+    /** Solo `watched_shows`: terminada (la serie acabó y has visto todos sus episodios emitidos). */
+    complete?: boolean;
 }
 
 export interface TraktPage {
@@ -133,7 +137,7 @@ function toTitle(x: any, dateField?: string): TraktTitle | null {
     return t;
 }
 
-const PATHS: Record<Exclude<TraktKind, 'lists' | 'list'>, { path: string; date: string; paged: boolean }> = {
+const PATHS: Record<Exclude<TraktKind, 'lists' | 'list' | 'watched_shows'>, { path: string; date: string; paged: boolean }> = {
     watched_movies: { path: '/sync/watched/movies', date: 'last_watched_at', paged: false },
     history_movies: { path: '/sync/history/movies', date: 'watched_at', paged: true },
     ratings_movies: { path: '/sync/ratings/movies', date: 'rated_at', paged: true },
@@ -144,7 +148,41 @@ const PATHS: Record<Exclude<TraktKind, 'lists' | 'list'>, { path: string; date: 
     favorites_shows: { path: '/sync/favorites/shows', date: 'listed_at', paged: true },
 };
 
+/**
+ * Series vistas con su progreso (F3). Trakt no pagina esta lista y la devuelve con cada episodio; con
+ * `extended=full` añade el estado de la serie y cuántos episodios se han emitido, para saber si está
+ * terminada (acabó y los has visto todos: Vistas) o a medias (Siguiendo). Los especiales (temporada 0)
+ * se importan, pero no cuentan para «terminada».
+ */
+async function fetchWatchedShows(token: string): Promise<TraktPage> {
+    const { data } = await request<any[]>(`${API}/sync/watched/shows?extended=full`, { token });
+    const titles: TraktTitle[] = [];
+    let skipped = 0;
+    for (const x of data ?? []) {
+        const t = toTitle(x, 'last_watched_at');
+        if (!t) { skipped++; continue; }
+        const eps: [number, number, string][] = [];
+        for (const s of x.seasons ?? []) {
+            for (const e of s.episodes ?? []) {
+                const season = Number(s.number), episode = Number(e.number);
+                if (Number.isInteger(season) && season >= 0 && Number.isInteger(episode) && episode > 0) {
+                    eps.push([season, episode, String(e.last_watched_at ?? x.last_watched_at ?? '')]);
+                }
+            }
+        }
+        if (!eps.length) continue;
+        const regular = eps.filter(([s]) => s > 0).length;
+        const aired = Number(x.show?.aired_episodes) || 0;
+        const ended = ['ended', 'canceled'].includes(String(x.show?.status ?? '').toLowerCase());
+        t.episodes = eps;
+        t.complete = ended && aired > 0 && regular >= aired;
+        titles.push(t);
+    }
+    return { titles, skipped, pages: 1 };
+}
+
 export async function fetchTraktPage(token: string, kind: TraktKind, page: number, listId?: number): Promise<TraktPage> {
+    if (kind === 'watched_shows') return fetchWatchedShows(token);
     const paging = new URLSearchParams({ page: String(page), limit: String(PAGE_LIMIT) });
     if (kind === 'lists') {
         const { data } = await request<any[]>(`${API}/users/me/lists`, { token });

@@ -36,11 +36,12 @@ function jobSummary(j: ImportJob): string {
     if (n(t.rated)) parts.push(count(n(t.rated), 'nota', 'notas'));
     if (n(t.logged)) parts.push(count(n(t.logged), 'pase', 'pases'));
     if (n(t.listed)) parts.push(`${n(t.listed).toLocaleString('es-ES')} en colecciones`);
+    if (n(t.episodes)) parts.push(count(n(t.episodes), 'episodio', 'episodios'));
     if (n(t.missing)) parts.push(`${n(t.missing).toLocaleString('es-ES')} sin encontrar`);
     return parts.join(' · ');
 }
 /** Una importación que no cambió nada no tiene nada que deshacer. */
-const changed = (j: ImportJob) => ['added', 'rated', 'removed', 'logged', 'listed'].some((k) => n(j.totals?.[k]) > 0);
+const changed = (j: ImportJob) => ['added', 'rated', 'removed', 'logged', 'listed', 'episodes'].some((k) => n(j.totals?.[k]) > 0);
 
 // Huellas de lo ya importado (y no deshecho): el script avisa si eliges el mismo fichero otra vez.
 const knownHashes = Object.fromEntries(
@@ -148,7 +149,7 @@ const knownHashes = Object.fromEntries(
         <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:link" /></span>
         <span class="aj-row-text">
             <span class="aj-row-title">Desde tu cuenta de Trakt {!traktOn && <span class="aj-soon">Pronto</span>}</span>
-            <p class="aj-row-desc">Vistas, valoraciones, watchlist, favoritos, listas y tu historial de películas. Das permiso en trakt.tv, leemos tu cuenta y el permiso se retira al terminar.</p>
+            <p class="aj-row-desc">Vistas, valoraciones, watchlist, favoritos, listas, tu historial de películas y tu progreso en cada serie, episodio a episodio. Das permiso en trakt.tv, leemos tu cuenta y el permiso se retira al terminar.</p>
         </span>
         {traktOn && <a class="aj-btn" href="/api/import/trakt/start" data-imp-trakt><Icon name="lucide:link" aria-hidden="true" />Conectar</a>}
     </div>

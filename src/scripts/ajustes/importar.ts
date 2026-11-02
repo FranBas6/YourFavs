@@ -23,6 +23,7 @@ type Source = 'imdb' | 'letterboxd' | 'tmdb' | 'trakt';
 const RESOLVE_BATCH = 50;
 const APPLY_BATCH = 200;
 const LOG_BATCH = 300;
+const EPISODE_BATCH = 1000;
 const MAX_ROWS = 10_000;
 const POSTER = 'https://image.tmdb.org/t/p/w92';
 const SOURCE_LABEL: Record<Source, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB', trakt: 'Trakt' };
@@ -61,6 +62,9 @@ interface TraktEntry {
     rating?: number; ratedOn?: string;
     /** Días de cada visionado (historial de películas): pases en el diario. */
     plays: string[];
+    /** Series (F3): episodios vistos [temporada, episodio, ISO] y si está terminada. */
+    episodes?: [number, number, string][];
+    complete?: boolean;
 }
 interface TraktAccount {
     entries: Map<string, TraktEntry>;
@@ -289,7 +293,7 @@ function init(root: HTMLElement) {
         show('progress');
         const acc: TraktAccount = { entries: new Map(), lists: [], skipped: 0 };
         const STEPS: [string, string][] = [
-            ['watched_movies', 'películas vistas'], ['history_movies', 'historial'],
+            ['watched_movies', 'películas vistas'], ['history_movies', 'historial'], ['watched_shows', 'series vistas'],
             ['ratings_movies', 'valoraciones'], ['ratings_shows', 'series valoradas'],
             ['favorites_movies', 'favoritos'], ['favorites_shows', 'series favoritas'],
             ['watchlist_movies', 'watchlist'], ['watchlist_shows', 'series en tu watchlist'],
@@ -327,6 +331,7 @@ function init(root: HTMLElement) {
                     const e = entry(t);
                     if (kind === 'watched_movies') { e.seen = true; e.seenOn = t.date; }
                     if (kind === 'history_movies' && t.date) e.plays.push(t.date);
+                    if (kind === 'watched_shows') { e.episodes = t.episodes ?? []; e.complete = !!t.complete; e.seenOn = t.date; }
                     if (kind.startsWith('ratings') && t.rating) { e.rating = t.rating; e.ratedOn = t.date; }
                     if (kind.startsWith('favorites')) e.favorite = true;
                     if (kind.startsWith('watchlist')) { e.watchlist = true; e.listedOn = t.date; }
@@ -491,6 +496,7 @@ function init(root: HTMLElement) {
         if (by('liked').length) li('Me gusta', what(by('liked')));
         if (by('seen').length) li('Vistas', count(by('seen').length, 'título', 'títulos'));
         if (rated) li('Notas', `${num(rated)} (las tuyas mandan)`);
+        if (by('following').length) li('Siguiendo', count(by('following').length, 'serie a medias', 'series a medias'));
         if (by('watchlist').length) li('Pendientes', count(by('watchlist').length, 'título', 'títulos'));
         if (plan.log.length) li('Diario', count(plan.log.length, 'pase con su fecha', 'pases con su fecha'));
         if (plan.lists.length) {
@@ -500,7 +506,11 @@ function init(root: HTMLElement) {
                 + (plan.lists.length > 4 ? ` y ${count(plan.lists.length - 4, 'más', 'más')}` : '');
             li('Colecciones', `${count(plan.lists.length, 'lista', 'listas')} con ${count(items, 'título', 'títulos')}: ${names}`);
         }
-        $<HTMLButtonElement>('[data-imp-apply]').disabled = !plan.items.length && !plan.log.length && !plan.lists.length;
+        if (plan.episodes.length) {
+            const series = new Set(plan.episodes.map((e) => e.serie_id)).size;
+            li('Episodios', `${num(plan.episodes.length)} vistos en ${count(series, 'serie', 'series')}, con su fecha`);
+        }
+        $<HTMLButtonElement>('[data-imp-apply]').disabled = !plan.items.length && !plan.log.length && !plan.lists.length && !plan.episodes.length;
     }
 
     function renderAmbiguous(amb: [string, Resolved][]) {
@@ -558,10 +568,12 @@ function init(root: HTMLElement) {
     // --- 4 · Qué se manda: títulos, diario y colecciones -------------------------------
     interface PlanItem { media_type: 'movie' | 'tv'; tmdb_id: number; kind: string; rating?: number; date?: string }
     interface PlanLog { media_type: 'movie' | 'tv'; tmdb_id: number; date: string; rewatch: boolean }
+    interface PlanEpisode { serie_id: number; season: number; episode: number; watched_at: string }
     interface PlanList { name: string; description: string; items: { media_type: 'movie' | 'tv'; tmdb_id: number; title: string; poster_path: string | null }[] }
 
-    function buildPlan(): { items: PlanItem[]; log: PlanLog[]; lists: PlanList[] } {
+    function buildPlan(): { items: PlanItem[]; log: PlanLog[]; lists: PlanList[]; episodes: PlanEpisode[] } {
         const items: PlanItem[] = [];
+        const episodes: PlanEpisode[] = [];
         const log: PlanLog[] = [];
         const lists: PlanList[] = [];
         const opt = (rating?: number, date?: string) => ({ ...(rating ? { rating } : {}), ...(date ? { date } : {}) });
@@ -587,7 +599,7 @@ function init(root: HTMLElement) {
                 }
                 if (its.length) lists.push({ name: l.name, description: '', items: its });
             }
-            return { items, log, lists };
+            return { items, log, lists, episodes };
         }
 
         // Trakt: Favoritos > Vistas (vista o valorada) > Pendientes; el historial de películas, pases en el
@@ -596,8 +608,15 @@ function init(root: HTMLElement) {
             for (const [k, e] of trakt!.entries) {
                 const p = pickFor(k);
                 if (!p) continue;
-                const kind = e.favorite ? 'favorite' : (e.seen || e.rating) ? 'seen' : e.watchlist ? 'watchlist' : null;
-                if (kind) items.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, kind, ...opt(e.rating, kind === 'watchlist' ? e.listedOn : (e.seenOn ?? e.ratedOn)) });
+                // Series con progreso (F3): a medias → Siguiendo (desde el primer episodio que viste);
+                // terminadas → Vistas (o Favoritos). Lo demás, como las películas.
+                const progress = p.media_type === 'tv' && !!e.episodes?.length;
+                const kind = progress && !e.complete ? 'following'
+                    : e.favorite ? 'favorite' : (e.seen || e.rating || progress) ? 'seen' : e.watchlist ? 'watchlist' : null;
+                const started = progress ? e.episodes!.map(([, , at]) => at.slice(0, 10)).filter(Boolean).sort()[0] : undefined;
+                const date = kind === 'watchlist' ? e.listedOn : kind === 'following' ? started : (e.seenOn ?? e.ratedOn);
+                if (kind) items.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, kind, ...opt(e.rating, date) });
+                if (progress) for (const [season, episode, at] of e.episodes!) episodes.push({ serie_id: p.tmdb_id, season, episode, watched_at: at });
                 if (p.media_type === 'movie') {
                     [...e.plays].sort().forEach((date, i) => log.push({ media_type: 'movie', tmdb_id: p.tmdb_id, date, rewatch: i > 0 }));
                 }
@@ -613,7 +632,7 @@ function init(root: HTMLElement) {
                 }
                 if (its.length) lists.push({ name: l.name, description: l.description, items: its });
             }
-            return { items, log, lists };
+            return { items, log, lists, episodes };
         }
 
         // Cuenta de TMDB: ya viene un título por id; Favoritos > Vistas (valorada) > Pendientes.
@@ -623,7 +642,7 @@ function init(root: HTMLElement) {
                 if (kind) items.push({ media_type: t.media_type, tmdb_id: t.tmdb_id, kind, ...opt(t.rating, kind === 'watchlist' ? undefined : t.rated_on) });
             }
             for (const l of tmdb!.lists) if (l.items.length) lists.push(l);
-            return { items, log, lists };
+            return { items, log, lists, episodes };
         }
 
         // Letterboxd: una ficha por película → una sola lista (Favoritos > Me gusta > Vistas; Pendientes
@@ -656,13 +675,13 @@ function init(root: HTMLElement) {
             }
             if (its.length) lists.push({ name: l.name, description: l.description, items: its });
         }
-        return { items, log, lists };
+        return { items, log, lists, episodes };
     }
 
     // --- 5 · Aplicar -----------------------------------------------------------------------
     async function apply() {
         const plan = buildPlan();
-        const total = plan.items.length + plan.log.length + plan.lists.reduce((s, l) => s + l.items.length, 0);
+        const total = plan.items.length + plan.log.length + plan.lists.reduce((s, l) => s + l.items.length, 0) + plan.episodes.length;
         const found = [...results.values()].filter((r) => r.status === 'found').length + [...choices.values()].filter((v) => v != null).length;
         const missing = [...results.values()].filter((r) => r.status === 'missing').length;
         show('progress');
@@ -679,7 +698,7 @@ function init(root: HTMLElement) {
             return showToast('No se ha podido empezar. Inténtalo de nuevo.', 'error');
         }
 
-        const sum = { added: 0, removed: 0, rated: 0, logged: 0, listed: 0 };
+        const sum = { added: 0, removed: 0, rated: 0, logged: 0, listed: 0, episodes: 0 };
         let failed = 0;
         let done = 0;
         const send = async (body: Record<string, unknown>, size: number): Promise<any> => {
@@ -705,6 +724,10 @@ function init(root: HTMLElement) {
             const batch = plan.log.slice(i, i + LOG_BATCH);
             await send({ log: batch }, batch.length);
         }
+        for (let i = 0; i < plan.episodes.length; i += EPISODE_BATCH) {
+            const batch = plan.episodes.slice(i, i + EPISODE_BATCH);
+            await send({ episodes: batch }, batch.length);
+        }
         for (const l of plan.lists) {
             let listId = '';
             for (let i = 0; i < l.items.length; i += APPLY_BATCH) {
@@ -720,6 +743,7 @@ function init(root: HTMLElement) {
         if (sum.rated) parts.push(count(sum.rated, 'nota', 'notas'));
         if (sum.logged) parts.push(count(sum.logged, 'pase en el diario', 'pases en el diario'));
         if (sum.listed) parts.push(`${num(sum.listed)} en ${count(plan.lists.length, 'colección', 'colecciones')}`);
+        if (sum.episodes) parts.push(count(sum.episodes, 'episodio marcado', 'episodios marcados'));
         $('[data-imp-done-t]').textContent = parts.length
             ? `Hecho: ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}` : parts[0]}.`
             : 'No había nada nuevo que añadir.';
@@ -746,6 +770,7 @@ function init(root: HTMLElement) {
         const bits = [count(sum.added, 'añadido', 'añadidos')];
         if (sum.rated) bits.push(count(sum.rated, 'nota', 'notas'));
         if (sum.logged) bits.push(count(sum.logged, 'pase', 'pases'));
+        if (sum.episodes) bits.push(count(sum.episodes, 'episodio', 'episodios'));
         if (sum.listed) bits.push(`${num(sum.listed)} en colecciones`);
         if (missing) bits.push(`${num(missing)} sin encontrar`);
         row.querySelector('.aj-row-desc')!.textContent = `Hoy · ${bits.join(' · ')}`;

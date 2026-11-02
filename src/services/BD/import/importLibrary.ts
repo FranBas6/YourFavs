@@ -22,7 +22,8 @@ export type ImportSource = 'imdb' | 'letterboxd' | 'tmdb' | 'trakt';
 export interface ImportItem {
     media_type: 'movie' | 'tv';
     tmdb_id: number;
-    kind: 'seen' | 'liked' | 'favorite' | 'watchlist';
+    /** `following` (Trakt, F3): serie a medias → Siguiendo. */
+    kind: 'seen' | 'liked' | 'favorite' | 'watchlist' | 'following';
     /** 1-10, ya en nuestra escala. */
     rating?: number;
     /** YYYY-MM-DD */
@@ -47,6 +48,15 @@ export interface ImportLog {
     rewatch: boolean;
 }
 
+/** Un episodio visto con su fecha (Trakt, F3). */
+export interface ImportEpisode {
+    serie_id: number;
+    season: number;
+    episode: number;
+    /** ISO: cuándo lo viste. */
+    watched_at: string | null;
+}
+
 /** Un título para una colección propia (D3b). */
 export interface ImportListed {
     media_type: 'movie' | 'tv';
@@ -61,6 +71,7 @@ interface Ops {
     rate: { media_type: 'movie' | 'tv'; tmdb_id: number; score: number; at: string | null }[];
     log?: ImportLog[];
     listed?: (ImportListed & { list_id: string; position: number })[];
+    episodes?: ImportEpisode[];
 }
 
 const SEEN = { movie: 'MoviesVistas', tv: 'SeriesVistas' } as const;
@@ -151,6 +162,15 @@ export function planImport(items: ImportItem[], state: Map<string, TitleState>):
             for (const a of ops.add) if (a.tmdb_id === id && a.rating === null) a.rating = it.rating;
         }
 
+        // Serie a medias (Trakt, F3) → Siguiendo, y sale de Pendientes / Ver pronto. Si ya la sigues,
+        // la abandonaste o la tienes vista (Vistas, Me gusta, Favoritos), se deja como está.
+        if (it.kind === 'following') {
+            if (mt !== 'tv') continue;
+            if ([...IN_PROGRESS.tv, SEEN.tv, LIKED.tv, FAVS.tv].some((c) => s.collections.has(c))) continue;
+            add('SeriesSiguiendo');
+            for (const c of CLEARED_BY_SEEN.tv) remove(c);
+            continue;
+        }
         if (it.kind === 'watchlist') {
             if (KEEP_ON_WATCHLIST[mt].some((c) => s.collections.has(c))) continue;
             add(WATCHLIST[mt]);
@@ -209,11 +229,13 @@ export async function applyImportBatch(jobId: string, batch: {
     items?: ImportItem[];
     log?: ImportLog[];
     list?: { id: string; items: ImportListed[] };
+    episodes?: ImportEpisode[];
 }): Promise<Record<string, number>> {
     const userId = requireAuthId();
     const items = batch.items ?? [];
     const ops = planImport(items, await loadState(userId, items));
     if (batch.log?.length) ops.log = batch.log;
+    if (batch.episodes?.length) ops.episodes = batch.episodes;
     if (batch.list?.items.length) {
         const { data: last, error } = await db().from('custom_list_items').select('position')
             .eq('user_id', userId).eq('list_id', batch.list.id)
@@ -222,8 +244,8 @@ export async function applyImportBatch(jobId: string, batch: {
         const from = Number(last?.position) || 0;
         ops.listed = batch.list.items.map((it, i) => ({ ...it, list_id: batch.list!.id, position: from + i + 1 }));
     }
-    if (!ops.add.length && !ops.remove.length && !ops.rate.length && !ops.log?.length && !ops.listed?.length) {
-        return { added: 0, removed: 0, rated: 0, logged: 0, listed: 0 };
+    if (!ops.add.length && !ops.remove.length && !ops.rate.length && !ops.log?.length && !ops.listed?.length && !ops.episodes?.length) {
+        return { added: 0, removed: 0, rated: 0, logged: 0, listed: 0, episodes: 0 };
     }
     const { data, error } = await db().rpc('import_apply', { p_job: jobId, p_ops: ops as any });
     if (error) throw new Error(error.message);
