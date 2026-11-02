@@ -5,12 +5,13 @@
  * una función de Netlify):
  *   { source: 'imdb',       rows: [{ imdb, type }] }      → exacto, con `/find`
  *   { source: 'letterboxd', rows: [{ key, name, year }] } → por título y año, con `/search`
+ *   { source: 'trakt',      rows: [{ key, tmdb, type }] }  → por id de TMDB (Trakt lo da), con la caché
  * Respuesta, en el mismo orden y con la clave de cada fila (`imdb` o `key`): `found` (con título,
  * año, póster y si ya lo tienes en alguna lista), `ambiguous` (solo Letterboxd: candidatas para
  * elegir), `missing` o `error` (fallo de TMDB: el navegador lo reintenta).
  */
 import type { APIRoute } from 'astro';
-import { resolveImdbIds, resolveByTitle } from '../../../services/API/shared/importResolve';
+import { resolveImdbIds, resolveByTitle, resolveTmdbIds } from '../../../services/API/shared/importResolve';
 import { db, getCurrentLanguage, requireAuthId } from '../../../services/BD/shared/userScope';
 import { json } from './_shared';
 
@@ -22,7 +23,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     const body = await request.json().catch(() => null);
     const source = body?.source;
-    if (source !== 'imdb' && source !== 'letterboxd') return json({ ok: false, error: 'Origen no soportado' }, 400);
+    if (source !== 'imdb' && source !== 'letterboxd' && source !== 'trakt') return json({ ok: false, error: 'Origen no soportado' }, 400);
     const rows: any[] = Array.isArray(body?.rows) ? body.rows.slice(0, MAX_ROWS) : [];
 
     try {
@@ -38,6 +39,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 if (!r) return { imdb: row.imdb, status: 'missing' };
                 return { imdb: row.imdb, status: 'found', ...r };
             });
+        } else if (source === 'trakt') {
+            const clean = rows
+                .filter((r) => typeof r?.key === 'string' && Number(r?.tmdb) > 0)
+                .map((r) => ({ key: String(r.key).slice(0, 40), tmdb: Number(r.tmdb), type: r.type === 'tv' ? 'tv' as const : 'movie' as const }));
+            const resolved = await resolveTmdbIds(clean);
+            results = clean.map((row, i) => (resolved[i] ? { key: row.key, status: 'found', ...resolved[i] } : { key: row.key, status: 'missing' }));
         } else {
             const clean = rows
                 .filter((r) => typeof r?.key === 'string' && typeof r?.name === 'string' && r.name.trim())

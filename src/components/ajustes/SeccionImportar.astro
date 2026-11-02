@@ -12,6 +12,7 @@
 import { Icon } from 'astro-icon/components';
 import type { ImportJob } from '../../services/BD/import/importLibrary';
 import { tmdbAccountEnabled } from '../../services/API/shared/tmdbAccount';
+import { traktEnabled } from '../../services/API/shared/traktAccount';
 
 interface Props {
     jobs: ImportJob[];
@@ -19,8 +20,10 @@ interface Props {
 const { jobs } = Astro.props;
 // Sin `TMDB_READ_TOKEN` (variable de Netlify) no se puede pedir permiso: la opción sale como «Pronto».
 const tmdbOn = tmdbAccountEnabled();
+// Lo mismo con Trakt (F2): sin `TRAKT_CLIENT_ID`, «Pronto». Hoy solo en local: la app de Trakt es «Development».
+const traktOn = traktEnabled();
 
-const SOURCE_LABEL: Record<string, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB' };
+const SOURCE_LABEL: Record<string, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB', trakt: 'Trakt' };
 const fmtDate = (iso: string) => new Intl.DateTimeFormat('es-ES', {
     day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Madrid',
 }).format(new Date(iso));
@@ -140,6 +143,14 @@ const knownHashes = Object.fromEntries(
             <p class="aj-row-desc">Favoritos, valoraciones, watchlist y listas. Das permiso en themoviedb.org, leemos tu cuenta y el permiso se retira al terminar.</p>
         </span>
         {tmdbOn && <a class="aj-btn" href="/api/import/tmdb/start" data-imp-tmdb><Icon name="lucide:link" aria-hidden="true" />Conectar</a>}
+    </div>
+    <div class:list={["aj-row", { "is-soon": !traktOn }]}>
+        <span class="aj-row-ico" aria-hidden="true"><Icon name="lucide:link" /></span>
+        <span class="aj-row-text">
+            <span class="aj-row-title">Desde tu cuenta de Trakt {!traktOn && <span class="aj-soon">Pronto</span>}</span>
+            <p class="aj-row-desc">Vistas, valoraciones, watchlist, favoritos, listas y tu historial de películas. Das permiso en trakt.tv, leemos tu cuenta y el permiso se retira al terminar.</p>
+        </span>
+        {traktOn && <a class="aj-btn" href="/api/import/trakt/start" data-imp-trakt><Icon name="lucide:link" aria-hidden="true" />Conectar</a>}
     </div>
 </div>
 

@@ -17,7 +17,7 @@
  */
 import { db, fetchAll, requireAuthId } from '../shared/userScope';
 
-export type ImportSource = 'imdb' | 'letterboxd' | 'tmdb';
+export type ImportSource = 'imdb' | 'letterboxd' | 'tmdb' | 'trakt';
 
 export interface ImportItem {
     media_type: 'movie' | 'tv';

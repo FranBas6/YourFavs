@@ -4,6 +4,7 @@
  * previa y la importación no necesitan nada más de TMDB.
  */
 import { tmdbFetch } from './tmdbClient';
+import { getTitleDetails } from './tmdbTitleCache';
 import { processBatch } from '../../../utils/processBatch';
 
 /** Llamadas a la vez dentro de un lote. Un lote de 50 tarda ~1-2 s; TMDB aguanta ~50/s. */
@@ -48,6 +49,31 @@ export async function resolveImdbIds(rows: { imdb: string; type: 'movie' | 'tv' 
             return 'error' as const;
         }
     }, CONCURRENCY);
+}
+
+/**
+ * Trakt (lote F2): ya trae el id de TMDB, así que solo falta el título en tu idioma, el año y el póster.
+ * Sale de `tmdb_cache` (la frescura que declara TMDB), una pasada por tipo. `null` = TMDB no lo tiene.
+ */
+export async function resolveTmdbIds(rows: { tmdb: number; type: 'movie' | 'tv' }[]): Promise<(ResolvedTitle | null)[]> {
+    const out: (ResolvedTitle | null)[] = rows.map(() => null);
+    for (const type of ['movie', 'tv'] as const) {
+        const idx = rows.flatMap((r, i) => (r.type === type ? [i] : []));
+        if (!idx.length) continue;
+        const details = await getTitleDetails(type, idx.map((i) => rows[i].tmdb));
+        idx.forEach((i, k) => {
+            const d = details[k];
+            if (!d?.id) return;
+            out[i] = {
+                media_type: type,
+                tmdb_id: Number(d.id),
+                title: String((type === 'movie' ? d.title : d.name) ?? ''),
+                year: yearOf(type === 'movie' ? d.release_date : d.first_air_date),
+                poster_path: d.poster_path ?? null,
+            };
+        });
+    }
+    return out;
 }
 
 // ---------------------------------------------------------------------------------------
