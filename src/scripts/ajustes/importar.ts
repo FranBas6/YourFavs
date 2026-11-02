@@ -18,14 +18,15 @@ import { parseImdbExport, type ImdbRow } from '../../utils/import/imdb';
 import { isLetterboxdPath, looksLikeLetterboxd, parseLetterboxdExport, type LbExport, type LbFilm } from '../../utils/import/letterboxd';
 import { readZipTexts } from '../../utils/import/zip';
 
-type Source = 'imdb' | 'letterboxd' | 'tmdb';
+type Source = 'imdb' | 'letterboxd' | 'tmdb' | 'trakt';
 
 const RESOLVE_BATCH = 50;
 const APPLY_BATCH = 200;
 const LOG_BATCH = 300;
+const EPISODE_BATCH = 1000;
 const MAX_ROWS = 10_000;
 const POSTER = 'https://image.tmdb.org/t/p/w92';
-const SOURCE_LABEL: Record<Source, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB' };
+const SOURCE_LABEL: Record<Source, string> = { imdb: 'IMDb', letterboxd: 'Letterboxd', tmdb: 'TMDB', trakt: 'Trakt' };
 
 const count = (v: number, one: string, many: string) => `${v.toLocaleString('es-ES')} ${v === 1 ? one : many}`;
 const num = (v: number) => v.toLocaleString('es-ES');
@@ -54,6 +55,23 @@ interface TmdbAccount {
     lists: { name: string; description: string; items: { media_type: 'movie' | 'tv'; tmdb_id: number; title: string; poster_path: string | null }[] }[];
 }
 
+/** Lo leído de la cuenta de Trakt (F2): una ficha por `media_type:tmdb_id` y las listas (por clave). */
+interface TraktEntry {
+    media_type: 'movie' | 'tv'; tmdb_id: number; title: string; year: number | null;
+    seen: boolean; seenOn?: string; favorite: boolean; watchlist: boolean; listedOn?: string;
+    rating?: number; ratedOn?: string;
+    /** Días de cada visionado (historial de películas): pases en el diario. */
+    plays: string[];
+    /** Series (F3): episodios vistos [temporada, episodio, ISO] y si está terminada. */
+    episodes?: [number, number, string][];
+    complete?: boolean;
+}
+interface TraktAccount {
+    entries: Map<string, TraktEntry>;
+    lists: { name: string; description: string; keys: string[] }[];
+    skipped: number;
+}
+
 /** El título ya elegido (encontrado, o candidata pulsada en un dudoso). */
 interface Pick { media_type: 'movie' | 'tv'; tmdb_id: number; title: string; poster_path: string | null; have: boolean }
 
@@ -74,8 +92,11 @@ function init(root: HTMLElement) {
     let hash: string | null = null;
     let ignored = 0;
     let imdbRows: ImdbRow[] = [];
+    /** Listas propias de IMDb (F1), una colección por fichero. */
+    let imdbLists: { name: string; items: ImdbRow[] }[] = [];
     let lb: LbExport | null = null;
     let tmdb: TmdbAccount | null = null;
+    let trakt: TraktAccount | null = null;
     let lookups: Lookup[] = [];
     const results = new Map<string, Resolved>();
     /** Dudosos: clave → tmdb_id elegido (o null = «Ninguna»). */
@@ -141,23 +162,24 @@ function init(root: HTMLElement) {
 
     async function readImdb(texts: Map<string, string>) {
         const rows: ImdbRow[] = [];
+        const lists: { name: string; items: ImdbRow[] }[] = [];
         ignored = 0;
         for (const [name, text] of texts) {
             const parsed = parseImdbExport(text, name);
-            if (parsed.kind === 'list') {
-                return pickError(`«${name}» es una lista de IMDb. Por ahora se importan valoraciones y watchlist (las listas, desde Letterboxd).`);
-            }
+            if (parsed.list?.items.length) lists.push(parsed.list);
             if (parsed.kind === 'unknown') {
                 return pickError(`«${name}» no parece una exportación de IMDb ni de Letterboxd. Busca ratings.csv, WATCHLIST.csv o el ZIP de Letterboxd.`);
             }
             rows.push(...parsed.rows);
             ignored += parsed.ignored + parsed.invalid;
         }
-        if (!rows.length) return pickError('No hay películas ni series en esos ficheros.');
-        if (rows.length > MAX_ROWS) return pickError(`Son ${num(rows.length)} filas; el máximo es ${num(MAX_ROWS)}.`);
+        const all = [...rows, ...lists.flatMap((l) => l.items)];
+        if (!all.length) return pickError('No hay películas ni series en esos ficheros.');
+        if (all.length > MAX_ROWS) return pickError(`Son ${num(all.length)} filas; el máximo es ${num(MAX_ROWS)}.`);
         imdbRows = rows;
+        imdbLists = lists;
         lb = null;
-        lookups = [...new Map(rows.map((r) => [r.imdb, r])).values()].map((r) => ({
+        lookups = [...new Map(all.map((r) => [r.imdb, r])).values()].map((r) => ({
             key: r.imdb, label: r.year ? `${r.title} (${r.year})` : r.title, req: { imdb: r.imdb, type: r.type },
         }));
         await resolveAll();
@@ -169,6 +191,7 @@ function init(root: HTMLElement) {
         if (parsed.films.size > MAX_ROWS) return pickError(`Son ${num(parsed.films.size)} películas; el máximo es ${num(MAX_ROWS)}.`);
         lb = parsed;
         imdbRows = [];
+        imdbLists = [];
         ignored = parsed.favoritesUnmatched;
         lookups = [...parsed.films.values()].map((f) => ({
             key: f.key, label: f.year ? `${f.name} (${f.year})` : f.name, req: { key: f.key, name: f.name, year: f.year },
@@ -251,6 +274,7 @@ function init(root: HTMLElement) {
         hash = null;
         ignored = 0;
         imdbRows = [];
+        imdbLists = [];
         lb = null;
         results.clear();
         choices.clear();
@@ -260,6 +284,89 @@ function init(root: HTMLElement) {
             results.set(k, { status: 'found', media_type: t.media_type, tmdb_id: t.tmdb_id, title: t.title, year: t.year, poster_path: t.poster_path, have: t.have });
         }
         renderPreview();
+    }
+
+    // --- 1c · Leer la cuenta de Trakt (F2) -------------------------------------------------
+    // Trakt da el id de TMDB de cada título: aquí solo se reúne qué es cada uno (visto, nota,
+    // watchlist, favorito, listas) y luego `resolveAll` trae de TMDB el título en tu idioma y el póster.
+    async function readTraktAccount() {
+        show('progress');
+        const acc: TraktAccount = { entries: new Map(), lists: [], skipped: 0 };
+        const STEPS: [string, string][] = [
+            ['watched_movies', 'películas vistas'], ['history_movies', 'historial'], ['watched_shows', 'series vistas'],
+            ['ratings_movies', 'valoraciones'], ['ratings_shows', 'series valoradas'],
+            ['favorites_movies', 'favoritos'], ['favorites_shows', 'series favoritas'],
+            ['watchlist_movies', 'watchlist'], ['watchlist_shows', 'series en tu watchlist'],
+        ];
+        let step = 0;
+        const total = STEPS.length + 1;
+        const title = (what: string) => `Leyendo tu cuenta de Trakt: ${what}…`;
+        const all = async (kind: string, extra: Record<string, unknown> = {}) => {
+            const out: any[] = [];
+            let lists: any[] = [];
+            for (let page = 1, pages = 1; page <= pages; page++) {
+                const r = await post<any>('/api/import/trakt/fetch', { kind, page, ...extra });
+                pages = Math.min(Number(r.total_pages) || 1, 500);
+                out.push(...(r.titles ?? []));
+                acc.skipped += Number(r.skipped) || 0;
+                if (r.lists) lists = lists.concat(r.lists);
+            }
+            return { titles: out, lists };
+        };
+        const entry = (t: any): TraktEntry => {
+            const k = `${t.media_type}:${t.tmdb_id}`;
+            let e = acc.entries.get(k);
+            if (!e) {
+                e = { media_type: t.media_type, tmdb_id: t.tmdb_id, title: t.title, year: t.year, seen: false, favorite: false, watchlist: false, plays: [] };
+                acc.entries.set(k, e);
+            }
+            return e;
+        };
+
+        try {
+            for (const [kind, what] of STEPS) {
+                progress(title(what), step++, total);
+                const { titles } = await all(kind);
+                for (const t of titles) {
+                    const e = entry(t);
+                    if (kind === 'watched_movies') { e.seen = true; e.seenOn = t.date; }
+                    if (kind === 'history_movies' && t.date) e.plays.push(t.date);
+                    if (kind === 'watched_shows') { e.episodes = t.episodes ?? []; e.complete = !!t.complete; e.seenOn = t.date; }
+                    if (kind.startsWith('ratings') && t.rating) { e.rating = t.rating; e.ratedOn = t.date; }
+                    if (kind.startsWith('favorites')) e.favorite = true;
+                    if (kind.startsWith('watchlist')) { e.watchlist = true; e.listedOn = t.date; }
+                }
+            }
+            progress(title('listas'), step++, total);
+            const { lists } = await all('lists');
+            for (const l of lists) {
+                const { titles } = await all('list', { list_id: l.id });
+                acc.lists.push({ name: l.name, description: l.description, keys: titles.map((t: any) => { entry(t); return `${t.media_type}:${t.tmdb_id}`; }) });
+            }
+        } catch (err) {
+            console.error('[importar] cuenta de Trakt', err);
+            await disconnectTrakt();
+            return pickError('No se ha podido leer tu cuenta de Trakt (la conexión dura 15 minutos). Vuelve a conectar.');
+        }
+        await disconnectTrakt();
+
+        if (!acc.entries.size) return pickError('Tu cuenta de Trakt no tiene vistas, valoraciones, watchlist, favoritos ni listas que importar.');
+        if (acc.entries.size > MAX_ROWS) return pickError(`Son ${num(acc.entries.size)} títulos; el máximo es ${num(MAX_ROWS)}.`);
+        trakt = acc;
+        source = 'trakt';
+        label = 'Cuenta de Trakt';
+        hash = null;
+        ignored = acc.skipped;
+        imdbRows = [];
+        imdbLists = [];
+        lb = null;
+        tmdb = null;
+        lookups = [...acc.entries.entries()].map(([k, e]) => ({ key: k, label: e.year ? `${e.title} (${e.year})` : e.title, req: { key: k, tmdb: e.tmdb_id, type: e.media_type } }));
+        await resolveAll();
+    }
+
+    async function disconnectTrakt() {
+        try { await fetch('/api/import/trakt/disconnect', { method: 'POST' }); } catch { /* caduca en 15 min */ }
     }
 
     /** El permiso de TMDB no se queda vivo: se revoca en cuanto se ha leído (o si falla). */
@@ -389,13 +496,21 @@ function init(root: HTMLElement) {
         if (by('liked').length) li('Me gusta', what(by('liked')));
         if (by('seen').length) li('Vistas', count(by('seen').length, 'título', 'títulos'));
         if (rated) li('Notas', `${num(rated)} (las tuyas mandan)`);
+        if (by('following').length) li('Siguiendo', count(by('following').length, 'serie a medias', 'series a medias'));
         if (by('watchlist').length) li('Pendientes', count(by('watchlist').length, 'título', 'títulos'));
         if (plan.log.length) li('Diario', count(plan.log.length, 'pase con su fecha', 'pases con su fecha'));
         if (plan.lists.length) {
             const items = plan.lists.reduce((s, l) => s + l.items.length, 0);
-            li('Colecciones', `${count(plan.lists.length, 'lista', 'listas')} con ${count(items, 'título', 'títulos')}`);
+            // Con los nombres: en IMDb salen del fichero y conviene verlos antes de aplicar.
+            const names = plan.lists.slice(0, 4).map((l) => `«${l.name}» (${num(l.items.length)})`).join(', ')
+                + (plan.lists.length > 4 ? ` y ${count(plan.lists.length - 4, 'más', 'más')}` : '');
+            li('Colecciones', `${count(plan.lists.length, 'lista', 'listas')} con ${count(items, 'título', 'títulos')}: ${names}`);
         }
-        $<HTMLButtonElement>('[data-imp-apply]').disabled = !plan.items.length && !plan.log.length && !plan.lists.length;
+        if (plan.episodes.length) {
+            const series = new Set(plan.episodes.map((e) => e.serie_id)).size;
+            li('Episodios', `${num(plan.episodes.length)} vistos en ${count(series, 'serie', 'series')}, con su fecha`);
+        }
+        $<HTMLButtonElement>('[data-imp-apply]').disabled = !plan.items.length && !plan.log.length && !plan.lists.length && !plan.episodes.length;
     }
 
     function renderAmbiguous(amb: [string, Resolved][]) {
@@ -453,10 +568,12 @@ function init(root: HTMLElement) {
     // --- 4 · Qué se manda: títulos, diario y colecciones -------------------------------
     interface PlanItem { media_type: 'movie' | 'tv'; tmdb_id: number; kind: string; rating?: number; date?: string }
     interface PlanLog { media_type: 'movie' | 'tv'; tmdb_id: number; date: string; rewatch: boolean }
+    interface PlanEpisode { serie_id: number; season: number; episode: number; watched_at: string }
     interface PlanList { name: string; description: string; items: { media_type: 'movie' | 'tv'; tmdb_id: number; title: string; poster_path: string | null }[] }
 
-    function buildPlan(): { items: PlanItem[]; log: PlanLog[]; lists: PlanList[] } {
+    function buildPlan(): { items: PlanItem[]; log: PlanLog[]; lists: PlanList[]; episodes: PlanEpisode[] } {
         const items: PlanItem[] = [];
+        const episodes: PlanEpisode[] = [];
         const log: PlanLog[] = [];
         const lists: PlanList[] = [];
         const opt = (rating?: number, date?: string) => ({ ...(rating ? { rating } : {}), ...(date ? { date } : {}) });
@@ -471,7 +588,51 @@ function init(root: HTMLElement) {
                 seen.add(k);
                 items.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, kind: row.kind, ...opt(row.rating, row.date) });
             }
-            return { items, log, lists };
+            for (const l of imdbLists) {
+                const ids = new Set<string>();
+                const its: PlanList['items'] = [];
+                for (const row of l.items) {
+                    const p = pickFor(row.imdb);
+                    if (!p || ids.has(`${p.media_type}:${p.tmdb_id}`)) continue;
+                    ids.add(`${p.media_type}:${p.tmdb_id}`);
+                    its.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, title: p.title, poster_path: p.poster_path });
+                }
+                if (its.length) lists.push({ name: l.name, description: '', items: its });
+            }
+            return { items, log, lists, episodes };
+        }
+
+        // Trakt: Favoritos > Vistas (vista o valorada) > Pendientes; el historial de películas, pases en el
+        // diario con su día (el primero, visionado; los siguientes, re-visionados).
+        if (source === 'trakt') {
+            for (const [k, e] of trakt!.entries) {
+                const p = pickFor(k);
+                if (!p) continue;
+                // Series con progreso (F3): a medias → Siguiendo (desde el primer episodio que viste);
+                // terminadas → Vistas (o Favoritos). Lo demás, como las películas.
+                const progress = p.media_type === 'tv' && !!e.episodes?.length;
+                const kind = progress && !e.complete ? 'following'
+                    : e.favorite ? 'favorite' : (e.seen || e.rating || progress) ? 'seen' : e.watchlist ? 'watchlist' : null;
+                const started = progress ? e.episodes!.map(([, , at]) => at.slice(0, 10)).filter(Boolean).sort()[0] : undefined;
+                const date = kind === 'watchlist' ? e.listedOn : kind === 'following' ? started : (e.seenOn ?? e.ratedOn);
+                if (kind) items.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, kind, ...opt(e.rating, date) });
+                if (progress) for (const [season, episode, at] of e.episodes!) episodes.push({ serie_id: p.tmdb_id, season, episode, watched_at: at });
+                if (p.media_type === 'movie') {
+                    [...e.plays].sort().forEach((date, i) => log.push({ media_type: 'movie', tmdb_id: p.tmdb_id, date, rewatch: i > 0 }));
+                }
+            }
+            for (const l of trakt!.lists) {
+                const ids = new Set<string>();
+                const its: PlanList['items'] = [];
+                for (const k of l.keys) {
+                    const p = pickFor(k);
+                    if (!p || ids.has(`${p.media_type}:${p.tmdb_id}`)) continue;
+                    ids.add(`${p.media_type}:${p.tmdb_id}`);
+                    its.push({ media_type: p.media_type, tmdb_id: p.tmdb_id, title: p.title, poster_path: p.poster_path });
+                }
+                if (its.length) lists.push({ name: l.name, description: l.description, items: its });
+            }
+            return { items, log, lists, episodes };
         }
 
         // Cuenta de TMDB: ya viene un título por id; Favoritos > Vistas (valorada) > Pendientes.
@@ -481,7 +642,7 @@ function init(root: HTMLElement) {
                 if (kind) items.push({ media_type: t.media_type, tmdb_id: t.tmdb_id, kind, ...opt(t.rating, kind === 'watchlist' ? undefined : t.rated_on) });
             }
             for (const l of tmdb!.lists) if (l.items.length) lists.push(l);
-            return { items, log, lists };
+            return { items, log, lists, episodes };
         }
 
         // Letterboxd: una ficha por película → una sola lista (Favoritos > Me gusta > Vistas; Pendientes
@@ -514,13 +675,13 @@ function init(root: HTMLElement) {
             }
             if (its.length) lists.push({ name: l.name, description: l.description, items: its });
         }
-        return { items, log, lists };
+        return { items, log, lists, episodes };
     }
 
     // --- 5 · Aplicar -----------------------------------------------------------------------
     async function apply() {
         const plan = buildPlan();
-        const total = plan.items.length + plan.log.length + plan.lists.reduce((s, l) => s + l.items.length, 0);
+        const total = plan.items.length + plan.log.length + plan.lists.reduce((s, l) => s + l.items.length, 0) + plan.episodes.length;
         const found = [...results.values()].filter((r) => r.status === 'found').length + [...choices.values()].filter((v) => v != null).length;
         const missing = [...results.values()].filter((r) => r.status === 'missing').length;
         show('progress');
@@ -537,7 +698,7 @@ function init(root: HTMLElement) {
             return showToast('No se ha podido empezar. Inténtalo de nuevo.', 'error');
         }
 
-        const sum = { added: 0, removed: 0, rated: 0, logged: 0, listed: 0 };
+        const sum = { added: 0, removed: 0, rated: 0, logged: 0, listed: 0, episodes: 0 };
         let failed = 0;
         let done = 0;
         const send = async (body: Record<string, unknown>, size: number): Promise<any> => {
@@ -563,6 +724,10 @@ function init(root: HTMLElement) {
             const batch = plan.log.slice(i, i + LOG_BATCH);
             await send({ log: batch }, batch.length);
         }
+        for (let i = 0; i < plan.episodes.length; i += EPISODE_BATCH) {
+            const batch = plan.episodes.slice(i, i + EPISODE_BATCH);
+            await send({ episodes: batch }, batch.length);
+        }
         for (const l of plan.lists) {
             let listId = '';
             for (let i = 0; i < l.items.length; i += APPLY_BATCH) {
@@ -578,6 +743,7 @@ function init(root: HTMLElement) {
         if (sum.rated) parts.push(count(sum.rated, 'nota', 'notas'));
         if (sum.logged) parts.push(count(sum.logged, 'pase en el diario', 'pases en el diario'));
         if (sum.listed) parts.push(`${num(sum.listed)} en ${count(plan.lists.length, 'colección', 'colecciones')}`);
+        if (sum.episodes) parts.push(count(sum.episodes, 'episodio marcado', 'episodios marcados'));
         $('[data-imp-done-t]').textContent = parts.length
             ? `Hecho: ${parts.length > 1 ? `${parts.slice(0, -1).join(', ')} y ${parts.at(-1)}` : parts[0]}.`
             : 'No había nada nuevo que añadir.';
@@ -604,6 +770,7 @@ function init(root: HTMLElement) {
         const bits = [count(sum.added, 'añadido', 'añadidos')];
         if (sum.rated) bits.push(count(sum.rated, 'nota', 'notas'));
         if (sum.logged) bits.push(count(sum.logged, 'pase', 'pases'));
+        if (sum.episodes) bits.push(count(sum.episodes, 'episodio', 'episodios'));
         if (sum.listed) bits.push(`${num(sum.listed)} en colecciones`);
         if (missing) bits.push(`${num(missing)} sin encontrar`);
         row.querySelector('.aj-row-desc')!.textContent = `Hoy · ${bits.join(' · ')}`;
@@ -645,6 +812,14 @@ function init(root: HTMLElement) {
         if (tmdbState === 'ok') readTmdbAccount();
         else if (tmdbState === 'denied') showToast('No se ha dado permiso en TMDB: no se ha leído nada.', 'error');
         else showToast('No se ha podido conectar con TMDB. Inténtalo de nuevo en un rato.', 'error');
+    }
+    // Vuelta desde trakt.tv (F2), igual.
+    const traktState = new URLSearchParams(location.search).get('trakt');
+    if (traktState) {
+        history.replaceState(null, '', location.pathname);
+        if (traktState === 'ok') readTraktAccount();
+        else if (traktState === 'denied') showToast('No se ha dado permiso en Trakt: no se ha leído nada.', 'error');
+        else showToast('No se ha podido conectar con Trakt. Inténtalo de nuevo en un rato.', 'error');
     }
 
     $('[data-imp-cancel]').addEventListener('click', () => show('pick'));

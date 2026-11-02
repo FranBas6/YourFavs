@@ -66,6 +66,11 @@ interface ImportMetaEnv {
     // Token de lectura v4: autentica TODAS las llamadas con `Authorization: Bearer` (TMDB E4; sin él,
     // `TMDB_API_KEY`) y permite «Importar desde tu cuenta de TMDB» (D3c; sin él, sale «Pronto»).
     readonly TMDB_READ_TOKEN?: string;
+    // Client ID de la app de Trakt (lote F2; login PKCE, sin secreto). Sin él, «Desde tu cuenta de
+    // Trakt» sale como «Pronto». La app de Trakt es «Development»: solo vale en localhost.
+    readonly TRAKT_CLIENT_ID?: string;
+    // Solo desarrollo: un Trakt de mentira para probar la importación sin cuenta. En prod se ignora.
+    readonly TRAKT_FAKE_URL?: string;
     // Supabase (todas de servidor: el navegador no habla con Supabase)
     readonly SUPABASE_URL: string;
     readonly SUPABASE_PUBLISHABLE_KEY: string;

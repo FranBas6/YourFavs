@@ -10,7 +10,7 @@ import { json } from './_shared';
 
 export const prerender = false;
 
-const SOURCES: ImportSource[] = ['imdb', 'letterboxd', 'tmdb'];
+const SOURCES: ImportSource[] = ['imdb', 'letterboxd', 'tmdb', 'trakt'];
 const TOTAL_KEYS = ['rows', 'found', 'missing', 'ignored'];
 
 export const POST: APIRoute = async ({ request, locals }) => {

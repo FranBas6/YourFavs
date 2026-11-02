@@ -12,7 +12,7 @@
  */
 import type { APIRoute } from 'astro';
 import {
-    applyImportBatch, createImportList, type ImportItem, type ImportListed, type ImportLog,
+    applyImportBatch, createImportList, type ImportEpisode, type ImportItem, type ImportListed, type ImportLog,
 } from '../../../services/BD/import/importLibrary';
 import { normalizeScore } from '../../../utils/constants/helpers/media-helpers';
 import { json, isUuid } from './_shared';
@@ -21,7 +21,8 @@ export const prerender = false;
 
 const MAX_ITEMS = 200;
 const MAX_LOG = 300;
-const KINDS = new Set(['seen', 'liked', 'favorite', 'watchlist']);
+const MAX_EPISODES = 1000;
+const KINDS = new Set(['seen', 'liked', 'favorite', 'watchlist', 'following']);
 const isDate = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** media_type + tmdb_id válidos, o null. */
@@ -54,6 +55,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
         if (t && isDate(r.date)) log.push({ ...t, watched_on: r.date, rewatch: r.rewatch === true });
     }
 
+    // Episodios vistos (Trakt, F3): serie, temporada (0 = especiales), episodio y cuándo.
+    const episodes: ImportEpisode[] = [];
+    for (const r of (Array.isArray(body?.episodes) ? body.episodes.slice(0, MAX_EPISODES) : [])) {
+        const serie = Number(r?.serie_id), season = Number(r?.season), episode = Number(r?.episode);
+        if (!Number.isInteger(serie) || serie <= 0 || !Number.isInteger(season) || season < 0 || season > 999
+            || !Number.isInteger(episode) || episode <= 0 || episode > 9999) continue;
+        const at = typeof r?.watched_at === 'string' && !Number.isNaN(Date.parse(r.watched_at)) ? new Date(r.watched_at).toISOString() : null;
+        episodes.push({ serie_id: serie, season, episode, watched_at: at });
+    }
+
     try {
         let list: { id: string; items: ImportListed[] } | undefined;
         if (body?.list && Array.isArray(body.list.items)) {
@@ -68,14 +79,14 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 id = (await createImportList(body.job_id, {
                     name: String(body.list.name ?? ''),
                     description: String(body.list.description ?? ''),
-                    suffix: body.list.source === 'tmdb' ? 'TMDB' : 'Letterboxd',
+                    suffix: ({ tmdb: 'TMDB', imdb: 'IMDb', trakt: 'Trakt' } as Record<string, string>)[body.list.source] ?? 'Letterboxd',
                     cover: first ? { poster_path: first.poster_path!, tmdb_id: first.tmdb_id } : null,
                 })).id;
             }
             list = { id, items: listItems };
         }
 
-        const result = await applyImportBatch(body.job_id, { items, log, list });
+        const result = await applyImportBatch(body.job_id, { items, log, list, episodes });
         return json({ ok: true, ...result, ...(list ? { list_id: list.id } : {}) });
     } catch (err) {
         console.error('[api/import/apply] error:', (err as Error).message);
