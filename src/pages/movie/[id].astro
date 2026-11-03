@@ -584,11 +584,22 @@ const jsonLd = item ? {
                 <!-- Columna derecha -->
                 <div class="md:w-2/3 space-y-8">
 
-                    <!-- Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: vídeos, reparto
-                         y equipo, imágenes, productoras, reseñas y, al final, saga, «También en TV» y parecidas. -->
+                    <!-- Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: vídeos y saga,
+                         reparto y equipo, imágenes, productoras, reseñas y, al final, «También en TV» y parecidas. -->
 
                     <!-- Tráiler + más vídeos -->
                     <div id="sec-videos" data-fs><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
+
+                    <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), justo tras los vídeos (Fran) -->
+                    {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
+                        <SagaProgress
+                            name={collectionInfo.name}
+                            overview={collectionInfo.overview}
+                            parts={collectionInfo.parts}
+                            watchedTiers={watchedMovieTiers}
+                            currentId={item?.id}
+                        />
+                    )}
 
                     <!-- Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com) -->
                     <div id="sec-reparto" data-fs class="space-y-8">
@@ -608,17 +619,6 @@ const jsonLd = item ? {
 
                     <!-- Reviews de TMDB -->
                     <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
-
-                    <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), encima de las parecidas -->
-                    {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
-                        <SagaProgress
-                            name={collectionInfo.name}
-                            overview={collectionInfo.overview}
-                            parts={collectionInfo.parts}
-                            watchedTiers={watchedMovieTiers}
-                            currentId={item?.id}
-                        />
-                    )}
 
                     <!-- La saga al otro lado: series de esta misma película -->
                     <CrossMediaSection items={crossMediaSeries} mediaType="tv" />
