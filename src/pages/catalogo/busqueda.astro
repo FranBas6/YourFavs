@@ -17,9 +17,12 @@ import { withMode } from "../../utils/catalogUrl";
 import '../../styles/pages/catalogo/shared.css';
 
 const queryParams = new URLSearchParams(Astro.request.url.split('?')[1]);
-const title = queryParams.get('query') || '';
+const title = (queryParams.get('query') || '').trim();
+// Sin término no se busca nada (antes se pedían las tres búsquedas vacías y salía «Sin resultados para ""»):
+// se enseña el buscador.
+const hasQuery = title.length > 0;
 
-const [allMovies, allSeries, allActors] = await Promise.all([
+const [allMovies, allSeries, allActors] = !hasQuery ? [[], [], []] as any[][] : await Promise.all([
     safeFetch(
         loadAllPages(({title, page}) => getMoviesByTitle({title, page}), title, "title"),
         'busqueda/movies', [] as any[]
@@ -39,11 +42,11 @@ const limitedSeries = allSeries.slice(0, 65);
 const limitedActors = allActors.slice(0, 30);
 const totalResults = limitedMovies.length + limitedSeries.length + limitedActors.length;
 ---
-<Layout title={`Búsqueda: ${title}`}>
+<Layout title={hasQuery ? `Búsqueda: ${title}` : 'Buscar'}>
     <section class="px-1 sm:py-8">
         <CatalogHeader
-            kicker="Resultados para"
-            title={`"${title}"`}
+            kicker={hasQuery ? 'Resultados para' : 'Buscar'}
+            title={hasQuery ? `"${title}"` : 'Películas, series y personas'}
             color="slate"
             icon="search"
         />
@@ -96,7 +99,15 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
             </div>
         )}
 
-        {totalResults === 0 ? (
+        {!hasQuery ? (
+            <form action="/catalogo/busqueda" method="get" role="search" class="srch-empty">
+                <label for="srch-empty-q" class="sr-only">Buscar películas, series y personas</label>
+                <input id="srch-empty-q" name="query" type="search" autocomplete="off" autofocus required
+                       placeholder="Título, serie o persona…" class="srch-empty-input" />
+                <button type="submit" class="pf-btn pri">Buscar</button>
+                <p class="srch-empty-hint">También puedes buscar desde cualquier página con <kbd>⌘K</kbd> (o <kbd>Ctrl K</kbd>).</p>
+            </form>
+        ) : totalResults === 0 ? (
             <EmptyState
                 variant="search"
                 size="lg"
@@ -230,3 +241,17 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
     sections.forEach(function (s) { observer.observe(s); });
 })();
 </script>
+
+<style>
+    /* Búsqueda sin término (paso 1.4 del rediseño): el buscador, solo con tokens. */
+    .srch-empty { display: flex; flex-wrap: wrap; gap: var(--s-2); max-width: 640px; margin: var(--s-4) 0 var(--s-8); }
+    .srch-empty-input {
+        flex: 1 1 260px; min-width: 0; height: 44px; padding: 0 var(--s-4);
+        border: 1px solid var(--border-strong); border-radius: var(--r-md);
+        background: var(--bg-elev); color: var(--text); font: inherit; font-size: 15px;
+    }
+    .srch-empty-input::placeholder { color: var(--text-4); }
+    .srch-empty-input:focus { outline: 2px solid var(--primary); outline-offset: 2px; border-color: transparent; }
+    .srch-empty-hint { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--text-3); }
+    .srch-empty-hint kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--bg-tint); }
+</style>

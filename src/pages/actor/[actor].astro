@@ -25,6 +25,7 @@ import { SOCIAL_PHASE } from "../../utils/constants/social";
 import type { ActorImage, TaggedImage } from "../../services/API/Actors/InfoActor";
 import { safeFetch } from "../../utils/safeFetch";
 import { getLibrarySnapshot } from "../../services/BD/shared/librarySnapshot";
+import { departmentEs } from "../../utils/constants/helpers/team-helpers";
 
 const { actor } = Astro.params;
 
@@ -98,7 +99,7 @@ const crewSections = JOB_ORDER
 const actorInfo = actorDetails || {
     id: null, nombre: actor, biografia: null, lugarNacimiento: null,
     fechaNacimiento: null, fechaFallecimiento: null, imagen: null,
-    popularidad: null, conocidoPor: "Actuación", genero: null,
+    popularidad: null, conocidoPor: "Acting", genero: null,
     alias: [], homepage: null,
     redes: { imdb: null, wikidata: null, wikipedia: null, twitter: null, instagram: null, facebook: null, tiktok: null, youtube: null },
 };
@@ -181,7 +182,7 @@ const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
     "name": actorInfo.nombre,
-    "jobTitle": actorInfo.conocidoPor || "Actor",
+    "jobTitle": departmentEs(actorInfo.conocidoPor) || "Interpretación",
     ...(actorInfo.imagen && { image: actorInfo.imagen }),
     ...(actorInfo.fechaNacimiento && { birthDate: actorInfo.fechaNacimiento }),
     ...(actorInfo.fechaFallecimiento && { deathDate: actorInfo.fechaFallecimiento }),
@@ -201,7 +202,7 @@ const jsonLd = {
         <header class="mb-6">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">{actorInfo.nombre}</h1>
             <p class="text-gray-500 text-base">
-                {actorInfo.conocidoPor || 'Actor/Actriz'} · {totalProductions} producciones
+                {departmentEs(actorInfo.conocidoPor) || 'Interpretación'} · {totalProductions} producciones
             </p>
         </header>
 

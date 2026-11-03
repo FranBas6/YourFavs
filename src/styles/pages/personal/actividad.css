@@ -7,7 +7,7 @@
 
 /* ---- Cabecera ---- */
 .act-head { margin-bottom: 22px; }
-.act-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.act-head h1 { margin: 0 0 4px; font-size: 30px; font-weight: 700; letter-spacing: -.02em; color: var(--text); }
 .act-head p { margin: 0; color: var(--text-3); font-size: 14px; }
 .act-live { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-3); font-family: var(--font-mono); letter-spacing: .04em; }
 .act-live .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--rating-high); animation: act-pulse 2.4s ease-out infinite; }
@@ -22,7 +22,7 @@
 .stat-tile { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
 .stat-tile .ico { width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: var(--tile-bg); color: var(--tile-ink); }
 .stat-tile .ico svg { width: 18px; height: 18px; }
-.stat-tile .n { font-size: 24px; font-weight: 800; line-height: 1; letter-spacing: -.02em; color: var(--tile-ink); }
+.stat-tile .n { font-size: 24px; font-weight: 700; line-height: 1; letter-spacing: -.02em; color: var(--tile-ink); }
 .stat-tile .l { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
 
 /* ---- Heatmap de racha (estilo GitHub) ---- */
@@ -57,7 +57,10 @@
 .tl-day { position: relative; margin-bottom: 8px; }
 .tl-day-head { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; position: relative; }
 .tl-day-head::before { content: ""; position: absolute; left: -26px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
-.tl-day-head .d { font-size: 15px; font-weight: 700; text-transform: capitalize; color: var(--text); }
+/* «viernes, 30 de octubre» → solo la primera letra en mayúscula (capitalize subía todas las palabras:
+   «Viernes, 30 De Octubre»). ::first-letter necesita una caja de bloque. */
+.tl-day-head .d { display: inline-block; font-size: 15px; font-weight: 700; color: var(--text); }
+.tl-day-head .d::first-letter { text-transform: uppercase; }
 .tl-day-head .c { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
 .tl-day-head .sum { margin-left: auto; display: flex; gap: 5px; }
 .tl-day-head .sum .b { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-full); }
