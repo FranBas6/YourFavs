@@ -60,7 +60,14 @@ details[open] .season-overview {
 .sr-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--r-md); }
 /* Póster destacado (Fran: «el diseño limpio, algo más grande»): 112 × 168 en escritorio, 76 × 114 en móvil. */
 .sr-poster { width: 112px; aspect-ratio: 2 / 3; height: auto; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; background: var(--bg-tint); box-shadow: var(--sh-md); }
-.sr-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+.sr-main { flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; flex-direction: column; gap: 10px; padding-top: 2px; }
+/* Tres cifras grandes y limpias (episodios · nota · duración), como las casillas de prod pero sin color. */
+.sr-stats { display: flex; gap: 28px; }
+.sr-stats > span { display: flex; flex-direction: column; }
+.sr-stats b { font: 600 var(--fs-sub) var(--font); color: var(--text); line-height: 1.2; white-space: nowrap; }
+.sr-stats small { font-size: var(--fs-meta); color: var(--text-3); }
+/* La tira, pegada abajo: se alinea con el pie del póster. */
+.sr-main > .sr-strip { margin-top: auto; }
 .sr-head { display: flex; align-items: flex-start; gap: 12px; }
 .sr-t { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .sr-t b { font: 600 var(--fs-sub) var(--font); color: var(--text); line-height: 1.25; }
@@ -74,7 +81,6 @@ details[open] .season-overview {
 .sr-c[data-b="low"]  { background: var(--rating-low); }
 .sr-c[data-b="poor"] { background: var(--rating-poor); }
 .sr-n { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
-.sr-r { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
 /* Sinopsis: oculta hasta abrir la temporada (Fran), y entonces entera. */
 .sr-main .sr-ov { display: none; margin: 0; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
 details[open] > summary .sr-main .sr-ov { display: block; -webkit-line-clamp: unset; overflow: visible; }
@@ -113,11 +119,17 @@ details[open] > summary .sr-chev { transform: rotate(180deg); }
 
 @media (max-width: 767px) {
     /* La tira baja a su propia línea, a todo el ancho; la nota de temporada se oculta. */
-    .sr-row { gap: 12px; padding: 12px; }
-    .sr-poster { width: 76px; }
-    .sr-t b { font-size: var(--fs-body, 15px); }
-    .sr-head { gap: 8px; }
-    .sr-r { display: none; }
+    /* Móvil: al lado del póster, nombre y cifras; debajo, a todo el ancho, los datos y la tira. */
+    .sr-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); column-gap: 12px; row-gap: 10px; padding: 12px; align-items: start; }
+    .sr-poster { width: 76px; grid-row: 1 / span 2; }
+    .sr-main { display: contents; }
+    .sr-head { grid-column: 2; gap: 8px; }
+    .sr-stats { grid-column: 2; gap: 16px; align-self: end; }
+    .sr-stats b { font-size: var(--fs-body); }
+    .sr-facts, .sr-main > .sr-strip, .sr-main .sr-ov { grid-column: 1 / -1; margin-top: 0; }
+    .sr-t b { font-size: var(--fs-body); }
+    .sr-strip { gap: 3px; }
+    .sr-strip .sr-c { width: 10px; height: 10px; border-radius: 2px; }
     .sr-el-body { flex-direction: column; }
     .sr-el-still { width: 100%; }
     .sr-legend-k { margin-left: 0; }

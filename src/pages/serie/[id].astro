@@ -969,16 +969,20 @@ const jsonLd = item ? {
                                                 <div class="sr-head">
                                                     <span class="sr-t">
                                                         <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
-                                                        <small>{seasonTotal} ep.{season.air_date ? ` · ${season.air_date.slice(0, 4)}` : ''}</small>
+                                                        {season.air_date && <small>{season.air_date.slice(0, 4)}</small>}
                                                     </span>
                                                     {seasonTotal > 0 && <span class="sr-n" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>}
-                                                    {stats.averageRating !== '0.0' && <span class="sr-r">★ {stats.averageRating.replace('.', ',')}</span>}
                                                     <svg class="sr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                                                 </div>
-                                                {/* Lo que antes iba en casillas de colores, en una línea de texto */}
+                                                {/* Las tres cifras de prod, sin cajas de color */}
+                                                <div class="sr-stats">
+                                                    <span><b>{stats.totalEpisodes}</b><small>Episodios</small></span>
+                                                    <span><b>{stats.averageRating !== '0.0' ? `★ ${stats.averageRating.replace('.', ',')}` : '—'}</b><small>Nota</small></span>
+                                                    <span><b>{stats.averageRuntime !== 'No disponible' ? stats.averageRuntime : '—'}</b><small>Duración</small></span>
+                                                </div>
+                                                {/* El resto, en una línea de texto */}
                                                 <p class="sr-facts">
                                                     {[
-                                                        stats.averageRuntime !== 'No disponible' ? `${stats.averageRuntime} por episodio` : null,
                                                         stats.totalWatchtime ? `Total ${stats.totalWatchtime}` : null,
                                                         stats.bestEpisode ? `Mejor: E${stats.bestEpisode.episode_number} (${stats.bestEpisode.vote_average.toFixed(1).replace('.', ',')})` : null,
                                                         stats.dateRange,
