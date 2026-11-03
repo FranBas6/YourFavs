@@ -102,14 +102,14 @@ function handleWatchedEpisodeForm(form) {
             if (cell) cell.classList.toggle('is-seen', !isWatched);
             var bar = document.querySelector('[data-season-bar="' + seasonNum + '"]');
             var count = document.querySelector('[data-season-count="' + seasonNum + '"]');
-            var progressDiv = document.querySelector('[data-season-progress="' + seasonNum + '"]');
-            if (bar && count && progressDiv) {
-                var total = parseInt(progressDiv.getAttribute('data-season-total') || '0');
+            if (count) {
+                // «7/10»: el total va en el propio texto (la barra de temporada ya no existe desde el rediseño 4.6).
                 var parts = count.textContent.split('/');
+                var total = parseInt(parts[1]) || 0;
                 var current = parseInt(parts[0]) + (isWatched ? -1 : 1);
                 current = Math.max(0, Math.min(total, current));
                 count.textContent = current + '/' + total;
-                bar.style.width = Math.round(current / total * 100) + '%';
+                if (bar && total) bar.style.width = Math.round(current / total * 100) + '%';
             }
 
             // Totales globales (solo si la temporada es "regular", no la 0)

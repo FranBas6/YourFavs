@@ -964,43 +964,42 @@ const jsonLd = item ? {
                                     <details id={`season-${season.season_number}`} class="sr scroll-mt-20">
                                         {/* 4.6 · Una fila por temporada: póster · nombre · tira de episodios · vistos · nota */}
                                         <summary class="sr-row">
-                                            <img class="sr-poster" src={posterUrl(season.poster_path || item?.poster_path, 'w154')} alt="" loading="lazy" />
-                                            <span class="sr-t">
-                                                <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
-                                                <small>{seasonTotal} ep.{season.air_date ? ` · ${season.air_date.slice(0, 4)}` : ''}</small>
-                                            </span>
-                                            {seasonTotal > 0 && (
-                                                <span class="sr-strip" role="img" aria-label={`${season.season_number === 0 ? 'Especiales' : `T${season.season_number}`}: ${seasonTotal} episodios, ${seasonWatched} vistos`}>
-                                                    {seasonEpisodes.slice(0, STRIP_MAX).map((ep) => {
-                                                        const seen = watchedSet.has(`${season.season_number}-${ep.episode_number}`);
-                                                        // Sin spoilers: la nota de un episodio no visto no se enseña (ni por color), como en el mapa.
-                                                        const band = spoilerFree && !seen ? 'none' : epBand(ep);
-                                                        const tip = `T${season.season_number}·E${ep.episode_number}` + (band !== 'none' ? ` · ★ ${ep.vote_average.toFixed(1)}` : '') + (seen ? ' · visto' : '');
-                                                        return <i class:list={['sr-c', { 'is-seen': seen }]} data-b={band} data-ep-cell={`${season.season_number}-${ep.episode_number}`} title={tip}></i>;
-                                                    })}
-                                                    {seasonTotal > STRIP_MAX && <span class="sr-more" title={`${seasonTotal - STRIP_MAX} episodios más: ábrela para verlos todos`}>+{seasonTotal - STRIP_MAX}</span>}
-                                                </span>
-                                            )}
-                                            {seasonTotal > 0 && <span class="sr-n" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>}
-                                            <span class="sr-r">{stats.averageRating !== '0.0' ? `★ ${stats.averageRating.replace('.', ',')}` : ''}</span>
-                                            <svg class="sr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                            <img class="sr-poster" src={posterUrl(season.poster_path || item?.poster_path, 'w342')} alt="" loading="lazy" />
+                                            <div class="sr-main">
+                                                <div class="sr-head">
+                                                    <span class="sr-t">
+                                                        <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
+                                                        <small>{seasonTotal} ep.{season.air_date ? ` · ${season.air_date.slice(0, 4)}` : ''}</small>
+                                                    </span>
+                                                    {seasonTotal > 0 && <span class="sr-n" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>}
+                                                    {stats.averageRating !== '0.0' && <span class="sr-r">★ {stats.averageRating.replace('.', ',')}</span>}
+                                                    <svg class="sr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                                </div>
+                                                {/* Lo que antes iba en casillas de colores, en una línea de texto */}
+                                                <p class="sr-facts">
+                                                    {[
+                                                        stats.averageRuntime !== 'No disponible' ? `${stats.averageRuntime} por episodio` : null,
+                                                        stats.totalWatchtime ? `Total ${stats.totalWatchtime}` : null,
+                                                        stats.bestEpisode ? `Mejor: E${stats.bestEpisode.episode_number} (${stats.bestEpisode.vote_average.toFixed(1).replace('.', ',')})` : null,
+                                                        stats.dateRange,
+                                                    ].filter(Boolean).join(' · ')}
+                                                </p>
+                                                {seasonTotal > 0 && (
+                                                    <span class="sr-strip" role="img" aria-label={`${season.season_number === 0 ? 'Especiales' : `T${season.season_number}`}: ${seasonTotal} episodios, ${seasonWatched} vistos`}>
+                                                        {seasonEpisodes.slice(0, STRIP_MAX).map((ep) => {
+                                                            const seen = watchedSet.has(`${season.season_number}-${ep.episode_number}`);
+                                                            // Sin spoilers: la nota de un episodio no visto no se enseña (ni por color), como en el mapa.
+                                                            const band = spoilerFree && !seen ? 'none' : epBand(ep);
+                                                            const tip = `T${season.season_number}·E${ep.episode_number}` + (band !== 'none' ? ` · ★ ${ep.vote_average.toFixed(1)}` : '') + (seen ? ' · visto' : '');
+                                                            return <i class:list={['sr-c', { 'is-seen': seen }]} data-b={band} data-ep-cell={`${season.season_number}-${ep.episode_number}`} title={tip}></i>;
+                                                        })}
+                                                        {seasonTotal > STRIP_MAX && <span class="sr-more" title={`${seasonTotal - STRIP_MAX} episodios más: ábrela para verlos todos`}>+{seasonTotal - STRIP_MAX}</span>}
+                                                    </span>
+                                                )}
+                                                <p class="sr-ov season-overview">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
+                                            </div>
                                         </summary>
                                         <div class="sr-body space-y-2">
-                                            {/* Lo que antes iba en la cabecera grande de la temporada (4.6: nada se pierde) */}
-                                            <div class="sr-meta">
-                                                <span><b>{stats.totalEpisodes}</b> episodios</span>
-                                                {stats.averageRating !== '0.0' && <span>Nota <b>{stats.averageRating}</b></span>}
-                                                {stats.averageRuntime !== 'No disponible' && <span><b>{stats.averageRuntime}</b> por episodio</span>}
-                                                {stats.totalWatchtime && <span>Total <b>{stats.totalWatchtime}</b></span>}
-                                                {stats.bestEpisode && <span>Mejor: <b>E{stats.bestEpisode.episode_number}</b> ({stats.bestEpisode.vote_average.toFixed(1)})</span>}
-                                                {stats.dateRange && <span>{stats.dateRange}</span>}
-                                            </div>
-                                            {seasonTotal > 0 && (
-                                                <div class="sr-prog" data-season-progress={season.season_number} data-season-total={seasonTotal}>
-                                                    <span class="sr-prog-bar"><i data-season-bar={season.season_number} style={`width: ${Math.round(seasonWatched / seasonTotal * 100)}%`}></i></span>
-                                                </div>
-                                            )}
-                                            <p class="sr-ov season-overview">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
                                             {/* Botón marcar/desmarcar temporada */}
                                             {seasonTotal > 0 && (
                                                 <form method="POST" class="mb-3">

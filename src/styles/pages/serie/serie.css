@@ -52,34 +52,37 @@ details[open] .season-overview {
 .sr { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); overflow: hidden; }
 .sr[open] { border-color: var(--border-strong); }
 .sr-row {
-    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
-    min-height: 64px; padding: 10px 14px 10px 10px;
+    list-style: none; cursor: pointer; display: flex; align-items: flex-start; gap: 18px;
+    padding: 14px 16px 14px 14px;
 }
 .sr-row::-webkit-details-marker { display: none; }
 .sr-row:hover { background: var(--bg-tint); }
 .sr-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--r-md); }
-/* Póster algo más destacado (pedido de Fran): 64 × 96 en escritorio, 52 × 78 en móvil. */
-.sr-poster { width: 64px; height: 96px; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; background: var(--bg-tint); box-shadow: var(--sh-md); }
-.sr-t { display: flex; flex-direction: column; min-width: 104px; flex-shrink: 0; }
-.sr-t b { font: 600 var(--fs-body, 15px) var(--font); color: var(--text); white-space: nowrap; }
-.sr-t small { font-size: var(--fs-meta); color: var(--text-3); }
-.sr-strip { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+/* Póster destacado (Fran: «el diseño limpio, algo más grande»): 112 × 168 en escritorio, 76 × 114 en móvil. */
+.sr-poster { width: 112px; aspect-ratio: 2 / 3; height: auto; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; background: var(--bg-tint); box-shadow: var(--sh-md); }
+.sr-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 8px; padding-top: 2px; }
+.sr-head { display: flex; align-items: flex-start; gap: 12px; }
+.sr-t { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.sr-t b { font: 600 var(--fs-sub) var(--font); color: var(--text); line-height: 1.25; }
+.sr-t small { font-size: var(--fs-meta); color: var(--text-3); margin-top: 2px; }
+.sr-facts { margin: 0; font-size: var(--fs-meta); color: var(--text-2); line-height: 1.5; }
+.sr-strip { display: flex; flex-wrap: wrap; gap: 4px; }
 .sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--border-strong); opacity: .35; }
 .sr-c.is-seen { opacity: 1; }
 .sr-c[data-b="high"] { background: var(--rating-high); }
 .sr-c[data-b="med"]  { background: var(--rating-med); }
 .sr-c[data-b="low"]  { background: var(--rating-low); }
 .sr-c[data-b="poor"] { background: var(--rating-poor); }
-.sr-n { font: 600 var(--fs-meta) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; min-width: 40px; text-align: right; }
-.sr-r { font: 600 var(--fs-meta) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; min-width: 44px; text-align: right; }
+.sr-n { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
+.sr-r { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
+/* Sinopsis: oculta hasta abrir la temporada (Fran), y entonces entera. */
+.sr-main .sr-ov { display: none; margin: 0; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
+details[open] > summary .sr-main .sr-ov { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .sr-chev { width: 18px; height: 18px; color: var(--text-3); flex-shrink: 0; transition: transform .15s ease; }
 details[open] > summary .sr-chev { transform: rotate(180deg); }
 .sr-body { border-top: 1px solid var(--border); padding: 12px 16px 16px; }
-.sr-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-meta); color: var(--text-2); }
-.sr-meta b { color: var(--text); font-weight: 600; }
 .sr-prog-bar { display: block; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
 .sr-prog-bar i { display: block; height: 100%; background: var(--ok, var(--a-visto)); transition: width .3s ease; }
-.sr-ov { font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
 
 /* Leyenda, en una línea */
 .sr-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 12px; font-size: var(--fs-micro); color: var(--text-3); }
@@ -110,10 +113,10 @@ details[open] > summary .sr-chev { transform: rotate(180deg); }
 
 @media (max-width: 767px) {
     /* La tira baja a su propia línea, a todo el ancho; la nota de temporada se oculta. */
-    .sr-row { flex-wrap: wrap; row-gap: 8px; }
-    .sr-poster { width: 52px; height: 78px; }
-    .sr-t { flex: 1 1 auto; min-width: 0; }
-    .sr-strip { order: 5; flex-basis: 100%; }
+    .sr-row { gap: 12px; padding: 12px; }
+    .sr-poster { width: 76px; }
+    .sr-t b { font-size: var(--fs-body, 15px); }
+    .sr-head { gap: 8px; }
     .sr-r { display: none; }
     .sr-el-body { flex-direction: column; }
     .sr-el-still { width: 100%; }
