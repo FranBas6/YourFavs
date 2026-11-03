@@ -1,0 +1,86 @@
+---
+/**
+ * Página de prueba SOLO DE DESARROLLO (rediseño v2, Fase 3 · pasos 3.1 y 3.2): la tarjeta nueva
+ * (TitleCard) en sus densidades y contextos, y la fila horizontal (Row) con su cabecera, con datos
+ * reales de TMDB (tendencias de la semana). Algunas props (tu nota, progreso, cuenta atrás, #n) son
+ * de ejemplo para enseñar cada estado. En producción: 404.
+ */
+import Layout from '../../layouts/Layout.astro';
+import TitleCard from '../../components/Cards/TitleCard.astro';
+import Row from '../../components/Row.astro';
+import HoverPreview from '../../components/HoverPreview.astro';
+import SectionHeader from '../../components/SectionHeader.astro';
+import { getTrending } from '../../services/API/shared/tmdbDiscoverService';
+import { posterUrl } from '../../services/API/shared/tmdbClient';
+import { safeFetch } from '../../utils/safeFetch';
+
+export const prerender = false;
+
+if (!import.meta.env.DEV) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
+
+const [movies, series] = await Promise.all([
+    safeFetch(getTrending<any>('movie', 'week'), 'dev/sistema/movies', [] as any[]),
+    safeFetch(getTrending<any>('tv', 'week'), 'dev/sistema/series', [] as any[]),
+]);
+const mv = (m: any) => ({ mediaType: 'movie' as const, id: String(m.id), title: m.title, img: posterUrl(m.poster_path), vote_average: m.vote_average, overview: m.overview, date: m.release_date, backdrop: m.backdrop_path });
+const tv = (s: any) => ({ mediaType: 'tv' as const, id: String(s.id), title: s.name, img: posterUrl(s.poster_path), vote_average: s.vote_average, overview: s.overview, date: s.first_air_date, backdrop: s.backdrop_path });
+const mix = [...movies.slice(0, 10).map(mv), ...series.slice(0, 10).map(tv)].sort(() => 0.5 - Math.random());
+const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+const s0 = series[0] ? tv(series[0]) : null;
+const m0 = movies[0] ? mv(movies[0]) : null;
+---
+<Layout title="Sistema v2 · tarjeta y fila">
+    <section class="px-1 sm:py-8 dev-v2">
+        <p class="dev-k">Solo desarrollo · Fase 3 · pasos 3.1 y 3.2</p>
+        <h1 class="dev-h1">Tarjeta y fila del sistema v2</h1>
+
+        <SectionHeader title="Tendencias de la semana" icon="trending-up" color="red" count={mix.length} link="/catalogo/tendencias" railId="dev-rail-1" subtitle="Lo más visto en TMDB estos 7 días" why="actualizada el lunes" />
+        <Row id="dev-rail-1" label="Tendencias de la semana" moreHref="/catalogo/tendencias" moreCount={mix.length}>
+            {mix.map((c) => (
+                <HoverPreview tmdbId={c.id} tmdbType={c.mediaType} title={c.title} backdropPath={c.backdrop} href={`/${c.mediaType === 'tv' ? 'serie' : 'movie'}/${c.id}`} year={c.date?.slice(0, 4)} rating={c.vote_average}>
+                    <TitleCard {...c} context="home" />
+                </HoverPreview>
+            ))}
+        </Row>
+
+        <div class="dev-gap"></div>
+        <SectionHeader title="Del mismo director" icon="clapperboard" color="slate" size="sub" count={9} link="/team/David%20Fincher" railId="dev-rail-2" />
+        <Row id="dev-rail-2" label="Del mismo director" density="min" moreHref="/team/David%20Fincher" moreCount={9}>
+            {movies.slice(0, 9).map((m: any) => <TitleCard {...mv(m)} density="min" />)}
+        </Row>
+
+        <div class="dev-gap"></div>
+        <SectionHeader title="Estados de la tarjeta" icon="layers" color="purple" size="sub" />
+        <div class="dev-grid">
+            {m0 && <figure><TitleCard {...m0} context="home" /><figcaption>Portada · nota TMDB</figcaption></figure>}
+            {m0 && <figure><TitleCard {...m0} context="catalog" platform="Netflix" /><figcaption>Nuevo en streaming</figcaption></figure>}
+            {m0 && <figure><TitleCard {...m0} context="lists" userRating={9.5} favoriteNumber={2} /><figcaption>Mis listas · #2 y tu nota</figcaption></figure>}
+            {s0 && <figure><TitleCard {...s0} context="lists" followed next_episode_to_air={{ air_date: tomorrow, season_number: 2, episode_number: 9 }} watchedEpisodes={17} totalEpisodes={19} airPeriod="2022 – hoy" seasonsLabel="2 temp." /><figcaption>Siguiendo · mañana + progreso</figcaption></figure>}
+            {s0 && <figure><TitleCard {...s0} context="lists" followed next_episode_to_air={{ air_date: tomorrow, season_number: 1, episode_number: 10, episode_type: 'finale' }} watchedEpisodes={9} totalEpisodes={10} /><figcaption>Siguiendo · el próximo es final</figcaption></figure>}
+            {s0 && <figure><TitleCard {...s0} context="catalog" abandoned airPeriod="2022 – hoy" seasonsLabel="2 temp." /><figcaption>Abandonada (fuera de su lista)</figcaption></figure>}
+            {m0 && <figure><TitleCard {...m0} context="home" seedTitle="El club de la lucha" /><figcaption>Para ti · porque viste…</figcaption></figure>}
+            {m0 && <figure><TitleCard {...m0} context="lists" recommendedBy={{ name: 'Ana', more: 1 }} /><figcaption>Recomendada por…</figcaption></figure>}
+        </div>
+
+        <div class="dev-gap"></div>
+        <SectionHeader title="Detallada · vista de lista («Ver más»)" icon="list" color="blue" size="sub" />
+        <div class="dev-list">
+            {mix.slice(0, 4).map((c) => <TitleCard {...c} density="detail" context="catalog" genres={[{ id: 1, name: 'Drama' }, { id: 2, name: 'Suspense' }]} />)}
+        </div>
+    </section>
+</Layout>
+
+<style>
+    .dev-v2 { max-width: 1240px; margin: 0 auto; }
+    .dev-k { font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin: 0 0 var(--s-2); }
+    .dev-h1 { font: 700 var(--fs-page)/1.15 var(--font); letter-spacing: -.02em; color: var(--text); margin: 0 0 var(--s-7); }
+    .dev-gap { height: var(--s-8); }
+    .dev-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: var(--s-6) var(--s-4); }
+    .dev-grid figure { margin: 0; display: flex; flex-direction: column; gap: var(--s-2); }
+    .dev-grid figcaption { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+    .dev-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: var(--s-6); }
+    @media (max-width: 767px) { .dev-list { grid-template-columns: 1fr; } .dev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>

@@ -1,0 +1,324 @@
+---
+/**
+ * QuickView — la «vista rápida» de las tarjetas (rediseño, paso 3.7; docs/design_handoff_rediseno,
+ * README «Encargo E»). Sustituye a la vista previa por hover (HoverPreview + hover-preview.js).
+ *
+ * - Se abre A PROPÓSITO: el ▶ del póster de la TitleCard (`[data-qv]`), con clic o Enter/Espacio.
+ *   Recorrer una fila con el ratón no abre nada.
+ * - Escritorio (≥ 1024 px): un panel de 400 px anclado a la tarjeta, NO modal. Crece hacia la
+ *   derecha (o hacia la izquierda si no cabe) y sube lo justo si no cabe abajo. Se cierra con ×, Esc,
+ *   clic fuera, al abrir otra o si la tarjeta sale de la vista; el scroll y salir con el ratón no lo
+ *   cierran. Foco: al título al abrir, de vuelta al ▶ al cerrar.
+ * - Móvil: el mismo contenido en una hoja inferior (BottomSheet, modal).
+ * - Abre al instante con lo que trae la tarjeta y se rellena con /api/quick/{tipo}/{id} (precarga
+ *   al pasar el ratón o enfocar el ▶). Tráiler en silencio (los controles, sonido incluido,
+ *   son los de YouTube; respeta `yf_hover_muted` si quedó guardado); sin tráiler, el fondo; sin fondo, el póster.
+ * - Acciones con los botones con estado del sistema v2 y los endpoints de siempre:
+ *   Pendiente/Visto → /api/lists/fixed · Seguir → /api/series/state · Marcar visto del próximo
+ *   episodio (único rojo) → /api/episodes/watched · ⊕ → SaveToPopover (.js-saveto).
+ */
+import BottomSheet from './BottomSheet.astro';
+---
+<div class="qv" id="yf-qv" role="dialog" aria-modal="false" aria-labelledby="yf-qv-title" hidden>
+    <div class="qv-inner" data-qv-desktop></div>
+</div>
+<BottomSheet id="quickview" title="Vista rápida" hideTitle>
+    <div class="qv-inner qv-inner--sheet" data-qv-mobile></div>
+</BottomSheet>
+
+<style is:global>
+    .qv {
+        position: absolute; z-index: 1200; width: 520px; max-width: calc(100vw - 32px);
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
+        box-shadow: var(--sh-lg); overflow: hidden;
+        opacity: 0; transform: scale(.96); transition: opacity .16s ease, transform .16s ease;
+    }
+    .qv.is-open { opacity: 1; transform: scale(1); }
+    .qv[hidden] { display: none; }
+    @media (prefers-reduced-motion: reduce) { .qv { transform: none !important; transition: opacity .12s ease; } }
+
+    .qv-media { position: relative; aspect-ratio: 16 / 9; background: var(--card); overflow: hidden; }
+    .qv-inner--sheet .qv-media { border-radius: var(--r-md); margin: 0 var(--s-4); }
+    .qv-media img, .qv-media iframe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 0; }
+    .qv-media .qv-poster { object-fit: contain; }
+    .qv-tag {
+        position: absolute; left: var(--s-3); bottom: var(--s-3); z-index: 2;
+        display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: var(--r-full);
+        background: rgba(10, 15, 28, .72); color: #fff; font: 600 var(--fs-micro) var(--font-mono); letter-spacing: .02em;
+    }
+    .qv-tag svg { width: 11px; height: 11px; }
+
+    .qv-body { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); }
+    .qv-inner--sheet .qv-body { padding: var(--s-4); }
+    .qv-head { display: flex; align-items: center; gap: var(--s-3); }
+    .qv-head .qv-title { flex: 1; min-width: 0; }
+    .qv-x { margin: -6px -8px -6px 0; flex-shrink: 0; }
+    .qv-title { margin: 0; font: 700 var(--fs-sub)/1.25 var(--font); color: var(--text); outline: none; }
+    .qv-vote { flex-shrink: 0; font: 700 var(--fs-micro) var(--font-mono); color: var(--text-2); white-space: nowrap; }
+    .qv-vote span { color: var(--a-rating); }
+    .qv-meta { margin: 0; font-size: var(--fs-meta); color: var(--text-3); }
+    .qv-prog { display: flex; align-items: center; gap: var(--s-2); }
+    .qv-prog-bar { flex: 1; height: 4px; border-radius: var(--r-full); background: var(--border); overflow: hidden; }
+    .qv-prog-bar > span { display: block; height: 100%; background: var(--a-seguir); }
+    .qv-prog-n { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+    .qv-next { margin: 0; font-size: var(--fs-meta); color: var(--text-2); }
+    .qv-ov {
+        margin: 0; font-size: var(--fs-ui); line-height: 1.5; color: var(--text-2);
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .qv-prov {
+        display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) 0;
+        border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .qv-prov img { width: 32px; height: 32px; border-radius: var(--r-sm); flex-shrink: 0; }
+    .qv-prov-t { flex: 1; min-width: 0; }
+    .qv-prov-t strong { display: block; font-size: var(--fs-ui); color: var(--text); }
+    .qv-prov-t span { font-size: var(--fs-micro); color: var(--text-3); }
+    .qv-acts { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; padding-top: var(--s-1); }
+    .qv-more { margin-left: auto; display: inline-flex; align-items: center; gap: 2px; min-height: 36px; font: 600 var(--fs-ui) var(--font); color: var(--primary); text-decoration: none; white-space: nowrap; }
+    .qv-more svg { width: 14px; height: 14px; }
+    .qv-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .qv-sk { background: var(--bg-tint); border-radius: var(--r-sm); height: 12px; }
+    .qv-sk--l { height: 44px; border-radius: var(--r-md); }
+    @media (prefers-reduced-motion: no-preference) {
+        .qv-sk { animation: qv-shine 1.2s ease-in-out infinite; }
+        @keyframes qv-shine { 50% { opacity: .55; } }
+    }
+</style>
+
+<script>
+    type Seed = { type: 'movie' | 'tv'; id: string; title: string; poster: string; year: string; vote: string };
+    type Quick = {
+        ok: boolean; title: string; years: string; duration: string | null; seasonsLabel: string | null; genres: string[];
+        overview: string; vote: number | null; backdrop: string | null; trailer: string | null;
+        provider: { name: string; logo: string | null; mine: boolean; kind: string; link: string | null } | null;
+        loggedIn: boolean; state: Record<string, boolean> | null;
+        progress: { watched: number; total: number } | null;
+        next: { season: number; episode: number; name: string | null; airDate: string | null } | null;
+    };
+
+    const panel = document.getElementById('yf-qv') as HTMLElement | null;
+    const deskBox = panel?.querySelector<HTMLElement>('[data-qv-desktop]') ?? null;
+    const sheetBox = document.querySelector<HTMLElement>('[data-qv-mobile]');
+    const sheetRoot = document.querySelector<HTMLElement>('[data-sheet="quickview"]');
+    const isMobile = () => window.matchMedia('(max-width: 1023.98px)').matches;
+    const cache = new Map<string, Promise<Quick | null>>();
+    const MUTE_KEY = 'yf_hover_muted';
+    let current: { seed: Seed; trigger: HTMLElement; card: Element | null; box: HTMLElement } | null = null;
+    let io: IntersectionObserver | null = null;
+
+    const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+    const mutedPref = () => { try { return localStorage.getItem(MUTE_KEY) !== '0'; } catch { return true; } };
+    const ICON = {
+        x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+        clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+        check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+        eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
+        plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+        ext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+        chev: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>',
+    };
+
+    function load(seed: Seed): Promise<Quick | null> {
+        const key = `${seed.type}:${seed.id}`;
+        if (!cache.has(key)) {
+            cache.set(key, fetch(`/api/quick/${seed.type}/${seed.id}`).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+        }
+        return cache.get(key)!;
+    }
+
+    function seedOf(el: HTMLElement): Seed {
+        const d = el.dataset;
+        return { type: d.qvType === 'tv' ? 'tv' : 'movie', id: d.qvId || '', title: d.qvTitle || '', poster: d.qvPoster || '', year: d.qvYear || '', vote: d.qvVote || '' };
+    }
+
+    function mediaHtml(seed: Seed, q: Quick | null): string {
+        // Encima del vídeo no va nada nuestro: YouTube trae sus controles (sonido incluido) y se
+        // tapaban. La × va en la cabecera del texto. Empieza en silencio salvo que lo quitaras.
+        if (q?.trailer) {
+            const muted = mutedPref();
+            const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(q.trailer)}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3`;
+            return `<div class="qv-media"><iframe src="${src}" title="Tráiler de ${esc(q.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
+        }
+        if (q?.backdrop) return `<div class="qv-media"><img src="${q.backdrop}" alt="" /><span class="qv-tag">Sin tráiler</span></div>`;
+        if (q) return `<div class="qv-media"><img class="qv-poster" src="${esc(seed.poster)}" alt="" /><span class="qv-tag">Sin tráiler</span></div>`;
+        return `<div class="qv-media"><div class="qv-sk" style="position:absolute;inset:0;border-radius:0"></div></div>`;
+    }
+
+    function btn(label: string, icon: string, attrs: string, cls = '') {
+        return `<button type="button" class="btn btn--sm ${cls}" ${attrs}>${icon}<span>${label}</span></button>`;
+    }
+
+    function bodyHtml(seed: Seed, q: Quick | null): string {
+        const href = `/${seed.type === 'tv' ? 'serie' : 'movie'}/${seed.id}`;
+        const vote = q?.vote ?? (seed.vote ? Number(seed.vote) : null);
+        const head = `<div class="qv-head"><h2 class="qv-title" id="yf-qv-title" tabindex="-1">${esc(q?.title || seed.title)}</h2>`
+            + (vote ? `<span class="qv-vote"><span aria-hidden="true">★</span> ${String(vote).replace('.', ',')}</span>` : '')
+            + `<button type="button" class="btn btn--sm btn--icon btn--ghost qv-x" data-qv-close aria-label="Cerrar">${ICON.x}</button></div>`;
+        if (!q) {
+            return `<div class="qv-body">${head}<p class="qv-meta">${esc(seed.year)}</p>`
+                + `<div class="qv-sk" style="width:90%"></div><div class="qv-sk" style="width:75%"></div><div class="qv-sk qv-sk--l"></div>`
+                + `<div class="qv-acts"><a class="qv-more" href="${href}">Ver ficha ${ICON.chev}</a></div></div>`;
+        }
+        const meta = [q.years, q.duration || q.seasonsLabel, q.genres.join(', ')].filter(Boolean).join(' · ');
+        let follow = '';
+        if (q.progress && q.progress.total) {
+            const pct = Math.min(100, Math.round(q.progress.watched / q.progress.total * 100));
+            follow += `<div class="qv-prog"><span class="qv-prog-bar"><span style="width:${pct}%"></span></span><span class="qv-prog-n">${q.progress.watched}/${q.progress.total}</span></div>`;
+        }
+        if (q.next) follow += `<p class="qv-next">Próximo · T${q.next.season}·E${q.next.episode}${q.next.name ? ` «${esc(q.next.name)}»` : ''}</p>`;
+        const prov = q.provider ? `<div class="qv-prov">${q.provider.logo ? `<img src="${q.provider.logo}" alt="" />` : ''}`
+            + `<div class="qv-prov-t"><strong>${esc(q.provider.name)}</strong><span>${q.provider.mine ? 'En tu plataforma · ' : ''}${esc(q.provider.kind)}</span></div>`
+            + (q.provider.link ? `<a class="btn btn--sm btn--ghost" href="${q.provider.link}" target="_blank" rel="noopener">${ICON.ext}<span>Ver ahora</span></a>` : '') + '</div>' : '';
+
+        let acts = '';
+        if (q.loggedIn && q.state) {
+            const s = q.state;
+            const save = `<span role="button" tabindex="0" class="btn btn--sm btn--icon js-saveto" data-mt="${seed.type}" data-id="${seed.id}" data-title="${esc(q.title)}" data-poster="${esc(seed.poster)}" aria-label="Guardar ${esc(q.title)} en tus listas">${ICON.plus}</span>`;
+            if (seed.type === 'tv' && s.siguiendo && q.next) {
+                acts = btn(`Marcar visto T${q.next.season}·E${q.next.episode}`, ICON.check, `data-qv-act="ep"`, 'btn--pri')
+                    + btn('Siguiendo', ICON.eye, `data-qv-act="seguir" data-tone="seguir" aria-pressed="true"`) + save;
+            } else if (seed.type === 'tv') {
+                acts = btn('Pendiente', ICON.clock, `data-qv-act="pendientes" data-tone="pend" aria-pressed="${s.pendiente}"`)
+                    + btn(s.siguiendo ? 'Siguiendo' : 'Seguir', ICON.eye, `data-qv-act="seguir" data-tone="seguir" aria-pressed="${s.siguiendo}"`) + save;
+            } else {
+                acts = btn('Pendiente', ICON.clock, `data-qv-act="pendientes" data-tone="pend" aria-pressed="${s.pendiente}"`)
+                    + btn('Visto', ICON.check, `data-qv-act="vistas" data-tone="visto" aria-pressed="${s.visto}"`) + save;
+            }
+        }
+        return `<div class="qv-body">${head}${meta ? `<p class="qv-meta">${esc(meta)}</p>` : ''}${follow}`
+            + (q.overview ? `<p class="qv-ov">${esc(q.overview)}</p>` : '') + prov
+            + `<div class="qv-acts">${acts}<a class="qv-more" href="${href}">Ver ficha ${ICON.chev}</a></div></div>`;
+    }
+
+    function render(box: HTMLElement, seed: Seed, q: Quick | null) {
+        box.innerHTML = mediaHtml(seed, q) + bodyHtml(seed, q);
+    }
+
+    function place() {
+        if (!current || !panel || isMobile() || !current.card) return;
+        const r = current.card.getBoundingClientRect();
+        const w = panel.offsetWidth, h = panel.offsetHeight;
+        let left = r.left - 12;
+        let origin = 'top left';
+        if (left + w + 16 > window.innerWidth) { left = r.right + 12 - w; origin = 'top right'; }
+        left = Math.max(16, left);
+        let top = r.top - 12;
+        if (top + h + 16 > window.innerHeight) top = Math.max(16, window.innerHeight - h - 16);
+        panel.style.left = `${left + window.scrollX}px`;
+        panel.style.top = `${top + window.scrollY}px`;
+        panel.style.transformOrigin = origin;
+    }
+
+    function close(returnFocus = true) {
+        if (!current) return;
+        const { trigger, box } = current;
+        current = null;
+        io?.disconnect(); io = null;
+        if (panel && !panel.hidden) { panel.classList.remove('is-open'); panel.hidden = true; }
+        box.innerHTML = '';
+        if (box === sheetBox && sheetRoot?.classList.contains('is-open')) document.dispatchEvent(new CustomEvent('yf:sheet-close'));
+        if (returnFocus) trigger.focus({ preventScroll: true });
+    }
+
+    async function open(trigger: HTMLElement) {
+        const seed = seedOf(trigger);
+        if (!seed.id) return;
+        if (current) close(false);
+        const mobile = isMobile();
+        const box = mobile ? sheetBox : deskBox;
+        if (!box || (!mobile && !panel)) return;
+        const card = trigger.closest('.media-card');
+        current = { seed, trigger, card, box };
+        render(box, seed, null);
+        if (mobile) {
+            document.dispatchEvent(new CustomEvent('yf:sheet-open', { detail: { id: 'quickview' } }));
+        } else {
+            panel!.hidden = false;
+            place();
+            requestAnimationFrame(() => panel!.classList.add('is-open'));
+            if (card) {
+                io = new IntersectionObserver((es) => { if (es.some((e) => !e.isIntersecting)) close(false); }, { threshold: 0 });
+                io.observe(card);
+            }
+        }
+        box.querySelector<HTMLElement>('#yf-qv-title')?.focus({ preventScroll: true });
+        const q = await load(seed);
+        if (!current || current.seed !== seed) return;
+        if (!q?.ok) return;
+        render(box, seed, q);
+        if (!mobile) place();
+        box.querySelector<HTMLElement>('#yf-qv-title')?.focus({ preventScroll: true });
+    }
+
+    async function act(b: HTMLButtonElement) {
+        if (!current || b.getAttribute('aria-busy') === 'true') return;
+        const { seed } = current;
+        const kind = b.dataset.qvAct;
+        const pressed = b.getAttribute('aria-pressed') === 'true';
+        b.setAttribute('aria-busy', 'true');
+        try {
+            let res: Response;
+            if (kind === 'pendientes' || kind === 'vistas') {
+                res = await fetch('/api/lists/fixed', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ media_type: seed.type, tmdb_id: Number(seed.id), list: kind, action: pressed ? 'remove' : 'add' }) });
+            } else if (kind === 'seguir') {
+                res = await fetch('/api/series/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: seed.id, actionType: 'siguiendo', action: pressed ? 'remove' : 'add' }) });
+            } else {
+                const q = await load(seed);
+                if (!q?.next) return;
+                res = await fetch('/api/episodes/watched', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ serieId: seed.id, season: q.next.season, episode: q.next.episode }) });
+            }
+            if (!res.ok) throw new Error(String(res.status));
+            // Recargar los datos: el estado (y el próximo episodio) cambian.
+            cache.delete(`${seed.type}:${seed.id}`);
+            const q = await load(seed);
+            if (current && current.seed === seed && q?.ok) { render(current.box, seed, q); if (!isMobile()) place(); }
+        } catch {
+            b.removeAttribute('aria-busy');
+            b.classList.add('is-error');
+        }
+    }
+
+    // «Próximo · T3·E4» de la TitleCard → ficha del episodio. En captura, para adelantarse al <a> de
+    // la tarjeta (vivía en TitleCard; aquí está una sola vez).
+    const goEp = (e: Event) => {
+        const el = (e.target as HTMLElement).closest?.<HTMLElement>('.js-ep-link');
+        if (!el?.dataset.epHref) return;
+        e.preventDefault(); e.stopPropagation();
+        location.href = el.dataset.epHref;
+    };
+    document.addEventListener('click', goEp, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') goEp(e); }, true);
+
+    // ---- Eventos (delegados) ----
+    const isTrigger = (t: EventTarget | null) => (t as HTMLElement | null)?.closest?.<HTMLElement>('[data-qv]') ?? null;
+    document.addEventListener('click', (e) => {
+        const trg = isTrigger(e.target);
+        if (trg) { e.preventDefault(); e.stopPropagation(); void open(trg); return; }
+        const t = e.target as HTMLElement;
+        if (t.closest('[data-qv-close]')) { close(); return; }
+        const a = t.closest<HTMLButtonElement>('[data-qv-act]');
+        if (a) { void act(a); return; }
+        // Clic fuera del panel (escritorio): cierra.
+        if (current && !isMobile() && panel && !panel.contains(t) && !t.closest('#saveto-pop, #saveto-backdrop')) close(false);
+    }, true);
+    document.addEventListener('keydown', (e) => {
+        const trg = isTrigger(e.target);
+        if (trg && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); e.stopPropagation(); void open(trg); return; }
+        if (e.key === 'Escape' && current) close();
+    }, true);
+    // Precarga al pasar el ratón o enfocar el ▶ (no la tarjeta).
+    const prefetch = (e: Event) => { const trg = isTrigger(e.target); if (trg) void load(seedOf(trg)); };
+    document.addEventListener('pointerover', prefetch, { passive: true });
+    document.addEventListener('focusin', prefetch);
+    window.addEventListener('resize', () => place());
+    // Hoja de móvil: al cerrarse (asa, fuera, Esc), parar el tráiler y devolver el foco.
+    if (sheetRoot) {
+        let wasOpen = false;
+        new MutationObserver(() => {
+            const isOpen = sheetRoot.classList.contains('is-open');
+            if (wasOpen && !isOpen && current && current.box === sheetBox) close();
+            wasOpen = isOpen;
+        }).observe(sheetRoot, { attributes: true, attributeFilter: ['class'] });
+    }
+</script>

@@ -1,0 +1,94 @@
+---
+/**
+ * Row — la fila horizontal del sistema v2 (docs/design_handoff_rediseno, README §3.5). Sustituye a
+ * las rejillas 2 × 5 de la portada, el catálogo, el actor y la productora; la rejilla completa queda
+ * para «Ver más».
+ *
+ * Una sola línea deslizable (sin barra visible). Escritorio: tarjetas de 160 px (140 en densidad
+ * mínima), separadas 16 px; se ven ~6 y asoma la siguiente. Móvil: 124 px (108), separadas 12 px,
+ * con snap por tarjeta; asoma la 3.ª. Al final, una tesela «Ver los N →» del alto de un póster.
+ *
+ * Las flechas van en la cabecera: <SectionHeader railId={id} …/> pinta dos botones que mueven esta
+ * fila una pantalla. El script es uno para todas las filas (delegación en document).
+ */
+interface Props {
+    /** id del carril; el mismo que se pasa a SectionHeader como `railId`. */
+    id: string;
+    /** Nombre accesible de la fila («Tendencias de la semana»). */
+    label: string;
+    density?: 'min' | 'std';
+    moreHref?: string;
+    moreCount?: number;
+    class?: string;
+}
+const { id, label, density = 'std', moreHref, moreCount, class: cls } = Astro.props;
+---
+<div class:list={['yf-rail', `yf-rail--${density}`, cls]} id={id} role="region" aria-label={label} tabindex="-1" data-rail>
+    <slot />
+    {moreHref && (
+        <a href={moreHref} class="yf-rail-more">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            <span>{moreCount ? `Ver los ${moreCount}` : 'Ver más'}</span>
+        </a>
+    )}
+</div>
+
+<style is:global>
+    .yf-rail {
+        --rail-w: 160px; --rail-gap: 16px;
+        display: grid; grid-auto-flow: column; grid-auto-columns: var(--rail-w); gap: var(--rail-gap);
+        align-items: start; overflow-x: auto; overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity; scrollbar-width: none;
+        padding: 4px 2px 8px; margin: -4px -2px 0;
+    }
+    .yf-rail::-webkit-scrollbar { display: none; }
+    .yf-rail > * { scroll-snap-align: start; }
+    .yf-rail--min { --rail-w: 140px; }
+    .yf-rail:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: var(--r-md); }
+
+    .yf-rail-more {
+        aspect-ratio: 2 / 3; border: 1px dashed var(--border-strong); border-radius: var(--r-md);
+        display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s-2);
+        color: var(--text-2); font: 600 var(--fs-ui) var(--font); text-decoration: none; text-align: center;
+        transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+    }
+    .yf-rail-more svg { width: 18px; height: 18px; }
+    .yf-rail-more:hover { border-color: var(--text-3); color: var(--text); background: var(--bg-tint); }
+    .yf-rail-more:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+    @media (max-width: 767px) {
+        .yf-rail { --rail-w: 124px; --rail-gap: 12px; scroll-snap-type: x mandatory; }
+        .yf-rail--min { --rail-w: 108px; }
+    }
+</style>
+
+<script is:inline>
+    (function () {
+        if (window.__yfRail) return; window.__yfRail = true;
+        function rail(id) { return id ? document.getElementById(id) : null; }
+        function sync(r) {
+            if (!r) return;
+            var max = r.scrollWidth - r.clientWidth - 2;
+            document.querySelectorAll('[data-rail-prev="' + r.id + '"]').forEach(function (b) { b.disabled = r.scrollLeft <= 2; });
+            document.querySelectorAll('[data-rail-next="' + r.id + '"]').forEach(function (b) { b.disabled = r.scrollLeft >= max; });
+        }
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest && e.target.closest('[data-rail-prev],[data-rail-next]');
+            if (!b) return;
+            var r = rail(b.getAttribute('data-rail-prev') || b.getAttribute('data-rail-next'));
+            if (!r) return;
+            var dir = b.hasAttribute('data-rail-prev') ? -1 : 1;
+            var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            r.scrollBy({ left: dir * Math.max(200, r.clientWidth * 0.9), behavior: reduce ? 'auto' : 'smooth' });
+        });
+        function init() {
+            document.querySelectorAll('[data-rail]').forEach(function (r) {
+                if (r.__yfSync) return; r.__yfSync = true;
+                r.addEventListener('scroll', function () { sync(r); }, { passive: true });
+                sync(r);
+            });
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+        window.addEventListener('resize', function () { document.querySelectorAll('[data-rail]').forEach(sync); });
+    })();
+</script>

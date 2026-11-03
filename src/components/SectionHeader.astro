@@ -34,8 +34,10 @@ interface Props {
     onlyOwner?: boolean;
     /** `id` del `<h2>`, para que su `<section aria-labelledby>` lo nombre por el título. */
     headingId?: string;
+    /** id de un <Row> que va debajo: pinta sus flechas (solo escritorio). */
+    railId?: string;
 }
-const { title, link, count, size = 'page', color = 'slate', icon, subtitle, why, cap, onlyOwner = false, headingId } = Astro.props;
+const { title, link, count, size = 'page', color = 'slate', icon, subtitle, why, cap, onlyOwner = false, headingId, railId } = Astro.props;
 const countLabel = cap
     ? cap
     : count != null && count > 0
@@ -57,6 +59,18 @@ const countLabel = cap
             Solo lo ves tú
         </span>
     )}
+    {(railId || link) && (
+    <div class="yf-sh-right">
+    {railId && (
+        <span class="yf-sh-arrows">
+            <button type="button" class="btn btn--sm btn--icon" data-rail-prev={railId} aria-controls={railId} aria-label={`Anteriores: ${title}`} disabled>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button type="button" class="btn btn--sm btn--icon" data-rail-next={railId} aria-controls={railId} aria-label={`Siguientes: ${title}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+        </span>
+    )}
     {link && (
         <a href={link} class="yf-sh-more" aria-label={`Ver más: ${title}`}>
             <span>Ver más</span>{count != null && count > 0 && <span class="yf-sh-more-n">· {count}</span>}
@@ -64,6 +78,8 @@ const countLabel = cap
                 <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
             </svg>
         </a>
+    )}
+    </div>
     )}
 </header>
 
@@ -87,6 +103,9 @@ const countLabel = cap
         letter-spacing: 0; margin-left: var(--s-2); white-space: nowrap;
     }
     .yf-sh-sub { margin: 3px 0 0; font-size: var(--fs-meta); line-height: 1.4; color: var(--text-3); }
+    .yf-sh-right { display: flex; align-items: center; gap: var(--s-3); flex-shrink: 0; }
+    .yf-sh-arrows { display: inline-flex; gap: var(--s-1); }
+    @media (max-width: 1023.98px) { .yf-sh-arrows { display: none; } }
     .yf-sh-more {
         display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
         min-height: 32px; font: 600 var(--fs-ui) var(--font); color: var(--primary);

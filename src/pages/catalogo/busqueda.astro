@@ -24,22 +24,25 @@ const hasQuery = title.length > 0;
 
 const [allMovies, allSeries, allActors] = !hasQuery ? [[], [], []] as any[][] : await Promise.all([
     safeFetch(
-        loadAllPages(({title, page}) => getMoviesByTitle({title, page}), title, "title"),
+        loadAllPages(({title, page}) => getMoviesByTitle({title, page}), title, "title", 2),
         'busqueda/movies', [] as any[]
     ),
     safeFetch(
-        loadAllPages(({title, page}) => getSeriesByTitle({title, page}), title, "title"),
+        loadAllPages(({title, page}) => getSeriesByTitle({title, page}), title, "title", 2),
         'busqueda/series', [] as any[]
     ),
     safeFetch(
-        loadAllPages(({name, page}) => getActorsByName({name, page}), title, "name"),
+        loadAllPages(({name, page}) => getActorsByName({name, page}), title, "name", 2),
         'busqueda/actors', [] as any[]
     ),
 ]);
 
-const limitedMovies = allMovies.slice(0, 65);
-const limitedSeries = allSeries.slice(0, 65);
-const limitedActors = allActors.slice(0, 30);
+// Rediseño 3.5: 2 páginas de TMDB por tipo (antes 5: ~15 llamadas y 160 resultados de golpe, 37.000 px
+// en móvil). Se enseñan PAGE por sección y «Mostrar más» destapa los siguientes.
+const limitedMovies = allMovies.slice(0, 40);
+const limitedSeries = allSeries.slice(0, 40);
+const limitedActors = allActors.slice(0, 20);
+const PAGE = 10;
 const totalResults = limitedMovies.length + limitedSeries.length + limitedActors.length;
 ---
 <Layout title={hasQuery ? `Búsqueda: ${title}` : 'Buscar'}>
@@ -135,8 +138,8 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                             <span class="text-sm font-normal text-gray-400 ml-1">({limitedMovies.length})</span>
                         </h2>
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {limitedMovies.map((item) => (
-                                <div class="card-wrapper group">
+                            {limitedMovies.map((item, i) => (
+                                <div class="card-wrapper group" hidden={i >= PAGE} data-srch-item>
                                     <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}>
                                         <CardMovie
                                             id={item.id.toString()}
@@ -151,6 +154,11 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                                 </div>
                             ))}
                         </div>
+                        {limitedMovies.length > PAGE && (
+                            <div class="srch-more-wrap">
+                                <button type="button" class="btn" data-srch-more>Mostrar más <span class="srch-more-n">· quedan {limitedMovies.length - PAGE}</span></button>
+                            </div>
+                        )}
                     </section>
                 )}
 
@@ -163,8 +171,8 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                             <span class="text-sm font-normal text-gray-400 ml-1">({limitedSeries.length})</span>
                         </h2>
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {limitedSeries.map((item) => (
-                                <div class="card-wrapper group">
+                            {limitedSeries.map((item, i) => (
+                                <div class="card-wrapper group" hidden={i >= PAGE} data-srch-item>
                                     <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}>
                                         <CardSerie
                                             id={item.id.toString()}
@@ -181,6 +189,11 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                                 </div>
                             ))}
                         </div>
+                        {limitedSeries.length > PAGE && (
+                            <div class="srch-more-wrap">
+                                <button type="button" class="btn" data-srch-more>Mostrar más <span class="srch-more-n">· quedan {limitedSeries.length - PAGE}</span></button>
+                            </div>
+                        )}
                     </section>
                 )}
 
@@ -193,8 +206,8 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                             <span class="text-sm font-normal text-gray-400 ml-1">({limitedActors.length})</span>
                         </h2>
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                            {limitedActors.map((item) => (
-                                <div class="card-wrapper group">
+                            {limitedActors.map((item, i) => (
+                                <div class="card-wrapper group" hidden={i >= PAGE} data-srch-item>
                                     <CardActor
                                         id={item.id.toString()}
                                         imagen={posterUrl(item.imagen) || "/placeholder-actor.jpg"}
@@ -206,6 +219,11 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                                 </div>
                             ))}
                         </div>
+                        {limitedActors.length > PAGE && (
+                            <div class="srch-more-wrap">
+                                <button type="button" class="btn" data-srch-more>Mostrar más <span class="srch-more-n">· quedan {limitedActors.length - PAGE}</span></button>
+                            </div>
+                        )}
                     </section>
                 )}
             </div>
@@ -254,4 +272,23 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
     .srch-empty-input:focus { outline: 2px solid var(--primary); outline-offset: 2px; border-color: transparent; }
     .srch-empty-hint { flex-basis: 100%; margin: 0; font-size: 12px; color: var(--text-3); }
     .srch-empty-hint kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 5px; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--bg-tint); }
+    /* El display de las tarjetas le gana al [hidden] de Tailwind: aquí manda «Mostrar más». */
+    [data-srch-item][hidden] { display: none !important; }
+    .srch-more-wrap { display: flex; justify-content: center; margin-top: var(--s-6); }
+    .srch-more-n { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); }
 </style>
+
+<script>
+    // Rediseño 3.5: «Mostrar más» destapa los siguientes resultados de su sección, de 10 en 10.
+    const STEP = 10;
+    document.addEventListener('click', (e) => {
+        const btn = (e.target as HTMLElement).closest?.<HTMLButtonElement>('[data-srch-more]');
+        if (!btn) return;
+        const sec = btn.closest('section');
+        const hidden = sec ? [...sec.querySelectorAll<HTMLElement>('[data-srch-item][hidden]')] : [];
+        hidden.slice(0, STEP).forEach((el) => { el.hidden = false; });
+        const left = hidden.length - STEP;
+        if (left <= 0) btn.parentElement?.remove();
+        else { const n = btn.querySelector('.srch-more-n'); if (n) n.textContent = `· quedan ${left}`; }
+    });
+</script>
