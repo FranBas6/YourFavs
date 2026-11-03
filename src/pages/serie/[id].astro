@@ -27,6 +27,7 @@ import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/detail/FriendsSeen.astro";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
 import FichaActions from "../../components/detail/FichaActions.astro";
+import FichaSections from "../../components/detail/FichaSections.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
 import DubbingSection from "../../components/detail/DubbingSection.astro";
 import CrewGrid from "../../components/detail/CrewGrid.astro";
@@ -440,6 +441,14 @@ const serieLanguages: { iso_639_1: string; name: string }[] = additionalInfo.lan
 const _topActors = Astro.locals.user ? peekTopActors() : null;
 const seenWithMap = _topActors ? new Map(_topActors.map((a) => [a.id, a.appearances])) : undefined;
 const serieNetworks: { id: number; name: string; logo_path: string | null }[] = additionalInfo.networks || [];
+// Kicker del hero (4.3): «SERIE · HBO · 2011–2019 · CREADA POR …» (en emisión, «2019–hoy»).
+const kickerYears: string = (() => {
+    const start = item?.first_air_date ? item.first_air_date.slice(0, 4) : '';
+    if (!start) return '';
+    const ended = status === 'Ended' || status === 'Canceled';
+    const end = ended ? (item?.last_air_date || item?.last_episode_to_air?.air_date || '').slice(0, 4) : '';
+    return ended ? (end && end !== start ? `${start}–${end}` : start) : `${start}–hoy`;
+})();
 const reviews = (reviewsData.results || []).filter((r: any) => r.content && r.content.length > 50).slice(0, 5);
 const productionCountries: string[] = item?.origin_country || [];
 
@@ -499,6 +508,10 @@ const jsonLd = item ? {
                         <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
                     </div>
                     <div class="flex-1 text-white">
+                        <p class="ficha-kicker">
+                            Serie{serieNetworks[0]?.name && <> · {serieNetworks[0].name}</>}{kickerYears && <> · {kickerYears}</>}
+                            {createdBy.length > 0 && <> · Creada por {createdBy.slice(0, 3).map((c, i, arr) => (<>{i > 0 && (i === arr.length - 1 ? ' y ' : ', ')}<a href={`/team/${encodeURIComponent(c.name)}`}>{c.name}</a></>))}</>}
+                        </p>
                         {serieLogo
                             ? <h1 class="mb-3"><img src={serieLogo} alt={item?.name} class="h-auto max-h-20 md:max-h-28 w-auto max-w-[85%] md:max-w-[440px] object-contain drop-shadow-lg" /></h1>
                             : <h1 class="text-4xl md:text-5xl font-bold mb-3 leading-tight">{item?.name}</h1>}
@@ -563,6 +576,16 @@ const jsonLd = item ? {
             homepage={item?.homepage}
             trailerUrl={trailerUrl}
         />
+        <FichaSections items={[
+            { id: 'sec-temporadas', label: 'Temporadas' },
+            { id: 'sec-donde', label: 'Dónde ver' },
+            { id: 'sec-reparto', label: 'Reparto' },
+            { id: 'sec-videos', label: 'Vídeos' },
+            { id: 'sec-imagenes', label: 'Imágenes' },
+            { id: 'sec-detalles', label: 'Detalles' },
+            { id: 'sec-resenas', label: 'Reseñas' },
+            { id: 'sec-parecidas', label: 'Parecidas' },
+        ]} />
 
         <!-- Layout 2 columnas -->
         <div class="max-w-6xl mx-auto px-4 py-8">
@@ -575,7 +598,7 @@ const jsonLd = item ? {
                     </div>
 
                     <!-- Info -->
-                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                    <div id="sec-detalles" data-fs class="bg-white rounded-xl border border-gray-200 p-4">
                         <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
                         <ul class="space-y-2.5 text-sm sm:text-base">
                             <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class={`font-medium ${status === 'Returning Series' ? 'text-green-600' : status === 'Canceled' ? 'text-red-600' : 'text-gray-800'}`}>{status ? ((statusMap as any)[status] || status) : ''}</span></li>
@@ -622,6 +645,7 @@ const jsonLd = item ? {
                     })()}
 
                     <!-- Dónde ver -->
+                    <div id="sec-donde" data-fs>
                     <StreamingProviders
                         providersByCountry={(item as any)?.providersByCountry || {}}
                         linkByCountry={(item as any)?.providerLinksByCountry || {}}
@@ -633,6 +657,7 @@ const jsonLd = item ? {
                         totalSeasons={providerSeasons.length}
                         serieId={id}
                     />
+                    </div>
 
                     <!-- Amigos que la han visto (F5 social) -->
                     <FriendsSeen mediaType="tv" tmdbId={item?.id} />
@@ -795,8 +820,10 @@ const jsonLd = item ? {
                 <div class="md:w-2/3 space-y-8">
 
                     <!-- Trailer + Videos extras -->
-                    <VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} />
+                    <div id="sec-videos" data-fs><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
 
+                    <!-- Temporadas (ancla de la barra de secciones): próximo y último episodio, calidad y acordeón -->
+                    <div id="sec-temporadas" data-fs class="space-y-8">
                     <!-- Próximo Episodio -->
                     {item?.next_episode_to_air && (
                         <section class="bg-white rounded-xl border-2 border-green-200 p-5">
@@ -1117,12 +1144,16 @@ const jsonLd = item ? {
                         </div>
                     </div>
 
+                    </div>
+
                     <!-- Pósters -->
-                    <LightboxGallery posters={posters} prefix="poster" />
-                    <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
+                    <div id="sec-imagenes" data-fs class="space-y-8">
+                        <LightboxGallery posters={posters} prefix="poster" />
+                        <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
+                    </div>
 
                     <!-- Reparto -->
-                    <CastGrid cast={cast} seenWith={seenWithMap} />
+                    <div id="sec-reparto" data-fs><CastGrid cast={cast} seenWith={seenWithMap} /></div>
 
                     <!-- Dobladores en español (lazy, eldoblaje.com, por temporada) -->
                     <DubbingSection type="tv" tmdbId={id} />
@@ -1137,14 +1168,14 @@ const jsonLd = item ? {
                     <ProductionCompanies companies={item?.production_companies || []} />
 
                     <!-- Recomendaciones -->
-                    <RecommendationsCarousel
+                    <div id="sec-parecidas" data-fs><RecommendationsCarousel
                         items={seriesRecommendations}
                         mediaType="tv"
                         title={seriesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Series similares'}
-                    />
+                    /></div>
 
                     <!-- Reviews TMDB -->
-                    <ReviewsSection reviews={reviews} />
+                    <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
                 </div>
             </div>
         </div>

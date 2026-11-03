@@ -1,0 +1,96 @@
+---
+/**
+ * FichaSections — barra de secciones de las fichas (rediseño, Fase 4 · 4.3; README del handoff D1).
+ * `<nav>` con ANCLAS (no pestañas: no oculta nada), fija arriba al hacer scroll, justo debajo de la
+ * barra de acciones. La sección visible se marca con `aria-current="location"` (IntersectionObserver,
+ * sin escuchar el scroll). Solo se pintan las anclas cuyas secciones existen y tienen contenido: el
+ * servidor pasa las candidatas y el script quita las que salen vacías (p. ej., sin reseñas).
+ * En móvil, la fila se desliza en horizontal.
+ *
+ * Cada sección destino lleva `id` y `data-fs` (para el margen al saltar).
+ */
+interface Props {
+    items: { id: string; label: string }[];
+}
+const { items } = Astro.props;
+---
+{items.length > 1 && (
+    <nav class="fs" aria-label="Secciones de la ficha" data-fs-nav>
+        <ul class="fs-in">
+            {items.map((it) => (
+                <li><a href={`#${it.id}`} data-fs-link={it.id}>{it.label}</a></li>
+            ))}
+        </ul>
+        <script is:inline>
+            (function () {
+                var nav = document.currentScript && document.currentScript.closest('[data-fs-nav]');
+                if (!nav) return;
+                // Las secciones van DESPUÉS en el HTML: hay que esperar a que estén.
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+                function init() {
+                var links = Array.prototype.slice.call(nav.querySelectorAll('[data-fs-link]'));
+                var targets = [];
+                links.forEach(function (a) {
+                    var t = document.getElementById(a.getAttribute('data-fs-link'));
+                    if (!t || t.offsetHeight < 8) { a.parentNode.remove(); return; }
+                    targets.push({ a: a, t: t });
+                });
+                if (targets.length < 2) { nav.remove(); return; }
+                if (!('IntersectionObserver' in window)) return;
+                // Activa = la sección que está cruzando una franja fina justo bajo la barra; si cruzan
+                // dos (columna lateral y principal), la que empezó más abajo (la última que ha pasado).
+                var visible = new Set(), lockUntil = 0;
+                function setCur(cur) {
+                    targets.forEach(function (x) {
+                        if (x === cur) x.a.setAttribute('aria-current', 'location'); else x.a.removeAttribute('aria-current');
+                    });
+                    if (!cur) return;
+                    var ul = nav.firstElementChild, l = cur.a.parentNode;
+                    if (l.offsetLeft < ul.scrollLeft || l.offsetLeft + l.offsetWidth > ul.scrollLeft + ul.clientWidth) {
+                        ul.scrollTo({ left: l.offsetLeft - 16, behavior: 'auto' });
+                    }
+                }
+                function mark() {
+                    if (Date.now() < lockUntil) return;
+                    var cur = null, best = -Infinity;
+                    targets.forEach(function (x) {
+                        if (!visible.has(x.t)) return;
+                        var top = x.t.getBoundingClientRect().top;
+                        if (top > best) { best = top; cur = x; }
+                    });
+                    if (cur) setCur(cur);
+                }
+                // Al pulsar un enlace se marca ese, aunque la sección sea corta y no llegue a la franja.
+                targets.forEach(function (x) {
+                    x.a.addEventListener('click', function () { setCur(x); lockUntil = Date.now() + 900; });
+                });
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (e) { if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target); });
+                    mark();
+                }, { rootMargin: '-60px 0px -' + Math.max(0, window.innerHeight - 140) + 'px 0px' });
+                targets.forEach(function (x) { io.observe(x.t); });
+                }
+            })();
+        </script>
+    </nav>
+)}
+
+<style is:global>
+    .fs { position: sticky; top: 0; z-index: 40; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+    .fs-in {
+        max-width: 72rem; margin: 0 auto; padding: 0 16px; list-style: none;
+        display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+    }
+    .fs-in::-webkit-scrollbar { display: none; }
+    .fs-in a {
+        display: flex; align-items: center; height: 44px; padding: 0 12px; white-space: nowrap;
+        font: 500 var(--fs-ui) var(--font); color: var(--text-2); text-decoration: none;
+        border-bottom: 2px solid transparent; margin-bottom: -1px;
+        transition: color .15s ease, border-color .15s ease;
+    }
+    .fs-in a:hover { color: var(--text); }
+    .fs-in a[aria-current="location"] { font-weight: 600; color: var(--text); border-bottom-color: var(--accent); }
+    .fs-in a:focus-visible { outline: 2px solid var(--primary); outline-offset: -4px; border-radius: var(--r-sm); }
+    [data-fs] { scroll-margin-top: 60px; }
+    @media (max-width: 767px) { .fs-in { padding: 0 8px; } .fs-in a { padding: 0 10px; } }
+</style>

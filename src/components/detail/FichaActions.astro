@@ -95,7 +95,8 @@ let watch: { label: string; short: string; href: string } | null = null;
         const href = (homeIsProvider ? homepage : null) || providerLinks[pick.provider_name] || linkByCountry[region] || homepage || null;
         // Nombre corto en el botón («Prime Video», «Disney+»); «Ver en …» completo en el menú y al lector.
         const short = pick.provider_name.replace(/^Amazon\s+/i, '').replace(/\s+(Standard\s+)?with\s+Ads$/i, '')
-            .replace(/^Disney Plus$/i, 'Disney+').replace(/^Movistar Plus\+$/i, 'Movistar+');
+            .replace(/\s+(Amazon|Apple TV) Channel$/i, '')
+            .replace(/^Disney Plus$/i, 'Disney+').replace(/^Movistar Plus\+.*$/i, 'Movistar+');
         if (href) watch = { label: `Ver en ${pick.provider_name}`, short, href };
     }
     if (!watch && (homepage || trailerUrl)) watch = { label: 'Ver ahora', short: 'Ver ahora', href: (homepage || trailerUrl)! };
