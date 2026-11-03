@@ -288,6 +288,9 @@
         // En mobile inyectamos nuestro propio trigger de preview al pie de la card
         // (la card entera ya navega al tocarla; este botón abre la vista rápida).
         if (host.querySelector('.view-details-btn.is-quickview')) return;
+        // Tarjeta del sistema v2 (sin caja): no se le inyecta el botón; la «Vista rápida» nueva
+        // (rediseño, paso 3.7) tendrá su propio disparador sobre el póster.
+        if (host.querySelector('.ytc')) return;
         var card = host.querySelector('a');
         if (!card) return;
         var content = card.lastElementChild; // columna de contenido (.p-3.5 flex-col)

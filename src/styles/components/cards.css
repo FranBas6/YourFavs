@@ -269,3 +269,16 @@
     margin: var(--s-2) 0 0; font-size: var(--fs-ui); line-height: 1.45; color: var(--text-2);
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
+
+/* Dentro de las rejillas del catálogo (.card-wrapper, shared.css/busqueda.css/plataformas.css), que
+   pintaban una caja blanca con sombra, levantaban la tarjeta y recortaban h3/p para la tarjeta vieja:
+   con la TitleCard (sin caja) no aplica nada de eso. Se retira del todo cuando ya no haya tarjetas
+   viejas dentro de .card-wrapper (CardActor). */
+.card-wrapper:has(.ytc), .card-wrapper:has(.ytc):hover { transform: none; }
+.card-wrapper:has(.ytc) > *, .card-wrapper:has(.ytc):hover > * {
+    background: none !important; box-shadow: none !important; border-radius: 0; overflow: visible; color: inherit !important;
+}
+.card-wrapper .ytc-title { height: auto; }
+.card-wrapper .ytc-meta { display: block; flex-grow: 0; -webkit-line-clamp: unset; }
+.card-wrapper .ytc-overview { flex-grow: 0; }
+.card-wrapper .ytc-poster img { transition: none; }
