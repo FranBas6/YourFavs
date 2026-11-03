@@ -1,6 +1,7 @@
 ---
 /**
- * LevelControl — el «Nivel» de la barra de acciones de las fichas: Vista · Me gusta · Favorita
+ * LevelControl — el «Nivel» de la barra de acciones de las fichas: Favorita · Vista · Me gusta (orden
+ * de Fran; Me gusta es el corazón solo, como el de antes, con «Me gusta» para lectores y al pasar)
  * (rediseño, Fase 4; README del handoff §3.7 + B0). Un `role="group"` de tres botones con
  * `aria-pressed`; el pulsado se tiñe con el tono de su lista (--a-visto / --a-like / --a-fav).
  *
@@ -38,6 +39,14 @@ const f = (l: Parameters<typeof fichaField>[1]) => fichaField(mediaType, l);
 const menuId = `fa-m-vista-${mediaType}-${id}`;
 ---
 <div class="lvl" role="group" aria-label="Tu opinión">
+    <form method="POST">
+        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={fav ? 'remove' : 'add'} /><input type="hidden" name={f('fav').name} value={f('fav').value} />
+        <button type="submit" class="lvl-b" data-tone="fav" aria-pressed={fav ? 'true' : 'false'} title={fav ? 'Quitar de Favoritos' : (liked ? 'Favorita (deja de ser Me gusta)' : 'Favorita (la marca como vista)')}>
+            <svg class="f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.crown} />
+            Favorita
+            {fav && favPos ? <span class="pos" aria-label={`posición ${favPos}`}>#{favPos}</span> : null}
+        </button>
+    </form>
     {watched ? (
         <div class="fa-mw">
             <button type="button" class="lvl-b" data-tone="visto" aria-pressed="true" aria-haspopup="menu" aria-expanded="false" aria-controls={menuId} data-fa-menu>
@@ -90,17 +99,8 @@ const menuId = `fa-m-vista-${mediaType}-${id}`;
     )}
     <form method="POST">
         <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={liked ? 'remove' : 'add'} /><input type="hidden" name={f('like').name} value={f('like').value} />
-        <button type="submit" class="lvl-b" data-tone="like" aria-pressed={liked ? 'true' : 'false'} title={liked ? 'Quitar de Me gusta' : (fav ? 'Pasa de Favorita a Me gusta' : 'Me gusta (la marca como vista)')}>
+        <button type="submit" class="lvl-b is-ico" data-tone="like" aria-pressed={liked ? 'true' : 'false'} aria-label="Me gusta" title={liked ? 'Quitar de Me gusta' : (fav ? 'Me gusta (deja de ser Favorita)' : 'Me gusta (la marca como vista)')}>
             <svg class="f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.heart} />
-            Me gusta
-        </button>
-    </form>
-    <form method="POST">
-        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={fav ? 'remove' : 'add'} /><input type="hidden" name={f('fav').name} value={f('fav').value} />
-        <button type="submit" class="lvl-b" data-tone="fav" aria-pressed={fav ? 'true' : 'false'} title={fav ? 'Quitar de Favoritos' : (liked ? 'Pasa de Me gusta a Favorita' : 'Favorita (la marca como vista)')}>
-            <svg class="f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.crown} />
-            Favorita
-            {fav && favPos ? <span class="pos" aria-label={`posición ${favPos}`}>#{favPos}</span> : null}
         </button>
     </form>
 </div>

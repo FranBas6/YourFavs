@@ -9,7 +9,7 @@
  *   vista → Volver a ver.
  *   Serie sin estado → Seguir · siguiendo → ninguno (el rojo es «Marcar visto» del episodio) ·
  *   abandonada → Retomar. Una serie ya vista no lleva rojo: «Seguir» pasa a secundario.
- * Después, el Nivel (LevelControl: Vista ▾ · Me gusta · Favorita), Pendiente y Ver pronto (con su
+ * Después, el Nivel (LevelControl: Favorita · Vista ▾ · ♥), Pendiente y Ver pronto (con su
  * tono al activarse) y, en series, Siguiendo ▾ (Abandonar, Dejar de seguir) y Nuevas temporadas.
  * A la derecha, fantasmas: Colección, Recomendar, Enviar a…, «···» (IMDb) y «Ver en {plataforma}».
  * En móvil: principal a lo ancho, el Nivel a lo ancho y los secundarios con «···», que recoge
@@ -425,6 +425,8 @@ const mid = `fa-${mediaType}-${id}`;
     .lvl-b[data-tone="like"]  { --tone: var(--a-like);  --tone-bg: var(--a-like-bg); }
     .lvl-b[data-tone="fav"]   { --tone: var(--a-fav);   --tone-bg: var(--a-fav-bg); }
     .lvl-b .pos { font: 600 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+    .lvl-b.is-ico { padding: 0 13px; }
+    .lvl-b.is-ico svg { width: 18px; height: 18px; }
 
     /* Menús (Vista ▾, Siguiendo ▾, «···») */
     .fa-mw { position: relative; display: inline-flex; }
@@ -478,6 +480,7 @@ const mid = `fa-${mediaType}-${id}`;
         .lvl { flex: 1 1 100%; display: flex; }
         .lvl > form, .lvl > .fa-mw { flex: 1 1 0; }
         .lvl-b { flex: 1; height: 42px; padding: 0 6px; }
+        .lvl > form:has(.is-ico) { flex: 0 0 56px; }
         .fa-row > .fa-sec .btn, .fa-row > form.fa-sec > .btn { flex: 1 1 0; min-width: 0; }
         .fa-row > .fa-sec.fa-mw { flex: 1 1 0; }
         .fa-row > .fa-sec.fa-mw > .btn { width: 100%; }
@@ -487,5 +490,6 @@ const mid = `fa-${mediaType}-${id}`;
     }
     @media (min-width: 1024px) {
         .lvl-b { height: 34px; padding: 0 11px; }
+        .lvl-b.is-ico { padding: 0 12px; }
     }
 </style>
