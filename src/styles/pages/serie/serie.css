@@ -53,14 +53,15 @@ details[open] .season-overview {
 .sr[open] { border-color: var(--border-strong); }
 .sr-row {
     list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
-    min-height: 64px; padding: 8px 12px;
+    min-height: 64px; padding: 10px 14px 10px 10px;
 }
 .sr-row::-webkit-details-marker { display: none; }
 .sr-row:hover { background: var(--bg-tint); }
 .sr-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--r-md); }
-.sr-poster { width: 34px; height: 51px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: var(--bg-tint); }
+/* Póster algo más destacado (pedido de Fran): 64 × 96 en escritorio, 52 × 78 en móvil. */
+.sr-poster { width: 64px; height: 96px; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; background: var(--bg-tint); box-shadow: var(--sh-md); }
 .sr-t { display: flex; flex-direction: column; min-width: 104px; flex-shrink: 0; }
-.sr-t b { font: 600 var(--fs-ui) var(--font); color: var(--text); white-space: nowrap; }
+.sr-t b { font: 600 var(--fs-body, 15px) var(--font); color: var(--text); white-space: nowrap; }
 .sr-t small { font-size: var(--fs-meta); color: var(--text-3); }
 .sr-strip { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
 .sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--border-strong); opacity: .35; }
@@ -110,6 +111,7 @@ details[open] > summary .sr-chev { transform: rotate(180deg); }
 @media (max-width: 767px) {
     /* La tira baja a su propia línea, a todo el ancho; la nota de temporada se oculta. */
     .sr-row { flex-wrap: wrap; row-gap: 8px; }
+    .sr-poster { width: 52px; height: 78px; }
     .sr-t { flex: 1 1 auto; min-width: 0; }
     .sr-strip { order: 5; flex-basis: 100%; }
     .sr-r { display: none; }
