@@ -97,6 +97,9 @@ function handleWatchedEpisodeForm(form) {
             }
 
             var seasonNum = formData.get('season');
+            // Tira de episodios de la fila de temporada (rediseño 4.6): visto = color pleno.
+            var cell = document.querySelector('[data-ep-cell="' + seasonNum + '-' + formData.get('episode') + '"]');
+            if (cell) cell.classList.toggle('is-seen', !isWatched);
             var bar = document.querySelector('[data-season-bar="' + seasonNum + '"]');
             var count = document.querySelector('[data-season-count="' + seasonNum + '"]');
             var progressDiv = document.querySelector('[data-season-progress="' + seasonNum + '"]');

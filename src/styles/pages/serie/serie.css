@@ -42,3 +42,79 @@ details[open] .season-overview {
     -webkit-line-clamp: unset;
     overflow: visible;
 }
+
+/* =====================================================================================
+   4.6 · Temporadas fundidas (README del handoff D3). Una fila por temporada con su tira de
+   episodios; al abrirla, los datos de la temporada y la lista de episodios de siempre.
+   Tira: color = nota de TMDB del episodio; visto = color pleno, sin ver = el mismo al 35 %.
+   Solo tokens: el oscuro sale de ellos.
+   ===================================================================================== */
+.sr { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); overflow: hidden; }
+.sr[open] { border-color: var(--border-strong); }
+.sr-row {
+    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px;
+    min-height: 64px; padding: 8px 12px;
+}
+.sr-row::-webkit-details-marker { display: none; }
+.sr-row:hover { background: var(--bg-tint); }
+.sr-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--r-md); }
+.sr-poster { width: 34px; height: 51px; object-fit: cover; border-radius: 4px; flex-shrink: 0; background: var(--bg-tint); }
+.sr-t { display: flex; flex-direction: column; min-width: 104px; flex-shrink: 0; }
+.sr-t b { font: 600 var(--fs-ui) var(--font); color: var(--text); white-space: nowrap; }
+.sr-t small { font-size: var(--fs-meta); color: var(--text-3); }
+.sr-strip { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+.sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--border-strong); opacity: .35; }
+.sr-c.is-seen { opacity: 1; }
+.sr-c[data-b="high"] { background: var(--rating-high); }
+.sr-c[data-b="med"]  { background: var(--rating-med); }
+.sr-c[data-b="low"]  { background: var(--rating-low); }
+.sr-c[data-b="poor"] { background: var(--rating-poor); }
+.sr-n { font: 600 var(--fs-meta) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; min-width: 40px; text-align: right; }
+.sr-r { font: 600 var(--fs-meta) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; min-width: 44px; text-align: right; }
+.sr-chev { width: 18px; height: 18px; color: var(--text-3); flex-shrink: 0; transition: transform .15s ease; }
+details[open] > summary .sr-chev { transform: rotate(180deg); }
+.sr-body { border-top: 1px solid var(--border); padding: 12px 16px 16px; }
+.sr-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-meta); color: var(--text-2); }
+.sr-meta b { color: var(--text); font-weight: 600; }
+.sr-prog-bar { display: block; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.sr-prog-bar i { display: block; height: 100%; background: var(--ok, var(--a-visto)); transition: width .3s ease; }
+.sr-ov { font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
+
+/* Leyenda, en una línea */
+.sr-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 12px; font-size: var(--fs-micro); color: var(--text-3); }
+.sr-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.sr-legend .sr-c { width: 10px; height: 10px; }
+.sr-legend-k { margin-left: auto; }
+
+/* Próximo / último episodio: una línea */
+.sr-eps { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.sr-el { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); }
+.sr-el > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+    min-height: 44px; padding: 8px 12px; font-size: var(--fs-ui); color: var(--text-2);
+}
+.sr-el > summary::-webkit-details-marker { display: none; }
+.sr-el > summary:hover { background: var(--bg-tint); }
+.sr-el-k { font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.sr-el-k.is-next { color: var(--a-ep); }
+.sr-el-code { font: 600 var(--fs-meta) var(--font-mono); color: var(--text-2); }
+.sr-el-name { font-weight: 600; color: var(--text); text-decoration: none; min-width: 0; }
+.sr-el-name:hover { text-decoration: underline; text-underline-offset: 2px; }
+.sr-el-mark { font: 700 var(--fs-micro) var(--font); letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; background: var(--a-rating-bg); color: var(--text); }
+.sr-el-when { color: var(--text-3); }
+.sr-el-r { color: var(--text-2); font-weight: 600; }
+.sr-el > summary .sr-chev { margin-left: auto; }
+.sr-el-body { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 0 12px 12px; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
+.sr-el-still { width: 160px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; }
+
+@media (max-width: 767px) {
+    /* La tira baja a su propia línea, a todo el ancho; la nota de temporada se oculta. */
+    .sr-row { flex-wrap: wrap; row-gap: 8px; }
+    .sr-t { flex: 1 1 auto; min-width: 0; }
+    .sr-strip { order: 5; flex-basis: 100%; }
+    .sr-r { display: none; }
+    .sr-el-body { flex-direction: column; }
+    .sr-el-still { width: 100%; }
+    .sr-legend-k { margin-left: 0; }
+}
+.sr-more { font: 600 var(--fs-micro) var(--font); color: var(--text-3); align-self: center; line-height: 12px; }

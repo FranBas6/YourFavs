@@ -377,6 +377,35 @@ function episodeMark(ep: any): { label: string; title: string } | null {
 }
 // Dirección y guion de un episodio (vienen en `crew` de cada episodio).
 const EPISODE_WRITER_JOBS = ['Writer', 'Teleplay', 'Screenplay'];
+// ---- 4.6 · Temporadas fundidas ----
+// Banda de color de un episodio por su nota de TMDB (README del handoff D3): ≥ 9 · 8–8,9 · 6,5–7,9 · < 6,5.
+function epBand(ep: any): 'high' | 'med' | 'low' | 'poor' | 'none' {
+    const v = typeof ep?.vote_average === 'number' && (ep.vote_count ?? 1) > 0 ? ep.vote_average : 0;
+    if (!v) return 'none';
+    return v >= 9 ? 'high' : v >= 8 ? 'med' : v >= 6.5 ? 'low' : 'poor';
+}
+// Tope de casillas por fila (los Especiales de algunas series pasan de 300): el resto, «+N».
+const STRIP_MAX = 48;
+// «hoy», «mañana», «en 3 días» o la fecha (próximo episodio).
+function relAirDate(iso?: string | null): string {
+    if (!iso) return '';
+    const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
+    const d = Math.round((Date.parse(iso + 'T00:00:00Z') - today) / 86400000);
+    if (d === 0) return 'hoy';
+    if (d === 1) return 'mañana';
+    if (d > 1 && d < 7) return `en ${d} días`;
+    return formatDate(iso);
+}
+// Último y próximo episodio en una línea (antes, dos tarjetas). Fotograma y sinopsis, al desplegar;
+// sin spoilers, difuminados si no lo has visto.
+const epLines = ([['Próximo', item?.next_episode_to_air], ['Último', item?.last_episode_to_air]] as const)
+    .filter(([, ep]) => !!ep)
+    .map(([label, ep]: any) => ({
+        label, ep, mark: episodeMark(ep),
+        when: label === 'Próximo' ? relAirDate(ep.air_date) : formatDate(ep.air_date),
+        seen: watchedSet.has(`${ep.season_number}-${ep.episode_number}`),
+    }));
+
 function episodeCredits(ep: any): { directors: string[]; writers: string[] } {
     const crew: any[] = ep?.crew || [];
     const names = (jobs: string[]) => [...new Set(crew.filter((c) => jobs.includes(c.job)).map((c) => c.name as string))];
@@ -815,65 +844,6 @@ const jsonLd = item ? {
 
                     <!-- Temporadas (ancla de la barra de secciones): próximo y último episodio, calidad y acordeón -->
                     <div id="sec-temporadas" data-fs class="space-y-8">
-                    <!-- Próximo Episodio -->
-                    {item?.next_episode_to_air && (
-                        <section class="bg-white rounded-xl border-2 border-green-200 p-5">
-                            <h2 class="text-lg font-semibold text-green-700 mb-3 flex items-center gap-2">
-                                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                Próximo Episodio
-                            </h2>
-                            <h3 class="text-base font-medium text-gray-800 mb-2">{item.next_episode_to_air.name}</h3>
-                            <div class="flex flex-wrap gap-3 text-sm text-gray-600 mb-2">
-                                <span>T{item.next_episode_to_air.season_number} E{item.next_episode_to_air.episode_number}</span>
-                                <span>{formatDate(item.next_episode_to_air.air_date)}</span>
-                                {episodeMark(item.next_episode_to_air) && (
-                                    <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 self-center" title={episodeMark(item.next_episode_to_air)!.title}>{episodeMark(item.next_episode_to_air)!.label}</span>
-                                )}
-                            </div>
-                            {item.next_episode_to_air.overview && (
-                                <details class="text-sm text-gray-600 group">
-                                    <summary class="cursor-pointer">
-                                        <p class="leading-relaxed line-clamp-3 sm:line-clamp-none group-open:line-clamp-none inline">{item.next_episode_to_air.overview}</p>
-                                    </summary>
-                                </details>
-                            )}
-                        </section>
-                    )}
-
-                    <!-- Último Episodio -->
-                    {item?.last_episode_to_air && (
-                        <section class="bg-white rounded-xl border border-gray-200 p-5">
-                            <div class="flex items-start gap-4">
-                                {item.last_episode_to_air.still_path && (
-                                    <img src={posterUrl(item.last_episode_to_air.still_path, 'w300')} alt={item.last_episode_to_air.name} class="w-32 h-20 object-cover rounded-lg flex-shrink-0 hidden sm:block" loading="lazy" />
-                                )}
-                                <div>
-                                    <h2 class="text-lg font-semibold text-gray-800 mb-1">Último Episodio</h2>
-                                    <h3 class="text-base font-medium text-gray-700 mb-2">{item.last_episode_to_air.name}</h3>
-                                    <div class="flex flex-wrap gap-3 text-sm text-gray-500 mb-2">
-                                        <span>T{item.last_episode_to_air.season_number} E{item.last_episode_to_air.episode_number}</span>
-                                        <span>{formatDate(item.last_episode_to_air.air_date)}</span>
-                                        {episodeMark(item.last_episode_to_air) && (
-                                            <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 self-center" title={episodeMark(item.last_episode_to_air)!.title}>{episodeMark(item.last_episode_to_air)!.label}</span>
-                                        )}
-                                        {item.last_episode_to_air.vote_average > 0 && <span class="text-yellow-600">{item.last_episode_to_air.vote_average.toFixed(1)}</span>}
-                                    </div>
-                                    {item.last_episode_to_air.overview && (
-                                        <details class="text-sm text-gray-600 group">
-                                            <summary class="cursor-pointer">
-                                                <p class="leading-relaxed line-clamp-2 sm:line-clamp-none group-open:line-clamp-none inline">{item.last_episode_to_air.overview}</p>
-                                            </summary>
-                                        </details>
-                                    )}
-                                </div>
-                            </div>
-                        </section>
-                    )}
-
-
-                    <!-- Mapa de calidad por episodio (datos ya cargados, cero fetches) -->
-                    <SeasonHeatmap seasons={regularSeasons} episodesBySeason={allSeasonEpisodes} spoilerFree={spoilerFree} watchedSet={watchedSet} />
-
                     <!-- Temporadas con acordeón -->
                     <div class="bg-white rounded-xl border border-gray-200 p-5">
                         <div class="flex items-center justify-between gap-3 mb-2">
@@ -944,6 +914,45 @@ const jsonLd = item ? {
                                 style={`width: ${totalRegularEpisodes > 0 ? Math.min(100, Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)) : 0}%`}
                             ></div>
                         </div>
+                        {/* 4.6 · Leyenda de la tira, en una línea */}
+                        <p class="sr-legend">
+                            <span><i class="sr-c is-seen" data-b="high"></i>≥ 9</span>
+                            <span><i class="sr-c is-seen" data-b="med"></i>8–8,9</span>
+                            <span><i class="sr-c is-seen" data-b="low"></i>6,5–7,9</span>
+                            <span><i class="sr-c is-seen" data-b="poor"></i>&lt; 6,5</span>
+                            <span><i class="sr-c is-seen" data-b="none"></i>sin nota</span>
+                            <span class="sr-legend-k">color pleno = visto · apagado = sin ver</span>
+                        </p>
+                        {/* 4.6 · Próximo y último episodio, una línea cada uno */}
+                        {epLines.length > 0 && (
+                            <div class="sr-eps">
+                                {epLines.map((l) => (
+                                    <details class="sr-el">
+                                        <summary>
+                                            <span class:list={['sr-el-k', { 'is-next': l.label === 'Próximo' }]}>{l.label}</span>
+                                            <span class="sr-el-code">T{l.ep.season_number}·E{l.ep.episode_number}</span>
+                                            <a href={episodeHref(id, l.ep.season_number, l.ep.episode_number)} class="sr-el-name" onclick="event.stopPropagation()">{l.ep.name}</a>
+                                            {l.mark && <span class="sr-el-mark" title={l.mark.title}>{l.mark.label}</span>}
+                                            <span class="sr-el-when">{l.when}</span>
+                                            {l.ep.vote_average > 0 && l.label === 'Último' && (!spoilerFree || l.seen) && <span class="sr-el-r">★ {l.ep.vote_average.toFixed(1).replace('.', ',')}</span>}
+                                            {(l.ep.overview || l.ep.still_path) && <svg class="sr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>}
+                                        </summary>
+                                        {(l.ep.overview || l.ep.still_path) && (
+                                            <div class:list={['sr-el-body', { 'yf-spoil': (hideStills || hideSynopsis) && !l.seen }]}>
+                                                {(hideStills || hideSynopsis) && !l.seen && (
+                                                    <button type="button" class="yf-spoil-btn" aria-label="Mostrar contenido con posibles spoilers">
+                                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                        Mostrar (spoilers)
+                                                    </button>
+                                                )}
+                                                {l.ep.still_path && <img src={posterUrl(l.ep.still_path, 'w300')} alt="" loading="lazy" class:list={['sr-el-still', { 'yf-blur': hideStills && !l.seen }]} />}
+                                                {l.ep.overview && <p class:list={{ 'yf-blur': hideSynopsis && !l.seen }}>{l.ep.overview}</p>}
+                                            </div>
+                                        )}
+                                    </details>
+                                ))}
+                            </div>
+                        )}
                         <div class="space-y-4">
                             {sortedSeasons.map((season) => {
                                 const seasonEpisodes = allSeasonEpisodes[season.season_number] || [];
@@ -952,72 +961,46 @@ const jsonLd = item ? {
                                 const seasonTotal = seasonEpisodes.length;
                                 const isSeasonComplete = seasonTotal > 0 && seasonWatched === seasonTotal;
                                 return (
-                                    <details id={`season-${season.season_number}`} class={`border rounded-xl overflow-hidden transition-all hover:shadow-md scroll-mt-20 ${season.season_number === 0 ? 'border-purple-200 bg-purple-50/50' : 'border-blue-200 bg-blue-50/50'}`}>
-                                        <summary class={`cursor-pointer p-5 ${season.season_number === 0 ? 'hover:bg-purple-100/50' : 'hover:bg-blue-100/50'}`}>
-                                            <div class="flex flex-col lg:flex-row gap-5 items-start">
-                                                <div class="w-full max-w-[220px] mx-auto lg:mx-0 lg:w-1/4 flex-shrink-0">
-                                                    <img
-                                                        src={posterUrl(season.poster_path || item?.poster_path, 'w400')}
-                                                        alt={season.season_number === 0 ? "Episodios Especiales" : `Temporada ${season.season_number}`}
-                                                        loading="lazy"
-                                                        class="w-full rounded-lg shadow-lg"
-                                                    />
-                                                </div>
-                                                <div class="lg:w-3/4 w-full">
-                                                    <div class="flex items-center justify-between mb-3">
-                                                        <h3 class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>
-                                                            {season.season_number === 0 ? 'Episodios Especiales' : `Temporada ${season.season_number}`}
-                                                        </h3>
-                                                        <svg class={`w-5 h-5 ${season.season_number === 0 ? 'text-purple-500' : 'text-blue-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                                                    </div>
-                                                    <div class="grid grid-cols-3 gap-3 mb-3">
-                                                        <div class={`text-center p-2.5 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>{stats.totalEpisodes}</div>
-                                                            <div class="text-xs text-gray-600">Episodios</div>
-                                                        </div>
-                                                        <div class={`text-center p-2.5 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                                                            <div class={`text-xl font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>{stats.averageRating !== "0.0" ? `${stats.averageRating}` : "N/A"}</div>
-                                                            <div class="text-xs text-gray-600">Nota</div>
-                                                        </div>
-                                                        <div class={`text-center p-2.5 rounded-lg ${season.season_number === 0 ? 'bg-purple-100' : 'bg-blue-100'}`}>
-                                                            <div class={`text-base font-bold ${season.season_number === 0 ? 'text-purple-800' : 'text-blue-800'}`}>{stats.averageRuntime !== "No disponible" ? stats.averageRuntime : "N/A"}</div>
-                                                            <div class="text-xs text-gray-600">Duración</div>
-                                                        </div>
-                                                    </div>
-                                                    <!-- Stats extra -->
-                                                    <div class="flex flex-wrap gap-2 mb-3 text-xs">
-                                                        {stats.totalWatchtime && (
-                                                            <span class={`px-2 py-0.5 rounded-full ${season.season_number === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                                Total: {stats.totalWatchtime}
-                                                            </span>
-                                                        )}
-                                                        {stats.bestEpisode && (
-                                                            <span class={`px-2 py-0.5 rounded-full ${season.season_number === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                                Mejor: E{stats.bestEpisode.episode_number} ({stats.bestEpisode.vote_average.toFixed(1)})
-                                                            </span>
-                                                        )}
-                                                        {stats.dateRange && (
-                                                            <span class={`px-2 py-0.5 rounded-full ${season.season_number === 0 ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                                {stats.dateRange}
-                                                            </span>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Progreso de temporada */}
-                                                    {seasonTotal > 0 && (
-                                                        <div class="flex items-center gap-3 mb-3" data-season-progress={season.season_number} data-season-total={seasonTotal}>
-                                                            <div class="flex-1 bg-gray-200 rounded-full h-1.5">
-                                                                <div class={`h-1.5 rounded-full transition-all duration-300 ${season.season_number === 0 ? 'bg-purple-500' : 'bg-green-500'}`} data-season-bar={season.season_number} style={`width: ${Math.round(seasonWatched / seasonTotal * 100)}%`}></div>
-                                                            </div>
-                                                            <span class="text-xs text-gray-500 flex-shrink-0" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>
-                                                        </div>
-                                                    )}
-
-                                                    <p class="text-sm text-gray-600 leading-relaxed season-overview">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
-                                                </div>
-                                            </div>
+                                    <details id={`season-${season.season_number}`} class="sr scroll-mt-20">
+                                        {/* 4.6 · Una fila por temporada: póster · nombre · tira de episodios · vistos · nota */}
+                                        <summary class="sr-row">
+                                            <img class="sr-poster" src={posterUrl(season.poster_path || item?.poster_path, 'w92')} alt="" loading="lazy" />
+                                            <span class="sr-t">
+                                                <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
+                                                <small>{seasonTotal} ep.{season.air_date ? ` · ${season.air_date.slice(0, 4)}` : ''}</small>
+                                            </span>
+                                            {seasonTotal > 0 && (
+                                                <span class="sr-strip" role="img" aria-label={`${season.season_number === 0 ? 'Especiales' : `T${season.season_number}`}: ${seasonTotal} episodios, ${seasonWatched} vistos`}>
+                                                    {seasonEpisodes.slice(0, STRIP_MAX).map((ep) => {
+                                                        const seen = watchedSet.has(`${season.season_number}-${ep.episode_number}`);
+                                                        // Sin spoilers: la nota de un episodio no visto no se enseña (ni por color), como en el mapa.
+                                                        const band = spoilerFree && !seen ? 'none' : epBand(ep);
+                                                        const tip = `T${season.season_number}·E${ep.episode_number}` + (band !== 'none' ? ` · ★ ${ep.vote_average.toFixed(1)}` : '') + (seen ? ' · visto' : '');
+                                                        return <i class:list={['sr-c', { 'is-seen': seen }]} data-b={band} data-ep-cell={`${season.season_number}-${ep.episode_number}`} title={tip}></i>;
+                                                    })}
+                                                    {seasonTotal > STRIP_MAX && <span class="sr-more" title={`${seasonTotal - STRIP_MAX} episodios más: ábrela para verlos todos`}>+{seasonTotal - STRIP_MAX}</span>}
+                                                </span>
+                                            )}
+                                            {seasonTotal > 0 && <span class="sr-n" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>}
+                                            <span class="sr-r">{stats.averageRating !== '0.0' ? `★ ${stats.averageRating.replace('.', ',')}` : ''}</span>
+                                            <svg class="sr-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                                         </summary>
-                                        <div class="bg-white p-4 space-y-2">
+                                        <div class="sr-body space-y-2">
+                                            {/* Lo que antes iba en la cabecera grande de la temporada (4.6: nada se pierde) */}
+                                            <div class="sr-meta">
+                                                <span><b>{stats.totalEpisodes}</b> episodios</span>
+                                                {stats.averageRating !== '0.0' && <span>Nota <b>{stats.averageRating}</b></span>}
+                                                {stats.averageRuntime !== 'No disponible' && <span><b>{stats.averageRuntime}</b> por episodio</span>}
+                                                {stats.totalWatchtime && <span>Total <b>{stats.totalWatchtime}</b></span>}
+                                                {stats.bestEpisode && <span>Mejor: <b>E{stats.bestEpisode.episode_number}</b> ({stats.bestEpisode.vote_average.toFixed(1)})</span>}
+                                                {stats.dateRange && <span>{stats.dateRange}</span>}
+                                            </div>
+                                            {seasonTotal > 0 && (
+                                                <div class="sr-prog" data-season-progress={season.season_number} data-season-total={seasonTotal}>
+                                                    <span class="sr-prog-bar"><i data-season-bar={season.season_number} style={`width: ${Math.round(seasonWatched / seasonTotal * 100)}%`}></i></span>
+                                                </div>
+                                            )}
+                                            <p class="sr-ov season-overview">{season.overview || (season.season_number === 0 ? "Episodios especiales y contenido adicional." : "No hay descripción disponible.")}</p>
                                             {/* Botón marcar/desmarcar temporada */}
                                             {seasonTotal > 0 && (
                                                 <form method="POST" class="mb-3">
@@ -1134,6 +1117,9 @@ const jsonLd = item ? {
                             })}
                         </div>
                     </div>
+
+                    <!-- Mapa de calidad por episodio, plegado al final (4.6; datos ya cargados, cero fetches) -->
+                    <SeasonHeatmap seasons={regularSeasons} episodesBySeason={allSeasonEpisodes} spoilerFree={spoilerFree} watchedSet={watchedSet} />
 
                     </div>
 
