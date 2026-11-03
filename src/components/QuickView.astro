@@ -11,8 +11,8 @@
  *   cierran. Foco: al título al abrir, de vuelta al ▶ al cerrar.
  * - Móvil: el mismo contenido en una hoja inferior (BottomSheet, modal).
  * - Abre al instante con lo que trae la tarjeta y se rellena con /api/quick/{tipo}/{id} (precarga
- *   al pasar el ratón o enfocar el ▶). Tráiler en silencio con botón de sonido (recuerda
- *   `yf_hover_muted`); sin tráiler, el fondo; sin fondo, el póster.
+ *   al pasar el ratón o enfocar el ▶). Tráiler en silencio (los controles, sonido incluido,
+ *   son los de YouTube; respeta `yf_hover_muted` si quedó guardado); sin tráiler, el fondo; sin fondo, el póster.
  * - Acciones con los botones con estado del sistema v2 y los endpoints de siempre:
  *   Pendiente/Visto → /api/lists/fixed · Seguir → /api/series/state · Marcar visto del próximo
  *   episodio (único rojo) → /api/episodes/watched · ⊕ → SaveToPopover (.js-saveto).
@@ -28,7 +28,7 @@ import BottomSheet from './BottomSheet.astro';
 
 <style is:global>
     .qv {
-        position: absolute; z-index: 1200; width: 400px; max-width: calc(100vw - 32px);
+        position: absolute; z-index: 1200; width: 520px; max-width: calc(100vw - 32px);
         background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
         box-shadow: var(--sh-lg); overflow: hidden;
         opacity: 0; transform: scale(.96); transition: opacity .16s ease, transform .16s ease;
@@ -47,21 +47,12 @@ import BottomSheet from './BottomSheet.astro';
         background: rgba(10, 15, 28, .72); color: #fff; font: 600 var(--fs-micro) var(--font-mono); letter-spacing: .02em;
     }
     .qv-tag svg { width: 11px; height: 11px; }
-    .qv-ico {
-        position: absolute; z-index: 3; width: 32px; height: 32px; border-radius: var(--r-full); border: 0;
-        display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
-        background: rgba(10, 15, 28, .72); color: #fff;
-    }
-    .qv-ico svg { width: 16px; height: 16px; }
-    .qv-ico:hover { background: rgba(10, 15, 28, .9); }
-    .qv-ico:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-    .qv-close { top: var(--s-3); right: var(--s-3); }
-    .qv-mute { bottom: var(--s-3); right: var(--s-3); }
-    .qv-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--accent); z-index: 2; }
 
     .qv-body { padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-2); }
     .qv-inner--sheet .qv-body { padding: var(--s-4); }
-    .qv-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); }
+    .qv-head { display: flex; align-items: center; gap: var(--s-3); }
+    .qv-head .qv-title { flex: 1; min-width: 0; }
+    .qv-x { margin: -6px -8px -6px 0; flex-shrink: 0; }
     .qv-title { margin: 0; font: 700 var(--fs-sub)/1.25 var(--font); color: var(--text); outline: none; }
     .qv-vote { flex-shrink: 0; font: 700 var(--fs-micro) var(--font-mono); color: var(--text-2); white-space: nowrap; }
     .qv-vote span { color: var(--a-rating); }
@@ -118,12 +109,8 @@ import BottomSheet from './BottomSheet.astro';
 
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
     const mutedPref = () => { try { return localStorage.getItem(MUTE_KEY) !== '0'; } catch { return true; } };
-    const setMutedPref = (m: boolean) => { try { localStorage.setItem(MUTE_KEY, m ? '1' : '0'); } catch { /* sin almacenamiento */ } };
     const ICON = {
         x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
-        play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4v16l13-8z"/></svg>',
-        muted: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="m22 9-6 6M16 9l6 6"/></svg>',
-        sound: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5Z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/></svg>',
         clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
         check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
         eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>',
@@ -146,17 +133,16 @@ import BottomSheet from './BottomSheet.astro';
     }
 
     function mediaHtml(seed: Seed, q: Quick | null): string {
-        const close = `<button type="button" class="qv-ico qv-close" data-qv-close aria-label="Cerrar">${ICON.x}</button>`;
+        // Encima del vídeo no va nada nuestro: YouTube trae sus controles (sonido incluido) y se
+        // tapaban. La × va en la cabecera del texto. Empieza en silencio salvo que lo quitaras.
         if (q?.trailer) {
             const muted = mutedPref();
-            const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(q.trailer)}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&playsinline=1&rel=0&modestbranding=1&enablejsapi=1`;
-            return `<div class="qv-media"><iframe src="${src}" title="Tráiler de ${esc(q.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`
-                + `${close}<button type="button" class="qv-ico qv-mute" data-qv-mute aria-pressed="${muted ? 'false' : 'true'}" aria-label="${muted ? 'Activar sonido' : 'Silenciar'}">${muted ? ICON.muted : ICON.sound}</button>`
-                + `<span class="qv-bar" aria-hidden="true"></span></div>`;
+            const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(q.trailer)}?autoplay=1&mute=${muted ? 1 : 0}&controls=1&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3`;
+            return `<div class="qv-media"><iframe src="${src}" title="Tráiler de ${esc(q.title)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe></div>`;
         }
-        if (q?.backdrop) return `<div class="qv-media"><img src="${q.backdrop}" alt="" />${close}<span class="qv-tag">Sin tráiler</span></div>`;
-        if (q) return `<div class="qv-media"><img class="qv-poster" src="${esc(seed.poster)}" alt="" />${close}<span class="qv-tag">Sin tráiler</span></div>`;
-        return `<div class="qv-media"><div class="qv-sk" style="position:absolute;inset:0;border-radius:0"></div>${close}</div>`;
+        if (q?.backdrop) return `<div class="qv-media"><img src="${q.backdrop}" alt="" /><span class="qv-tag">Sin tráiler</span></div>`;
+        if (q) return `<div class="qv-media"><img class="qv-poster" src="${esc(seed.poster)}" alt="" /><span class="qv-tag">Sin tráiler</span></div>`;
+        return `<div class="qv-media"><div class="qv-sk" style="position:absolute;inset:0;border-radius:0"></div></div>`;
     }
 
     function btn(label: string, icon: string, attrs: string, cls = '') {
@@ -167,7 +153,8 @@ import BottomSheet from './BottomSheet.astro';
         const href = `/${seed.type === 'tv' ? 'serie' : 'movie'}/${seed.id}`;
         const vote = q?.vote ?? (seed.vote ? Number(seed.vote) : null);
         const head = `<div class="qv-head"><h2 class="qv-title" id="yf-qv-title" tabindex="-1">${esc(q?.title || seed.title)}</h2>`
-            + (vote ? `<span class="qv-vote"><span aria-hidden="true">★</span> ${String(vote).replace('.', ',')}</span>` : '') + '</div>';
+            + (vote ? `<span class="qv-vote"><span aria-hidden="true">★</span> ${String(vote).replace('.', ',')}</span>` : '')
+            + `<button type="button" class="btn btn--sm btn--icon btn--ghost qv-x" data-qv-close aria-label="Cerrar">${ICON.x}</button></div>`;
         if (!q) {
             return `<div class="qv-body">${head}<p class="qv-meta">${esc(seed.year)}</p>`
                 + `<div class="qv-sk" style="width:90%"></div><div class="qv-sk" style="width:75%"></div><div class="qv-sk qv-sk--l"></div>`
@@ -310,17 +297,6 @@ import BottomSheet from './BottomSheet.astro';
         if (trg) { e.preventDefault(); e.stopPropagation(); void open(trg); return; }
         const t = e.target as HTMLElement;
         if (t.closest('[data-qv-close]')) { close(); return; }
-        const mute = t.closest<HTMLButtonElement>('[data-qv-mute]');
-        if (mute) {
-            const iframe = mute.closest('.qv-media')?.querySelector('iframe');
-            const nowMuted = mute.getAttribute('aria-pressed') === 'true';
-            iframe?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: nowMuted ? 'mute' : 'unMute', args: [] }), '*');
-            mute.setAttribute('aria-pressed', nowMuted ? 'false' : 'true');
-            mute.setAttribute('aria-label', nowMuted ? 'Activar sonido' : 'Silenciar');
-            mute.innerHTML = nowMuted ? ICON.muted : ICON.sound;
-            setMutedPref(nowMuted);
-            return;
-        }
         const a = t.closest<HTMLButtonElement>('[data-qv-act]');
         if (a) { void act(a); return; }
         // Clic fuera del panel (escritorio): cierra.

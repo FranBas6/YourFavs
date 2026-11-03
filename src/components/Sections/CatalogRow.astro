@@ -24,7 +24,7 @@ for (let k = 0; k < Math.max(movies.length, series.length); k++) {
     if (movies[k]) items.push({ kind: 'movie', item: movies[k] });
     if (series[k]) items.push({ kind: 'tv', item: series[k] });
 }
-const total = (section.movies?.length ?? 0) + (section.series?.length ?? 0);
+// Sin contador: lo que trae la fila (20 + 20) no es el total de la sección, que está en «Ver más».
 const railId = `rail-${String(section.key ?? section.title ?? 'fila').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
 const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }));
 ---
@@ -34,13 +34,12 @@ const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: get
         link={section.link}
         color={section.color as any}
         icon={section.lucide}
-        count={total}
         subtitle={section.subtitle}
         why={section.why}
         railId={items.length > 0 ? railId : undefined}
     />
 
-    <Row id={railId} label={section.title} moreHref={section.link} moreCount={total > items.length ? total : undefined}>
+    <Row id={railId} label={section.title} moreHref={section.link}>
         {items.map(({ kind, item }) => kind === 'movie' ? (
             <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
                 id={item.id.toString()}
