@@ -265,10 +265,10 @@ function init(root: HTMLElement) {
                 ? `<div class="aj-four-po">${p.poster_path ? `<img src="${posterSrc(p.poster_path)}" alt="" loading="lazy" />` : ''}</div>`
                 : `<div class="aj-four-po is-empty">${ICON.plus}</div>`;
             const ctl = p
-                ? `<button type="button" class="aj-btn is-ico" data-four-move="-1" aria-label="Mover a la izquierda"${i === 0 ? ' disabled' : ''}>${ICON.left}</button>
-                   <button type="button" class="aj-btn" data-four-pick>Cambiar</button>
-                   <button type="button" class="aj-btn is-ico" data-four-move="1" aria-label="Mover a la derecha"${i === four.length - 1 ? ' disabled' : ''}>${ICON.right}</button>`
-                : `<button type="button" class="aj-btn" data-four-pick>Elegir</button>`;
+                ? `<button type="button" class="btn btn--sm btn--icon aj-btn" data-four-move="-1" aria-label="Mover a la izquierda"${i === 0 ? ' disabled' : ''}>${ICON.left}</button>
+                   <button type="button" class="btn btn--sm aj-btn" data-four-pick>Cambiar</button>
+                   <button type="button" class="btn btn--sm btn--icon aj-btn" data-four-move="1" aria-label="Mover a la derecha"${i === four.length - 1 ? ' disabled' : ''}>${ICON.right}</button>`
+                : `<button type="button" class="btn btn--sm aj-btn" data-four-pick>Elegir</button>`;
             return `<div class="aj-four-cell" data-slot="${i}">
                 <span class="aj-four-pos">${i + 1}</span>${po}
                 <div class="aj-four-t" title="${p ? esc(p.title) : ''}">${p ? esc(p.title) : `Hueco ${i + 1}`}</div>

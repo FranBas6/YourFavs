@@ -1,0 +1,86 @@
+/* =====================================================================================
+   Botones del sistema v2 (docs/design_handoff_rediseno, README §3.2 + B0). Global (Layout).
+   Solo tokens: el oscuro sale de los tokens, sin reglas aparte.
+
+   .btn            secundario (por defecto): fondo --bg-elev, borde --border-strong
+   .btn--pri       principal: rojo de marca, UNO por pantalla
+   .btn--ghost     fantasma: solo texto
+   .btn--sm        36 px, solo en escritorio (por debajo de 1024 px vuelve a 44: dedo)
+   .btn--icon      cuadrado, solo icono (lleva aria-label)
+   .btn--dgr       peligro: secundario con texto rojo
+   Estados: :hover · :focus-visible · [disabled]/[aria-disabled] · [aria-busy] (cargando, sin
+   cambiar el ancho: el JS fija min-width al empezar) · [aria-pressed="true"] (con estado).
+
+   Botón con estado (Visto, Me gusta, Favorito, Pendiente, Ver pronto, Seguir…): sin marcar es un
+   secundario con el icono en su color de lista; marcado se tiñe con el fondo suave de su lista.
+   La lista se elige con `data-tone` (visto, fav, like, pend, pronto, seguir, ep, rating, abandon).
+
+   .pf-btn (capa social, F1–F6) es un ALIAS de .btn durante la migración: .pf-btn.pri = .btn--pri,
+   .ghost = .btn--ghost, .sm = .btn--sm, .ico = .btn--icon, .dgr = destructivo relleno (Bloquear).
+   ===================================================================================== */
+
+.btn, .pf-btn {
+    --tone: var(--text-2);
+    --tone-bg: var(--bg-tint);
+    position: relative;
+    height: 44px; padding: 0 16px; border-radius: var(--r-md);
+    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    font: 600 var(--fs-ui) var(--font);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; white-space: nowrap; text-decoration: none; line-height: 1;
+    transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.btn svg, .pf-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+.btn:hover, .pf-btn:hover { border-color: var(--text-3); background: var(--bg-tint); color: var(--text); }
+.btn:focus-visible, .pf-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Principal */
+.btn--pri, .pf-btn.pri { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--on-accent); }
+.btn--pri:hover, .pf-btn.pri:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* Fantasma */
+.btn--ghost, .pf-btn.ghost { background: none; border-color: transparent; color: var(--text-2); }
+.btn--ghost:hover, .pf-btn.ghost:hover { background: var(--bg-tint); border-color: transparent; color: var(--text); }
+
+/* Peligro: secundario con texto rojo (en oscuro, la tinta clara del sello rojo). */
+.btn--dgr { color: var(--accent-dark); }
+[data-theme="dark"] .btn--dgr { color: var(--stamp-red-ink); }
+/* .pf-btn.dgr (Bloquear) sigue siendo relleno, como en la capa social. */
+.pf-btn.dgr, .pf-btn.dgr:hover { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--on-accent); }
+
+/* Solo icono */
+.btn--icon, .pf-btn.ico { width: 44px; padding: 0; }
+
+/* Pequeño: 36 px solo en escritorio */
+.btn--sm, .pf-btn.sm { padding: 0 12px; gap: 6px; }
+@media (min-width: 1024px) {
+    .btn--sm, .pf-btn.sm { height: 36px; }
+    .btn--sm svg, .pf-btn.sm svg { width: 15px; height: 15px; }
+    .btn--sm.btn--icon, .pf-btn.sm.ico { width: 36px; }
+}
+
+/* Desactivado y cargando */
+.btn[disabled], .btn[aria-disabled="true"],
+.pf-btn[disabled], .pf-btn[aria-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.btn[aria-busy="true"], .pf-btn[aria-busy="true"] { cursor: progress; }
+.btn[aria-busy="true"] > svg:first-child { animation: btn-spin .8s linear infinite; }
+@keyframes btn-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .btn[aria-busy="true"] > svg:first-child { animation: none; } }
+
+/* Con estado: sin marcar, el icono en su color; marcado, fondo suave y borde de su lista. */
+.btn[data-tone] > svg:first-child { color: var(--tone); }
+.btn[aria-pressed="true"], .pf-btn[aria-pressed="true"] {
+    background: var(--tone-bg); border-color: var(--tone); color: var(--text);
+}
+.btn[aria-pressed="true"] > svg:first-child { color: var(--tone); }
+.btn[data-tone="visto"]   { --tone: var(--a-visto);   --tone-bg: var(--a-visto-bg); }
+.btn[data-tone="fav"]     { --tone: var(--a-fav);     --tone-bg: var(--a-fav-bg); }
+.btn[data-tone="like"]    { --tone: var(--a-like);    --tone-bg: var(--a-like-bg); }
+.btn[data-tone="pend"]    { --tone: var(--a-pend);    --tone-bg: var(--a-pend-bg); }
+.btn[data-tone="pronto"]  { --tone: var(--a-pronto);  --tone-bg: var(--a-pronto-bg); }
+.btn[data-tone="seguir"]  { --tone: var(--a-seguir);  --tone-bg: var(--a-seguir-bg); }
+.btn[data-tone="ep"]      { --tone: var(--a-ep);      --tone-bg: var(--a-ep-bg); }
+.btn[data-tone="rating"]  { --tone: var(--a-rating);  --tone-bg: var(--a-rating-bg); }
+.btn[data-tone="abandon"] { --tone: var(--a-abandon); --tone-bg: var(--a-abandon-bg); }
+/* Sin data-tone, el «pulsado» de la capa social de siempre: fondo tinte y borde fuerte. */
+.btn:not([data-tone])[aria-pressed="true"], .pf-btn[aria-pressed="true"] { border-color: var(--border-strong); }
