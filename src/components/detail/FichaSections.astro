@@ -136,7 +136,11 @@ const { items } = Astro.props;
     .fs-in a[aria-current="location"] { font-weight: 600; color: var(--text); border-bottom-color: var(--accent); }
     .fs-in a:focus-visible { outline: 2px solid var(--primary); outline-offset: -4px; border-radius: var(--r-sm); }
     .fs-sentinel { display: block; height: 0; }
-    .fs.is-stuck { box-shadow: var(--sh-md); }
+    /* Las flechas solo existen en móvil (abajo). */
+    .fs-arr { display: none; }
+    /* Fija: fondo y línea de abajo de borde a borde. `border-image` con outset pinta fuera de la caja
+       sin ensancharla ni crear scroll lateral (un ::before de 100vw sí lo creaba). */
+    .fs.is-stuck { border-image: linear-gradient(to top, var(--border) 1px, var(--bg-elev) 1px) fill 0 / 0 / 0 100vmax; }
     [data-fs] { scroll-margin-top: 60px; }
     @media (max-width: 767px) {
         .fs-in { padding: 0 8px; }
@@ -149,8 +153,5 @@ const { items } = Astro.props;
         .fs-arr--next { right: 0; justify-content: flex-end; padding-right: 8px; background: linear-gradient(to right, transparent, var(--bg-elev) 55%); }
         .fs-arr--prev { left: 0; justify-content: flex-start; padding-left: 8px; background: linear-gradient(to left, transparent, var(--bg-elev) 55%); }
         .fs.has-more .fs-arr--next, .fs.has-less .fs-arr--prev { display: flex; }
-        /* Fija: de borde a borde (la página tiene margen lateral en móvil). */
-        .fs.is-stuck { margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); }
-        .fs.is-stuck .fs-in { padding: 0 12px; }
     }
 </style>
