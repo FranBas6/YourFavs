@@ -597,53 +597,6 @@ const jsonLd = item ? {
                         <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
                     </div>
 
-                    <!-- Info -->
-                    <div id="sec-detalles" data-fs class="bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
-                        <ul class="space-y-2.5 text-sm sm:text-base">
-                            <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class={`font-medium ${status === 'Returning Series' ? 'text-green-600' : status === 'Canceled' ? 'text-red-600' : 'text-gray-800'}`}>{status ? ((statusMap as any)[status] || status) : ''}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Emisión</span><span class="text-gray-800 font-medium">{yearsActive}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Temporadas</span><span class="text-gray-800 font-medium">{regularSeasonsCount}{hasSpecialSeasons ? ` + ${specialSeasonsCount} especiales` : ''}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="text-gray-800 font-medium">{totalRegularEpisodes}</span></li>
-                            {episodeRuntime && (
-                                <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{formatRuntime(episodeRuntime)} por episodio</span></li>
-                            )}
-                            {lastAirDate && (
-                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Última emisión</span><span class="text-gray-800 font-medium text-right">{formatDate(lastAirDate)}</span></li>
-                            )}
-                            {createdBy.length > 0 && (
-                                <li class="flex justify-between gap-2">
-                                    <span class="text-gray-500 flex-shrink-0">Creada por</span>
-                                    <span class="text-gray-800 font-medium text-right">
-                                        {createdBy.map((c, i) => (
-                                            <>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(c.name)}`} class="hover:text-blue-600 hover:underline">{c.name}</a></>
-                                        ))}
-                                    </span>
-                                </li>
-                            )}
-                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
-                            {item?.original_name && item.original_name !== item.name && (
-                                <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_name}</span></li>
-                            )}
-                            {productionCountries.length > 0 && (
-                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">País</span><span class="text-gray-800 font-medium text-right">{productionCountries.join(', ')}</span></li>
-                            )}
-                        </ul>
-                    </div>
-
-                    <!-- Clasificación -->
-                    {additionalInfo.content_ratings && additionalInfo.content_ratings.length > 0 && (() => {
-                        const rating = getContentRating(additionalInfo.content_ratings);
-                        return rating ? (
-                            <div class="bg-white rounded-xl border border-gray-200 p-4">
-                                <h3 class="text-base font-semibold text-gray-800 mb-2">Clasificación</h3>
-                                <p class="text-sm font-medium text-gray-700">{rating.text}</p>
-                            </div>
-                        ) : null;
-                    })()}
-
                     <!-- Dónde ver -->
                     <div id="sec-donde" data-fs>
                     <StreamingProviders
@@ -756,12 +709,87 @@ const jsonLd = item ? {
                         </div>
                     )}
 
-                    <!-- Keywords TMDB: desplegable en mobile, visible en desktop -->
+                    <!-- Información (con clasificación, cadena, enlaces e idiomas; rediseño 4.4) -->
+                    <div id="sec-detalles" data-fs class="bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
+                        <ul class="space-y-2.5 text-sm sm:text-base">
+                            <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class={`font-medium ${status === 'Returning Series' ? 'text-green-600' : status === 'Canceled' ? 'text-red-600' : 'text-gray-800'}`}>{status ? ((statusMap as any)[status] || status) : ''}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Emisión</span><span class="text-gray-800 font-medium">{yearsActive}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Temporadas</span><span class="text-gray-800 font-medium">{regularSeasonsCount}{hasSpecialSeasons ? ` + ${specialSeasonsCount} especiales` : ''}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="text-gray-800 font-medium">{totalRegularEpisodes}</span></li>
+                            {episodeRuntime && (
+                                <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{formatRuntime(episodeRuntime)} por episodio</span></li>
+                            )}
+                            {lastAirDate && (
+                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Última emisión</span><span class="text-gray-800 font-medium text-right">{formatDate(lastAirDate)}</span></li>
+                            )}
+                            {createdBy.length > 0 && (
+                                <li class="flex justify-between gap-2">
+                                    <span class="text-gray-500 flex-shrink-0">Creada por</span>
+                                    <span class="text-gray-800 font-medium text-right">
+                                        {createdBy.map((c, i) => (
+                                            <>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(c.name)}`} class="hover:text-blue-600 hover:underline">{c.name}</a></>
+                                        ))}
+                                    </span>
+                                </li>
+                            )}
+                            {/* Clasificación por edades (antes, tarjeta aparte) */}
+                            {(() => {
+                                const rating = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null;
+                                return rating ? <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Clasificación</span><span class="text-gray-800 font-medium text-right">{rating.text}</span></li> : null;
+                            })()}
+                            {/* Cadenas (antes, tarjeta aparte) */}
+                            {serieNetworks.length > 0 && (
+                                <li class="flex justify-between gap-3">
+                                    <span class="text-gray-500 flex-shrink-0">{serieNetworks.length === 1 ? 'Cadena' : 'Cadenas'}</span>
+                                    <span class="flex flex-col items-end gap-1.5">
+                                        {serieNetworks.map((network) => (
+                                            <span class="flex items-center gap-2 text-gray-800 font-medium">
+                                                {network.logo_path && <img src={posterUrl(network.logo_path, 'w92')} alt="" class="w-10 h-5 object-contain" loading="lazy" />}
+                                                {network.name}
+                                            </span>
+                                        ))}
+                                    </span>
+                                </li>
+                            )}
+                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
+                            {item?.original_name && item.original_name !== item.name && (
+                                <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_name}</span></li>
+                            )}
+                            {productionCountries.length > 0 && (
+                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">País</span><span class="text-gray-800 font-medium text-right">{productionCountries.join(', ')}</span></li>
+                            )}
+                        </ul>
+                        {(hasSocialLinks || imdbId || serieLanguages.length > 0) && (
+                            <div class="mt-4 pt-3 border-t border-gray-100 space-y-3">
+                        {(hasSocialLinks || imdbId) && (
+                            <div class="flex flex-wrap gap-2">
+                                {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100">IMDb</a>}
+                                {serieSocialLinks.facebook && <a href={serieSocialLinks.facebook} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">Facebook</a>}
+                                {serieSocialLinks.instagram && <a href={serieSocialLinks.instagram} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100">Instagram</a>}
+                                {serieSocialLinks.twitter && <a href={serieSocialLinks.twitter} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100">Twitter</a>}
+                            </div>
+                        )}
+                        {serieLanguages.length > 0 && (
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-xs text-gray-500 mr-1">Idiomas</span>
+                                {serieLanguages.map((lang) => (
+                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">{getLanguageDisplayName(lang.iso_639_1)}</span>
+                                ))}
+                            </div>
+                        )}
+                            </div>
+                        )}
+                    </div>
+
+                    <!-- Palabras clave de TMDB (aparte de tus etiquetas): plegadas en móvil -->
                     {serieKeywords.length > 0 && (
                         <>
                             <details class="bg-white rounded-xl border border-gray-200 sm:hidden">
                                 <summary class="p-4 cursor-pointer flex items-center justify-between">
-                                    <h3 class="text-base font-semibold text-gray-800">Keywords ({serieKeywords.length})</h3>
+                                    <h3 class="text-base font-semibold text-gray-800">Palabras clave de TMDB ({serieKeywords.length})</h3>
                                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                 </summary>
                                 <div class="px-4 pb-4 flex flex-wrap gap-1.5">
@@ -771,7 +799,7 @@ const jsonLd = item ? {
                                 </div>
                             </details>
                             <div class="hidden sm:block bg-white rounded-xl border border-gray-200 p-4">
-                                <h3 class="text-base font-semibold text-gray-800 mb-2">Keywords</h3>
+                                <h3 class="text-base font-semibold text-gray-800 mb-2">Palabras clave de TMDB</h3>
                                 <div class="flex flex-wrap gap-1.5">
                                     {serieKeywords.map((kw) => (
                                         <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
@@ -779,40 +807,6 @@ const jsonLd = item ? {
                                 </div>
                             </div>
                         </>
-                    )}
-
-                    <!-- Social -->
-                    {(hasSocialLinks || imdbId) && (
-                        <div class="flex flex-wrap gap-2">
-                            {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100">IMDb</a>}
-                            {serieSocialLinks.facebook && <a href={serieSocialLinks.facebook} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">Facebook</a>}
-                            {serieSocialLinks.instagram && <a href={serieSocialLinks.instagram} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100">Instagram</a>}
-                            {serieSocialLinks.twitter && <a href={serieSocialLinks.twitter} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100">Twitter</a>}
-                        </div>
-                    )}
-
-                    <!-- Idiomas -->
-                    {serieLanguages.length > 0 && (
-                        <div class="flex flex-wrap gap-1.5">
-                            {serieLanguages.map((lang) => (
-                                <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">{getLanguageDisplayName(lang.iso_639_1)}</span>
-                            ))}
-                        </div>
-                    )}
-
-                    <!-- Redes de transmisión -->
-                    {serieNetworks.length > 0 && (
-                        <div class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-base font-semibold text-gray-800 mb-3">Cadenas</h3>
-                            <div class="space-y-2">
-                                {serieNetworks.map((network) => (
-                                    <div class="flex items-center gap-3">
-                                        {network.logo_path && <img src={posterUrl(network.logo_path, 'w92')} alt={network.name} class="w-10 h-6 object-contain" loading="lazy" />}
-                                        <span class="text-sm text-gray-700">{network.name}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
                     )}
                 </div>
 
