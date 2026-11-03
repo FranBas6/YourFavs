@@ -1,0 +1,91 @@
+---
+/**
+ * StatRow — la pieza única de cifras del sistema v2 (docs/design_handoff_rediseno, README §3.6).
+ * Sustituye a las tarjetas de Actividad, Tu año y De siempre.
+ *
+ * Una fila plana (no son tarjetas): borde arriba y abajo y separadores verticales. Cada cifra lleva
+ * el valor en --fs-sec con números tabulares, el icono en el color de su lista (--a-{tone}) y la
+ * etiqueta en --fs-meta. Las cifras a 0 salen de la fila y se juntan en una línea («Aún a 0: …»),
+ * para no enseñar una tarjeta grande con un cero. En móvil, rejilla de 2 columnas.
+ */
+import { Icon } from 'astro-icon/components';
+
+export interface StatItem {
+    value: number | string;
+    label: string;
+    /** Icono Lucide, sin el prefijo `lucide:`. */
+    icon: string;
+    /** Clave de --a-* (visto, fav, like, ep, pend, pronto, seguir, rewatch, rating, person…). */
+    tone: string;
+    /** Línea pequeña bajo la etiqueta («+140 % vs 2025»). */
+    sub?: string;
+    /** Subida o bajada: pinta la línea pequeña en verde o rojo (tokens de lista, con su oscuro). */
+    trend?: 'up' | 'down';
+}
+
+interface Props {
+    items: StatItem[];
+    /** Junta las cifras a 0 en una línea aparte (por defecto, sí). */
+    groupZeros?: boolean;
+    class?: string;
+}
+
+const { items, groupZeros = true, class: cls } = Astro.props;
+const isZero = (v: number | string) => v === 0 || v === '0';
+const shown = groupZeros ? items.filter((i) => !isZero(i.value)) : items;
+const zeros = groupZeros ? items.filter((i) => isZero(i.value)) : [];
+const zeroText = zeros.map((z) => z.label.toLowerCase()).join(', ');
+---
+<div class:list={["stat-row-wrap", cls]}>
+    {shown.length > 0 && (
+        <div class="stat-row" role="list" style={`--cols: ${Math.min(shown.length, 6)}`}>
+            {shown.map((it) => (
+                <div class="sr-i" role="listitem" style={`--tone: var(--a-${it.tone});`}>
+                    <span class="sr-v"><Icon name={`lucide:${it.icon}`} aria-hidden="true" />{it.value}</span>
+                    <span class="sr-l">{it.label}</span>
+                    {it.sub && <span class:list={["sr-s", it.trend && `is-${it.trend}`]}>{it.sub}</span>}
+                </div>
+            ))}
+        </div>
+    )}
+    {zeros.length > 0 && (
+        <p class="sr-zero"><Icon name="lucide:info" aria-hidden="true" /><span><strong>Aún a 0:</strong> {zeroText}. Saldrán aquí cuando haya algo.</span></p>
+    )}
+</div>
+
+<style>
+    .stat-row-wrap { display: flex; flex-direction: column; gap: var(--s-2); }
+    .stat-row {
+        display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+        margin: 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .sr-i {
+        display: flex; flex-direction: column; gap: 2px; min-width: 0;
+        padding: var(--s-4) var(--s-4) var(--s-4) 0;
+    }
+    .sr-i + .sr-i { padding-left: var(--s-4); border-left: 1px solid var(--border); }
+    .sr-v {
+        margin: 0; display: flex; align-items: center; gap: var(--s-2);
+        font: 700 var(--fs-sec)/1.1 var(--font); letter-spacing: -.02em; color: var(--text);
+        font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sr-v :global(svg) { width: 16px; height: 16px; flex-shrink: 0; color: var(--tone); }
+    .sr-l { margin: 0; font-size: var(--fs-meta); color: var(--text-3); }
+    .sr-s { margin: 0; font-size: var(--fs-micro); color: var(--text-3); }
+    .sr-s.is-up { color: var(--a-visto); font-weight: 600; }
+    .sr-s.is-down { color: var(--a-remove); font-weight: 600; }
+    .sr-zero {
+        margin: 0; display: flex; align-items: flex-start; gap: var(--s-2);
+        font-size: var(--fs-meta); color: var(--text-3); line-height: 1.45;
+    }
+    .sr-zero :global(svg) { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; }
+    .sr-zero strong { color: var(--text-2); font-weight: 600; }
+
+    @media (max-width: 767px) {
+        .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .sr-i, .sr-i + .sr-i { padding: var(--s-3); border-left: 0; }
+        .sr-i:nth-child(2n) { border-left: 1px solid var(--border); }
+        .sr-i:nth-child(n + 3) { border-top: 1px solid var(--border); }
+        .sr-v { font-size: var(--fs-sub); }
+    }
+</style>

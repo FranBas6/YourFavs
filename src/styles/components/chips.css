@@ -1,0 +1,65 @@
+/* =====================================================================================
+   Chips del sistema v2 (docs/design_handoff_rediseno, README §3.3). Global (Layout). Solo tokens.
+
+   .chip-filter  se selecciona (filtros de listas, catálogo y Actividad). Activo: .is-on, .active o
+                 aria-pressed="true" → fondo --text y ✓ (si lleva .chip-check). 32 px (36 en móvil,
+                 con 44 de área táctil).
+   .chip-tag     informa o enlaza: género, keyword, criterio («why»). 24 px. Si es <a>, subraya al
+                 pasar el ratón.
+   .chip-state   dice algo del título: FINAL, PARÓN, NUEVO, EN NETFLIX, TRENDING, #n. Mono, mayúsculas,
+                 sobre el sello de su color (--sb fondo / --si tinta, en línea o con data-tone).
+
+   Alias durante la migración: .etag (ficha de episodio y «Estás viendo») = .chip-state;
+   .act-filters .chip (Actividad) = .chip-filter.
+   ===================================================================================== */
+
+/* ---- Filtro ---- */
+.chip-filter, .act-filters .chip {
+    position: relative;
+    height: 32px; padding: 0 12px; border-radius: var(--r-full);
+    border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text-2);
+    font: 600 var(--fs-meta) var(--font);
+    display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+    cursor: pointer; transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+.chip-filter svg { width: 13px; height: 13px; flex-shrink: 0; }
+.chip-filter .chip-n { font: 500 var(--fs-micro) var(--font-mono); opacity: .75; }
+.chip-filter:hover, .act-filters .chip:hover { border-color: var(--text-3); color: var(--text); }
+.chip-filter:focus-visible, .act-filters .chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.chip-filter.is-on, .chip-filter.active, .chip-filter[aria-pressed="true"],
+.act-filters .chip.active { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+.chip-filter .chip-check { display: none; }
+.chip-filter.is-on .chip-check, .chip-filter.active .chip-check,
+.chip-filter[aria-pressed="true"] .chip-check { display: inline-block; }
+.chip-filter[disabled] { opacity: .45; cursor: not-allowed; }
+@media (max-width: 1023.98px) {
+    .chip-filter, .act-filters .chip { height: 36px; }
+    /* 44 px de área táctil sin agrandar el chip. */
+    .chip-filter::before, .act-filters .chip::before { content: ""; position: absolute; inset: -4px 0; }
+}
+
+/* ---- Etiqueta ---- */
+.chip-tag {
+    height: 24px; padding: 0 9px; border-radius: var(--r-sm);
+    background: var(--bg-tint); border: 1px solid var(--border); color: var(--text-2);
+    font: 500 var(--fs-micro) var(--font);
+    display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; text-decoration: none;
+}
+.chip-tag svg { width: 12px; height: 12px; flex-shrink: 0; }
+a.chip-tag:hover { border-color: var(--border-strong); color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---- Estado ---- */
+.chip-state, .etag {
+    --sb: var(--stamp-slate); --si: var(--stamp-slate-ink);
+    height: 22px; padding: 0 7px; border-radius: var(--r-sm);
+    background: var(--sb); color: var(--si);
+    font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .05em; text-transform: uppercase;
+    display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+.chip-state svg, .etag svg { width: 12px; height: 12px; flex-shrink: 0; }
+.chip-state[data-tone="red"]    { --sb: var(--stamp-red);    --si: var(--stamp-red-ink); }
+.chip-state[data-tone="amber"]  { --sb: var(--stamp-amber);  --si: var(--stamp-amber-ink); }
+.chip-state[data-tone="blue"]   { --sb: var(--stamp-blue);   --si: var(--stamp-blue-ink); }
+.chip-state[data-tone="green"]  { --sb: var(--stamp-green);  --si: var(--stamp-green-ink); }
+.chip-state[data-tone="purple"] { --sb: var(--stamp-purple); --si: var(--stamp-purple-ink); }
+.chip-state[data-tone="pink"]   { --sb: var(--stamp-pink);   --si: var(--stamp-pink-ink); }

@@ -3,6 +3,7 @@ import Layout from "../../../layouts/Layout.astro";
 import { Icon } from 'astro-icon/components';
 import PersonalNav from "../../../components/personal/PersonalNav.astro";
 import EmptyState from "../../../components/EmptyState.astro";
+import StatRow, { type StatItem } from "../../../components/StatRow.astro";
 import { calculateYearStats, type ItemShowcase } from "../../../utils/yearStats";
 import { getGenreName } from "../../../utils/constants/genres";
 import { appDateParts, APP_TZ } from "../../../utils/appTime";
@@ -117,15 +118,31 @@ if (currentWeek.some(c => c !== null)) weeks.push(currentWeek);
 function showcaseHref(s: ItemShowcase): string {
     return s.kind === 'movie' ? `/movie/${s.id}` : `/serie/${s.id}`;
 }
-function deltaLabel(delta: number | null): { text: string; className: string } {
-    if (delta === null) return { text: '', className: '' };
-    if (delta > 0) return { text: `+${delta}% vs ${prevYear}`, className: 'text-emerald-600' };
-    if (delta < 0) return { text: `${delta}% vs ${prevYear}`, className: 'text-red-600' };
-    return { text: `=  ${prevYear}`, className: 'text-gray-500' };
+function deltaLabel(delta: number | null): { text: string; trend?: 'up' | 'down' } {
+    if (delta === null) return { text: '' };
+    if (delta > 0) return { text: `+${delta} % vs ${prevYear}`, trend: 'up' };
+    if (delta < 0) return { text: `${delta} % vs ${prevYear}`, trend: 'down' };
+    return { text: `= que ${prevYear}` };
 }
 const moviesDelta = deltaLabel(stats.comparison.moviesDelta);
 const seriesDelta = deltaLabel(stats.comparison.seriesDelta);
 const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
+// Cifras del año (StatRow). Los colores de antes (rojo, azul, verde, ámbar, morado, rosa) pasan al
+// icono, con los tokens --a-*.
+const activeMonthSub = stats.activeMonth ? [
+    stats.activeMonth.series > 0 ? `${stats.activeMonth.series} ${stats.activeMonth.series === 1 ? 'serie' : 'series'}` : '',
+    stats.activeMonth.movies > 0 ? `${stats.activeMonth.movies} ${stats.activeMonth.movies === 1 ? 'película' : 'películas'}` : '',
+    // Plural del día: «Sábados», «Domingos», pero «Viernes» (de lunes a viernes ya acaban en s).
+    stats.activeWeekday ? WEEKDAY_NAMES[stats.activeWeekday.weekday].replace(/([^s])$/, '$1s') : '',
+].filter(Boolean).join(' · ') : '';
+const YEAR_STATS: StatItem[] = [
+    { value: stats.moviesAdded, label: 'Películas', icon: 'clapperboard', tone: 'rewatch', sub: moviesDelta.text, trend: moviesDelta.trend },
+    { value: stats.seriesAdded, label: 'Series', icon: 'tv', tone: 'ep', sub: seriesDelta.text, trend: seriesDelta.trend },
+    { value: stats.episodesWatched, label: 'Episodios', icon: 'play', tone: 'visto', sub: episodesDelta.text, trend: episodesDelta.trend },
+    { value: `${stats.totalHours} h`, label: 'Horas estimadas', icon: 'clock', tone: 'rating', sub: `~${Math.round(stats.totalHours / 24)} días` },
+    { value: stats.activeMonth ? MONTH_NAMES[stats.activeMonth.month] : '—', label: 'Mes más visto', icon: 'calendar', tone: 'seguir', sub: activeMonthSub },
+    { value: stats.rewatches, label: 'Re-visionados', icon: 'repeat', tone: 'like' },
+];
 ---
 <Layout title={`Tu ${yearNum}`}>
     <section class="px-1 sm:py-8">
@@ -179,57 +196,8 @@ const episodesDelta = deltaLabel(stats.comparison.episodesDelta);
 
         {stats.hasData && (
             <div class="space-y-10">
-                {/* Stat cards principales */}
-                <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-                    <div class="rounded-xl bg-gradient-to-br from-red-50 to-red-100 border border-red-200 p-4">
-                        <Icon name="lucide:clapperboard" class="w-8 h-8 text-red-600" />
-                        <div class="mt-2 text-3xl font-bold text-red-700">{stats.moviesAdded}</div>
-                        <div class="text-xs text-red-600 font-medium uppercase tracking-wide mt-1">Películas</div>
-                        {moviesDelta.text && <div class={`text-[11px] mt-1 font-medium ${moviesDelta.className}`}>{moviesDelta.text}</div>}
-                    </div>
-                    <div class="rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 p-4">
-                        <Icon name="lucide:tv" class="w-8 h-8 text-blue-600" />
-                        <div class="mt-2 text-3xl font-bold text-blue-700">{stats.seriesAdded}</div>
-                        <div class="text-xs text-blue-600 font-medium uppercase tracking-wide mt-1">Series</div>
-                        {seriesDelta.text && <div class={`text-[11px] mt-1 font-medium ${seriesDelta.className}`}>{seriesDelta.text}</div>}
-                    </div>
-                    <div class="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 p-4">
-                        <Icon name="lucide:play" class="w-8 h-8 text-emerald-600" />
-                        <div class="mt-2 text-3xl font-bold text-emerald-700">{stats.episodesWatched}</div>
-                        <div class="text-xs text-emerald-600 font-medium uppercase tracking-wide mt-1">Episodios</div>
-                        {episodesDelta.text && <div class={`text-[11px] mt-1 font-medium ${episodesDelta.className}`}>{episodesDelta.text}</div>}
-                    </div>
-                    <div class="rounded-xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200 p-4">
-                        <Icon name="lucide:clock" class="w-8 h-8 text-amber-600" />
-                        <div class="mt-2 text-3xl font-bold text-amber-700">{stats.totalHours}h</div>
-                        <div class="text-xs text-amber-600 font-medium uppercase tracking-wide mt-1">Horas estimadas</div>
-                        <div class="text-[11px] text-amber-500 mt-1">~{Math.round(stats.totalHours / 24)} días</div>
-                    </div>
-                    <div class="rounded-xl bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 p-4 col-span-2 md:col-span-1">
-                        <Icon name="lucide:calendar" class="w-8 h-8 text-purple-600" />
-                        <div class="mt-2 text-xl font-bold text-purple-700 truncate">
-                            {stats.activeMonth ? MONTH_NAMES[stats.activeMonth.month] : '—'}
-                        </div>
-                        <div class="text-xs text-purple-600 font-medium uppercase tracking-wide mt-1">Mes más visto</div>
-                        {stats.activeMonth && (
-                            <div class="text-[11px] text-purple-500 mt-1">
-                                {[
-                                    stats.activeMonth.series > 0 ? `${stats.activeMonth.series} ${stats.activeMonth.series === 1 ? 'serie' : 'series'}` : '',
-                                    stats.activeMonth.movies > 0 ? `${stats.activeMonth.movies} ${stats.activeMonth.movies === 1 ? 'película' : 'películas'}` : '',
-                                    // Plural del día: «Sábados», «Domingos», pero «Viernes» (de lunes a viernes ya acaban en s).
-                                    stats.activeWeekday ? WEEKDAY_NAMES[stats.activeWeekday.weekday].replace(/([^s])$/, '$1s') : '',
-                                ].filter(Boolean).join(' · ')}
-                            </div>
-                        )}
-                    </div>
-                    {stats.rewatches > 0 && (
-                        <div class="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200 p-4 col-span-2 md:col-span-1">
-                            <svg class="w-8 h-8 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                            <div class="mt-2 text-3xl font-bold text-rose-700">{stats.rewatches}</div>
-                            <div class="text-xs text-rose-600 font-medium uppercase tracking-wide mt-1">Re-visionados</div>
-                        </div>
-                    )}
-                </div>
+                {/* Cifras del año: fila única del sistema v2 (StatRow) */}
+                <StatRow items={YEAR_STATS} />
 
                 {/* Showcase con posters */}
                 {(stats.showcase.bestUserRated || stats.showcase.bestTmdb || stats.showcase.firstOfYear || stats.showcase.lastOfYear) && (

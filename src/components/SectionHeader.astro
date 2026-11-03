@@ -1,15 +1,20 @@
 ---
-// Cabecera de sección refinada. Desktop: stamp 40 + título 22px (--primary) +
-// contador mono inline + tag "Destacado" + pill "Ver más". Móvil: fila compacta
-// (stamp 32, título 14px, contador inline, sin tag, "Ver más" como link plano)
-// replicando el MobileSection del prototipo. Ver docs/design_handoff.
+// Cabecera de sección del sistema v2 (docs/design_handoff_rediseno, README §3.5). Una sola en toda
+// la web, en dos tamaños: `size="page"` (sección de página: stamp 36 + título --fs-sec) y
+// `size="sub"` (subsección: stamp 28 + --fs-sub). Título en --text (el azul queda para los enlaces),
+// contador mono al lado, criterio como chip de etiqueta y «Ver más · n ›» a la derecha. Móvil: una
+// línea (stamp 32/26, título --fs-body/--fs-ui), sin contador ni criterio. Sin tag «Destacado» ni
+// línea inferior.
 import Stamp from './Stamp.astro';
 
 interface Props {
     title: string;
     link?: string;
     count?: number;       // nº total de títulos de la sección
-    featured?: boolean;   // muestra el tag "Destacado" (oculto en móvil)
+    /** @deprecated El tag «Destacado» se retiró en el sistema v2; se acepta y se ignora. */
+    featured?: boolean;
+    /** Sección de página (por defecto) o subsección. */
+    size?: 'page' | 'sub';
     color?: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
     icon: string;         // icono Lucide del stamp
     /** Una línea de qué promete la fila, bajo el título. */
@@ -30,22 +35,21 @@ interface Props {
     /** `id` del `<h2>`, para que su `<section aria-labelledby>` lo nombre por el título. */
     headingId?: string;
 }
-const { title, link, count, featured = false, color = 'slate', icon, subtitle, why, cap, onlyOwner = false, headingId } = Astro.props;
+const { title, link, count, size = 'page', color = 'slate', icon, subtitle, why, cap, onlyOwner = false, headingId } = Astro.props;
 const countLabel = cap
     ? cap
     : count != null && count > 0
         ? `${count} ${count === 1 ? 'título' : 'títulos'}`
         : null;
 ---
-<header class="yf-section-header">
+<header class:list={["yf-section-header", size === 'sub' && "is-sub"]}>
     <div class="yf-sh-left">
         <Stamp color={color} icon={icon} />
         <div class="yf-sh-titlewrap">
             <h2 class="yf-sh-title" id={headingId}>{title}{countLabel && <span class="yf-sh-count">{countLabel}</span>}</h2>
             {subtitle && <p class="yf-sh-sub">{subtitle}</p>}
         </div>
-        {why && <span class="yf-sh-why">◇ {why}</span>}
-        {featured && <span class="yf-sh-tag">Destacado</span>}
+        {why && <span class="chip-tag yf-sh-why">{why}</span>}
     </div>
     {onlyOwner && (
         <span class="pf-only">
@@ -54,8 +58,8 @@ const countLabel = cap
         </span>
     )}
     {link && (
-        <a href={link} class="yf-sh-more">
-            <span>Ver más</span>
+        <a href={link} class="yf-sh-more" aria-label={`Ver más: ${title}`}>
+            <span>Ver más</span>{count != null && count > 0 && <span class="yf-sh-more-n">· {count}</span>}
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/>
             </svg>
@@ -65,150 +69,45 @@ const countLabel = cap
 
 <style>
     .yf-section-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
-        flex-wrap: wrap;
-        padding-bottom: 18px;
-        border-bottom: 2px solid var(--border);
-        margin-bottom: 24px;
+        display: flex; align-items: center; justify-content: space-between;
+        gap: var(--s-4); flex-wrap: wrap; margin-bottom: var(--s-5);
     }
-    .yf-sh-left {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        flex-wrap: wrap;
-        min-width: 0;
-    }
-    .yf-sh-title {
-        margin: 0;
-        font-family: var(--font);
-        font-weight: 700;
-        font-size: 22px;
-        letter-spacing: -0.02em;
-        color: var(--primary);
-        line-height: 1.1;
-    }
-    .yf-sh-count {
-        font-family: var(--font-mono);
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--text-3);
-        letter-spacing: 0;
-        margin-left: 8px;
-        white-space: nowrap;
-    }
+    .yf-sh-left { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; min-width: 0; }
+    /* El tamaño del sello va por CSS (no por la prop de Stamp, que es estilo en línea y no se podría
+       cambiar en móvil). */
+    .yf-sh-left :global(.yf-stamp) { --st-size: 36px; }
+    .is-sub .yf-sh-left :global(.yf-stamp) { --st-size: 28px; }
     .yf-sh-titlewrap { min-width: 0; }
-    .yf-sh-sub {
-        margin: 3px 0 0;
-        font-family: var(--font);
-        font-size: 12.5px;
-        line-height: 1.4;
-        color: var(--text-3);
+    .yf-sh-title {
+        margin: 0; font: 700 var(--fs-sec)/1.15 var(--font); letter-spacing: -0.02em; color: var(--text);
     }
-    /* El criterio de la fila. Neutro a propósito: informa, no compite con el título. */
-    .yf-sh-why {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        height: 22px;
-        padding: 0 9px;
-        border-radius: var(--r-full);
-        background: var(--bg-tint);
-        border: 1px solid var(--border);
-        font-family: var(--font);
-        font-size: 11px;
-        font-weight: 500;
-        color: var(--text-3);
-        white-space: nowrap;
+    .is-sub .yf-sh-title { font-weight: 600; font-size: var(--fs-sub); letter-spacing: -0.01em; }
+    .yf-sh-count {
+        font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3);
+        letter-spacing: 0; margin-left: var(--s-2); white-space: nowrap;
     }
-    .yf-sh-tag {
-        font-family: var(--font);
-        font-size: 10.5px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--accent);
-        background: var(--accent-soft);
-        border: 1px solid var(--accent-light);
-        padding: 4px 10px;
-        border-radius: var(--r-full);
-    }
+    .yf-sh-sub { margin: 3px 0 0; font-size: var(--fs-meta); line-height: 1.4; color: var(--text-3); }
     .yf-sh-more {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        flex-shrink: 0;
-        padding: 6px 12px;
-        font-size: 13px;
-        font-weight: 500;
-        text-decoration: none;
-        color: var(--primary);
-        background: var(--primary-soft);
-        border-radius: var(--r-sm);
-        border: 1px solid transparent;
-        transition: all 0.15s ease;
+        display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+        min-height: 32px; font: 600 var(--fs-ui) var(--font); color: var(--primary);
+        text-decoration: none; white-space: nowrap;
     }
-    .yf-sh-more svg {
-        width: 13px;
-        height: 13px;
-        transition: transform 0.15s ease;
-    }
-    .yf-sh-more:hover {
-        background: var(--primary);
-        color: #fff;
-    }
-    .yf-sh-more:hover svg {
-        transform: translateX(2px);
-    }
+    .yf-sh-more-n { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); }
+    .yf-sh-more svg { width: 14px; height: 14px; transition: transform .15s ease; }
+    .yf-sh-more:hover { text-decoration: underline; text-underline-offset: 3px; }
+    .yf-sh-more:hover svg { transform: translateX(2px); }
+    .yf-sh-more:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--r-sm); }
 
-    /* Móvil: fila compacta de una sola línea (réplica del MobileSection) */
+    /* Móvil: una sola línea compacta; el contador y el criterio se caen, el subtítulo se queda. */
     @media (max-width: 640px) {
-        .yf-section-header {
-            gap: 8px;
-            flex-wrap: nowrap;
-            padding-bottom: 12px;
-            margin-bottom: 16px;
-        }
-        .yf-sh-left {
-            gap: 10px;
-            flex-wrap: nowrap;
-        }
-        .yf-sh-left :global(.yf-stamp) {
-            --st-size: 32px;
-        }
-        .yf-sh-title {
-            font-size: 14px;
-            line-height: 1.2;
-            min-width: 0;
-        }
-        .yf-sh-count {
-            font-size: 10px;
-            margin-left: 6px;
-        }
-        .yf-sh-tag {
-            display: none;
-        }
-        /* En móvil la cabecera es una sola línea compacta: el chip del criterio no cabe junto al
-           título, así que se cae y el subtítulo se queda (que es el que explica la fila). */
-        .yf-sh-why { display: none; }
-        .yf-sh-sub {
-            font-size: 11.5px;
-            margin-top: 2px;
-            white-space: normal;
-        }
-        .yf-sh-more {
-            background: transparent;
-            border: 0;
-            padding: 0;
-            font-size: 12px;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-        .yf-sh-more:hover {
-            background: transparent;
-            color: var(--primary-dark);
-        }
+        .yf-section-header { gap: var(--s-2); flex-wrap: nowrap; margin-bottom: var(--s-4); }
+        .yf-sh-left { gap: 10px; flex-wrap: nowrap; }
+        .yf-sh-left :global(.yf-stamp) { --st-size: 32px; }
+        .is-sub .yf-sh-left :global(.yf-stamp) { --st-size: 26px; }
+        .yf-sh-title { font-size: var(--fs-body); line-height: 1.2; min-width: 0; }
+        .is-sub .yf-sh-title { font-size: var(--fs-ui); }
+        .yf-sh-count, .yf-sh-why, .yf-sh-more-n { display: none; }
+        .yf-sh-sub { font-size: var(--fs-meta); margin-top: 2px; white-space: normal; }
+        .yf-sh-more { min-height: 44px; }
     }
 </style>

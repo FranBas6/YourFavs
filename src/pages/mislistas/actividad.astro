@@ -7,7 +7,7 @@ import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
 import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
 import { processBatch } from "../../utils/processBatch";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
-import ActivityStat from "../../components/personal/ActivityStat.astro";
+import StatRow from "../../components/StatRow.astro";
 import ActivityHeatmap from "../../components/personal/ActivityHeatmap.astro";
 import { Icon } from "astro-icon/components";
 import { appDateParts, APP_TZ } from "../../utils/appTime";
@@ -288,6 +288,8 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
     { cat: 'pend',    icon: 'bookmark',  n: kpis.pend,    label: 'Pendientes' },
     { cat: 'person',  icon: 'user-plus', n: kpis.person,  label: 'Personas' },
 ];
+// Cifras del periodo en la fila única del sistema v2 (los ceros se agrupan en una línea).
+const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.icon, tone: t.cat }));
 ---
 <Layout title="Actividad">
     <section class="px-1 sm:py-8">
@@ -326,9 +328,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                         <span class="chev"><Icon name="lucide:chevron-down" /></span>
                     </summary>
                     <div class="panel">
-                        <div class="act-summary">
-                            {KPI_TILES.map(t => <ActivityStat {...t} />)}
-                        </div>
+                        <StatRow class="act-summary" items={KPI_ITEMS} />
                         <ActivityHeatmap cells={heatCells} weeks={HEAT_WEEKS} streak={streak} />
                     </div>
                 </details>
@@ -342,9 +342,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
                     ))}
                 </div>
 
-                <div class="act-summary is-desktop">
-                    {KPI_TILES.map(t => <ActivityStat {...t} />)}
-                </div>
+                <StatRow class="act-summary is-desktop" items={KPI_ITEMS} />
 
         {windowEvents.length === 0 && (
             <EmptyState
