@@ -13,6 +13,28 @@ const departmentMap: Record<string, string> = {
     "Lighting": "Iluminación",
 };
 
+/**
+ * Departamento de TMDB (`known_for_department`) en español y sin género: «Interpretación»,
+ * «Dirección»… Para etiquetas de una persona (actor, ⌘K). `getMainRole` da el oficio («Director/a»).
+ */
+export const DEPARTMENT_ES: Record<string, string> = {
+    Acting: 'Interpretación',
+    Directing: 'Dirección',
+    Writing: 'Guion',
+    Production: 'Producción',
+    Camera: 'Cámara',
+    Editing: 'Montaje',
+    Sound: 'Sonido',
+    Art: 'Arte',
+    'Visual Effects': 'Efectos visuales',
+    'Costume & Make-Up': 'Vestuario y maquillaje',
+    Lighting: 'Iluminación',
+    Crew: 'Equipo técnico',
+};
+
+export const departmentEs = (department?: string | null): string =>
+    (department && DEPARTMENT_ES[department]) || department || '';
+
 export function getMainRole(department?: string): string {
     if (department && departmentMap[department]) {
         return departmentMap[department];

@@ -10,6 +10,7 @@
  */
 import type { APIRoute } from 'astro';
 import { tmdbFetch, posterUrl } from '../../../services/API/shared/tmdbClient';
+import { DEPARTMENT_ES } from '../../../utils/constants/helpers/team-helpers';
 
 export const prerender = false;
 
@@ -31,18 +32,6 @@ export interface MultiSearchItem {
 
 const MAX_PER_GROUP = 8;
 
-const DEPARTMENT_ES: Record<string, string> = {
-    Acting: 'Interpretación',
-    Directing: 'Dirección',
-    Writing: 'Guion',
-    Production: 'Producción',
-    Camera: 'Cámara',
-    Editing: 'Montaje',
-    Sound: 'Sonido',
-    Art: 'Arte',
-    'Visual Effects': 'Efectos visuales',
-    Crew: 'Equipo técnico',
-};
 
 function toItem(raw: any): MultiSearchItem | null {
     const type = raw?.media_type;
