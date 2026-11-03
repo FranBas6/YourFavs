@@ -136,13 +136,13 @@ const showSaveBtn = !path.startsWith('/mislistas') || path.startsWith('/mislista
             {badgeA && density !== 'detail' && (
                 <span class="chip-state ytc-badge-a" data-tone={badgeA.tone} title={badgeA.title}>{badgeA.text}</span>
             )}
-            {/* Hueco B: la nota de TMDB y, si la hay, la tuya al lado (decisión de Fran: en tus listas
-                quiere ver las dos). */}
-            {density !== 'min' && (tmdbScore || p.userRating) && (
-                <span class="ytc-scores">
-                    {tmdbScore && <span class="ytc-score" title="Nota de TMDB"><span aria-hidden="true">★</span> {tmdbScore}</span>}
-                    {p.userRating && <span class="ytc-score is-user" title="Tu nota"><span aria-hidden="true">★</span> {formatScore(p.userRating)} <span class="ytc-score-tu">tú</span></span>}
-                </span>
+            {/* Cada cosa en su esquina (decisión de Fran): insignia arriba a la izquierda, TU nota arriba
+                a la derecha, la de TMDB abajo a la izquierda y ▶/⊕ abajo a la derecha. */}
+            {density !== 'min' && tmdbScore && (
+                <span class="ytc-score" title="Nota de TMDB"><span aria-hidden="true">★</span> {tmdbScore}</span>
+            )}
+            {density !== 'min' && p.userRating && (
+                <span class="ytc-score is-user" title="Tu nota"><span aria-hidden="true">★</span> {formatScore(p.userRating)} <span class="ytc-score-tu">tú</span></span>
             )}
             {/* ▶ Vista rápida (paso 3.7): span con role=button porque la tarjeta entera ya es un <a>;
                 QuickView lo atiende en captura. Escritorio: sale con hover/foco; móvil: siempre. */}
