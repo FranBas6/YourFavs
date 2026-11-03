@@ -57,7 +57,10 @@
 .tl-day { position: relative; margin-bottom: 8px; }
 .tl-day-head { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; position: relative; }
 .tl-day-head::before { content: ""; position: absolute; left: -26px; width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent); }
-.tl-day-head .d { font-size: 15px; font-weight: 700; text-transform: capitalize; color: var(--text); }
+/* «viernes, 30 de octubre» → solo la primera letra en mayúscula (capitalize subía todas las palabras:
+   «Viernes, 30 De Octubre»). ::first-letter necesita una caja de bloque. */
+.tl-day-head .d { display: inline-block; font-size: 15px; font-weight: 700; color: var(--text); }
+.tl-day-head .d::first-letter { text-transform: uppercase; }
 .tl-day-head .c { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
 .tl-day-head .sum { margin-left: auto; display: flex; gap: 5px; }
 .tl-day-head .sum .b { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-full); }
