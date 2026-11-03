@@ -151,7 +151,7 @@ const clientPayload = {
                             type="button"
                             data-country-btn={c.code}
                             class:list={[
-                                "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                                "inline-flex items-center min-h-[44px] md:min-h-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
                                 c.code === defaultCountry
                                     ? "bg-gray-800 text-white border-gray-800"
                                     : "bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700",
@@ -314,6 +314,8 @@ const clientPayload = {
     .season-chip:hover { border-color: #9ca3af; color: #374151; }
     .season-chip.is-active { background: #111827; border-color: #111827; color: #fff; }
     .season-chip[disabled] { opacity: .5; cursor: progress; }
+    /* Objetivo táctil de 44 px en móvil (rediseño 1.7). */
+    @media (max-width: 767px) { .season-chip { min-height: 44px; padding: 4px 14px; } }
 
     /* Hasta dónde llega la plataforma. Apagado si la cubre entera; ámbar si es parcial,
        que es justo el caso que el dato de título ocultaba. */
