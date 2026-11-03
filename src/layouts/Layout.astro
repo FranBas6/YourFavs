@@ -3,6 +3,7 @@ import Header from "../components/Header.astro";
 import CommandPalette from "../components/CommandPalette.astro";
 import AuthModal from "../components/AuthModal.astro";
 import SaveToPopover from "../components/SaveToPopover.astro";
+import QuickView from "../components/QuickView.astro";
 import Coach from "../components/Coach.astro";
 import MobileTabBar from "../components/MobileTabBar.astro";
 import MobileNavSheets from "../components/MobileNavSheets.astro";
@@ -120,6 +121,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 <CommandPalette/>
 <AuthModal/>
 <SaveToPopover/>
+<QuickView/>
 <Coach/>
 {Astro.locals.user && <SocialLayer/>}
 {Astro.locals.user && <MiniChat/>}
@@ -210,7 +212,6 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 {!hideTabbar && <MobileTabBar />}
 {!hideTabbar && <MobileNavSheets />}
-<script is:inline src="/js/hover-preview.js" defer></script>
 <script is:inline src="/js/scroll-restore.js"></script>
 {import.meta.env.PROD && (
     <script is:inline>

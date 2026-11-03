@@ -125,16 +125,6 @@
     var inner = document.getElementById('saveto-inner');
     if (!pop || !inner) return;
 
-    // El hover-preview (desktop) arma un timer de 1.25s al entrar en la card. Si el
-    // usuario va a por el botón ⊕, cancelamos ese preview (mouseleave al host) para
-    // que no salte el tráiler encima justo cuando quiere guardar.
-    document.addEventListener('mouseover', function (e) {
-        var t = e.target.closest && e.target.closest('.js-saveto');
-        if (!t) return;
-        var host = t.closest('.hover-preview-host');
-        if (host) host.dispatchEvent(new Event('mouseleave'));
-    });
-
     // "Vuelto a ver" (ficha de pelis/series): abre un mini-popover con una nota
     // OPCIONAL ("¿con quién? ¿qué te pareció?") y registra el re-visionado en el
     // diario (WatchLog, append sin dedupe → rewatch=true). Recarga para refrescar
@@ -524,7 +514,7 @@
     // La card a desvanecer = el item de la rejilla (host de HoverPreview) o la propia card.
     function cardOf(trigger) {
         if (!trigger) return null;
-        return trigger.closest('.hover-preview-host') || trigger.closest('.media-card');
+        return trigger.closest('.media-card');
     }
     // ¿El título ya NO pertenece a la lista de esta página tras el marcado?
     function leftCurrentList(snap, key) {

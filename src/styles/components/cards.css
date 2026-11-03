@@ -136,34 +136,6 @@
     flex-shrink: 0;
 }
 
-/* --- Botón "Vista rápida" (solo mobile, inyectado por hover-preview.js) ---
-   El CTA "Ver detalles" del pie de card se eliminó en el refinamiento; esta
-   clase base la reutiliza ahora únicamente el span .is-quickview de mobile. */
-.view-details-btn {
-    font-size: 0.75rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.45rem 1rem;
-    border-radius: 9999px;
-    font-weight: 500;
-    color: #ffffff;
-    transition: all 0.2s;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.06);
-}
-
-/* En mobile el span se convierte en trigger de preview (tinte accent #E63946) */
-.view-details-btn.is-quickview {
-    border-color: rgba(230, 57, 70, 0.5);
-    background: rgba(230, 57, 70, 0.18);
-    cursor: pointer;
-}
-.view-details-btn.is-quickview:active {
-    background: rgba(230, 57, 70, 0.4);
-    transform: scale(0.97);
-}
-
 /* --- Line clamp --- */
 .line-clamp-2 {
     display: -webkit-box;
@@ -236,6 +208,27 @@
 .ytc-save:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 @media (hover: none) { .ytc-save { display: none; } }
 
+/* ▶ Vista rápida: abajo a la derecha (la esquina libre: insignia arriba a la izquierda, nota abajo
+   a la izquierda). Escritorio: junto al ⊕, con hover/foco. Móvil (sin hover): siempre visible y sin ⊕
+   (allí «Guardar» es la pulsación larga). */
+.ytc-qv {
+    position: absolute; right: calc(var(--s-2) + 38px); bottom: var(--s-2);
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(10, 15, 28, .72); color: #fff; box-shadow: var(--sh-md);
+    opacity: 0; transition: opacity .15s ease, background-color .15s ease; cursor: pointer;
+}
+.ytc-qv svg { width: 14px; height: 14px; margin-left: 2px; }
+.ytc:hover .ytc-qv, .ytc-qv:focus-visible, .ytc:focus-within .ytc-qv { opacity: 1; }
+.ytc-qv:hover { background: rgba(10, 15, 28, .9); }
+.ytc-qv:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (hover: none) {
+    .ytc-qv { opacity: 1; right: var(--s-2); }
+    /* 44 px de área táctil sin agrandar el botón. */
+    .ytc-qv::before { content: ""; position: absolute; inset: -6px; }
+}
+.ytc-poster:not(:has(.ytc-save)) .ytc-qv { right: var(--s-2); }
+
 /* Texto */
 .ytc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ytc-title {
@@ -278,6 +271,8 @@
 .card-wrapper:has(.ytc) > *, .card-wrapper:has(.ytc):hover > * {
     background: none !important; box-shadow: none !important; border-radius: 0; overflow: visible; color: inherit !important;
 }
+/* Sin el envoltorio de HoverPreview (retirado en 3.7), la tarjeta es hija directa del flex: que llene. */
+.card-wrapper > .ytc, .card-container > .ytc { width: 100%; flex: 1 1 auto; }
 .card-wrapper .ytc-title { height: auto; }
 .card-wrapper .ytc-meta { display: block; flex-grow: 0; -webkit-line-clamp: unset; }
 .card-wrapper .ytc-overview { flex-grow: 0; }

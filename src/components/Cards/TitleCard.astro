@@ -14,7 +14,9 @@
  * - ⊕ Guardar abajo a la derecha (hover/foco en escritorio, pulsación larga en móvil: SaveToPopover).
  *
  * Mantiene los ganchos de siempre: `.media-card` en la raíz, `.js-saveto` con data-mt/id/title/
- * poster (SaveToPopover) y `.js-ep-link` con data-ep-href (ficha del próximo episodio).
+ * poster (SaveToPopover) y `.js-ep-link` con data-ep-href (ficha del próximo episodio). Sin <script>
+ * propio: el de `.js-ep-link` y el del ▶ viven en QuickView.astro (una vez en el Layout), porque un
+ * <script> dentro de la tarjeta acababa pintado como hijo de las rejillas flex.
  */
 import '../../styles/components/cards.css';
 import { isRecentRelease } from "../../utils/constants/helpers/card-helpers";
@@ -139,6 +141,13 @@ const showSaveBtn = !path.startsWith('/mislistas') || path.startsWith('/mislista
             ) : tmdbScore && (
                 <span class="ytc-score" title="Nota de TMDB"><span aria-hidden="true">★</span> {tmdbScore}</span>
             ))}
+            {/* ▶ Vista rápida (paso 3.7): span con role=button porque la tarjeta entera ya es un <a>;
+                QuickView lo atiende en captura. Escritorio: sale con hover/foco; móvil: siempre. */}
+            <span role="button" tabindex="0" class="ytc-qv" data-qv data-qv-type={mediaType} data-qv-id={id}
+                  data-qv-title={title} data-qv-poster={img} data-qv-year={year} data-qv-vote={hasTmdb ? String(p.vote_average) : ''}
+                  aria-haspopup="dialog" aria-label={`Vista rápida: ${title}`}>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            </span>
             {showSaveBtn && (
                 <span role="button" tabindex="0" class="ytc-save js-saveto"
                       data-mt={mediaType} data-id={id} data-title={title} data-poster={img} aria-label={`Guardar ${title} en tus listas`}>
@@ -182,16 +191,3 @@ const showSaveBtn = !path.startsWith('/mislistas') || path.startsWith('/mislista
         </div>
     </a>
 </div>
-
-<script>
-    // «Próximo · T3·E4» → ficha del episodio. En captura, para adelantarse al <a> de la tarjeta.
-    const go = (e: Event) => {
-        const el = (e.target as HTMLElement).closest?.<HTMLElement>('.js-ep-link');
-        if (!el?.dataset.epHref) return false;
-        e.preventDefault(); e.stopPropagation();
-        location.href = el.dataset.epHref;
-        return true;
-    };
-    document.addEventListener('click', go, true);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') go(e); }, true);
-</script>
