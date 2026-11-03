@@ -1,0 +1,106 @@
+---
+/**
+ * LevelControl — el «Nivel» de la barra de acciones de las fichas: Vista · Me gusta · Favorita
+ * (rediseño, Fase 4; README del handoff §3.7 + B0). Un `role="group"` de tres botones con
+ * `aria-pressed`; el pulsado se tiñe con el tono de su lista (--a-visto / --a-like / --a-fav).
+ *
+ * Las reglas son las de `stateTransitions.ts` (las aplica el servidor, aquí solo se envía):
+ *   - Me gusta y Favorita se excluyen; las dos añaden Vista.
+ *   - Quitar nunca arrastra: quitar Vista deja la opinión.
+ * Sin marcar, «Vista» la marca. Marcada, abre el menú Vista ▾: Volver a ver (película: empieza un
+ * re-visionado), Apuntar otro visionado (un pase con fecha) y Quitar de Vistas.
+ *
+ * Cada tramo es un formulario POST con el mismo contrato que la barra anterior (`fichaForms.ts`).
+ * El menú lo abre el script de FichaActions (`[data-fa-menu]`).
+ */
+import { FI } from './fichaIcons';
+import { fichaField } from './fichaForms';
+
+interface Props {
+    mediaType: 'movie' | 'tv';
+    id: string | number;
+    /** Vista en cualquier nivel (Vistas, Me gusta, Favoritos o con pases en el diario). */
+    watched: boolean;
+    /** Está en la lista Vistas en sí (para ofrecer «Quitar de Vistas»). */
+    inVistas: boolean;
+    liked: boolean;
+    fav: boolean;
+    /** Película que ya estás viendo: el menú no ofrece «Volver a ver». */
+    viendo?: boolean;
+    /** Posición en Favoritos (series), se pinta como «#3». */
+    favPos?: number | null;
+    /** Serie vista y sin seguir: el menú ofrece «Volver a seguirla». */
+    refollow?: boolean;
+}
+
+const { mediaType, id, watched, inVistas, liked, fav, viendo = false, favPos = null, refollow = false } = Astro.props;
+const f = (l: Parameters<typeof fichaField>[1]) => fichaField(mediaType, l);
+const menuId = `fa-m-vista-${mediaType}-${id}`;
+---
+<div class="lvl" role="group" aria-label="Tu opinión">
+    {watched ? (
+        <div class="fa-mw">
+            <button type="button" class="lvl-b" data-tone="visto" aria-pressed="true" aria-haspopup="menu" aria-expanded="false" aria-controls={menuId} data-fa-menu>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.check} />
+                Vista
+                <svg class="car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.down} />
+            </button>
+            <div class="fa-menu" id={menuId} role="menu" aria-label="Vista" hidden>
+                {mediaType === 'movie' && !viendo && (
+                    <form method="POST">
+                        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="add" /><input type="hidden" name={f('viendo').name} value={f('viendo').value} />
+                        <button type="submit" class="fa-mi" role="menuitem">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.rotate} />
+                            <span>Volver a ver<small>La pasa a «Estás viendo» hasta que pulses Terminar</small></span>
+                        </button>
+                    </form>
+                )}
+                {refollow && (
+                    <form method="POST" data-ok="Vuelve a «Estás viendo»">
+                        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="add" /><input type="hidden" name={f('seguir').name} value={f('seguir').value} />
+                        <button type="submit" class="fa-mi" role="menuitem">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.eye} />
+                            <span>Volver a seguirla<small>Vuelve a «Estás viendo» (temporada nueva o re-visionado)</small></span>
+                        </button>
+                    </form>
+                )}
+                <button type="button" class="fa-mi js-rewatch" role="menuitem" data-mt={mediaType} data-id={id}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.repeat} />
+                    <span>Apuntar otro visionado<small>Suma una vez más con la fecha de hoy</small></span>
+                </button>
+                {inVistas && (
+                    <form method="POST">
+                        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="remove" /><input type="hidden" name={f('vista').name} value={f('vista').value} />
+                        <button type="submit" class="fa-mi is-dgr" role="menuitem">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.x} />
+                            <span>Quitar de Vistas{(liked || fav) && <small>Tu {fav ? 'Favorita' : 'Me gusta'} se queda</small>}</span>
+                        </button>
+                    </form>
+                )}
+            </div>
+        </div>
+    ) : (
+        <form method="POST">
+            <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="add" /><input type="hidden" name={f('vista').name} value={f('vista').value} />
+            <button type="submit" class="lvl-b" data-tone="visto" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.check} />
+                Vista
+            </button>
+        </form>
+    )}
+    <form method="POST">
+        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={liked ? 'remove' : 'add'} /><input type="hidden" name={f('like').name} value={f('like').value} />
+        <button type="submit" class="lvl-b" data-tone="like" aria-pressed={liked ? 'true' : 'false'} title={liked ? 'Quitar de Me gusta' : (fav ? 'Pasa de Favorita a Me gusta' : 'Me gusta (la marca como vista)')}>
+            <svg class="f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.heart} />
+            Me gusta
+        </button>
+    </form>
+    <form method="POST">
+        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={fav ? 'remove' : 'add'} /><input type="hidden" name={f('fav').name} value={f('fav').value} />
+        <button type="submit" class="lvl-b" data-tone="fav" aria-pressed={fav ? 'true' : 'false'} title={fav ? 'Quitar de Favoritos' : (liked ? 'Pasa de Me gusta a Favorita' : 'Favorita (la marca como vista)')}>
+            <svg class="f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.crown} />
+            Favorita
+            {fav && favPos ? <span class="pos" aria-label={`posición ${favPos}`}>#{favPos}</span> : null}
+        </button>
+    </form>
+</div>

@@ -25,7 +25,7 @@ import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/detail/FriendsSeen.astro";
 import { countMoviePasses } from "../../services/BD/lists/watchLog";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
-import NotificationBell from "../../components/personal/NotificationBell.astro";
+import FichaActions from "../../components/detail/FichaActions.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
 import DubbingSection from "../../components/detail/DubbingSection.astro";
 import CrewGrid from "../../components/detail/CrewGrid.astro";
@@ -135,8 +135,7 @@ const isWatchedMovie = isInVistas || isInFavorites || isInLiked || moviePasses.p
 //  - Viendo ahora  → "Terminar" (cierra la sesión; cuenta un pase si ya estaba vista).
 //  - Ya vista      → "Volver a ver" (re-visionado: entra en Viendo, aparece en "Estás viendo").
 //  - Aún no vista  → "Empezar a ver".
-const showViendoCta = true;
-const viendoCtaLabel = isInViendo ? 'Terminar' : (isWatchedMovie ? 'Volver a ver' : 'Empezar a ver');
+// (Lo pinta FichaActions, rediseño Fase 4.)
 const movieTimes = (isWatchedMovie ? 1 : 0) + moviePasses.passes;
 const watchLastPretty = moviePasses.last ? new Date(moviePasses.last + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : '';
 
@@ -349,192 +348,28 @@ const jsonLd = item ? {
             </div>
         </div>
 
-        <!-- Action bar (debajo del hero, no sticky) -->
-        <div class="bg-white border-b border-gray-200 shadow-sm">
-            <!-- Desktop: fila horizontal -->
-            <div class="hidden md:flex max-w-6xl mx-auto px-4 py-2 items-center gap-2">
-                {showViendoCta && (
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInViendo ? 'finish_viewing' : 'add'}/>{!isInViendo && <input type="hidden" name="list_type" value="viendo"/>}
-                    <button type="submit" class="px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap bg-[#E63946] text-white hover:bg-[#C7283A]">
-                        {isInViendo
-                            ? <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            : isWatchedMovie
-                                ? <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"/></svg>
-                                : <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>}
-                        {viendoCtaLabel}
-                    </button>
-                </form>
-                )}
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="favorites"/>
-                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600 hover:bg-red-50'}`}>
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
-                        {isInFavorites ? 'En Favoritos' : 'Favoritos'}
-                    </button>
-                </form>
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="pendientes"/>
-                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
-                        {isInPendientes ? 'Pendiente' : 'Pendiente'}
-                    </button>
-                </form>
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="vistas"/>
-                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600 hover:bg-green-50'}`}>
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                        {isInVistas ? 'Vista' : 'Vista'}
-                    </button>
-                </form>
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="verPronto"/>
-                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600 hover:bg-purple-50'}`}>
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
-                        {isInVerPronto ? 'En Ver Pronto' : 'Ver Pronto'}
-                    </button>
-                </form>
-                <div class="ml-auto flex items-center gap-2">
-                    <button type="button" class="js-saveto px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center gap-1.5 whitespace-nowrap" data-mt="movie" data-id={item?.id} data-title={item?.title} data-poster={item?.poster_path} data-collections-only="1" aria-label="Guardar en una colección">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                        Guardar en colección
-                        <svg class="w-3 h-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                    </button>
-                    {/* F4 social: recomendar a un amigo (selector en scripts/social/recommend.ts). En escritorio, solo
-                        icono: con su texto la fila ya no cabía y «Notificar estreno» / «Ver ahora» partían en dos líneas. */}
-                    {SOCIAL_PHASE.recommend && Astro.locals.user && (
-                        <button type="button" class="w-[30px] h-[30px] text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center flex-shrink-0" title="Recomendar a un amigo" aria-label="Recomendar a un amigo" data-recommend data-target-type="movie" data-target-id={item?.id} data-title={item?.title} data-image={item?.poster_path} aria-haspopup="dialog" aria-expanded="false">
-                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                        </button>
-                    )}
-                    {/* Mensajes M4: «Enviar a…» una conversación (selector en scripts/social/messages/cardPick.ts). */}
-                    {SOCIAL_PHASE.messages && Astro.locals.user && (
-                        <button type="button" class="w-[30px] h-[30px] text-xs font-medium rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 transition-colors flex items-center justify-center flex-shrink-0" title="Enviar a una conversación" aria-label="Enviar a una conversación" data-send-to data-media-type="movie" data-tmdb-id={item?.id} data-title={item?.title} data-image={item?.poster_path} aria-haspopup="dialog" aria-expanded="false">
-                            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
-                        </button>
-                    )}
-                    {isUnreleased && <NotificationBell mediaType="movie" tmdbId={id} isSubscribed={isNotifSubscribed} />}
-                    <form method="POST">
-                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="liked"/>
-                        <button type="submit" class={`p-1.5 rounded-full transition-colors ${isInLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-400'}`}>
-                            <svg class="w-5 h-5" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
-                        </button>
-                    </form>
-                    {imdbId && (
-                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1.5 text-xs font-bold bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors whitespace-nowrap">IMDb</a>
-                    )}
-                    {(item?.homepage || trailerUrl) && (
-                        <a href={item?.homepage || trailerUrl} target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors whitespace-nowrap">Ver ahora</a>
-                    )}
-                </div>
-            </div>
-            <!-- Mobile: grid 2x2 + links -->
-            <div class="md:hidden max-w-6xl mx-auto px-4 py-3 space-y-2">
-                {showViendoCta && (
-                <form method="POST">
-                    <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInViendo ? 'finish_viewing' : 'add'}/>{!isInViendo && <input type="hidden" name="list_type" value="viendo"/>}
-                    <button type="submit" class="w-full min-h-[44px] px-3 py-2.5 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 bg-[#E63946] text-white">
-                        {isInViendo
-                            ? <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            : isWatchedMovie
-                                ? <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L3 8"/></svg>
-                                : <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path d="M6 4l10 6-10 6V4z"/></svg>}
-                        {viendoCtaLabel}
-                    </button>
-                </form>
-                )}
-                <div class="grid grid-cols-2 gap-2">
-                    <form method="POST">
-                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInFavorites ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="favorites"/>
-                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInFavorites ? 'bg-red-500 text-white' : 'border border-red-200 text-red-600'}`}>
-                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
-                            {isInFavorites ? 'En Favoritos' : 'Favoritos'}
-                        </button>
-                    </form>
-                    <form method="POST">
-                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInPendientes ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="pendientes"/>
-                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInPendientes ? 'bg-amber-500 text-white' : 'border border-amber-200 text-amber-600'}`}>
-                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg>
-                            {isInPendientes ? 'Pendiente' : 'Pendiente'}
-                        </button>
-                    </form>
-                    <form method="POST">
-                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVistas ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="vistas"/>
-                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVistas ? 'bg-green-500 text-white' : 'border border-green-200 text-green-600'}`}>
-                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
-                            {isInVistas ? 'Vista' : 'Vista'}
-                        </button>
-                    </form>
-                    <form method="POST">
-                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInVerPronto ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="verPronto"/>
-                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInVerPronto ? 'bg-purple-500 text-white' : 'border border-purple-200 text-purple-600'}`}>
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
-                            {isInVerPronto ? 'Ver Pronto' : 'Ver Pronto'}
-                        </button>
-                    </form>
-                </div>
-                {/* F4 social: con «Recomendar», los dos botones en rejilla de dos (sin sesión o con la fase apagada, como estaba). M4: con «Enviar a…», de tres. */}
-                <div class={SOCIAL_PHASE.recommend && Astro.locals.user ? `grid ${SOCIAL_PHASE.messages ? 'grid-cols-3' : 'grid-cols-2'} gap-2` : 'contents'}>
-                    <button type="button" class="js-saveto w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 flex items-center justify-center gap-1.5" data-mt="movie" data-id={item?.id} data-title={item?.title} data-poster={item?.poster_path} data-collections-only="1" aria-label="Guardar en una colección">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
-                        {SOCIAL_PHASE.recommend && SOCIAL_PHASE.messages && Astro.locals.user ? 'Colección' : 'Guardar en colección'}
-                    </button>
-                    {SOCIAL_PHASE.recommend && Astro.locals.user && (
-                        <button type="button" class="w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 flex items-center justify-center gap-1.5" data-recommend data-target-type="movie" data-target-id={item?.id} data-title={item?.title} data-image={item?.poster_path} aria-haspopup="dialog" aria-expanded="false">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
-                            Recomendar
-                        </button>
-                    )}
-                    {SOCIAL_PHASE.messages && Astro.locals.user && (
-                        <button type="button" class="w-full min-h-[44px] px-3 py-2.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 flex items-center justify-center gap-1.5" data-send-to data-media-type="movie" data-tmdb-id={item?.id} data-title={item?.title} data-image={item?.poster_path} aria-haspopup="dialog" aria-expanded="false">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 17 20 12 15 7"/><path d="M4 18v-2a4 4 0 0 1 4-4h12"/></svg>
-                            Enviar a…
-                        </button>
-                    )}
-                </div>
-                <div class="flex gap-2">
-                    {isUnreleased && <NotificationBell mediaType="movie" tmdbId={id} isSubscribed={isNotifSubscribed} />}
-                    <form method="POST" class="flex-1">
-                        <input type="hidden" name="id" value={item?.id}/><input type="hidden" name="action" value={isInLiked ? 'remove' : 'add'}/><input type="hidden" name="list_type" value="liked"/>
-                        <button type="submit" class={`w-full min-h-[44px] px-3 py-2 text-xs font-medium rounded-lg transition-colors flex items-center justify-center gap-1.5 ${isInLiked ? 'bg-red-50 text-red-500 border border-red-200' : 'border border-gray-200 text-gray-500'}`}>
-                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill={isInLiked ? "currentColor" : "none"} stroke="currentColor" stroke-width={isInLiked ? "0" : "1.5"}><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"/></svg>
-                            {isInLiked ? 'Me gusta' : 'Me gusta'}
-                        </button>
-                    </form>
-                    {imdbId && (
-                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="min-h-[44px] px-4 py-2 text-xs font-bold bg-yellow-400 text-gray-900 rounded-lg hover:bg-yellow-300 transition-colors flex items-center">IMDb</a>
-                    )}
-                    {(item?.homepage || trailerUrl) && (
-                        <a href={item?.homepage || trailerUrl} target="_blank" rel="noopener" class="min-h-[44px] px-4 py-2 text-xs font-medium bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center">Ver ahora</a>
-                    )}
-                </div>
-            </div>
-            </div>
-        </div>
-
-        <!-- Diario (L6): cuántas veces la has visto + marcar re-visionado -->
-        {isWatchedMovie && (
-            <div class="bg-white border-b border-gray-200">
-                <div class="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between gap-3 text-sm text-gray-600">
-                    <span class="flex items-center gap-2 min-w-0">
-                        <svg class="w-4 h-4 text-[#b91c1c] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                        {movieTimes > 0
-                            ? <span class="min-w-0"><strong class="text-gray-900 whitespace-nowrap">La has visto {movieTimes} {movieTimes === 1 ? 'vez' : 'veces'}</strong>{watchLastPretty && <span class="text-gray-400 hidden sm:inline"> · última en {watchLastPretty}</span>}</span>
-                            : <span class="text-gray-500">La tienes como vista</span>}
-                    </span>
-                    <button type="button" class="js-rewatch flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:border-[#E63946] hover:text-[#E63946] transition-colors text-xs font-medium" data-mt="movie" data-id={item?.id} aria-label="Marcar visto otra vez">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                        Vuelto a ver
-                    </button>
-                </div>
-                {movieEfemeride && (
-                    <div class="max-w-6xl mx-auto px-4 pb-2 -mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
-                        <svg class="w-3.5 h-3.5 flex-shrink-0 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-                        <span>{movieEfemeride}</span>
-                    </div>
-                )}
-            </div>
-        )}
+        <!-- Barra de acciones (rediseño, Fase 4 · 4.1): principal según el estado, Nivel, Pendiente,
+             Ver pronto y, debajo, «La has visto N veces». Mismos formularios que antes. -->
+        <FichaActions
+            mediaType="movie"
+            id={item?.id}
+            title={item?.title || ''}
+            poster={item?.poster_path}
+            state={{ vistas: isInVistas, liked: isInLiked, fav: isInFavorites, pend: isInPendientes, pronto: isInVerPronto, viendo: isInViendo }}
+            watched={isWatchedMovie}
+            times={movieTimes}
+            lastPretty={watchLastPretty}
+            efemeride={movieEfemeride}
+            unreleased={isUnreleased}
+            releaseLabel={isUnreleased ? formatDate(item?.release_date) : ''}
+            notif={isNotifSubscribed}
+            imdbId={imdbId}
+            providersByCountry={item?.providersByCountry || {}}
+            linkByCountry={item?.providerLinksByCountry || {}}
+            myPlatformIds={((Astro.locals.user as any)?.platforms ?? []).map(Number).filter(Number.isFinite)}
+            homepage={item?.homepage}
+            trailerUrl={trailerUrl}
+        />
 
         <!-- Layout 2 columnas -->
         <div class="max-w-6xl mx-auto px-4 py-8">
