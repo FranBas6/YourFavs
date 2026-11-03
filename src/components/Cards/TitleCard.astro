@@ -1,0 +1,197 @@
+---
+/**
+ * TitleCard — la tarjeta de título del sistema v2 (docs/design_handoff_rediseno, README §3.4 + B0).
+ * Sustituye a CardMovie y CardSerie, que pasan a ser envoltorios que la llaman.
+ *
+ * - SIN CAJA: el póster 2:3 (--r-md, --sh-sm) y el texto van sobre el fondo de la página.
+ * - Tres densidades:
+ *     min     póster + título (filas tipo «Del mismo director», «Las 4 de…»)
+ *     std     + metadatos («1999 · Película») y la nota sobre el póster (portada, catálogo, listas)
+ *     detail  vista de lista: póster pequeño + título + metadatos + géneros + sinopsis («Ver más»)
+ * - Dos huecos de insignia, siempre los mismos: A arriba a la izquierda (contexto, gana la de número
+ *   más bajo de la matriz) y B abajo a la izquierda (la nota: la tuya si la hay, si no la de TMDB).
+ *   TRENDING se queda en inglés (decisión de Fran) y no sale en tus listas ni en el perfil.
+ * - ⊕ Guardar abajo a la derecha (hover/foco en escritorio, pulsación larga en móvil: SaveToPopover).
+ *
+ * Mantiene los ganchos de siempre: `.media-card` en la raíz, `.js-saveto` con data-mt/id/title/
+ * poster (SaveToPopover) y `.js-ep-link` con data-ep-href (ficha del próximo episodio).
+ */
+import '../../styles/components/cards.css';
+import { isRecentRelease } from "../../utils/constants/helpers/card-helpers";
+import { formatScore } from "../../utils/constants/helpers/media-helpers";
+import { episodeTypeTag } from "../../utils/episodeType";
+import { episodeHref } from "../../utils/episodeView";
+
+export type CardDensity = 'min' | 'std' | 'detail';
+export type CardContext = 'home' | 'catalog' | 'search' | 'lists' | 'profile' | 'person';
+
+interface Props {
+    mediaType: 'movie' | 'tv';
+    id: string;
+    title: string;
+    img: string;
+    vote_average?: number;
+    overview?: string;
+    /** Fecha de estreno (película) o de primera emisión (serie), AAAA-MM-DD. */
+    date?: string;
+    genres?: { id: number; name: string }[];
+    character?: string;
+    userRating?: number;
+    seedTitle?: string;
+    recommendedBy?: { name: string; more: number };
+    platform?: string;
+    density?: CardDensity;
+    /** Si no se pasa, se deduce de la ruta. */
+    context?: CardContext;
+    // ---- Solo series ----
+    /** «2011 – 2019» / «2023 – hoy». */
+    airPeriod?: string | null;
+    /** «8 temp.» / «10 ep.». */
+    seasonsLabel?: string | null;
+    totalEpisodes?: number;
+    watchedEpisodes?: number;
+    favoriteNumber?: number;
+    /** Contexto de seguimiento: activa la cuenta atrás y el enlace al próximo episodio. */
+    followed?: boolean;
+    next_episode_to_air?: { air_date: string; episode_number: number; season_number: number; episode_type?: string } | null;
+    /** Serie abandonada (indicador, fuera de su propia lista). */
+    abandoned?: boolean;
+}
+
+const p = Astro.props;
+const { mediaType, id, title, img, density = 'std' } = p;
+const isTv = mediaType === 'tv';
+const href = `/${isTv ? 'serie' : 'movie'}/${id}`;
+const placeholderImg = '/placeholder.jpg';
+
+// ---- Contexto (decide qué insignias caben) ----
+const path = Astro.url.pathname;
+const context: CardContext = p.context ?? (
+    path.startsWith('/mislistas') ? 'lists'
+    : path.startsWith('/u/') ? 'profile'
+    : /^\/(actor|team|productora)\//.test(path) ? 'person'
+    : path.startsWith('/catalogo/busqueda') ? 'search'
+    : path === '/' ? 'home'
+    : 'catalog'
+);
+
+// ---- Cuenta atrás del próximo episodio (solo en contexto de seguimiento, ≤ 7 días) ----
+let countdown: string | null = null;
+let nextEpLabel: string | null = null;
+let nextEpUrl: string | null = null;
+let nextEpFinale: string | null = null;
+if (isTv && p.followed && p.next_episode_to_air?.air_date) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const air = new Date(p.next_episode_to_air.air_date + 'T00:00:00');
+    const days = Math.round((air.getTime() - today.getTime()) / 86400000);
+    if (days >= 0 && days <= 7) {
+        countdown = days === 0 ? 'Hoy' : days === 1 ? 'Mañana' : `En ${days} días`;
+        nextEpFinale = episodeTypeTag(p.next_episode_to_air.episode_type) || null;
+        nextEpLabel = `Próximo · T${p.next_episode_to_air.season_number}·E${p.next_episode_to_air.episode_number}`;
+        nextEpUrl = episodeHref(id, p.next_episode_to_air.season_number, p.next_episode_to_air.episode_number);
+    }
+}
+
+// ---- Insignia A: una sola, la de número más bajo que quepa en este contexto ----
+const isNew = isRecentRelease(p.date);
+const isTrending = (p.vote_average ?? 0) >= 8.0;
+type Badge = { text: string; tone: string; icon?: string; title?: string };
+const allow = {
+    rank: context === 'lists' || context === 'profile',
+    platform: context === 'home' || context === 'catalog',
+    next: context === 'home' || context === 'lists',
+    nuevo: context === 'home' || context === 'catalog' || context === 'search' || context === 'person',
+    trending: context === 'home' || context === 'catalog',
+};
+let badgeA: Badge | null = null;
+if (allow.rank && p.favoriteNumber) badgeA = { text: `#${p.favoriteNumber}`, tone: 'amber' };
+else if (allow.next && countdown) badgeA = { text: nextEpFinale ? `${countdown} · ${nextEpFinale}` : countdown, tone: nextEpFinale ? 'amber' : 'blue' };
+else if (allow.platform && p.platform) badgeA = { text: `En ${p.platform}`, tone: 'slate', title: `En ${p.platform}, una de tus plataformas` };
+else if (allow.nuevo && isNew) badgeA = { text: 'Nuevo', tone: 'green' };
+else if (allow.trending && isTrending) badgeA = { text: 'Trending', tone: 'red' };
+
+// ---- Insignia B: la nota (la tuya manda) ----
+const hasTmdb = typeof p.vote_average === 'number' && p.vote_average > 0;
+const tmdbScore = hasTmdb ? p.vote_average!.toFixed(1).replace('.', ',') : null;
+
+// ---- Metadatos ----
+const year = p.date ? p.date.slice(0, 4) : '';
+const metaParts = isTv
+    ? [p.airPeriod || year, 'Serie', p.seasonsLabel].filter(Boolean)
+    : [year, 'Película'].filter(Boolean);
+const meta = metaParts.join(' · ');
+const progressPct = isTv && p.watchedEpisodes && p.totalEpisodes ? Math.min(100, Math.round(p.watchedEpisodes / p.totalEpisodes * 100)) : 0;
+
+// ⊕ Guardar: acción de descubrimiento. Dentro de Mis listas solo donde el marcado reubica la tarjeta.
+const showSaveBtn = !path.startsWith('/mislistas') || path.startsWith('/mislistas/recomendaciones')
+    || path.startsWith('/mislistas/pendientes') || path.startsWith('/mislistas/vistos') || path.startsWith('/mislistas/favoritos');
+---
+<div class:list={['media-card', 'ytc', `ytc--${density}`, 'group']}>
+    <a href={href} class="ytc-link">
+        <div class="ytc-poster">
+            <img src={img || placeholderImg} alt="" loading="lazy" decoding="async"
+                 onerror={`this.onerror=null; this.src='${placeholderImg}'`} />
+            {badgeA && density !== 'detail' && (
+                <span class="chip-state ytc-badge-a" data-tone={badgeA.tone} title={badgeA.title}>{badgeA.text}</span>
+            )}
+            {density !== 'min' && (p.userRating ? (
+                <span class="ytc-score is-user" title="Tu nota"><span aria-hidden="true">★</span> {formatScore(p.userRating)} <span class="ytc-score-tu">tú</span></span>
+            ) : tmdbScore && (
+                <span class="ytc-score" title="Nota de TMDB"><span aria-hidden="true">★</span> {tmdbScore}</span>
+            ))}
+            {showSaveBtn && (
+                <span role="button" tabindex="0" class="ytc-save js-saveto"
+                      data-mt={mediaType} data-id={id} data-title={title} data-poster={img} aria-label={`Guardar ${title} en tus listas`}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                </span>
+            )}
+        </div>
+
+        <div class="ytc-body">
+            {density === 'detail' && badgeA && (
+                <span class="chip-state ytc-badge-inline" data-tone={badgeA.tone}>{badgeA.text}</span>
+            )}
+            <h3 class="ytc-title">{title}</h3>
+            {density !== 'min' && (
+                p.recommendedBy ? (
+                    <p class="ytc-meta ytc-why" title={`Recomendada por ${p.recommendedBy.name}${p.recommendedBy.more ? ` y ${p.recommendedBy.more} más` : ''}`}>
+                        Recomendada por <strong>{p.recommendedBy.name}</strong>{p.recommendedBy.more > 0 && ` y ${p.recommendedBy.more} más`}
+                    </p>
+                ) : p.seedTitle ? (
+                    <p class="ytc-meta ytc-why" title={`Porque viste ${p.seedTitle}`}>Porque viste <strong>{p.seedTitle}</strong></p>
+                ) : (
+                    meta && <p class="ytc-meta">{meta}</p>
+                )
+            )}
+            {p.character && density !== 'min' && <p class="ytc-meta ytc-character">{p.character}</p>}
+            {p.abandoned && context !== 'lists' && density !== 'min' && <p class="ytc-meta ytc-ind">Abandonada</p>}
+            {nextEpLabel && density !== 'min' && (
+                <span role="link" tabindex="0" data-ep-href={nextEpUrl} class="js-ep-link ytc-next"
+                      aria-label={`Ficha del episodio ${nextEpLabel.replace('Próximo · ', '')} de ${title}`}>{nextEpLabel}</span>
+            )}
+            {density === 'detail' && p.genres && p.genres.length > 0 && (
+                <div class="ytc-genres">{p.genres.slice(0, 3).map((g) => <span class="chip-tag">{g.name}</span>)}</div>
+            )}
+            {density === 'detail' && p.overview && <p class="ytc-overview">{p.overview}</p>}
+            {progressPct > 0 && density !== 'min' && (
+                <div class="ytc-progress" title={`${p.watchedEpisodes} de ${p.totalEpisodes} episodios vistos`}>
+                    <span class="ytc-progress-bar"><span style={`width: ${progressPct}%`}></span></span>
+                    <span class="ytc-progress-n">{p.watchedEpisodes}/{p.totalEpisodes}</span>
+                </div>
+            )}
+        </div>
+    </a>
+</div>
+
+<script>
+    // «Próximo · T3·E4» → ficha del episodio. En captura, para adelantarse al <a> de la tarjeta.
+    const go = (e: Event) => {
+        const el = (e.target as HTMLElement).closest?.<HTMLElement>('.js-ep-link');
+        if (!el?.dataset.epHref) return false;
+        e.preventDefault(); e.stopPropagation();
+        location.href = el.dataset.epHref;
+        return true;
+    };
+    document.addEventListener('click', go, true);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') go(e); }, true);
+</script>

@@ -3,12 +3,13 @@
    ======================================== */
 
 /* --- Card base --- */
-.media-card {
+/* Solo las tarjetas viejas: la TitleCard (.ytc) no tiene caja; su hover es el del póster. */
+.media-card:not(.ytc) {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     will-change: transform;
 }
 
-.media-card:hover {
+.media-card:not(.ytc):hover {
     transform: translateY(-2px);          /* lift suave (antes: sin lift) */
     box-shadow: var(--sh-card);
     z-index: 1;
@@ -186,4 +187,85 @@
 .provider-logo:hover {
     transform: scale(1.5);
     z-index: 2;
+}
+
+/* =====================================================================================
+   TitleCard · sistema v2 (docs/design_handoff_rediseno, README §3.4). SIN CAJA: póster 2:3 y texto
+   sobre el fondo de la página. Solo tokens: el oscuro sale solo. Las reglas viejas de arriba
+   (.top-badge, .genre-tag, .info-pill, .rating-badge…) se retiran cuando nada más las use.
+   ===================================================================================== */
+.ytc { min-width: 0; }
+.ytc-link { display: flex; flex-direction: column; gap: var(--s-2); color: inherit; text-decoration: none; height: 100%; }
+.ytc-link:focus-visible { outline: none; }
+.ytc-link:focus-visible .ytc-poster { outline: 2px solid var(--primary); outline-offset: 3px; }
+
+.ytc-poster {
+    position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-md); overflow: hidden;
+    background: var(--bg-tint); box-shadow: var(--sh-sm);
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.ytc-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ytc-link:hover .ytc-poster { transform: translateY(-3px); box-shadow: var(--sh-md); }
+@media (prefers-reduced-motion: reduce) { .ytc-poster { transition: none; } .ytc-link:hover .ytc-poster { transform: none; } }
+
+/* Hueco A (contexto) y B (nota) */
+.ytc-badge-a { position: absolute; top: var(--s-2); left: var(--s-2); max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
+.ytc-score {
+    position: absolute; left: var(--s-2); bottom: var(--s-2);
+    height: 22px; padding: 0 7px; border-radius: var(--r-sm);
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--card); color: var(--card-text);
+    font: 700 var(--fs-micro) var(--font-mono); white-space: nowrap;
+}
+.ytc-score > span[aria-hidden] { color: var(--a-rating); }
+.ytc-score.is-user { background: var(--stamp-amber); color: var(--stamp-amber-ink); }
+.ytc-score.is-user > span[aria-hidden] { color: var(--stamp-amber-ink); }
+.ytc-score-tu { font-weight: 500; opacity: .8; }
+
+/* ⊕ Guardar: sale con hover o foco (pulsación larga en móvil, SaveToPopover). */
+.ytc-save {
+    position: absolute; right: var(--s-2); bottom: var(--s-2);
+    width: 32px; height: 32px; border-radius: var(--r-full);
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--card); color: var(--card-text); box-shadow: var(--sh-md);
+    opacity: 0; transition: opacity .15s ease, background-color .15s ease; cursor: pointer;
+}
+.ytc-save svg { width: 16px; height: 16px; }
+.ytc:hover .ytc-save, .ytc-save:focus-visible, .ytc:focus-within .ytc-save { opacity: 1; }
+.ytc-save:hover { background: var(--accent-dark); color: var(--on-accent); }
+.ytc-save:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (hover: none) { .ytc-save { display: none; } }
+
+/* Texto */
+.ytc-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ytc-title {
+    margin: 0; font: 600 var(--fs-ui)/1.3 var(--font); color: var(--text);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ytc-link:hover .ytc-title { text-decoration: underline; text-underline-offset: 2px; }
+.ytc-meta { margin: 0; font-size: var(--fs-meta); color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ytc-why strong { color: var(--text-2); font-weight: 600; }
+.ytc-character { font-style: italic; }
+.ytc-ind { color: var(--a-abandon); font-weight: 600; }
+.ytc-next {
+    align-self: flex-start; font: 600 var(--fs-micro) var(--font-mono); letter-spacing: .04em;
+    color: var(--primary); cursor: pointer; text-transform: uppercase;
+}
+.ytc-next:hover, .ytc-next:focus-visible { text-decoration: underline; text-underline-offset: 2px; }
+
+.ytc-progress { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-1); }
+.ytc-progress-bar { flex: 1; height: 4px; border-radius: var(--r-full); background: var(--border); overflow: hidden; }
+.ytc-progress-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--ok); }
+.ytc-progress-n { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+/* Detallada: vista de lista (póster 112 + texto). */
+.ytc--detail .ytc-link { flex-direction: row; align-items: flex-start; gap: var(--s-4); }
+.ytc--detail .ytc-poster { flex: 0 0 112px; }
+.ytc--detail .ytc-title { font-size: var(--fs-body); }
+.ytc--detail .ytc-meta { white-space: normal; }
+.ytc-badge-inline { align-self: flex-start; margin-bottom: var(--s-1); }
+.ytc-genres { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--s-1); }
+.ytc-overview {
+    margin: var(--s-2) 0 0; font-size: var(--fs-ui); line-height: 1.45; color: var(--text-2);
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
 }
