@@ -379,8 +379,8 @@ const jsonLd = item ? {
         />
         <FichaSections items={[
             { id: 'sec-donde', label: 'Dónde ver' },
-            { id: 'sec-reparto', label: 'Reparto' },
             { id: 'sec-videos', label: 'Vídeos' },
+            { id: 'sec-reparto', label: 'Reparto' },
             { id: 'sec-imagenes', label: 'Imágenes' },
             { id: 'sec-detalles', label: 'Detalles' },
             { id: 'sec-resenas', label: 'Reseñas' },
@@ -584,10 +584,32 @@ const jsonLd = item ? {
                 <!-- Columna derecha -->
                 <div class="md:w-2/3 space-y-8">
 
-                    <!-- Trailer + Videos extras -->
+                    <!-- Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: vídeos, reparto
+                         y equipo, imágenes, productoras, reseñas y, al final, saga, «También en TV» y parecidas. -->
+
+                    <!-- Tráiler + más vídeos -->
                     <div id="sec-videos" data-fs><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
 
-                    <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.) -->
+                    <!-- Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com) -->
+                    <div id="sec-reparto" data-fs class="space-y-8">
+                        <CastGrid cast={cast} seenWith={seenWithMap} />
+                        <CrewGrid crew={directors} />
+                        <DubbingSection type="movie" tmdbId={id} />
+                    </div>
+
+                    <!-- Pósters y fondos -->
+                    <div id="sec-imagenes" data-fs class="space-y-8">
+                        <LightboxGallery posters={posters} prefix="poster" />
+                        <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
+                    </div>
+
+                    <!-- Productoras -->
+                    <ProductionCompanies companies={item?.production_companies || []} />
+
+                    <!-- Reviews de TMDB -->
+                    <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
+
+                    <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), encima de las parecidas -->
                     {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
                         <SagaProgress
                             name={collectionInfo.name}
@@ -598,26 +620,8 @@ const jsonLd = item ? {
                         />
                     )}
 
-                    <!-- Pósters -->
-                    <div id="sec-imagenes" data-fs class="space-y-8">
-                        <LightboxGallery posters={posters} prefix="poster" />
-                        <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
-                    </div>
-
-                    <!-- Reparto (grid cards) -->
-                    <div id="sec-reparto" data-fs><CastGrid cast={cast} seenWith={seenWithMap} /></div>
-
-                    <!-- Dobladores en español (lazy, eldoblaje.com) -->
-                    <DubbingSection type="movie" tmdbId={id} />
-
                     <!-- La saga al otro lado: series de esta misma película -->
                     <CrossMediaSection items={crossMediaSeries} mediaType="tv" />
-
-                    <!-- Equipo -->
-                    <CrewGrid crew={directors} />
-
-                    <!-- Productoras -->
-                    <ProductionCompanies companies={item?.production_companies || []} />
 
                     <!-- Recomendaciones -->
                     <div id="sec-parecidas" data-fs><RecommendationsCarousel
@@ -625,9 +629,6 @@ const jsonLd = item ? {
                         mediaType="movie"
                         title={moviesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Películas similares'}
                     /></div>
-
-                    <!-- Reviews de TMDB -->
-                    <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
                 </div>
             </div>
         </div>

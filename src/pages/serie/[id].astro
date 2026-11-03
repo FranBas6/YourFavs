@@ -579,8 +579,8 @@ const jsonLd = item ? {
         <FichaSections items={[
             { id: 'sec-temporadas', label: 'Temporadas' },
             { id: 'sec-donde', label: 'Dónde ver' },
-            { id: 'sec-reparto', label: 'Reparto' },
             { id: 'sec-videos', label: 'Vídeos' },
+            { id: 'sec-reparto', label: 'Reparto' },
             { id: 'sec-imagenes', label: 'Imágenes' },
             { id: 'sec-detalles', label: 'Detalles' },
             { id: 'sec-resenas', label: 'Reseñas' },
@@ -812,9 +812,6 @@ const jsonLd = item ? {
 
                 <!-- Columna derecha -->
                 <div class="md:w-2/3 space-y-8">
-
-                    <!-- Trailer + Videos extras -->
-                    <div id="sec-videos" data-fs><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
 
                     <!-- Temporadas (ancla de la barra de secciones): próximo y último episodio, calidad y acordeón -->
                     <div id="sec-temporadas" data-fs class="space-y-8">
@@ -1140,26 +1137,33 @@ const jsonLd = item ? {
 
                     </div>
 
-                    <!-- Pósters -->
+                    <!-- Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: temporadas, vídeos,
+                         reparto y equipo, imágenes, productoras, reseñas y, al final, «También en cine» y parecidas. -->
+
+                    <!-- Tráiler + más vídeos -->
+                    <div id="sec-videos" data-fs><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
+
+                    <!-- Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com, por temporada) -->
+                    <div id="sec-reparto" data-fs class="space-y-8">
+                        <CastGrid cast={cast} seenWith={seenWithMap} />
+                        <CrewGrid crew={directors} />
+                        <DubbingSection type="tv" tmdbId={id} />
+                    </div>
+
+                    <!-- Pósters y fondos -->
                     <div id="sec-imagenes" data-fs class="space-y-8">
                         <LightboxGallery posters={posters} prefix="poster" />
                         <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
                     </div>
 
-                    <!-- Reparto -->
-                    <div id="sec-reparto" data-fs><CastGrid cast={cast} seenWith={seenWithMap} /></div>
-
-                    <!-- Dobladores en español (lazy, eldoblaje.com, por temporada) -->
-                    <DubbingSection type="tv" tmdbId={id} />
-
-                    <!-- La saga al otro lado: películas de esta misma serie -->
-                    <CrossMediaSection items={crossMediaMovies} mediaType="movie" />
-
-                    <!-- Equipo -->
-                    <CrewGrid crew={directors} />
-
                     <!-- Productoras -->
                     <ProductionCompanies companies={item?.production_companies || []} />
+
+                    <!-- Reviews TMDB -->
+                    <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
+
+                    <!-- La saga al otro lado: películas de esta misma serie, encima de las parecidas -->
+                    <CrossMediaSection items={crossMediaMovies} mediaType="movie" />
 
                     <!-- Recomendaciones -->
                     <div id="sec-parecidas" data-fs><RecommendationsCarousel
@@ -1167,9 +1171,6 @@ const jsonLd = item ? {
                         mediaType="tv"
                         title={seriesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Series similares'}
                     /></div>
-
-                    <!-- Reviews TMDB -->
-                    <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
                 </div>
             </div>
         </div>

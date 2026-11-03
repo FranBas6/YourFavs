@@ -154,3 +154,18 @@ img.hover\:scale-105:hover {
 }
 .ficha-kicker a { color: inherit; text-decoration: none; }
 .ficha-kicker a:hover { color: var(--card-text, #fff); text-decoration: underline; }
+
+/* «Ver todo el reparto / equipo» (rediseño 4.5): el resto plegado en un <details>. */
+.cg-more-btn {
+    list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    min-height: 44px; padding: 0 16px; border: 1px solid var(--border-strong); border-radius: var(--r-md);
+    background: var(--bg-elev); color: var(--text); font: 600 var(--fs-ui) var(--font);
+}
+.cg-more-btn::-webkit-details-marker { display: none; }
+.cg-more-btn:hover { background: var(--bg-tint); border-color: var(--text-3); }
+.cg-more-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (min-width: 1024px) { .cg-more-btn { min-height: 36px; } }
+/* Rótulo de tipo en «Más vídeos». */
+.vs-type { margin: 0 0 8px; font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+/* Cerrado, las tarjetas de más (.cg-x) no se ven; al abrir «Ver todo», vuelven a su display normal. */
+section:not(:has(> details.cg-more[open])) .cg-x { display: none; }
