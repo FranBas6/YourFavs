@@ -11,7 +11,6 @@ import ListHeader from "../../components/personal/ListHeader.astro";
 import ListsNav from "../../components/personal/ListsNav.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
 import '../../styles/pages/personal/personal.css';
 
 const data = await fetchPersonalPageData(
@@ -71,7 +70,7 @@ const {
                             {seriesPaginadas.map((item) => {
                                 const realPos = seriesFavoritas.findIndex((s: any) => s.id === item.id) + 1;
                                 return (
-                                <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
+                                <CardSerie
                                     id={item.id.toString()}
                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
                                     name={item.name}
@@ -86,7 +85,7 @@ const {
                                     favoriteNumber={realPos}
                                     watchedEpisodes={watchedMap[String(item.id)]?.watched}
                                     userRating={(item as any).userRating}
-                                /></HoverPreview>);
+                                />);
                             })}
                         </div>
                     )}
@@ -116,7 +115,7 @@ const {
                     {peliculasPaginadas.length > 0 && (
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {peliculasPaginadas.map((item) => (
-                                <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
+                                <CardMovie
                                     id={item.id.toString()}
                                     img={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : "/placeholder.jpg"}
                                     title={item.title}
@@ -125,7 +124,7 @@ const {
                                     release_date={item.release_date}
                                     genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                     userRating={(item as any).userRating}
-                                /></HoverPreview>
+                                />
                             ))}
                         </div>
                     )}

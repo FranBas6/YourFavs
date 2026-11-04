@@ -12,7 +12,6 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {loadAllPages} from "../../utils/loadAllPages";
 import {safeFetch} from "../../utils/safeFetch";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
 import { withMode } from "../../utils/catalogUrl";
 import '../../styles/pages/catalogo/shared.css';
 
@@ -140,7 +139,7 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {limitedMovies.map((item, i) => (
                                 <div class="card-wrapper group" hidden={i >= PAGE} data-srch-item>
-                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}>
+                                    
                                         <CardMovie
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -150,7 +149,7 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                                             release_date={item.release_date}
                                             genres={item.genre_ids?.map((id: number) => ({id, name: getGenreName(id)}))}
                                         />
-                                    </HoverPreview>
+                                    
                                 </div>
                             ))}
                         </div>
@@ -173,7 +172,7 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {limitedSeries.map((item, i) => (
                                 <div class="card-wrapper group" hidden={i >= PAGE} data-srch-item>
-                                    <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}>
+                                    
                                         <CardSerie
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -185,7 +184,7 @@ const totalResults = limitedMovies.length + limitedSeries.length + limitedActors
                                             last_episode_to_air={item.last_episode_to_air}
                                             next_episode_to_air={item.next_episode_to_air}
                                         />
-                                    </HoverPreview>
+                                    
                                 </div>
                             ))}
                         </div>

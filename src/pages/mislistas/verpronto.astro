@@ -13,7 +13,6 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import ListsNav from "../../components/personal/ListsNav.astro";
 import ListTitle from "../../components/personal/ListTitle.astro";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
 import type {Movie} from "../../types/ApiMovie";
 import type {SeriesInterface} from "../../types/DbSerie";
@@ -167,7 +166,7 @@ const hasContent = hasSeries || hasMovies;
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {seriesVerPronto.map((item) => (
                                 <div class="flex flex-col h-full">
-                                    <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
+                                    <CardSerie
                                         id={item.id.toString()}
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                         name={item.name}
@@ -180,7 +179,7 @@ const hasContent = hasSeries || hasMovies;
                                         genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
                                         status={item.status}
                                         watchedEpisodes={watchedMap[String(item.id)]?.watched}
-                                    /></HoverPreview>
+                                    />
                                     <form method="POST" class="mt-1.5">
                                         <input type="hidden" name="deleteId" value={item.id}/>
                                         <input type="hidden" name="deleteType" value="serie"/>
@@ -211,7 +210,7 @@ const hasContent = hasSeries || hasMovies;
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {peliculasVerPronto.map((item) => (
                                 <div class="flex flex-col h-full">
-                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
+                                    <CardMovie
                                         id={item.id.toString()}
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                         title={item.title}
@@ -219,7 +218,7 @@ const hasContent = hasSeries || hasMovies;
                                         overview={item.overview}
                                         release_date={item.release_date}
                                         genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}
-                                    /></HoverPreview>
+                                    />
                                     <form method="POST" class="mt-1.5">
                                         <input type="hidden" name="deleteId" value={item.id}/>
                                         <input type="hidden" name="deleteType" value="pelicula"/>

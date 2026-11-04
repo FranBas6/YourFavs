@@ -6,7 +6,6 @@ import { getWatchedMovieTiers, type WatchedTier } from "../../../services/BD/mov
 import SagaProgress from "../../../components/detail/SagaProgress.astro";
 import { getGenreName } from "../../../utils/constants/genres";
 import EmptyState from "../../../components/EmptyState.astro";
-import HoverPreview from "../../../components/HoverPreview.astro";
 import '../../../styles/pages/catalogo/shared.css';
 
 const { id } = Astro.params;
@@ -135,7 +134,7 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
                         ) : isReleased(part) ? (
                             <span class="absolute top-10 right-2 z-20 font-mono text-[9px] font-bold text-white px-2 py-0.5 rounded-full shadow-md pointer-events-none" style="background:var(--accent)">TE FALTA</span>
                         ) : null}
-                        <HoverPreview tmdbId={part.id} tmdbType="movie" title={part.title} backdropPath={part.backdrop_path} href={`/movie/${part.id}`} year={part.release_date?.slice(0,4)} rating={part.vote_average}><CardMovie
+                        <CardMovie
                             id={part.id.toString()}
                             img={part.poster_path || "/placeholder.jpg"}
                             title={part.title}
@@ -143,7 +142,7 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
                             overview={part.overview || ''}
                             release_date={part.release_date || ''}
                             genres={part.genre_ids?.map(gId => ({ id: gId, name: getGenreName(gId) }))}
-                        /></HoverPreview>
+                        />
                       </div>
                     </div>
                 ))}

@@ -15,7 +15,6 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import Pagination from "../../components/Pagination.astro";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
 import { resolveMineFilter } from "../../utils/platformFilter";
@@ -116,7 +115,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                 {popularSeries.map((item) => (
                     <div class="card-wrapper group">
-                        <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}>
+                        
                             <CardSerie
                                     id={item.id.toString()}
                                     img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -129,7 +128,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
                                     next_episode_to_air={item.next_episode_to_air}
                                     genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
                             />
-                        </HoverPreview>
+                        
                     </div>
                 ))}
             </div>

@@ -4,7 +4,6 @@
  * para poder renderizarla dentro del bucle ordenable de "Home a tu medida" (§4).
  */
 import SectionHeader from "../SectionHeader.astro";
-import HoverPreview from "../HoverPreview.astro";
 import CardMovie from "../Cards/CardMovie.astro";
 import CardSerie from "../Cards/CardSerie.astro";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
@@ -41,7 +40,7 @@ const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: get
 
     <Row id={railId} label={section.title} moreHref={section.link}>
         {items.map(({ kind, item }) => kind === 'movie' ? (
-            <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
+            <CardMovie
                 id={item.id.toString()}
                 img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                 title={item.title}
@@ -50,9 +49,9 @@ const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: get
                 overview={item.overview}
                 release_date={item.release_date}
                 genres={genresOf(item)}
-            /></HoverPreview>
+            />
         ) : (
-            <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
+            <CardSerie
                 id={item.id.toString()}
                 img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                 name={item.name}
@@ -64,7 +63,7 @@ const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: get
                 last_episode_to_air={item.last_episode_to_air}
                 next_episode_to_air={item.next_episode_to_air}
                 genres={genresOf(item)}
-            /></HoverPreview>
+            />
         ))}
     </Row>
 </article>
