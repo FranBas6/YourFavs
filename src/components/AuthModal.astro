@@ -107,7 +107,7 @@ const I = {
 
             <form class="auth-form" id="auth-form" novalidate>
                 <div class="auth-field">
-                    <div class="auth-lb"><label for="auth-email">Email</label><span class="auth-last" id="auth-last-e" hidden>la última vez</span></div>
+                    <div class="auth-lb auth-lb--start"><label for="auth-email">Email</label><span class="auth-last" id="auth-last-e" hidden>la última vez</span></div>
                     <input type="email" name="email" id="auth-email" required autocomplete="email" placeholder="tu@email.com" aria-describedby="auth-email-err"/>
                     <span class="auth-hint is-er" id="auth-email-err" hidden></span>
                 </div>
@@ -273,6 +273,7 @@ const I = {
     .auth-field { display: flex; flex-direction: column; gap: 6px; }
     .auth-lb { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 600 var(--fs-meta) var(--font); color: var(--text-2); }
     .auth-lb label { font: inherit; color: inherit; }
+    .auth-lb--start { justify-content: flex-start; }
     .auth-field input {
         width: 100%; height: 44px; padding: 0 12px; border-radius: var(--r-md); border: 1px solid var(--border-strong);
         background: var(--bg); color: var(--text); font-size: var(--fs-body); font-family: inherit;
@@ -417,6 +418,38 @@ const I = {
                 .catch(() => {});
         }
         const inviteOnly = () => inviteMode && !inviter;
+
+        // ---- El navegador recuerda que ya entraste (7.4c) ----
+        // `yf_auth_seen = { method: 'google' | 'email' | null, at }`: SOLO de este navegador y NUNCA el
+        // email, así que no revela si un email tiene cuenta. Sirve para no crear por error una cuenta
+        // que ya tienes: aviso en Crear cuenta y «la última vez» en el método de Entrar. Cerrar sesión
+        // no lo borra; eliminar la cuenta, sí (SeccionCuenta).
+        type Seen = { method: 'google' | 'email' | null; at: string };
+        const SEEN_KEY = 'yf_auth_seen';
+        function readSeen(): Seen | null {
+            try { const o = JSON.parse(localStorage.getItem(SEEN_KEY) || 'null'); return o && typeof o === 'object' ? o : null; } catch { return null; }
+        }
+        function writeSeen(method: Seen['method']) {
+            try {
+                // Sin método (sesión de antes de esto), no pisa uno que ya sabíamos.
+                if (!method && readSeen()?.method) return;
+                localStorage.setItem(SEEN_KEY, JSON.stringify({ method, at: new Date().toISOString() }));
+            } catch { /* sin almacenamiento: sin aviso */ }
+        }
+        // Quien ya tiene sesión en este navegador cuenta como «ya entró» aunque fuera antes de esto.
+        if (hasSessionCookie && !readSeen()) writeSeen(null);
+        const knownEl = $('auth-known');
+        function paintSeen() {
+            const seen = readSeen();
+            const pending = !pendingEl.hidden;
+            knownEl.hidden = !(seen && mode === 'register' && !pending);
+            if (seen && mode === 'register') {
+                $('auth-known-t').textContent = 'Si es tu cuenta, entra en vez de crear otra.'
+                    + (seen.method === 'google' ? ' La última vez usaste Google.' : seen.method === 'email' ? ' La última vez usaste tu email.' : '');
+            }
+            $('auth-last-g').hidden = !(seen?.method === 'google' && mode === 'login');
+            $('auth-last-e').hidden = !(seen?.method === 'email' && mode === 'login');
+        }
 
         function paintInviter() {
             if (!inviter) return;
@@ -568,6 +601,7 @@ const I = {
             if (!isLogin) fillPosters();
             if (o.announce) liveEl.textContent = isLogin ? 'Entrar' : 'Crear cuenta';
             paintInviteExtras();
+            paintSeen();
         }
 
         // «Revisa tu correo» (registro) o «Confirma tu email» (entrar sin confirmar). Sustituye a todo.
@@ -580,6 +614,7 @@ const I = {
             pendingMsgEl.hidden = true;
             hadEl.hidden = unconfirmed;
             paintInviteExtras();
+            paintSeen();
             titleEl.textContent = unconfirmed ? 'Confirma tu email' : 'Revisa tu correo';
             const strong = document.createElement('strong');
             strong.textContent = email;
@@ -800,7 +835,7 @@ const I = {
             const a = await getActions();
             const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
             if (res.ok && res.pendingConfirmation) { showPending(email); return; }
-            if (res.ok) { afterAuth(res); return; }
+            if (res.ok) { writeSeen('email'); afterAuth(res); return; }
             if (res.code === 'invite_only') { setMode('login'); setLoading(false); showMsg(res.error); return; }
             if (res.code === 'email_not_confirmed') { showPending(email, true); return; }
             setLoading(false);
@@ -860,6 +895,7 @@ const I = {
                 open();
                 paintMsg(noteEl, 'Entra con tu email y contraseña; si aún no habías confirmado, te ofreceremos otro.', { kind: 'wn', title: 'Ese enlace ha caducado o ya se usó' });
             } else {
+                if (authReturn === 'ok' || authReturn === 'new') writeSeen('google');
                 // La página ya llega con sesión: solo falta lo que el popup hacía después.
                 let pending: string | null = null;
                 try { pending = sessionStorage.getItem('yf_pending_action'); } catch { /* noop */ }
