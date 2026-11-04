@@ -35,12 +35,22 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
     letter-spacing: 0.05em;
-    animation: logoShine 12s ease-in-out infinite;  /* más sutil (antes 6s) */
+    /* Logo quieto (rediseño, Fase 8 · 8.3): una pasada del brillo al cargar y se queda; al pasar el
+       ratón (o con el foco del teclado), otra, como transición, que vuelve al salir. Antes daba vueltas
+       sin parar (12 s en bucle). Con «reducir movimiento», nada. */
+    background-position: 0% 50%;
+    animation: logoShine 2.6s ease-in-out 1;
+    transition: background-position 1.4s ease-in-out;
 }
+.header-logo:hover .header-logo-text,
+.header-logo:focus-visible .header-logo-text { background-position: 100% 50%; }
 
 @keyframes logoShine {
     0%, 100% { background-position: 0% 50%; }
     50% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .header-logo-text { animation: none; transition: none; }
 }
 
 /* --- Nav desktop --- */
