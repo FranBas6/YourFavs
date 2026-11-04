@@ -2,6 +2,7 @@
 import Layout from "../../../layouts/Layout.astro";
 import { Icon } from 'astro-icon/components';
 import ListsNav from "../../../components/personal/ListsNav.astro";
+import ListTitle from "../../../components/personal/ListTitle.astro";
 import EmptyState from "../../../components/EmptyState.astro";
 import StatRow, { type StatItem } from "../../../components/StatRow.astro";
 import { calculateYearStats, type ItemShowcase } from "../../../utils/yearStats";
@@ -147,37 +148,34 @@ const YEAR_STATS: StatItem[] = [
 <Layout title={`Tu ${yearNum}`}>
     <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Tu {yearNum}</h1>
-            <p class="text-gray-500 text-base">Resumen de lo que has añadido y visto este año</p>
-        </header>
+        <ListTitle title={`Tu ${yearNum}`} subtitle="Resumen de lo que has añadido y visto este año" />
 
 
         {/* Selector de año */}
-        <div class="flex items-center justify-center gap-3 mb-8">
+        <nav class="yr-nav" aria-label="Año">
             {hasPrev ? (
-                <a href={`/mislistas/year/${prevYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                <a href={`/mislistas/year/${prevYear}`} class="btn btn--sm">
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
                     {prevYear}
                 </a>
             ) : (
-                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 text-sm font-medium text-gray-300 cursor-not-allowed">{prevYear}</span>
+                <span class="btn btn--sm" aria-disabled="true">{prevYear}</span>
             )}
-            <span class="text-2xl font-bold text-gray-900 px-4">{yearNum}</span>
+            <span class="yr-cur" aria-current="page">{yearNum}</span>
             {hasNext ? (
-                <a href={`/mislistas/year/${nextYear}`} class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                <a href={`/mislistas/year/${nextYear}`} class="btn btn--sm">
                     {nextYear}
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
                 </a>
             ) : (
-                <span class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-50 border border-gray-100 text-sm font-medium text-gray-300 cursor-not-allowed">{nextYear}</span>
+                <span class="btn btn--sm" aria-disabled="true">{nextYear}</span>
             )}
             {/* Ámbito de por vida (handoff v2 §⑤) */}
-            <a href="/mislistas/year/siempre" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-[#E63946] hover:text-[#E63946] transition ml-2">
+            <a href="/mislistas/year/siempre" class="btn btn--sm btn--ghost">
                 <Icon name="lucide:infinity" class="w-4 h-4" />
                 De siempre
             </a>
-        </div>
+        </nav>
 
         {!stats.hasData && (
             <EmptyState
@@ -185,7 +183,7 @@ const YEAR_STATS: StatItem[] = [
                 title={`Nada en ${yearNum}`}
                 description="No hay items añadidos ni episodios vistos en este año.">
                 {stats.availableYears.length > 0 && (
-                    <a slot="cta" href={`/mislistas/year/${stats.availableYears[0]}`} class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">
+                    <a slot="cta" href={`/mislistas/year/${stats.availableYears[0]}`} class="btn btn--sm">
                         Ver tu {stats.availableYears[0]}
                     </a>
                 )}
@@ -200,10 +198,7 @@ const YEAR_STATS: StatItem[] = [
                 {/* Showcase con posters */}
                 {(stats.showcase.bestUserRated || stats.showcase.bestTmdb || stats.showcase.firstOfYear || stats.showcase.lastOfYear) && (
                     <section>
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-rose-500 rounded-full"></span>
-                            Destacados del {yearNum}
-                        </h2>
+                        <div class="lg-h"><h2>Destacados del {yearNum}</h2></div>
                         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                             {[
                                 { item: stats.showcase.bestUserRated, icon: 'star', label: 'Tu mejor nota', sub: (s: ItemShowcase) => s.user_rating ? `${s.user_rating}/10` : '' },
@@ -234,10 +229,7 @@ const YEAR_STATS: StatItem[] = [
                 {/* Top series del año */}
                 {stats.showcase.topSeries.length > 0 && (
                     <section>
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
-                            Series con más episodios vistos
-                        </h2>
+                        <div class="lg-h"><h2>Series con más episodios vistos</h2></div>
                         <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 sm:gap-4">
                             {stats.showcase.topSeries.map((s, idx) => (
                                 <a href={`/serie/${s.id}`} class="group block">
@@ -261,33 +253,29 @@ const YEAR_STATS: StatItem[] = [
                     Una serie sale en CADA mes en que viste algo, con los episodios de ese mes. */}
                 {stats.timeline.length > 0 && (
                     <section>
-                        <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
-                            Mes a mes
-                            <span class="text-sm font-normal text-gray-400">({timelineTotal})</span>
-                        </h2>
+                        <div class="lg-h"><h2>Mes a mes</h2><span class="n">{timelineTotal}</span></div>
                         <p class="text-xs text-gray-500 mb-4">
                             Lo que viste cada mes del {yearNum}, en orden de visionado. Una serie aparece en cada mes
                             en que viste algún episodio, con los de ese mes.
                         </p>
-                        <div class="space-y-6">
-                            {stats.timeline.map((m) => (
-                                <div>
-                                    <h3 class="text-sm font-semibold text-purple-700 uppercase tracking-wide mb-3 flex items-center gap-2 flex-wrap">
-                                        <span class="w-1.5 h-1.5 bg-purple-400 rounded-full"></span>
-                                        {MONTH_NAMES[m.month]}
-                                        <span class="text-xs text-gray-400 normal-case font-normal">
+                        <div class="ym-list">
+                            {stats.timeline.map((m, i, arr) => (
+                                <details class="ym" open={i === arr.length - 1}>
+                                    <summary class="ym-s">
+                                        <b>{MONTH_NAMES[m.month]}</b>
+                                        <span class="ym-m">
                                             {m.series > 0 && <>· {m.series} serie{m.series !== 1 ? 's' : ''} ({m.episodes} ep.)</>}
                                             {m.movies > 0 && <>{' '}· {m.movies} película{m.movies !== 1 ? 's' : ''}</>}
                                         </span>
                                         {m.minutes > 0 && (
-                                            <span class="inline-flex items-center gap-1 text-[11px] font-semibold normal-case tracking-normal text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5" title="Tiempo estimado: cada película por su duración y cada episodio por la duración de los de su serie">
+                                            <span class="ym-h" title="Tiempo estimado: cada película por su duración y cada episodio por la duración de los de su serie">
                                                 <Icon name="lucide:clock" class="w-3 h-3" />
                                                 {watchTimeLabel(m.minutes)}
                                             </span>
                                         )}
-                                    </h3>
-                                    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                                        <svg class="ym-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                    </summary>
+                                    <div class="ym-b grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                                         {m.entries.map((e) => (
                                             <a href={e.kind === 'movie' ? `/movie/${e.id}` : `/serie/${e.id}`} class="group block">
                                                 <div class="relative aspect-[2/3] rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition bg-gray-200">
@@ -319,7 +307,7 @@ const YEAR_STATS: StatItem[] = [
                                             </a>
                                         ))}
                                     </div>
-                                </div>
+                                </details>
                             ))}
                         </div>
                     </section>
@@ -328,11 +316,8 @@ const YEAR_STATS: StatItem[] = [
                 {/* Heatmap calendario */}
                 {stats.heatmap.length > 0 && (
                     <section>
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-emerald-500 rounded-full"></span>
-                            Tu actividad en {yearNum}
-                        </h2>
-                        <div class="bg-white rounded-xl border border-gray-200 p-4 overflow-x-auto">
+                        <div class="lg-h"><h2>Tu actividad en {yearNum}</h2></div>
+                        <div class="ycard overflow-x-auto">
                             <div class="flex gap-[3px] min-w-fit">
                                 {weeks.map((week) => (
                                     <div class="flex flex-col gap-[3px]">
@@ -359,16 +344,16 @@ const YEAR_STATS: StatItem[] = [
                 {/* Distribuciones */}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {stats.byDecade.length > 0 && (
-                        <section class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Icon name="lucide:calendar-days" class="w-4 h-4 text-cyan-600" /> Por década de estreno
+                        <section class="ycard">
+                            <h3 class="ycard-h">
+                                <Icon name="lucide:calendar-days" class="w-4 h-4" /> Por década de estreno
                             </h3>
                             <div class="space-y-2">
                                 {stats.byDecade.map((d) => (
                                     <div class="flex items-center gap-3">
                                         <span class="text-xs font-medium text-gray-600 w-16">{d.decade}</span>
                                         <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
-                                            <div class="h-full bg-cyan-500 rounded" style={`width: ${(d.count / maxDecade) * 100}%`}></div>
+                                            <div class="h-full ybar-f rounded" style={`width: ${(d.count / maxDecade) * 100}%`}></div>
                                         </div>
                                         <span class="text-xs font-semibold text-gray-700 w-8 text-right">{d.count}</span>
                                     </div>
@@ -378,16 +363,16 @@ const YEAR_STATS: StatItem[] = [
                     )}
 
                     {stats.byCollection.length > 0 && (
-                        <section class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Icon name="lucide:folders" class="w-4 h-4 text-fuchsia-600" /> Por colección
+                        <section class="ycard">
+                            <h3 class="ycard-h">
+                                <Icon name="lucide:folders" class="w-4 h-4" /> Por colección
                             </h3>
                             <div class="space-y-2">
                                 {stats.byCollection.map((c) => (
                                     <div class="flex items-center gap-3">
                                         <span class="text-xs font-medium text-gray-600 w-20 truncate">{c.label}</span>
                                         <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
-                                            <div class="h-full bg-fuchsia-500 rounded" style={`width: ${(c.count / maxCollection) * 100}%`}></div>
+                                            <div class="h-full ybar-f rounded" style={`width: ${(c.count / maxCollection) * 100}%`}></div>
                                         </div>
                                         <span class="text-xs font-semibold text-gray-700 w-8 text-right">{c.count}</span>
                                     </div>
@@ -397,16 +382,16 @@ const YEAR_STATS: StatItem[] = [
                     )}
 
                     {stats.byLanguage.length > 0 && (
-                        <section class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Icon name="lucide:globe" class="w-4 h-4 text-teal-600" /> Por idioma original
+                        <section class="ycard">
+                            <h3 class="ycard-h">
+                                <Icon name="lucide:globe" class="w-4 h-4" /> Por idioma original
                             </h3>
                             <div class="space-y-2">
                                 {stats.byLanguage.map((l) => (
                                     <div class="flex items-center gap-3">
                                         <span class="text-xs font-medium text-gray-600 w-24 truncate">{getLanguageDisplayName(l.code)}</span>
                                         <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
-                                            <div class="h-full bg-teal-500 rounded" style={`width: ${(l.count / maxLanguage) * 100}%`}></div>
+                                            <div class="h-full ybar-f rounded" style={`width: ${(l.count / maxLanguage) * 100}%`}></div>
                                         </div>
                                         <span class="text-xs font-semibold text-gray-700 w-8 text-right">{l.count}</span>
                                     </div>
@@ -416,14 +401,14 @@ const YEAR_STATS: StatItem[] = [
                     )}
 
                     {stats.topGenres.length > 0 && (
-                        <section class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                                <Icon name="lucide:drama" class="w-4 h-4 text-orange-600" /> Top géneros
+                        <section class="ycard">
+                            <h3 class="ycard-h">
+                                <Icon name="lucide:drama" class="w-4 h-4" /> Top géneros
                             </h3>
                             <div class="flex flex-wrap gap-2">
                                 {stats.topGenres.map((g) => (
-                                    <span class="text-sm px-3 py-1.5 rounded-full bg-orange-50 text-orange-700 border border-orange-200 font-medium">
-                                        {getGenreName(g.id)} <span class="text-xs text-orange-500 ml-1">×{g.count}</span>
+                                    <span class="chip-tag">
+                                        {getGenreName(g.id)} <span class="ycnt">×{g.count}</span>
                                     </span>
                                 ))}
                             </div>
@@ -434,18 +419,15 @@ const YEAR_STATS: StatItem[] = [
                 {/* Altas en listas por mes. Va DESPUÉS del «Mes a mes» y mide otra cosa, así que lo dice
                     explícitamente: dos bloques mensuales seguidos sin aclararlo se conflaten solos. */}
                 <section>
-                    <h2 class="text-xl font-semibold text-gray-800 mb-1 flex items-center gap-2">
-                        <span class="w-1 h-6 bg-indigo-500 rounded-full"></span>
-                        Items añadidos por mes
-                    </h2>
+                    <div class="lg-h"><h2>Títulos añadidos por mes</h2></div>
                     <p class="text-sm text-gray-500 mb-4">Cuándo guardaste cada cosa en tus listas, no cuándo la viste.</p>
-                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                    <div class="ycard">
                         <div class="grid grid-cols-12 gap-1 items-end h-32">
                             {stats.monthlyBreakdown.map((count, idx) => (
                                 <div class="flex flex-col items-center justify-end h-full gap-1" title={`${MONTH_NAMES[idx]}: ${count} items`}>
                                     <div class="text-[10px] font-semibold text-gray-600">{count > 0 ? count : ''}</div>
                                     <div
-                                        class={`w-full rounded-t transition ${count > 0 ? 'bg-indigo-500' : 'bg-gray-100'}`}
+                                        class={`w-full rounded-t transition ${count > 0 ? 'ybar-f' : 'ybar-0'}`}
                                         style={`height: ${count === 0 ? '4px' : `${Math.max(8, (count / maxMonthly) * 100)}%`}`}>
                                     </div>
                                 </div>
@@ -465,7 +447,7 @@ const YEAR_STATS: StatItem[] = [
                         <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Saltar a otro año</h2>
                         <div class="flex flex-wrap gap-2">
                             {stats.availableYears.map((y) => (
-                                <a href={`/mislistas/year/${y}`} class={`text-sm px-3 py-1.5 rounded-lg border font-medium transition ${y === yearNum ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-700 border-gray-200 hover:border-red-300 hover:text-red-600'}`}>
+                                <a href={`/mislistas/year/${y}`} class="btn btn--sm yr-y" aria-current={y === yearNum ? 'page' : undefined}>
                                     {y}
                                 </a>
                             ))}
