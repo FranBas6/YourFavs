@@ -10,7 +10,8 @@
  * Cada sección destino lleva `id` y `data-fs` (para el margen al saltar).
  */
 interface Props {
-    items: { id: string; label: string }[];
+    /** `mo`: posición en móvil, donde los bloques se reordenan (4.7); en escritorio manda el orden de la lista. */
+    items: { id: string; label: string; mo?: number }[];
 }
 const { items } = Astro.props;
 ---
@@ -19,7 +20,7 @@ const { items } = Astro.props;
     <nav class="fs" aria-label="Secciones de la ficha" data-fs-nav>
         <ul class="fs-in">
             {items.map((it) => (
-                <li><a href={`#${it.id}`} data-fs-link={it.id}>{it.label}</a></li>
+                <li style={it.mo ? `--mo:${it.mo}` : undefined}><a href={`#${it.id}`} data-fs-link={it.id}>{it.label}</a></li>
             ))}
         </ul>
         {/* Flechas en móvil: dicen que la fila se desliza y la mueven (con ratón no hay gesto). */}
@@ -145,6 +146,7 @@ const { items } = Astro.props;
     @media (max-width: 767px) {
         .fs-in { padding: 0 8px; }
         .fs-in a { padding: 0 10px; }
+        .fs-in > li { order: var(--mo, 50); }
         .fs-arr {
             position: absolute; top: 0; bottom: 1px; width: 40px; border: 0; padding: 0; cursor: pointer;
             display: none; align-items: center; color: var(--text); z-index: 1;

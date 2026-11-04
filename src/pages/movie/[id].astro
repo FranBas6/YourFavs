@@ -378,28 +378,28 @@ const jsonLd = item ? {
             trailerUrl={trailerUrl}
         />
         <FichaSections items={[
-            { id: 'sec-donde', label: 'Dónde ver' },
-            { id: 'sec-videos', label: 'Vídeos' },
-            { id: 'sec-reparto', label: 'Reparto' },
-            { id: 'sec-imagenes', label: 'Imágenes' },
-            { id: 'sec-detalles', label: 'Detalles' },
-            { id: 'sec-resenas', label: 'Reseñas' },
-            { id: 'sec-parecidas', label: 'Parecidas' },
+            { id: 'sec-donde', label: 'Dónde ver', mo: 1 },
+            { id: 'sec-videos', label: 'Vídeos', mo: 2 },
+            { id: 'sec-reparto', label: 'Reparto', mo: 3 },
+            { id: 'sec-imagenes', label: 'Imágenes', mo: 5 },
+            { id: 'sec-detalles', label: 'Detalles', mo: 4 },
+            { id: 'sec-resenas', label: 'Reseñas', mo: 6 },
+            { id: 'sec-parecidas', label: 'Parecidas', mo: 7 },
         ]} />
 
         <!-- Layout 2 columnas -->
         <div class="max-w-6xl mx-auto px-4 py-8">
-            <div class="flex flex-col md:flex-row gap-8">
+            <div class="ficha-cols flex flex-col md:flex-row gap-8">
 
                 <!-- Sidebar izquierda -->
                 <div class="md:w-1/3 space-y-4">
                     <!-- Poster mobile -->
-                    <div class="md:hidden w-56 mx-auto rounded-xl overflow-hidden shadow-xl">
+                    <div class="mo-1 md:hidden w-56 mx-auto rounded-xl overflow-hidden shadow-xl">
                         <img src={posterUrl(item?.poster_path)} alt={item?.title} class="w-full aspect-[2/3] object-cover" />
                     </div>
 
                     <!-- Dónde ver -->
-                    <div id="sec-donde" data-fs>
+                    <div id="sec-donde" data-fs class="mo-2">
                     <StreamingProviders
                         providersByCountry={item?.providersByCountry || {}}
                         linkByCountry={item?.providerLinksByCountry || {}}
@@ -408,9 +408,12 @@ const jsonLd = item ? {
                     </div>
 
                     <!-- Amigos que la han visto (F5 social) -->
+                    <div class="mo mo-7">
                     <FriendsSeen mediaType="movie" tmdbId={item?.id} />
+                    </div>
 
                     <!-- Nota personal -->
+                    <div class="mo mo-8">
                     {!(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && <RecommendedBlock mediaType="movie" tmdbId={item?.id} alone />}
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
                         <StarRating
@@ -420,8 +423,10 @@ const jsonLd = item ? {
                             mediaType="movie"
                         ><RecommendedBlock mediaType="movie" tmdbId={item?.id} /></StarRating>
                     )}
+                    </div>
 
                     <!-- Opinión -->
+                    <div class="mo mo-9">
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
                         <div class="bg-white rounded-xl border border-gray-200 p-4">
                             <h3 class="text-base font-semibold text-gray-800 mb-3">Tu opinión</h3>
@@ -455,8 +460,10 @@ const jsonLd = item ? {
                             )}
                         </div>
                     )}
+                    </div>
 
                     <!-- Tus tags + notas (C15) -->
+                    <div class="mo mo-10">
                     {inAnyCollection && (
                         <div class="bg-white rounded-xl border border-gray-200 p-4">
                             <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
@@ -490,9 +497,10 @@ const jsonLd = item ? {
                             <HideFromProfileToggle mediaType="movie" tmdbId={item?.id} title={item?.title || ''} posterPath={item?.poster_path ?? null} />
                         </div>
                     )}
+                    </div>
 
                     <!-- Información (con clasificación, enlaces e idiomas; rediseño 4.4) -->
-                    <div id="sec-detalles" data-fs class="bg-white rounded-xl border border-gray-200 p-4">
+                    <div id="sec-detalles" data-fs class="mo-6 bg-white rounded-xl border border-gray-200 p-4">
                         <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
                         <ul class="space-y-2.5 text-sm sm:text-base">
                             <li class="flex justify-between"><span class="text-gray-500">Estreno</span><span class="text-gray-800 font-medium">{formatDate(item?.release_date)}</span></li>
@@ -569,16 +577,33 @@ const jsonLd = item ? {
                     </div>
 
                     <!-- Palabras clave de TMDB (aparte de tus etiquetas) -->
+                    <div class="mo mo-14">
                     {movieKeywords.length > 0 && (
-                        <div class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-base font-semibold text-gray-800 mb-2">Palabras clave de TMDB</h3>
-                            <div class="flex flex-wrap gap-1.5">
-                                {movieKeywords.map((kw) => (
-                                    <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
-                                ))}
+                        <>
+                            {/* Móvil: plegadas (4.7), como en la serie */}
+                            <details class="bg-white rounded-xl border border-gray-200 sm:hidden">
+                                <summary class="p-4 cursor-pointer flex items-center justify-between">
+                                    <h3 class="text-base font-semibold text-gray-800">Palabras clave de TMDB ({movieKeywords.length})</h3>
+                                    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                                </summary>
+                                <div class="px-4 pb-4 flex flex-wrap gap-1.5">
+                                    {movieKeywords.map((kw) => (
+                                        <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
+                                    ))}
+                                </div>
+                            </details>
+                            <div class="hidden sm:block bg-white rounded-xl border border-gray-200 p-4">
+                                <h3 class="text-base font-semibold text-gray-800 mb-2">Palabras clave de TMDB</h3>
+                                <div class="flex flex-wrap gap-1.5">
+                                    {movieKeywords.map((kw) => (
+                                        <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        </>
                     )}
+                    </div>
+
                 </div>
 
                 <!-- Columna derecha -->
@@ -588,9 +613,10 @@ const jsonLd = item ? {
                          reparto y equipo, imágenes, productoras, reseñas y, al final, «También en TV» y parecidas. -->
 
                     <!-- Tráiler + más vídeos -->
-                    <div id="sec-videos" data-fs><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
+                    <div id="sec-videos" data-fs class="mo-3"><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
 
                     <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), justo tras los vídeos (Fran) -->
+                    <div class="mo mo-4">
                     {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
                         <SagaProgress
                             name={collectionInfo.name}
@@ -600,31 +626,36 @@ const jsonLd = item ? {
                             currentId={item?.id}
                         />
                     )}
+                    </div>
 
                     <!-- Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com) -->
-                    <div id="sec-reparto" data-fs class="space-y-8">
+                    <div id="sec-reparto" data-fs class="mo-5 space-y-8">
                         <CastGrid cast={cast} seenWith={seenWithMap} />
                         <CrewGrid crew={directors} />
                         <DubbingSection type="movie" tmdbId={id} />
                     </div>
 
                     <!-- Pósters y fondos -->
-                    <div id="sec-imagenes" data-fs class="space-y-8">
+                    <div id="sec-imagenes" data-fs class="mo-11 space-y-8">
                         <LightboxGallery posters={posters} prefix="poster" />
                         <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
                     </div>
 
                     <!-- Productoras -->
+                    <div class="mo mo-12">
                     <ProductionCompanies companies={item?.production_companies || []} />
+                    </div>
 
                     <!-- Reviews de TMDB -->
-                    <div id="sec-resenas" data-fs><ReviewsSection reviews={reviews} /></div>
+                    <div id="sec-resenas" data-fs class="mo-13"><ReviewsSection reviews={reviews} /></div>
 
                     <!-- La saga al otro lado: series de esta misma película -->
+                    <div class="mo mo-15">
                     <CrossMediaSection items={crossMediaSeries} mediaType="tv" />
+                    </div>
 
                     <!-- Recomendaciones -->
-                    <div id="sec-parecidas" data-fs><RecommendationsCarousel
+                    <div id="sec-parecidas" data-fs class="mo-16"><RecommendationsCarousel
                         items={moviesRecommendations}
                         mediaType="movie"
                         title={moviesRecommendationType === 'recommendations' ? 'Recomendaciones' : 'Películas similares'}

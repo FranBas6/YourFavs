@@ -169,3 +169,21 @@ img.hover\:scale-105:hover {
 .vs-type { margin: 0 0 8px; font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
 /* Cerrado, las tarjetas de más (.cg-x) no se ven; al abrir «Ver todo», vuelven a su display normal. */
 section:not(:has(> details.cg-more[open])) .cg-x { display: none; }
+
+/* =====================================================================================
+   4.7 · Orden en móvil. Por debajo de 768 px las dos columnas se funden en una sola lista
+   (display: contents) y cada bloque toma su sitio con .mo-N; en escritorio no cambia nada.
+   Serie: Dónde ver → Temporadas → Reparto → Información → lo tuyo → vídeos → el resto.
+   Película: Dónde ver → Tráiler y saga → Reparto → Información → lo tuyo → el resto.
+   ===================================================================================== */
+.mo:not(:has(*)) { display: none; }   /* envoltorio de un bloque que hoy no pinta nada */
+@media (max-width: 767px) {
+    .ficha-cols { gap: 20px; }
+    .ficha-cols > div { display: contents; }
+    .mo-1 { order: 1; } .mo-2 { order: 2; } .mo-3 { order: 3; } .mo-4 { order: 4; }
+    .mo-5 { order: 5; } .mo-6 { order: 6; } .mo-7 { order: 7; } .mo-8 { order: 8; }
+    .mo-9 { order: 9; } .mo-10 { order: 10; } .mo-11 { order: 11; } .mo-12 { order: 12; }
+    .mo-13 { order: 13; } .mo-14 { order: 14; } .mo-15 { order: 15; } .mo-16 { order: 16; }
+    /* El espaciado lo pone el gap de la lista, no los space-y de cada columna. */
+    .ficha-cols > div > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+}
