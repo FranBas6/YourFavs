@@ -1,0 +1,496 @@
+---
+/**
+ * FichaActions — barra de acciones de las fichas de película y serie (rediseño, Fase 4 · 4.1/4.2;
+ * README del handoff §3.7 «S6» corregido por B0). Sustituye a las dos barras de antes (escritorio
+ * y móvil duplicadas, cinco colores) por UNA sola, que se recoloca con CSS.
+ *
+ * El rojo (principal) es la acción de progreso, una por pantalla:
+ *   Película no vista → Empezar a ver · sin estrenar → Avisarme del estreno · viendo → Terminar ·
+ *   vista → Volver a ver.
+ *   Serie sin estado → Seguir · siguiendo → ninguno (el rojo es «Marcar visto» del episodio) ·
+ *   abandonada → Retomar. Una serie ya vista no lleva rojo: «Seguir» pasa a secundario.
+ * Después, el Nivel (LevelControl: Favorita · Vista ▾ · ♥), Pendiente y Ver pronto (con su
+ * tono al activarse) y, en series, Siguiendo ▾ (Abandonar, Dejar de seguir) y Nuevas temporadas.
+ * A la derecha, fantasmas: Colección, Recomendar, Enviar a…, «···» (IMDb) y «Ver en {plataforma}».
+ * En móvil: principal a lo ancho, el Nivel a lo ancho y los secundarios con «···», que recoge
+ * Colección, Recomendar, Enviar a…, Ver en… e IMDb.
+ *
+ * Debajo, una línea: «La has visto N veces · Apuntar otro visionado», la efeméride, el progreso de
+ * la serie y, en Favoritos, «n.º 3 de tus 24 favoritas · Cambiar posición».
+ *
+ * Los formularios envían lo mismo que antes (`fichaForms.ts`); `optimistic-actions.js` los manda y
+ * recarga. Sin «Posición al añadir a favoritos»: se añade al final y se mueve con «Cambiar posición».
+ */
+import LevelControl from './LevelControl.astro';
+import { FI } from './fichaIcons';
+import { fichaField, type FichaList } from './fichaForms';
+import { SOCIAL_PHASE } from '../../utils/constants/social';
+import { providerLinks } from '../../utils/constants/helpers/media-helpers';
+import { getCurrentRegion } from '../../services/BD/shared/userScope';
+
+interface Provider { provider_id: number; provider_name: string; type: string }
+
+interface Props {
+    mediaType: 'movie' | 'tv';
+    id: string | number;
+    title: string;
+    poster?: string | null;
+    state: {
+        vistas: boolean; liked: boolean; fav: boolean; pend: boolean; pronto: boolean;
+        /** Película: en «Estás viendo». */
+        viendo?: boolean;
+        /** Serie: siguiendo / abandonada. */
+        siguiendo?: boolean; abandonada?: boolean;
+    };
+    /** Vista en cualquier nivel (o con pases en el diario). */
+    watched: boolean;
+    /** «La has visto N veces». */
+    times: number;
+    lastPretty?: string;
+    efemeride?: string;
+    /** Película sin estrenar: el principal es «Avisarme del estreno». */
+    unreleased?: boolean;
+    releaseLabel?: string;
+    /** Aviso de estreno (película) o de nuevas temporadas (serie) activo. */
+    notif?: boolean;
+    /** Serie en Favoritos: posición y total. */
+    favPos?: number | null;
+    favTotal?: number;
+    /** Serie: episodios vistos de los emitidos (temporadas regulares). */
+    progress?: { watched: number; total: number } | null;
+    imdbId?: string | null;
+    /** Para «Ver en {plataforma}». */
+    providersByCountry?: Record<string, Provider[]>;
+    linkByCountry?: Record<string, string>;
+    myPlatformIds?: number[];
+    homepage?: string | null;
+    trailerUrl?: string | null;
+}
+
+const {
+    mediaType, id, title, poster = null, state: s, watched, times, lastPretty = '', efemeride = '',
+    unreleased = false, releaseLabel = '', notif = false, favPos = null, favTotal = 0, progress = null,
+    imdbId = null, providersByCountry = {}, linkByCountry = {}, myPlatformIds = [], homepage = null, trailerUrl = null,
+} = Astro.props;
+
+const isMovie = mediaType === 'movie';
+const user = Astro.locals.user;
+const canRecommend = !!(SOCIAL_PHASE.recommend && user);
+const canSend = !!(SOCIAL_PHASE.messages && user);
+const f = (l: FichaList) => fichaField(mediaType, l);
+
+// ---- «Ver en {plataforma}»: la tuya primero; si no, la primera de suscripción de tu país. ----
+// El enlace: la web oficial del título si es de esa plataforma (suele llevar al título), si no la
+// portada de la plataforma y, si no la conocemos, la página de TMDB/JustWatch del país.
+let watch: { label: string; short: string; href: string } | null = null;
+{
+    const region = getCurrentRegion();
+    const list = providersByCountry[region] || [];
+    const mine = new Set(myPlatformIds);
+    const pick = list.find((p) => mine.has(p.provider_id) && p.type === 'flatrate')
+        || list.find((p) => p.type === 'flatrate') || null;
+    if (pick) {
+        const token = pick.provider_name.toLowerCase().split(/[\s+]/)[0];
+        const homeIsProvider = !!(homepage && token && homepage.toLowerCase().includes(token));
+        const href = (homeIsProvider ? homepage : null) || providerLinks[pick.provider_name] || linkByCountry[region] || homepage || null;
+        // Nombre corto en el botón («Prime Video», «Disney+»); «Ver en …» completo en el menú y al lector.
+        const short = pick.provider_name.replace(/^Amazon\s+/i, '').replace(/\s+(Standard\s+)?with\s+Ads$/i, '')
+            .replace(/\s+(Amazon|Apple TV) Channel$/i, '')
+            .replace(/^Disney Plus$/i, 'Disney+').replace(/^Movistar Plus\+.*$/i, 'Movistar+');
+        if (href) watch = { label: `Ver en ${pick.provider_name}`, short, href };
+    }
+    if (!watch && (homepage || trailerUrl)) watch = { label: 'Ver ahora', short: 'Ver ahora', href: (homepage || trailerUrl)! };
+}
+
+// ---- Estado → principal ----
+type Primary = { kind: 'form'; list: FichaList; action: string; label: string; icon: keyof typeof FI; ok?: string }
+    | { kind: 'notif'; label: string } | null;
+let primary: Primary = null;
+if (isMovie) {
+    if (unreleased && !watched && !s.viendo) primary = notif ? null : { kind: 'notif', label: 'Avisarme del estreno' };
+    else if (s.viendo) primary = { kind: 'form', list: 'viendo', action: 'finish_viewing', label: 'Terminar', icon: 'checkAll' };
+    else if (watched) primary = { kind: 'form', list: 'viendo', action: 'add', label: 'Volver a ver', icon: 'rotate' };
+    else primary = { kind: 'form', list: 'viendo', action: 'add', label: 'Empezar a ver', icon: 'play' };
+} else {
+    if (s.abandonada) primary = { kind: 'form', list: 'seguir', action: 'add', label: 'Retomar', icon: 'play', ok: 'Retomada: vuelve a «Estás viendo»' };
+    else if (!s.siguiendo && !watched) primary = { kind: 'form', list: 'seguir', action: 'add', label: 'Seguir', icon: 'eye' };
+}
+// Qué secundarios salen en cada estado (B0): sin estrenar no lleva Nivel; siguiendo y abandonada
+// no llevan Pendiente ni Ver pronto.
+const showLevel = !(isMovie && unreleased && !watched && !s.viendo);
+const showQueue = isMovie || (!s.siguiendo && !s.abandonada);
+// Serie ya vista y sin seguir: «Volver a seguirla» va en el menú Vista ▾ (como «Volver a ver»).
+const canRefollow = !isMovie && !s.siguiendo && !s.abandonada && watched;
+const hasMore = !!imdbId;
+const mid = `fa-${mediaType}-${id}`;
+---
+<div class="fa" data-fa>
+    <div class="fa-in">
+        <div class="fa-row">
+            {primary?.kind === 'form' && (
+                <form method="POST" data-ok={primary.ok}>
+                    <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={primary.action} />
+                    {primary.action !== 'finish_viewing' && <input type="hidden" name={f(primary.list).name} value={f(primary.list).value} />}
+                    <button type="submit" class="btn btn--pri fa-pri">
+                        <svg viewBox="0 0 24 24" fill={primary.icon === 'play' ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI[primary.icon]} />
+                        {primary.label}
+                    </button>
+                </form>
+            )}
+            {(primary?.kind === 'notif' || (isMovie && unreleased && notif && !watched && !s.viendo)) && (
+                <form method="POST" data-reload>
+                    <input type="hidden" name="actionType" value="notification" /><input type="hidden" name="media_type" value="movie" />
+                    <input type="hidden" name="tmdb_id" value={id} /><input type="hidden" name="action" value={notif ? 'remove' : 'add'} />
+                    {notif ? (
+                        <button type="submit" class="btn fa-pri" data-tone="ep" aria-pressed="true" title="Quitar el aviso">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.bell} />
+                            Te avisaremos del estreno
+                        </button>
+                    ) : (
+                        <button type="submit" class="btn btn--pri fa-pri">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.bell} />
+                            Avisarme del estreno
+                        </button>
+                    )}
+                </form>
+            )}
+
+            {!isMovie && s.siguiendo && (
+                <div class="fa-mw fa-sec">
+                    <button type="button" class="btn btn--sm" data-tone="seguir" aria-pressed="true" aria-haspopup="menu" aria-expanded="false" aria-controls={`${mid}-seg`} data-fa-menu>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.eye} />
+                        Siguiendo
+                        <svg class="car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.down} />
+                    </button>
+                    <div class="fa-menu" id={`${mid}-seg`} role="menu" aria-label="Siguiendo" hidden>
+                        <form method="POST" data-ok="Abandonada: sale de «Estás viendo» (tu progreso se guarda)">
+                            <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="add" /><input type="hidden" name={f('abandon').name} value={f('abandon').value} />
+                            <button type="submit" class="fa-mi" role="menuitem">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.pause} />
+                                <span>Abandonar<small>Sale de «Estás viendo»; tu progreso se guarda</small></span>
+                            </button>
+                        </form>
+                        <form method="POST" data-ok="Has dejado de seguirla">
+                            <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="remove" /><input type="hidden" name={f('seguir').name} value={f('seguir').value} />
+                            <button type="submit" class="fa-mi is-dgr" role="menuitem">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.x} />
+                                <span>Dejar de seguir</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {showLevel && (
+                <LevelControl mediaType={mediaType} id={id} watched={watched} inVistas={s.vistas} liked={s.liked} fav={s.fav} viendo={!!s.viendo} favPos={favPos} refollow={canRefollow} />
+            )}
+
+            {showQueue && (
+                <>
+                    <form method="POST" class="fa-sec">
+                        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={s.pend ? 'remove' : 'add'} /><input type="hidden" name={f('pend').name} value={f('pend').value} />
+                        <button type="submit" class="btn btn--sm" data-tone="pend" aria-pressed={s.pend ? 'true' : 'false'}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.clock} />
+                            Pendiente
+                        </button>
+                    </form>
+                    <form method="POST" class="fa-sec">
+                        <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={s.pronto ? 'remove' : 'add'} /><input type="hidden" name={f('pronto').name} value={f('pronto').value} />
+                        <button type="submit" class="btn btn--sm" data-tone="pronto" aria-pressed={s.pronto ? 'true' : 'false'}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.cal} />
+                            Ver pronto
+                        </button>
+                    </form>
+                </>
+            )}
+            {!isMovie && (
+                <form method="POST" class="fa-sec" data-reload>
+                    <input type="hidden" name="actionType" value="notification" /><input type="hidden" name="media_type" value="tv" />
+                    <input type="hidden" name="tmdb_id" value={id} /><input type="hidden" name="action" value={notif ? 'remove' : 'add'} />
+                    <button type="submit" class="btn btn--sm" data-tone="ep" aria-pressed={notif ? 'true' : 'false'} title={notif ? 'Te avisamos de temporadas y episodios nuevos. Pulsa para quitarlo' : 'Avisarme de temporadas y episodios nuevos'}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.bell} />
+                        <span class="fa-d-only">Nuevas temporadas</span><span class="fa-m-only">Avisos</span>
+                    </button>
+                </form>
+            )}
+
+            <div class="fa-end">
+            <button type="button" class="btn btn--ghost btn--sm btn--icon js-saveto fa-d-only" data-mt={mediaType} data-id={id} data-title={title} data-poster={poster} data-collections-only="1" aria-label="Guardar en una colección" title="Guardar en una colección">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.folder} />
+            </button>
+            {canRecommend && (
+                <button type="button" class="btn btn--ghost btn--sm btn--icon fa-d-only" title="Recomendar a un amigo" aria-label="Recomendar a un amigo" data-recommend data-target-type={mediaType} data-target-id={id} data-title={title} data-image={poster} aria-haspopup="dialog" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.send} />
+                </button>
+            )}
+            {canSend && (
+                <button type="button" class="btn btn--ghost btn--sm btn--icon fa-d-only" title="Enviar a una conversación" aria-label="Enviar a una conversación" data-send-to data-media-type={mediaType} data-tmdb-id={id} data-title={title} data-image={poster} aria-haspopup="dialog" aria-expanded="false">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.reply} />
+                </button>
+            )}
+            <div class:list={['fa-mw', 'fa-more', { 'fa-m-only': !hasMore }]}>
+                <button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="Más acciones" title="Más acciones" aria-haspopup="menu" aria-expanded="false" aria-controls={`${mid}-more`} data-fa-menu>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.more} />
+                </button>
+                <div class="fa-menu is-right" id={`${mid}-more`} role="menu" aria-label="Más acciones" hidden>
+                    <button type="button" class="fa-mi js-saveto fa-m-only" role="menuitem" data-mt={mediaType} data-id={id} data-title={title} data-poster={poster} data-collections-only="1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.folder} />
+                        <span>Guardar en una colección</span>
+                    </button>
+                    {canRecommend && (
+                        <button type="button" class="fa-mi fa-m-only" role="menuitem" data-recommend data-target-type={mediaType} data-target-id={id} data-title={title} data-image={poster} aria-haspopup="dialog" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.send} />
+                            <span>Recomendar a un amigo</span>
+                        </button>
+                    )}
+                    {canSend && (
+                        <button type="button" class="fa-mi fa-m-only" role="menuitem" data-send-to data-media-type={mediaType} data-tmdb-id={id} data-title={title} data-image={poster} aria-haspopup="dialog" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.reply} />
+                            <span>Enviar a una conversación</span>
+                        </button>
+                    )}
+                    {watch && (
+                        <a href={watch.href} target="_blank" rel="noopener" class="fa-mi fa-m-only" role="menuitem">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.ext} />
+                            <span>{watch.label}</span>
+                        </a>
+                    )}
+                    {imdbId && (
+                        <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="fa-mi" role="menuitem">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.film} />
+                            <span>Ver en IMDb</span>
+                        </a>
+                    )}
+                </div>
+            </div>
+            {watch && (
+                <>
+                    <span class="fa-vr fa-d-only" aria-hidden="true"></span>
+                    <a href={watch.href} target="_blank" rel="noopener" class="btn btn--sm fa-d-only" aria-label={`${watch.label} (se abre en otra pestaña)`} title={watch.label}>
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={FI.play} />
+                        {watch.short}
+                        <svg class="fa-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.ext} />
+                    </a>
+                </>
+            )}
+            </div>
+        </div>
+
+        {/* Línea de estado bajo la barra */}
+        {(watched || s.viendo || s.siguiendo || s.abandonada || (isMovie && unreleased && releaseLabel) || (!isMovie && s.fav && favPos)) && (
+            <div class="fa-cap">
+                {isMovie && unreleased && releaseLabel && !watched && (
+                    <span class="fa-ind" style="--tone:var(--a-ep)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.cal} />
+                        Se estrena el {releaseLabel}
+                    </span>
+                )}
+                {isMovie && s.viendo && (
+                    <span class="fa-ind" style="--tone:var(--a-ep)">
+                        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" set:html={FI.play} />
+                        {watched ? 'Volviendo a verla' : 'Viéndola ahora'} · sale en «Estás viendo»
+                    </span>
+                )}
+                {!isMovie && s.siguiendo && progress && progress.total > 0 && (
+                    <span class="fa-ind" style="--tone:var(--a-seguir)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.eye} />
+                        Llevas {progress.watched} de {progress.total} episodios
+                    </span>
+                )}
+                {!isMovie && s.abandonada && (
+                    <span class="fa-ind" style="--tone:var(--a-abandon)">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.pause} />
+                        Abandonada{progress && progress.total > 0 ? ` · ibas por ${progress.watched} de ${progress.total} episodios` : ''}
+                    </span>
+                )}
+                {watched && (
+                    <span class="fa-grp">
+                        <span class="fa-ind" style="--tone:var(--a-rewatch)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.repeat} />
+                            {times > 0 ? `La has visto ${times} ${times === 1 ? 'vez' : 'veces'}` : 'La tienes como vista'}
+                        </span>
+                        {lastPretty && <span class="fa-dim">· última en {lastPretty}</span>}
+                        <button type="button" class="fa-link js-rewatch" data-mt={mediaType} data-id={id}>Apuntar otro visionado</button>
+                    </span>
+                )}
+                {!isMovie && s.fav && favPos && (
+                    <span class="fa-grp">
+                        <span class="fa-ind" style="--tone:var(--a-fav)">
+                            <svg class="f" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.crown} />
+                            n.º {favPos}{favTotal > 0 && <> de tus {favTotal} favoritas</>}
+                        </span>
+                        <button type="button" class="fa-link" aria-expanded="false" aria-controls={`${mid}-pos`} data-fa-toggle>Cambiar posición</button>
+                        <form method="POST" class="fa-pos" id={`${mid}-pos`} data-optimistic="skip" hidden>
+                            <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value="update" /><input type="hidden" name="actionType" value="favs" />
+                            <label class="sr-only" for={`${mid}-pos-n`}>Nueva posición (1–{favTotal || 1})</label>
+                            <input id={`${mid}-pos-n`} type="number" name="custom_position" min="1" max={favTotal || 1} placeholder={`1–${favTotal || 1}`} required />
+                            <button type="submit" class="btn btn--sm">Mover</button>
+                        </form>
+                    </span>
+                )}
+                {watched && efemeride && (
+                    <span class="fa-efem">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.cal} />
+                        {efemeride}
+                    </span>
+                )}
+            </div>
+        )}
+    </div>
+
+    <script is:inline>
+        (function () {
+            if (window.__yfFa) return; window.__yfFa = true;
+            function menuOf(btn) { return document.getElementById(btn.getAttribute('aria-controls')); }
+            function items(menu) { return Array.prototype.slice.call(menu.querySelectorAll('[role="menuitem"]')).filter(function (el) { return el.offsetParent !== null; }); }
+            function closeAll(except) {
+                document.querySelectorAll('[data-fa-menu][aria-expanded="true"]').forEach(function (b) {
+                    if (b === except) return;
+                    b.setAttribute('aria-expanded', 'false');
+                    var m = menuOf(b); if (m) m.hidden = true;
+                });
+            }
+            function open(btn) {
+                closeAll(btn);
+                var m = menuOf(btn); if (!m) return;
+                btn.setAttribute('aria-expanded', 'true'); m.hidden = false;
+                var it = items(m); if (it[0]) it[0].focus();
+            }
+            document.addEventListener('click', function (e) {
+                var t = e.target;
+                var btn = t.closest && t.closest('[data-fa-menu]');
+                if (btn) { e.preventDefault(); btn.getAttribute('aria-expanded') === 'true' ? closeAll() : open(btn); return; }
+                var tg = t.closest && t.closest('[data-fa-toggle]');
+                if (tg) {
+                    var p = document.getElementById(tg.getAttribute('aria-controls'));
+                    var on = tg.getAttribute('aria-expanded') !== 'true';
+                    tg.setAttribute('aria-expanded', on ? 'true' : 'false');
+                    if (p) { p.hidden = !on; if (on) { var inp = p.querySelector('input[type="number"]'); if (inp) inp.focus(); } }
+                    return;
+                }
+                // Una opción del menú: se cierra DESPUÉS, para que los selectores que se colocan
+                // junto a ella (diario, colecciones) lean su posición antes de que se oculte.
+                if (t.closest && t.closest('.fa-menu [role="menuitem"]')) { setTimeout(closeAll, 0); return; }
+                if (!(t.closest && t.closest('.fa-menu'))) closeAll();
+            });
+            document.addEventListener('keydown', function (e) {
+                var openBtn = document.querySelector('[data-fa-menu][aria-expanded="true"]');
+                if (!openBtn) return;
+                var m = menuOf(openBtn);
+                if (e.key === 'Escape') { closeAll(); openBtn.focus(); return; }
+                if (!m || !m.contains(document.activeElement)) return;
+                if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    var it = items(m), i = it.indexOf(document.activeElement);
+                    var n = e.key === 'ArrowDown' ? (i + 1) % it.length : (i - 1 + it.length) % it.length;
+                    if (it[n]) it[n].focus();
+                }
+                if (e.key === 'Tab') closeAll();
+            });
+        })();
+    </script>
+</div>
+
+<style is:global>
+    /* Barra de acciones de ficha (S6 + B0). Solo tokens: el oscuro sale de ellos. */
+    .fa { background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+    .fa-in { max-width: 72rem; margin: 0 auto; padding: 12px 16px; }
+    .fa-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 6px; }
+    .fa-row > form { display: contents; }
+    .fa-end { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+    .fa-vr { width: 1px; height: 28px; background: var(--border-strong); margin: 0 2px; }
+    .fa .car { width: 13px !important; height: 13px !important; margin-left: -2px; opacity: .7; }
+    .fa-ext { width: 13px !important; height: 13px !important; opacity: .6; }
+    .fa-m-only { display: none !important; }
+    /* El principal relleno no se tiñe aunque lleve tono. */
+    .btn--pri[data-tone] > svg:first-child { color: inherit; }
+
+    /* Nivel: un grupo de tres tramos con borde común. */
+    .lvl { display: inline-flex; align-items: stretch; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--bg-elev); }
+    .lvl > form, .lvl > .fa-mw { display: flex; }
+    .lvl-b {
+        --tone: var(--text-3); --tone-bg: var(--bg-tint);
+        height: 42px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+        background: none; border: 0; border-left: 1px solid var(--border-strong); color: var(--text-2);
+        font: 600 var(--fs-ui) var(--font); white-space: nowrap; cursor: pointer;
+        transition: background-color .15s ease, color .15s ease;
+    }
+    .lvl > :first-child .lvl-b { border-left: 0; border-radius: calc(var(--r-md) - 1px) 0 0 calc(var(--r-md) - 1px); }
+    .lvl > :last-child .lvl-b { border-radius: 0 calc(var(--r-md) - 1px) calc(var(--r-md) - 1px) 0; }
+    .lvl-b svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--tone); }
+    .lvl-b:hover { background: var(--bg-tint); color: var(--text); }
+    .lvl-b:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; position: relative; z-index: 1; }
+    .lvl-b[aria-pressed="true"] { background: var(--tone-bg); color: var(--text); box-shadow: inset 0 0 0 1px var(--tone); }
+    .lvl-b[aria-pressed="true"] svg.f { fill: currentColor; }
+    .lvl-b[data-tone="visto"] { --tone: var(--a-visto); --tone-bg: var(--a-visto-bg); }
+    .lvl-b[data-tone="like"]  { --tone: var(--a-like);  --tone-bg: var(--a-like-bg); }
+    .lvl-b[data-tone="fav"]   { --tone: var(--a-fav);   --tone-bg: var(--a-fav-bg); }
+    .lvl-b .pos { font: 600 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+    .lvl-b.is-ico { padding: 0 13px; }
+    .lvl-b.is-ico svg { width: 18px; height: 18px; }
+
+    /* Menús (Vista ▾, Siguiendo ▾, «···») */
+    .fa-mw { position: relative; display: inline-flex; }
+    .fa-menu {
+        position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; min-width: 280px; max-width: min(340px, calc(100vw - 32px));
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-lg); padding: 6px;
+    }
+    .fa-menu[hidden] { display: none; }
+    .fa-menu.is-right { left: auto; right: 0; }
+    .fa-menu form { display: block; }
+    .fa-mi {
+        display: flex; width: 100%; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px;
+        border: 0; border-radius: var(--r-sm); background: none; color: var(--text);
+        font: 500 var(--fs-ui) var(--font); text-align: left; text-decoration: none; cursor: pointer;
+    }
+    .fa-mi:hover, .fa-mi:focus-visible { background: var(--bg-tint); outline: none; }
+    .fa-mi svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-3); }
+    .fa-mi small { display: block; color: var(--text-3); font: 400 var(--fs-meta) var(--font); margin-top: 1px; }
+    .fa-mi.is-dgr { color: var(--accent-dark); }
+    .fa-mi.is-dgr svg { color: currentColor; }
+    [data-theme="dark"] .fa-mi.is-dgr { color: var(--stamp-red-ink); }
+
+    /* Línea de estado */
+    .fa-cap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 10px; font-size: var(--fs-meta); color: var(--text-3); }
+    .fa-grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+    .fa-ind { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text-2); }
+    .fa-ind svg { width: 14px; height: 14px; flex-shrink: 0; color: var(--tone); }
+    .fa-ind svg.f { fill: currentColor; }
+    .fa-dim { color: var(--text-3); }
+    .fa-link { background: none; border: 0; padding: 4px 0; color: var(--primary); font: 600 var(--fs-meta) var(--font); cursor: pointer; }
+    .fa-link:hover { text-decoration: underline; }
+    .fa-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+    .fa-efem { display: inline-flex; align-items: center; gap: 6px; }
+    .fa-efem svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .fa-pos { display: inline-flex; align-items: center; gap: 6px; }
+    .fa-pos[hidden] { display: none; }
+    .fa-pos input[type="number"] {
+        width: 84px; height: 36px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+        background: var(--bg-elev); color: var(--text); font: 500 var(--fs-ui) var(--font);
+    }
+    .fa-pos input[type="number"]:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+    /* Móvil: principal y Nivel a lo ancho; los secundarios se reparten la fila con «···». */
+    @media (max-width: 767px) {
+        .fa-d-only { display: none !important; }
+        .fa-end { display: contents; }
+        .fa-m-only { display: revert !important; }
+        .fa-mi.fa-m-only { display: flex !important; }
+        span.fa-m-only { display: inline !important; }
+        .fa-pri { flex: 1 1 100%; }
+        .lvl { flex: 1 1 100%; display: flex; }
+        .lvl > form, .lvl > .fa-mw { flex: 1 1 0; }
+        .lvl-b { flex: 1; height: 42px; padding: 0 6px; }
+        .lvl > form:has(.is-ico) { flex: 0 0 56px; }
+        .fa-row > .fa-sec .btn, .fa-row > form.fa-sec > .btn { flex: 1 1 0; min-width: 0; }
+        .fa-row > .fa-sec.fa-mw { flex: 1 1 0; }
+        .fa-row > .fa-sec.fa-mw > .btn { width: 100%; }
+        .fa-more { flex: 0 0 44px; }
+        .fa-more .btn--icon { border-color: var(--border-strong); }
+        .fa-cap { margin-top: 12px; }
+    }
+    @media (min-width: 1024px) {
+        .lvl-b { height: 34px; padding: 0 11px; }
+        .lvl-b.is-ico { padding: 0 12px; }
+    }
+</style>

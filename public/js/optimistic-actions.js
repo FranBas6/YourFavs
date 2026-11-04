@@ -1,7 +1,7 @@
 var LIST_NAMES = {
     favorites: 'Favoritos', pendientes: 'Pendientes', vistas: 'Vistas',
     verPronto: 'Ver Pronto', liked: 'Me gusta', siguiendo: 'Siguiendo',
-    favs: 'Favoritos', verpronto: 'Ver Pronto', viendo: 'Viendo'
+    favs: 'Favoritos', verpronto: 'Ver Pronto', viendo: 'Viendo', abandonada: 'Abandonadas'
 };
 
 var TEXT_TOGGLES = {
@@ -76,10 +76,14 @@ function submitOptimistic(form, options) {
 function handleWatchedEpisodeForm(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (_f, btn, formData) {
-            var isWatched = btn.classList.contains('bg-green-500');
+            // Botón del sistema (rediseño 4.8): el estado va en aria-pressed; el texto no cambia.
+            var sysBtn = btn.classList.contains('btn');
+            var isWatched = sysBtn ? btn.getAttribute('aria-pressed') === 'true' : btn.classList.contains('bg-green-500');
             btn.dataset.wasWatched = isWatched ? '1' : '0';
 
-            if (isWatched) {
+            if (sysBtn) {
+                btn.setAttribute('aria-pressed', isWatched ? 'false' : 'true');
+            } else if (isWatched) {
                 btn.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
                 btn.classList.add('border', 'border-gray-300', 'text-gray-500', 'hover:border-green-400', 'hover:text-green-600');
                 btn.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Marcar visto'; });
@@ -97,16 +101,19 @@ function handleWatchedEpisodeForm(form) {
             }
 
             var seasonNum = formData.get('season');
+            // Tira de episodios de la fila de temporada (rediseño 4.6): visto = color pleno.
+            var cell = document.querySelector('[data-ep-cell="' + seasonNum + '-' + formData.get('episode') + '"]');
+            if (cell) cell.classList.toggle('is-seen', !isWatched);
             var bar = document.querySelector('[data-season-bar="' + seasonNum + '"]');
             var count = document.querySelector('[data-season-count="' + seasonNum + '"]');
-            var progressDiv = document.querySelector('[data-season-progress="' + seasonNum + '"]');
-            if (bar && count && progressDiv) {
-                var total = parseInt(progressDiv.getAttribute('data-season-total') || '0');
+            if (count) {
+                // «7/10»: el total va en el propio texto (la barra de temporada ya no existe desde el rediseño 4.6).
                 var parts = count.textContent.split('/');
+                var total = parseInt(parts[1]) || 0;
                 var current = parseInt(parts[0]) + (isWatched ? -1 : 1);
                 current = Math.max(0, Math.min(total, current));
                 count.textContent = current + '/' + total;
-                bar.style.width = Math.round(current / total * 100) + '%';
+                if (bar && total) bar.style.width = Math.round(current / total * 100) + '%';
             }
 
             // Totales globales (solo si la temporada es "regular", no la 0)
@@ -201,6 +208,11 @@ function handleNotificationForm(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (f, btn, formData) {
             var action = formData.get('action');
+            // Barra de las fichas (rediseño, Fase 4): botón del sistema con estado; recarga al guardar.
+            if (btn.classList.contains('btn')) {
+                if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', action === 'add' ? 'true' : 'false');
+                return;
+            }
             if (action === 'add') {
                 btn.classList.remove('border', 'border-amber-200', 'text-amber-600', 'hover:bg-amber-50', 'hover:border-amber-400');
                 btn.classList.add('bg-amber-500', 'text-white', 'hover:bg-amber-600');
@@ -213,7 +225,9 @@ function handleNotificationForm(form) {
         },
         successMsg: function (formData) {
             return formData.get('action') === 'add' ? 'Notificación activada' : 'Notificación desactivada';
-        }
+        },
+        reload: form.hasAttribute('data-reload'),
+        reloadDelay: 300
     });
 }
 
@@ -222,6 +236,16 @@ function handleGenericFavAction(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (f, btn, formData) {
             state.action = formData.get('action');
+            state.actionInput = f.querySelector('input[name="action"]');
+            // Barra de las fichas (rediseño, Fase 4): los botones con estado se pintan pulsados o
+            // no al instante (el texto no cambia) y la página recarga con el estado real.
+            if (btn.hasAttribute('aria-pressed') && !btn.hasAttribute('aria-haspopup')) {
+                state.pressed = btn.getAttribute('aria-pressed');
+                state.pressedBtn = btn;
+                btn.setAttribute('aria-pressed', state.action === 'add' ? 'true' : 'false');
+                if (state.actionInput) state.actionInput.value = (state.action === 'add') ? 'remove' : 'add';
+                return;
+            }
             var walker = document.createTreeWalker(btn, NodeFilter.SHOW_TEXT, null);
             while (walker.nextNode()) {
                 var trimmed = walker.currentNode.textContent.trim();
@@ -238,6 +262,7 @@ function handleGenericFavAction(form) {
             if (state.actionInput) state.actionInput.value = (state.action === 'add') ? 'remove' : 'add';
         },
         successMsg: function (formData) {
+            if (form.getAttribute('data-ok')) return form.getAttribute('data-ok');
             var listType = formData.get('list_type') || formData.get('actionType');
             var name = LIST_NAMES[listType] || listType;
             return (state.action === 'add') ? 'Añadido a ' + name : 'Quitado de ' + name;
@@ -253,6 +278,7 @@ function handleGenericFavAction(form) {
         reload: true,
         reloadDelay: 300,
         onError: function () {
+            if (state.pressedBtn) state.pressedBtn.setAttribute('aria-pressed', state.pressed);
             if (state.textNode) state.textNode.textContent = ' ' + state.originalText + ' ';
             if (state.actionInput) state.actionInput.value = state.action;
         }

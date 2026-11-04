@@ -1,0 +1,159 @@
+---
+/**
+ * FichaSections — barra de secciones de las fichas (rediseño, Fase 4 · 4.3; README del handoff D1).
+ * `<nav>` con ANCLAS (no pestañas: no oculta nada), fija arriba al hacer scroll, justo debajo de la
+ * barra de acciones. La sección visible se marca con `aria-current="location"` (IntersectionObserver,
+ * sin escuchar el scroll). Solo se pintan las anclas cuyas secciones existen y tienen contenido: el
+ * servidor pasa las candidatas y el script quita las que salen vacías (p. ej., sin reseñas).
+ * En móvil, la fila se desliza en horizontal.
+ *
+ * Cada sección destino lleva `id` y `data-fs` (para el margen al saltar).
+ */
+interface Props {
+    /** `mo`: posición en móvil, donde los bloques se reordenan (4.7); en escritorio manda el orden de la lista. */
+    items: { id: string; label: string; mo?: number }[];
+}
+const { items } = Astro.props;
+---
+{items.length > 1 && <span class="fs-sentinel" aria-hidden="true" data-fs-sentinel></span>}
+{items.length > 1 && (
+    <nav class="fs" aria-label="Secciones de la ficha" data-fs-nav>
+        <ul class="fs-in">
+            {items.map((it) => (
+                <li style={it.mo ? `--mo:${it.mo}` : undefined}><a href={`#${it.id}`} data-fs-link={it.id}>{it.label}</a></li>
+            ))}
+        </ul>
+        {/* Flechas en móvil: dicen que la fila se desliza y la mueven (con ratón no hay gesto). */}
+        <button type="button" class="fs-arr fs-arr--prev" tabindex="-1" aria-hidden="true" data-fs-arr="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+        </button>
+        <button type="button" class="fs-arr fs-arr--next" tabindex="-1" aria-hidden="true" data-fs-arr="1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </button>
+        <script is:inline>
+            (function () {
+                var nav = document.currentScript && document.currentScript.closest('[data-fs-nav]');
+                if (!nav) return;
+                // Las secciones van DESPUÉS en el HTML: hay que esperar a que estén.
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+                function init() {
+                var links = Array.prototype.slice.call(nav.querySelectorAll('[data-fs-link]'));
+                var targets = [];
+                links.forEach(function (a) {
+                    var t = document.getElementById(a.getAttribute('data-fs-link'));
+                    if (!t || t.offsetHeight < 8) { a.parentNode.remove(); return; }
+                    targets.push({ a: a, t: t });
+                });
+                if (targets.length < 2) { nav.remove(); return; }
+                var ul = nav.firstElementChild;
+                // Se puede deslizar: difumina el borde derecho mientras queden enlaces por ver.
+                function edge() {
+                    nav.classList.toggle('has-more', ul.scrollLeft + ul.clientWidth < ul.scrollWidth - 4);
+                    nav.classList.toggle('has-less', ul.scrollLeft > 4);
+                }
+                nav.querySelectorAll('[data-fs-arr]').forEach(function (b) {
+                    b.addEventListener('click', function () {
+                        ul.scrollBy({ left: Number(b.getAttribute('data-fs-arr')) * ul.clientWidth * 0.6, behavior: 'smooth' });
+                    });
+                });
+                ul.addEventListener('scroll', edge, { passive: true }); window.addEventListener('resize', edge); edge();
+                if (!('IntersectionObserver' in window)) return;
+                // Pegada arriba: en móvil pasa a todo el ancho y lleva sombra (si no, el contenido asoma por
+                // los márgenes de la página al hacer scroll).
+                var sen = nav.previousElementSibling;
+                if (sen && sen.hasAttribute('data-fs-sentinel')) {
+                    new IntersectionObserver(function (e) { nav.classList.toggle('is-stuck', !e[0].isIntersecting && e[0].boundingClientRect.top < 0); }).observe(sen);
+                }
+                // Activa = la sección que está cruzando una franja fina justo bajo la barra; si cruzan
+                // dos (columna lateral y principal), la que empezó más abajo (la última que ha pasado).
+                var visible = new Set(), lockUntil = 0;
+                function setCur(cur) {
+                    targets.forEach(function (x) {
+                        if (x === cur) x.a.setAttribute('aria-current', 'location'); else x.a.removeAttribute('aria-current');
+                    });
+                    if (!cur) return;
+                    var l = cur.a.parentNode;
+                    if (l.offsetLeft < ul.scrollLeft || l.offsetLeft + l.offsetWidth > ul.scrollLeft + ul.clientWidth) {
+                        ul.scrollTo({ left: l.offsetLeft - 16, behavior: 'auto' });
+                    }
+                }
+                function mark() {
+                    if (Date.now() < lockUntil) return;
+                    var cur = null, best = -Infinity;
+                    targets.forEach(function (x) {
+                        if (!visible.has(x.t)) return;
+                        var top = x.t.getBoundingClientRect().top;
+                        if (top > best) { best = top; cur = x; }
+                    });
+                    if (cur) setCur(cur);
+                }
+                // Al pulsar un enlace se marca ese, aunque la sección sea corta y no llegue a la franja.
+                // El salto se corrige al terminar: en las fichas largas, imágenes que cargan por el camino
+                // (pósters de temporadas) empujan la sección y el desplazamiento se quedaba corto.
+                function go(x, tries) {
+                    var off = nav.offsetHeight + 8;
+                    var d = x.t.getBoundingClientRect().top - off;
+                    if (Math.abs(d) <= 6 || tries > 4) return;
+                    var smooth = tries === 0 && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                    window.scrollBy({ top: d, behavior: smooth ? 'smooth' : 'auto' });
+                    var done = false;
+                    function next() { if (done) return; done = true; lockUntil = Date.now() + 400; setTimeout(function () { go(x, tries + 1); }, 120); }
+                    if ('onscrollend' in window) window.addEventListener('scrollend', next, { once: true });
+                    setTimeout(next, smooth ? 1200 : 200);
+                }
+                targets.forEach(function (x) {
+                    x.a.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        setCur(x); lockUntil = Date.now() + 1500;
+                        try { history.replaceState(null, '', '#' + x.t.id); } catch (_) {}
+                        go(x, 0);
+                    });
+                });
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (e) { if (e.isIntersecting) visible.add(e.target); else visible.delete(e.target); });
+                    mark();
+                }, { rootMargin: '-60px 0px -' + Math.max(0, window.innerHeight - 140) + 'px 0px' });
+                targets.forEach(function (x) { io.observe(x.t); });
+                }
+            })();
+        </script>
+    </nav>
+)}
+
+<style is:global>
+    .fs { position: sticky; top: 0; z-index: 40; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+    .fs-in {
+        max-width: 72rem; margin: 0 auto; padding: 0 16px; list-style: none;
+        display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+    }
+    .fs-in::-webkit-scrollbar { display: none; }
+    .fs-in a {
+        display: flex; align-items: center; height: 44px; padding: 0 12px; white-space: nowrap;
+        font: 500 var(--fs-ui) var(--font); color: var(--text-2); text-decoration: none;
+        border-bottom: 2px solid transparent; margin-bottom: -1px;
+        transition: color .15s ease, border-color .15s ease;
+    }
+    .fs-in a:hover { color: var(--text); }
+    .fs-in a[aria-current="location"] { font-weight: 600; color: var(--text); border-bottom-color: var(--accent); }
+    .fs-in a:focus-visible { outline: 2px solid var(--primary); outline-offset: -4px; border-radius: var(--r-sm); }
+    .fs-sentinel { display: block; height: 0; }
+    /* Las flechas solo existen en móvil (abajo). */
+    .fs-arr { display: none; }
+    /* Fija: fondo y línea de abajo de borde a borde. `border-image` con outset pinta fuera de la caja
+       sin ensancharla ni crear scroll lateral (un ::before de 100vw sí lo creaba). */
+    .fs.is-stuck { border-image: linear-gradient(to top, var(--border) 1px, var(--bg-elev) 1px) fill 0 / 0 / 0 100vmax; }
+    [data-fs] { scroll-margin-top: 60px; }
+    @media (max-width: 767px) {
+        .fs-in { padding: 0 8px; }
+        .fs-in a { padding: 0 10px; }
+        .fs-in > li { order: var(--mo, 50); }
+        .fs-arr {
+            position: absolute; top: 0; bottom: 1px; width: 40px; border: 0; padding: 0; cursor: pointer;
+            display: none; align-items: center; color: var(--text); z-index: 1;
+        }
+        .fs-arr svg { width: 20px; height: 20px; }
+        .fs-arr--next { right: 0; justify-content: flex-end; padding-right: 8px; background: linear-gradient(to right, transparent, var(--bg-elev) 55%); }
+        .fs-arr--prev { left: 0; justify-content: flex-start; padding-left: 8px; background: linear-gradient(to left, transparent, var(--bg-elev) 55%); }
+        .fs.has-more .fs-arr--next, .fs.has-less .fs-arr--prev { display: flex; }
+    }
+</style>

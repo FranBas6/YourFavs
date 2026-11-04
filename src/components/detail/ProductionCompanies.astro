@@ -16,16 +16,16 @@ const { companies, title = "Productoras" } = Astro.props;
 ---
 {companies && companies.length > 0 && (
     <section>
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+        <div class="fsec-h"><h2>{title}</h2><span class="n">{companies.length}</span></div>
+        <div class="cprod">
             {companies.map((company) => (
-                <a href={`/productora/${encodeURIComponent(company.name)}?companyId=${company.id}`} class="flex flex-col items-center gap-2 p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
+                <a href={`/productora/${encodeURIComponent(company.name)}?companyId=${company.id}`} class="cprod-i">
                     {company.logo_path ? (
                         <img src={posterUrl(company.logo_path, 'w200')} alt={company.name} class="dark-logo-chip h-10 object-contain p-1" loading="lazy" />
                     ) : (
-                        <div class="h-10 flex items-center"><span class="text-xs text-gray-400">{company.name}</span></div>
+                        <div class="cprod-ph" aria-hidden="true">{company.name.slice(0, 1)}</div>
                     )}
-                    <span class="text-xs text-gray-600 text-center truncate w-full">{company.name}</span>
+                    <span>{company.name}</span>
                 </a>
             ))}
         </div>

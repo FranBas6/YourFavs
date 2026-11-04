@@ -9,18 +9,29 @@ interface Props {
     title?: string;
 }
 
-const { crew, title = "Equipo de Producción" } = Astro.props;
+const { crew, title = "Equipo" } = Astro.props;
+// Rediseño 4.5: 9 a la vista (tres filas); el resto se muestra con «Ver todo el equipo».
+const SHOWN = crew.length <= 12 ? crew.length : 9; // plegar 1–3 no compensa
 ---
 {crew.length > 0 && (
     <section>
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
-        <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {crew.map((member) => (
-                <a href={`/team/${encodeURIComponent(member.name)}`} class="p-3 bg-white rounded-xl border border-gray-200 hover:border-gray-300 transition-colors">
-                    <p class="text-sm font-medium text-gray-800">{member.name}</p>
-                    <p class="text-xs text-gray-500">{member.job}</p>
+        <div class="fsec-h"><h2>{title}</h2><span class="n">{crew.length}</span></div>
+        <div class="fcrew">
+            {crew.map((member, i) => (
+                <a href={`/team/${encodeURIComponent(member.name)}`} class:list={[{ 'cg-x': i >= SHOWN }]}>
+                    <b>{member.name}</b>
+                    <span>{member.job}</span>
                 </a>
             ))}
         </div>
+        {crew.length - SHOWN > 0 && (
+            <details class="cg-more group mt-3">
+                <summary class="cg-more-btn">
+                    <span class="group-open:hidden">Ver todo el equipo · {crew.length}</span>
+                    <span class="hidden group-open:inline">Ver menos</span>
+                    <svg class="w-4 h-4 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+            </details>
+        )}
     </section>
 )}

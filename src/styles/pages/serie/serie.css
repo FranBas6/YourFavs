@@ -42,3 +42,97 @@ details[open] .season-overview {
     -webkit-line-clamp: unset;
     overflow: visible;
 }
+
+/* =====================================================================================
+   4.6 · Temporadas fundidas (README del handoff D3). Una fila por temporada con su tira de
+   episodios; al abrirla, los datos de la temporada y la lista de episodios de siempre.
+   Tira: azul por la nota de TMDB del episodio (--ep-q-*); visto = color pleno, sin ver = el mismo al 35 %.
+   Solo tokens: el oscuro sale de ellos.
+   ===================================================================================== */
+.sr { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); overflow: hidden; }
+.sr[open] { border-color: var(--border-strong); }
+.sr-row {
+    list-style: none; cursor: pointer; display: flex; align-items: flex-start; gap: 18px;
+    padding: 14px 16px 14px 14px;
+}
+.sr-row::-webkit-details-marker { display: none; }
+.sr-row:hover { background: var(--bg-tint); }
+.sr-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--r-md); }
+/* Póster destacado (Fran: «el diseño limpio, algo más grande»): 112 × 168 en escritorio, 76 × 114 en móvil. */
+.sr-poster { width: 112px; aspect-ratio: 2 / 3; height: auto; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; background: var(--bg-tint); box-shadow: var(--sh-md); }
+.sr-main { flex: 1 1 auto; min-width: 0; align-self: stretch; display: flex; flex-direction: column; gap: 10px; padding-top: 2px; }
+/* Tres cifras grandes y limpias (episodios · nota · duración), como las casillas de prod pero sin color. */
+.sr-stats { display: flex; gap: 28px; }
+.sr-stats > span { display: flex; flex-direction: column; }
+.sr-stats b { font: 600 var(--fs-sub) var(--font); color: var(--text); line-height: 1.2; white-space: nowrap; }
+.sr-stats small { font-size: var(--fs-meta); color: var(--text-3); }
+/* La tira, pegada abajo: se alinea con el pie del póster. */
+.sr-main > .sr-strip { margin-top: auto; }
+.sr-head { display: flex; align-items: flex-start; gap: 12px; }
+.sr-t { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
+.sr-t b { font: 600 var(--fs-sub) var(--font); color: var(--text); line-height: 1.25; }
+.sr-t small { font-size: var(--fs-meta); color: var(--text-3); margin-top: 2px; }
+.sr-facts { margin: 0; font-size: var(--fs-meta); color: var(--text-2); line-height: 1.5; }
+.sr-strip { display: flex; flex-wrap: wrap; gap: 4px; }
+.sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--border-strong); opacity: .35; }
+.sr-c.is-seen { opacity: 1; }
+/* Un solo tono (azul, elegido por Fran entre 5 muestras): cuanto más intenso, mejor nota. */
+.sr-c[data-b="high"] { background: var(--ep-q-high); }
+.sr-c[data-b="med"]  { background: var(--ep-q-med); }
+.sr-c[data-b="low"]  { background: var(--ep-q-low); }
+.sr-c[data-b="poor"] { background: var(--ep-q-poor); }
+.sr-n { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
+/* Sinopsis: oculta hasta abrir la temporada (Fran), y entonces entera. */
+.sr-main .sr-ov { display: none; margin: 0; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
+details[open] > summary .sr-main .sr-ov { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.sr-chev { width: 18px; height: 18px; color: var(--text-3); flex-shrink: 0; transition: transform .15s ease; }
+details[open] > summary .sr-chev { transform: rotate(180deg); }
+.sr-body { border-top: 1px solid var(--border); padding: 12px 16px 16px; }
+.sr-prog-bar { display: block; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+.sr-prog-bar i { display: block; height: 100%; background: var(--ok, var(--a-visto)); transition: width .3s ease; }
+
+/* Leyenda, en una línea */
+.sr-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0 0 12px; font-size: var(--fs-micro); color: var(--text-3); }
+.sr-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.sr-legend .sr-c { width: 10px; height: 10px; }
+.sr-legend-k { margin-left: auto; }
+
+/* Próximo / último episodio: una línea */
+.sr-eps { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.sr-el { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); }
+.sr-el > summary {
+    list-style: none; cursor: pointer; display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+    min-height: 44px; padding: 8px 12px; font-size: var(--fs-ui); color: var(--text-2);
+}
+.sr-el > summary::-webkit-details-marker { display: none; }
+.sr-el > summary:hover { background: var(--bg-tint); }
+.sr-el-k { font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.sr-el-k.is-next { color: var(--a-ep); }
+.sr-el-code { font: 600 var(--fs-meta) var(--font-mono); color: var(--text-2); }
+.sr-el-name { font-weight: 600; color: var(--text); text-decoration: none; min-width: 0; }
+.sr-el-name:hover { text-decoration: underline; text-underline-offset: 2px; }
+.sr-el-mark { font: 700 var(--fs-micro) var(--font); letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; background: var(--a-rating-bg); color: var(--text); }
+.sr-el-when { color: var(--text-3); }
+.sr-el-r { color: var(--text-2); font-weight: 600; }
+.sr-el > summary .sr-chev { margin-left: auto; }
+.sr-el-body { position: relative; display: flex; gap: 12px; align-items: flex-start; padding: 0 12px 12px; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
+.sr-el-still { width: 160px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; }
+
+@media (max-width: 767px) {
+    /* La tira baja a su propia línea, a todo el ancho; la nota de temporada se oculta. */
+    /* Móvil: al lado del póster, nombre y cifras; debajo, a todo el ancho, los datos y la tira. */
+    .sr-row { display: grid; grid-template-columns: 76px minmax(0, 1fr); column-gap: 12px; row-gap: 10px; padding: 12px; align-items: start; }
+    .sr-poster { width: 76px; grid-row: 1 / span 2; }
+    .sr-main { display: contents; }
+    .sr-head { grid-column: 2; gap: 8px; }
+    .sr-stats { grid-column: 2; gap: 16px; align-self: end; }
+    .sr-stats b { font-size: var(--fs-body); }
+    .sr-facts, .sr-main > .sr-strip, .sr-main .sr-ov { grid-column: 1 / -1; margin-top: 0; }
+    .sr-t b { font-size: var(--fs-body); }
+    .sr-strip { gap: 3px; }
+    .sr-strip .sr-c { width: 10px; height: 10px; border-radius: 2px; }
+    .sr-el-body { flex-direction: column; }
+    .sr-el-still { width: 100%; }
+    .sr-legend-k { margin-left: 0; }
+}
+.sr-more { font: 600 var(--fs-micro) var(--font); color: var(--text-3); align-self: center; line-height: 12px; }

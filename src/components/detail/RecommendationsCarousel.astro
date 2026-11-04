@@ -1,4 +1,12 @@
 ---
+/**
+ * Recomendaciones / parecidas de las fichas. Piel v2 (rediseño 4.8): la fila horizontal y la tarjeta
+ * del sistema (Row + TitleCard, como la portada) con cabecera sobria y flechas; la sinopsis que antes
+ * salía al pasar el ratón está ahora en la vista rápida (▶ del póster).
+ */
+import Row from '../Row.astro';
+import TitleCard from '../Cards/TitleCard.astro';
+
 interface Item {
     id: number | string;
     title?: string;
@@ -18,37 +26,35 @@ interface Props {
 }
 
 const { items, mediaType, title, limit = 20 } = Astro.props;
-const linkPrefix = mediaType === 'movie' ? '/movie/' : '/serie/';
+const shown = items.slice(0, limit);
+const railId = `rail-parecidas-${mediaType}`;
 ---
-{items.length > 0 && (
+{shown.length > 0 && (
     <section>
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">{title}</h2>
-        <div class="recommendations-carousel">
-            <div class="recommendations-container flex gap-5 overflow-x-auto pb-4">
-                {items.slice(0, limit).map((item, index) => {
-                    const displayName = item.title || item.name || '';
-                    const year = item.release_date
-                        ? new Date(item.release_date).getFullYear()
-                        : item.first_air_date
-                            ? new Date(item.first_air_date).getFullYear()
-                            : '';
-                    return (
-                        <a href={`${linkPrefix}${item.id}`} class="recommendation-card flex-shrink-0 w-40 animate-fade-in-up" style={`animation-delay: ${index * 0.05}s`}>
-                            <div class="relative rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
-                                <img src={item.poster_path || '/placeholder.jpg'} alt={displayName} loading="lazy" class="w-full aspect-[2/3] object-cover transition-transform duration-300 hover:scale-105" />
-                                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-end p-3">
-                                    <p class="text-white text-xs line-clamp-3 leading-relaxed">{item.overview}</p>
-                                </div>
-                                {item.vote_average && item.vote_average > 0 && (
-                                    <span class="absolute top-2 right-2 text-xs font-bold px-2 py-0.5 bg-black/70 text-yellow-400 rounded-lg backdrop-blur-sm">{item.vote_average.toFixed(1)}</span>
-                                )}
-                            </div>
-                            <p class="mt-2 text-sm font-medium text-gray-800 line-clamp-2">{displayName}</p>
-                            <p class="text-xs text-gray-400">{year}</p>
-                        </a>
-                    );
-                })}
-            </div>
+        <div class="fsec-h">
+            <h2>{title}</h2><span class="n">{shown.length}</span>
+            <span class="fsec-arr">
+                <button type="button" class="btn btn--sm btn--icon btn--ghost" data-rail-prev={railId} aria-label="Anteriores" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                </button>
+                <button type="button" class="btn btn--sm btn--icon btn--ghost" data-rail-next={railId} aria-label="Siguientes">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                </button>
+            </span>
         </div>
+        <Row id={railId} label={title}>
+            {shown.map((item) => (
+                <TitleCard
+                    mediaType={mediaType}
+                    id={String(item.id)}
+                    title={item.title || item.name || ''}
+                    img={item.poster_path || '/placeholder.jpg'}
+                    vote_average={item.vote_average}
+                    overview={item.overview}
+                    date={item.release_date || item.first_air_date}
+                    context="catalog"
+                />
+            ))}
+        </Row>
     </section>
 )}
