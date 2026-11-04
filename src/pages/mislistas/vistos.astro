@@ -7,9 +7,8 @@ import {getMoviesVistasSolo} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
-import StatsPanel from "../../components/personal/StatsPanel.astro";
+import ListHeader from "../../components/personal/ListHeader.astro";
 import ListsNav from "../../components/personal/ListsNav.astro";
-import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
@@ -42,41 +41,20 @@ const {
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Vistos</h1>
-            <p class="text-gray-500 text-base">Series y películas que ya has visto</p>
-        </header>
-
-        <div class="flex items-start justify-end gap-3 mb-6">
-            <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} myPlatforms={Astro.locals.user?.platforms ?? []} />
-        </div>
-        <StatsPanel stats={stats} />
-
+        {/* Cabecera de lista (rediseño 5.2): título con total, Todo · Películas · Series, Filtros y un solo orden */}
+        <ListHeader
+            title="Vistos" subtitle="Series y películas que ya has visto" total={stats?.general?.totalContent ?? (filteredSeries.length + filteredMovies.length)}
+            pageUrl={pageUrl} filter={filter} sort={sort} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter}
+            tagsFilter={tagsFilter} availableGenres={availableGenres} availableTags={availableTags}
+            myPlatforms={Astro.locals.user?.platforms ?? []} stats={stats}
+        >
+        </ListHeader>
         <PersonalResultsBar
             shown={seriesPaginadas.length + peliculasPaginadas.length}
             total={filteredSeries.length + filteredMovies.length}
             movies={filteredMovies.length}
             series={filteredSeries.length}
         />
-
-        {/* Orden: por defecto (recientes) o por tu nota personal */}
-        <div class="flex items-center justify-end gap-1.5 mb-5">
-            <span class="font-mono text-[10px] tracking-widest text-gray-400 mr-1">ORDEN</span>
-            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: '' })}
-               class={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all border
-                   ${sort !== 'mi-nota'
-                       ? 'bg-gray-800 text-white border-gray-800'
-                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
-                Recientes
-            </a>
-            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: 'mi-nota' })}
-               class={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all border
-                   ${sort === 'mi-nota'
-                       ? 'bg-amber-400 text-amber-950 border-amber-400'
-                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
-                ★ Tu nota ↓
-            </a>
-        </div>
 
         <div class="space-y-10">
             {/* Series */}

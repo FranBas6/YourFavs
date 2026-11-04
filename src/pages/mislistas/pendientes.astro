@@ -7,9 +7,8 @@ import {getMoviesPendientes} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
-import StatsPanel from "../../components/personal/StatsPanel.astro";
+import ListHeader from "../../components/personal/ListHeader.astro";
 import ListsNav from "../../components/personal/ListsNav.astro";
-import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
@@ -50,18 +49,15 @@ const recByMap = SOCIAL_PHASE.recommend && _me
             </div>
         )}
 
-        <header class="mb-6 flex items-start justify-between gap-3 flex-wrap">
-            <div>
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Pendientes</h1>
-                <p class="text-gray-500 text-base">Series y películas que quieres ver</p>
-            </div>
-            <WhatToWatch />
-        </header>
-
-        <div class="flex items-start justify-end gap-3 mb-6">
-            <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} myPlatforms={Astro.locals.user?.platforms ?? []} />
-        </div>
-        <StatsPanel stats={stats} />
+        {/* Cabecera de lista (rediseño 5.2): título con total, Todo · Películas · Series, Filtros y un solo orden */}
+        <ListHeader
+            title="Pendientes" subtitle="Series y películas que quieres ver" total={stats?.general?.totalContent ?? (filteredSeries.length + filteredMovies.length)}
+            pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter}
+            tagsFilter={tagsFilter} availableGenres={availableGenres} availableTags={availableTags}
+            myPlatforms={Astro.locals.user?.platforms ?? []} stats={stats} sorts={[{ key: '', label: 'Añadidos recientes' }]}
+        >
+            <WhatToWatch slot="actions" />
+        </ListHeader>
 
         <PersonalResultsBar
             shown={seriesPaginadas.length + peliculasPaginadas.length}

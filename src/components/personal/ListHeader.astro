@@ -1,0 +1,123 @@
+---
+/**
+ * ListHeader — cabecera de una lista de Mis listas (rediseño, Fase 5 · 5.2; README del handoff D4).
+ *   1. Título con su total («Favoritos · 64») y subtítulo; en móvil se oculta el título (ya lo dice
+ *      el botón de ListsNav «MIS LISTAS · Favoritos · 64») y queda para lectores de pantalla.
+ *   2. Una barra: Todo · Películas · Series a la izquierda; a la derecha Filtros (PersonalFilter,
+ *      neutro y cerrado, con contador) y UN solo «Orden ▾». En móvil, todo en una línea.
+ *   3. Estadísticas plegadas (StatsPanel), como antes.
+ * Los enlaces conservan búsqueda, géneros, plataformas, etiquetas y orden (buildUrl).
+ */
+import { buildUrl } from '../../utils/buildUrl';
+import PersonalFilter from './PersonalFilter.astro';
+import StatsPanel from './StatsPanel.astro';
+
+interface Props {
+    title: string;
+    subtitle?: string;
+    total: number;
+    pageUrl: URL;
+    filter: string;
+    sort?: string;
+    searchQuery?: string;
+    genreFilter?: string;
+    platformFilter?: string;
+    tagsFilter?: string;
+    availableGenres?: string[];
+    availableTags?: string[];
+    myPlatforms?: number[];
+    stats?: any;
+    /** Opciones de orden; la primera es la de por defecto (sort vacío). */
+    sorts?: { key: string; label: string }[];
+}
+const {
+    title, subtitle, total, pageUrl, filter, sort = '', searchQuery = '', genreFilter = '', platformFilter = '',
+    tagsFilter = '', availableGenres = [], availableTags = [], myPlatforms = [], stats,
+    sorts = [{ key: '', label: 'Añadidos recientes' }, { key: 'mi-nota', label: 'Tu nota' }],
+} = Astro.props;
+const base = { search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter };
+const TYPES = [{ key: 'todos', label: 'Todo' }, { key: 'peliculas', label: 'Películas' }, { key: 'series', label: 'Series' }];
+const curSort = sorts.find((o) => o.key === sort) ?? sorts[0];
+---
+<header class="lh">
+    <div class="lh-t">
+        <h1>{title}<span class="lh-n">{total.toLocaleString('es-ES')}</span></h1>
+        {subtitle && <p>{subtitle}</p>}
+    </div>
+    <slot name="actions" />
+</header>
+
+<div class="lh-bar">
+    <nav class="lh-seg" aria-label="Tipo de título">
+        {TYPES.map((t) => (
+            <a href={buildUrl(pageUrl, { ...base, filter: t.key, sort })} aria-current={filter === t.key ? 'page' : undefined}>{t.label}</a>
+        ))}
+    </nav>
+    <span class="lh-sp" aria-hidden="true"></span>
+    <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} myPlatforms={myPlatforms} hideType />
+    {sorts.length > 1 && (
+        <details class="lh-sort" data-lh-sort>
+            <summary class="btn btn--sm" aria-label={`Orden: ${curSort.label}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></svg>
+                <span class="lh-sort-l">{curSort.label}</span>
+                <svg class="lh-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </summary>
+            <div class="lh-menu" role="menu">
+                {sorts.map((o) => (
+                    <a role="menuitemradio" aria-checked={o.key === curSort.key ? 'true' : 'false'} href={buildUrl(pageUrl, { ...base, filter, sort: o.key })}>
+                        {o.label}
+                        {o.key === curSort.key && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>}
+                    </a>
+                ))}
+            </div>
+        </details>
+    )}
+</div>
+
+{stats && <StatsPanel stats={stats} />}
+
+<script is:inline>
+    (function () {
+        if (window.__yfLh) return; window.__yfLh = true;
+        // El menú de orden se cierra al pulsar fuera o con Esc.
+        document.addEventListener('click', function (e) {
+            document.querySelectorAll('[data-lh-sort][open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            document.querySelectorAll('[data-lh-sort][open]').forEach(function (d) { d.open = false; d.querySelector('summary').focus(); });
+        });
+    })();
+</script>
+
+<style is:global>
+    .lh { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .lh-t h1 { margin: 0; display: flex; align-items: baseline; gap: 12px; font: 700 var(--fs-page) var(--font); color: var(--text); line-height: 1.15; }
+    .lh-n { font: 500 var(--fs-body) var(--font-mono); color: var(--text-3); }
+    .lh-t p { margin: 6px 0 0; font-size: var(--fs-body); color: var(--text-3); }
+    .lh-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .lh-sp { flex: 1; }
+    .lh-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); }
+    .lh-seg a { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: calc(var(--r-md) - 3px); font: 600 var(--fs-ui) var(--font); color: var(--text-2); text-decoration: none; white-space: nowrap; }
+    .lh-seg a:hover { color: var(--text); }
+    .lh-seg a[aria-current="page"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm, 0 1px 2px rgba(15, 23, 42, .08)); }
+    .lh-seg a:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+    .lh-sort { position: relative; }
+    .lh-sort > summary { list-style: none; }
+    .lh-sort > summary::-webkit-details-marker { display: none; }
+    .lh-car { width: 13px !important; height: 13px !important; opacity: .7; }
+    .lh-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 200px; padding: 6px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-lg); }
+    .lh-menu a { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: var(--r-sm); font: 500 var(--fs-ui) var(--font); color: var(--text); text-decoration: none; }
+    .lh-menu a:hover, .lh-menu a:focus-visible { background: var(--bg-tint); outline: none; }
+    .lh-menu a[aria-checked="true"] { font-weight: 600; }
+    .lh-menu svg { width: 15px; height: 15px; color: var(--primary); }
+    @media (max-width: 1023px) {
+        /* El título ya está en el botón de Mis listas: queda solo para lectores de pantalla. */
+        .lh-t h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .lh-t p { margin: 0; font-size: var(--fs-ui); }
+        .lh { margin-bottom: 12px; }
+        .lh-bar { gap: 6px; }
+        .lh-seg a { padding: 0 9px; }
+        .lh-sort-l { display: none; }
+    }
+</style>
