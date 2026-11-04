@@ -378,11 +378,11 @@ const jsonLd = item ? {
             trailerUrl={trailerUrl}
         />
         <FichaSections items={[
-            { id: 'sec-donde', label: 'Dónde ver', mo: 1 },
-            { id: 'sec-videos', label: 'Vídeos', mo: 2 },
-            { id: 'sec-reparto', label: 'Reparto', mo: 3 },
+            { id: 'sec-detalles', label: 'Detalles', mo: 1 },
+            { id: 'sec-donde', label: 'Dónde ver', mo: 2 },
+            { id: 'sec-videos', label: 'Vídeos', mo: 3 },
+            { id: 'sec-reparto', label: 'Reparto', mo: 4 },
             { id: 'sec-imagenes', label: 'Imágenes', mo: 5 },
-            { id: 'sec-detalles', label: 'Detalles', mo: 4 },
             { id: 'sec-resenas', label: 'Reseñas', mo: 6 },
             { id: 'sec-parecidas', label: 'Parecidas', mo: 7 },
         ]} />
@@ -396,6 +396,83 @@ const jsonLd = item ? {
                     <!-- Poster mobile -->
                     <div class="mo-1 md:hidden w-56 mx-auto rounded-xl overflow-hidden shadow-xl">
                         <img src={posterUrl(item?.poster_path)} alt={item?.title} class="w-full aspect-[2/3] object-cover" />
+                    </div>
+
+                    <!-- Información (con clasificación, enlaces e idiomas; rediseño 4.4) -->
+                    <div id="sec-detalles" data-fs class="mo-1 bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
+                        <ul class="space-y-2.5 text-sm sm:text-base">
+                            <li class="flex justify-between"><span class="text-gray-500">Estreno</span><span class="text-gray-800 font-medium">{formatDate(item?.release_date)}</span></li>
+                            {regionReleases.length > 0 && (
+                                <li class="flex justify-between gap-3">
+                                    <span class="text-gray-500 flex-shrink-0">En {regionLabel}</span>
+                                    <span class="text-right flex flex-col gap-0.5">
+                                        {regionReleases.map((r) => (
+                                            <span class="text-gray-800 font-medium">
+                                                <span class="text-gray-500 font-normal">{r.label}</span> · {r.date}
+                                                {r.note && <span class="block text-xs text-gray-500 font-normal">{r.note}</span>}
+                                            </span>
+                                        ))}
+                                    </span>
+                                </li>
+                            )}
+                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
+                            <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
+                            {item?.original_title && item.original_title !== item.title && (
+                                <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_title}</span></li>
+                            )}
+                            {item?.runtime > 0 && (
+                                <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{Math.floor(item.runtime / 60)}h {item.runtime % 60}min</span></li>
+                            )}
+                            {additionalInfo.budget && additionalInfo.budget > 0 && (
+                                <li class="flex justify-between"><span class="text-gray-500">Presupuesto</span><span class="text-gray-800 font-medium">{formatCurrency(additionalInfo.budget)}</span></li>
+                            )}
+                            {additionalInfo.revenue && additionalInfo.revenue > 0 && (
+                                <li class="flex justify-between"><span class="text-gray-500">Recaudación</span><span class="text-green-600 font-medium">{formatCurrency(additionalInfo.revenue)}</span></li>
+                            )}
+                            {additionalInfo.budget && additionalInfo.budget > 0 && additionalInfo.revenue && additionalInfo.revenue > 0 && (
+                                <li class="flex justify-between"><span class="text-gray-500">Beneficio</span><span class="text-gray-800 font-medium">x{(additionalInfo.revenue / additionalInfo.budget).toFixed(1)}</span></li>
+                            )}
+                            {/* Clasificación por edades (antes, tarjeta aparte) */}
+                            {(() => {
+                                const rating = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null;
+                                return rating ? <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Clasificación</span><span class="text-gray-800 font-medium text-right">{rating.text}</span></li> : null;
+                            })()}
+                            {movieStatus && (
+                                <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class="text-yellow-700 font-medium">{movieStatus}</span></li>
+                            )}
+                            {productionCountries.length > 0 && (
+                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">País</span><span class="text-gray-800 font-medium text-right">{productionCountries.map((c: any) => c.name).join(', ')}</span></li>
+                            )}
+                            {yearsAgo && yearsAgo > 0 && (
+                                <li class="flex justify-between"><span class="text-gray-500">Antigüedad</span><span class="text-gray-800 font-medium">Hace {yearsAgo} {yearsAgo === 1 ? 'año' : 'años'}</span></li>
+                            )}
+                            {ratingPercentile !== null && (
+                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Comparativa</span><span class="text-gray-800 font-medium text-right">Mejor que el {ratingPercentile}%{mainGenre ? ` de ${mainGenre}` : ''}</span></li>
+                            )}
+                        </ul>
+                        {(hasSocialLinks || imdbId || movieLanguages.length > 0) && (
+                            <div class="mt-4 pt-3 border-t border-gray-100 space-y-3">
+                        {(hasSocialLinks || imdbId) && (
+                            <div class="flex flex-wrap gap-2">
+                                {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100">IMDb</a>}
+                                {movieSocialLinks.facebook && <a href={movieSocialLinks.facebook} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">Facebook</a>}
+                                {movieSocialLinks.instagram && <a href={movieSocialLinks.instagram} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100">Instagram</a>}
+                                {movieSocialLinks.twitter && <a href={movieSocialLinks.twitter} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100">Twitter</a>}
+                            </div>
+                        )}
+
+                        {movieLanguages.length > 0 && (
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="text-xs text-gray-500 mr-1">Idiomas</span>
+                                {movieLanguages.map((lang) => (
+                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">{getLanguageDisplayName(lang.iso_639_1)}</span>
+                                ))}
+                            </div>
+                        )}
+                            </div>
+                        )}
                     </div>
 
                     <!-- Dónde ver -->
@@ -497,83 +574,6 @@ const jsonLd = item ? {
                             <HideFromProfileToggle mediaType="movie" tmdbId={item?.id} title={item?.title || ''} posterPath={item?.poster_path ?? null} />
                         </div>
                     )}
-                    </div>
-
-                    <!-- Información (con clasificación, enlaces e idiomas; rediseño 4.4) -->
-                    <div id="sec-detalles" data-fs class="mo-6 bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
-                        <ul class="space-y-2.5 text-sm sm:text-base">
-                            <li class="flex justify-between"><span class="text-gray-500">Estreno</span><span class="text-gray-800 font-medium">{formatDate(item?.release_date)}</span></li>
-                            {regionReleases.length > 0 && (
-                                <li class="flex justify-between gap-3">
-                                    <span class="text-gray-500 flex-shrink-0">En {regionLabel}</span>
-                                    <span class="text-right flex flex-col gap-0.5">
-                                        {regionReleases.map((r) => (
-                                            <span class="text-gray-800 font-medium">
-                                                <span class="text-gray-500 font-normal">{r.label}</span> · {r.date}
-                                                {r.note && <span class="block text-xs text-gray-500 font-normal">{r.note}</span>}
-                                            </span>
-                                        ))}
-                                    </span>
-                                </li>
-                            )}
-                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
-                            {item?.original_title && item.original_title !== item.title && (
-                                <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_title}</span></li>
-                            )}
-                            {item?.runtime > 0 && (
-                                <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{Math.floor(item.runtime / 60)}h {item.runtime % 60}min</span></li>
-                            )}
-                            {additionalInfo.budget && additionalInfo.budget > 0 && (
-                                <li class="flex justify-between"><span class="text-gray-500">Presupuesto</span><span class="text-gray-800 font-medium">{formatCurrency(additionalInfo.budget)}</span></li>
-                            )}
-                            {additionalInfo.revenue && additionalInfo.revenue > 0 && (
-                                <li class="flex justify-between"><span class="text-gray-500">Recaudación</span><span class="text-green-600 font-medium">{formatCurrency(additionalInfo.revenue)}</span></li>
-                            )}
-                            {additionalInfo.budget && additionalInfo.budget > 0 && additionalInfo.revenue && additionalInfo.revenue > 0 && (
-                                <li class="flex justify-between"><span class="text-gray-500">Beneficio</span><span class="text-gray-800 font-medium">x{(additionalInfo.revenue / additionalInfo.budget).toFixed(1)}</span></li>
-                            )}
-                            {/* Clasificación por edades (antes, tarjeta aparte) */}
-                            {(() => {
-                                const rating = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null;
-                                return rating ? <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Clasificación</span><span class="text-gray-800 font-medium text-right">{rating.text}</span></li> : null;
-                            })()}
-                            {movieStatus && (
-                                <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class="text-yellow-700 font-medium">{movieStatus}</span></li>
-                            )}
-                            {productionCountries.length > 0 && (
-                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">País</span><span class="text-gray-800 font-medium text-right">{productionCountries.map((c: any) => c.name).join(', ')}</span></li>
-                            )}
-                            {yearsAgo && yearsAgo > 0 && (
-                                <li class="flex justify-between"><span class="text-gray-500">Antigüedad</span><span class="text-gray-800 font-medium">Hace {yearsAgo} {yearsAgo === 1 ? 'año' : 'años'}</span></li>
-                            )}
-                            {ratingPercentile !== null && (
-                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Comparativa</span><span class="text-gray-800 font-medium text-right">Mejor que el {ratingPercentile}%{mainGenre ? ` de ${mainGenre}` : ''}</span></li>
-                            )}
-                        </ul>
-                        {(hasSocialLinks || imdbId || movieLanguages.length > 0) && (
-                            <div class="mt-4 pt-3 border-t border-gray-100 space-y-3">
-                        {(hasSocialLinks || imdbId) && (
-                            <div class="flex flex-wrap gap-2">
-                                {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100">IMDb</a>}
-                                {movieSocialLinks.facebook && <a href={movieSocialLinks.facebook} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">Facebook</a>}
-                                {movieSocialLinks.instagram && <a href={movieSocialLinks.instagram} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100">Instagram</a>}
-                                {movieSocialLinks.twitter && <a href={movieSocialLinks.twitter} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100">Twitter</a>}
-                            </div>
-                        )}
-
-                        {movieLanguages.length > 0 && (
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="text-xs text-gray-500 mr-1">Idiomas</span>
-                                {movieLanguages.map((lang) => (
-                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">{getLanguageDisplayName(lang.iso_639_1)}</span>
-                                ))}
-                            </div>
-                        )}
-                            </div>
-                        )}
                     </div>
 
                     <!-- Palabras clave de TMDB (aparte de tus etiquetas) -->
