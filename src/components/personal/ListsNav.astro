@@ -19,8 +19,14 @@ import { LISTS_NAV, activeListsNavItem, type ListsNavItem } from '../../utils/co
 interface Props {
     /** Ruta de la página (por defecto, la actual). */
     current?: string;
+    /**
+     * Botón en vez de columna también en escritorio (abre la lista como desplegable). Para páginas
+     * que ya tienen su propia columna lateral (Amigos, Mensajes): con las dos no cabía el contenido.
+     */
+    compact?: boolean;
 }
 const current = Astro.props.current ?? Astro.url.pathname;
+const compact = !!Astro.props.compact;
 const active = activeListsNavItem(current);
 
 const ICON: Record<string, string> = {
@@ -44,8 +50,20 @@ const ICON: Record<string, string> = {
 const svg = (k: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k] ?? ''}</svg>`;
 const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
 ---
-{/* Escritorio: columna */}
-<nav class="ln-col" aria-label="Mis listas">
+
+<div class:list={["ln-wrap", { "is-compact": compact }]}>
+{/* Móvil: botón + hoja */}
+<button type="button" class:list={['ln-m', { 'ln-m--always': compact }]} aria-haspopup="dialog" aria-expanded={compact ? 'false' : undefined} data-ln-open>
+    <span class="ln-m-k">Mis listas</span>
+    <span class="ln-m-v">
+        {active && <Fragment set:html={svg(active.icon)} />}
+        <b>{active?.label ?? 'Mis listas'}</b>
+        {active?.countKey && <span class="ln-m-c" data-ln-count={active.countKey} data-ln-prefix="· "></span>}
+    </span>
+    <Fragment set:html={svg('chev')} />
+</button>
+{/* Escritorio: columna (en compacto, desplegable bajo el botón) */}
+<nav class:list={['ln-col', { 'ln-col--pop': compact }]} aria-label="Mis listas" id={compact ? 'ln-pop' : undefined} hidden={compact}>
     {LISTS_NAV.map((g) => (
         <div class="ln-g">
             <p class="ln-gt">{g.label}</p>
@@ -61,17 +79,7 @@ const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
         </div>
     ))}
 </nav>
-
-{/* Móvil: botón + hoja */}
-<button type="button" class="ln-m" aria-haspopup="dialog" data-ln-open>
-    <span class="ln-m-k">Mis listas</span>
-    <span class="ln-m-v">
-        {active && <Fragment set:html={svg(active.icon)} />}
-        <b>{active?.label ?? 'Mis listas'}</b>
-        {active?.countKey && <span class="ln-m-c" data-ln-count={active.countKey} data-ln-prefix="· "></span>}
-    </span>
-    <Fragment set:html={svg('chev')} />
-</button>
+</div>
 <BottomSheet id="listsnav" title="Mis listas">
     {LISTS_NAV.map((g) => (
         <div class="ln-sg">
@@ -95,9 +103,24 @@ const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
     (function () {
         if (window.__yfLn) return; window.__yfLn = true;
         document.addEventListener('click', function (e) {
+            var pop = document.getElementById('ln-pop');
             var b = e.target.closest && e.target.closest('[data-ln-open]');
-            if (!b) return;
+            if (!b) {
+                // Clic fuera del desplegable compacto: se cierra.
+                if (pop && !pop.hidden && !pop.contains(e.target)) { pop.hidden = true; document.querySelectorAll('[data-ln-open]').forEach(function (x) { x.setAttribute('aria-expanded', 'false'); }); }
+                return;
+            }
+            // Compacto en escritorio: desplegable. En móvil (o sin compacto): la hoja.
+            if (pop && window.innerWidth >= 1024) {
+                pop.hidden = !pop.hidden;
+                b.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+                return;
+            }
             document.dispatchEvent(new CustomEvent('yf:sheet-open', { detail: { id: 'listsnav' } }));
+        });
+        document.addEventListener('keydown', function (e) {
+            var pop = document.getElementById('ln-pop');
+            if (e.key === 'Escape' && pop && !pop.hidden) { pop.hidden = true; var b = document.querySelector('[data-ln-open]'); if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); } }
         });
         function fill() {
             fetch('/api/lists/counts', { credentials: 'same-origin' })
@@ -175,4 +198,11 @@ const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
         .ln-col { display: none; }
         .ln-m { display: flex; }
     }
+    /* Compacto: botón también en escritorio y la columna como desplegable debajo */
+    .ln-m--always { display: flex; max-width: 360px; }
+    /* El envoltorio no existe en modo columna (si no, la columna dejaría de quedarse fija). */
+    .ln-wrap { display: contents; }
+    .ln-wrap.is-compact { display: block; position: relative; }
+    .ln-col--pop { position: absolute; left: 0; top: calc(100% - 8px); z-index: 70; width: 260px; box-shadow: var(--sh-lg); }
+    .ln-col--pop[hidden] { display: none; }
 </style>
