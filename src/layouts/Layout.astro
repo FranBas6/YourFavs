@@ -127,7 +127,13 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 {Astro.locals.user && <MiniChat/>}
 
 <main id="content" class="max-w-7xl w-full px-3 sm:px-6 lg:px-8 mx-auto pt-4 sm:pt-6 md:pt-8 lg:pt-10">
-    <slot/>
+    {/* Columna lateral opcional (rediseño 5.1: la navegación de Mis listas). Solo si la página la pasa. */}
+    {Astro.slots.has('aside') ? (
+        <div class="yf-aside-shell">
+            <div class="yf-aside"><slot name="aside"/></div>
+            <div class="yf-aside-main"><slot/></div>
+        </div>
+    ) : <slot/>}
 
     <!-- Botón flotante para volver arriba -->
     <div class="back-to-top-container">

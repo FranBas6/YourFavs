@@ -8,6 +8,7 @@
  * al pulsar, el aviso pasa a su estado final en el sitio, sin recargar.
  */
 import Layout from '../../layouts/Layout.astro';
+import ListsNav from "../../components/personal/ListsNav.astro";
 import { syncNotifications } from '../../services/API/notifications/generator';
 import { listNotifications } from '../../services/BD/notifications/notifications';
 import { withSocialState } from '../../services/BD/social/notifState';
@@ -28,6 +29,7 @@ const groups = notifGroups(items, now);
 const hasUnread = items.some((it) => !it.read);
 ---
 <Layout title="Notificaciones">
+    <ListsNav slot="aside" />
     <section class="ntp" data-notif-page>
         <header class="ntp-head">
             <div>

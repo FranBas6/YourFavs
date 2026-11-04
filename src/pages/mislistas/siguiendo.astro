@@ -7,7 +7,7 @@ import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {processBatch} from "../../utils/processBatch";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import NextEpisode from "../../components/Sections/NextEpisode.astro";
 import {getNextEpisodesData, type NextEpisodeItem} from "../../services/API/Series/nextEpisode";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
@@ -157,6 +157,7 @@ function monthsAgo(timestamp: number): string {
 const pageUrl = Astro.url;
 ---
 <Layout title="Siguiendo">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -169,9 +170,6 @@ const pageUrl = Astro.url;
             <p class="text-gray-500 text-base">Series que estás siguiendo</p>
         </header>
 
-        <div class="mb-6">
-            <PersonalNav currentPage="/mislistas/siguiendo" />
-        </div>
 
         {searchQuery && (
             <div class="mb-4 text-sm text-gray-500">

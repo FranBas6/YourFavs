@@ -8,7 +8,7 @@ import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
 import StatsPanel from "../../components/personal/StatsPanel.astro";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import PersonalFilter from "../../components/personal/PersonalFilter.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
@@ -34,6 +34,7 @@ const {
 } = data;
 ---
 <Layout title="Me gusta">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -46,10 +47,7 @@ const {
             <p class="text-gray-500 text-base">Contenido que te ha gustado</p>
         </header>
 
-        <div class="flex items-start gap-3 mb-6">
-            <div class="flex-1 min-w-0">
-                <PersonalNav currentPage="/mislistas/megusta" />
-            </div>
+        <div class="flex items-start justify-end gap-3 mb-6">
             <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} myPlatforms={Astro.locals.user?.platforms ?? []} />
         </div>
         <StatsPanel stats={stats} />

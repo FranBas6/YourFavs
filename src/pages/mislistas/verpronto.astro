@@ -10,7 +10,7 @@ import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
 import {processBatch} from "../../utils/processBatch";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
@@ -92,6 +92,7 @@ const hasMovies = peliculasVerPronto.length > 0;
 const hasContent = hasSeries || hasMovies;
 ---
 <Layout title="Ver Pronto">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -113,9 +114,6 @@ const hasContent = hasSeries || hasMovies;
             <p class="text-gray-500 text-base">Contenido que quieres ver próximamente</p>
         </header>
 
-        <div class="mb-4">
-            <PersonalNav currentPage="/mislistas/verpronto" />
-        </div>
 
         <PlansBlock plans={plans} today={todayKey} convs={hasConvs} />
 

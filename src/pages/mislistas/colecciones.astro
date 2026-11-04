@@ -7,7 +7,7 @@
  * Crear/editar/borrar se hace por fetch a /api/lists (op create|update|delete).
  */
 import Layout from "../../layouts/Layout.astro";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import { getCustomLists, LIST_COLORS } from "../../services/BD/lists/customLists";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
@@ -20,6 +20,7 @@ const profileOn = Boolean(Astro.locals.user?.publicHandle && Astro.locals.user?.
 const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','📺','🎞️','🏆','🌟','🎃','💀','🧠','🌍'];
 ---
 <Layout title="Mis colecciones">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         <header class="mb-6 flex items-end justify-between gap-4">
             <div>
@@ -34,9 +35,6 @@ const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','�
             </button>
         </header>
 
-        <div class="mb-6">
-            <PersonalNav currentPage="/mislistas/colecciones" />
-        </div>
 
         {lists.length === 0 ? (
             <EmptyState

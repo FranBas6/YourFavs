@@ -1,5 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import { getCalendarData, hideEpisodeTitlesFor } from "../../services/API/Calendar/calendarService";
 import type { CalendarEvent } from "../../services/API/Calendar/calendarService";
 import EmptyState from "../../components/EmptyState.astro";
@@ -130,6 +131,7 @@ const notificationGroups = Array.from(groupsMap.entries())
     .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 ---
 <Layout title="Calendario de Estrenos">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">

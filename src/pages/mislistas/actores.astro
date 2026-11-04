@@ -5,7 +5,7 @@ import { getActorDetailsById, getMoviesAndSeriesByActorId } from "../../services
 import { calculateAge, processProductions } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import { calculateTopActors } from "../../utils/topActorsLibrary";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import type { Movie } from "../../types/ApiMovie";
 import type { Serie } from "../../types/ApiSerie";
@@ -76,6 +76,7 @@ try {
 }
 ---
 <Layout title="Actores Favoritos">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -88,9 +89,6 @@ try {
             <p class="text-gray-500 text-base">{actorsWithDetails.length} actores en tu colección</p>
         </header>
 
-        <div class="mb-4">
-            <PersonalNav currentPage="/mislistas/actores" />
-        </div>
 
         {topLibraryActors.length > 0 && (
             <section class="mb-8">

@@ -8,7 +8,7 @@
  * Sin la fase de mensajes encendida, al centro «Amigos».
  */
 import Layout from '../../../../layouts/Layout.astro';
-import PersonalNav from '../../../../components/personal/PersonalNav.astro';
+import ListsNav from "../../../../components/personal/ListsNav.astro";
 import Stamp from '../../../../components/Stamp.astro';
 import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
 import MsgSegment from '../../../../components/social/messages/MsgSegment.astro';
@@ -53,6 +53,7 @@ const empty = friends === 0
 const canGroup = SOCIAL_PHASE.groups && friends > 0;
 ---
 <Layout title="Mensajes · YourFavs" robots="noindex, nofollow">
+    <ListsNav slot="aside" />
     {first && (
         // Escritorio: directo a la conversación más reciente (en móvil esta página ES la lista).
         <script is:inline define:vars={{ first }}>
@@ -60,7 +61,6 @@ const canGroup = SOCIAL_PHASE.groups && friends > 0;
         </script>
     )}
     <div class="am">
-        <div class="am-nav"><PersonalNav currentPage="/mislistas/amigos" /></div>
 
         {!user ? (
             <div class="so-emp am-guest">

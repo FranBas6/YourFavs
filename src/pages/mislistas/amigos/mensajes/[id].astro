@@ -11,7 +11,7 @@
  * Si no estás en ella: «Ya no estás en este grupo» o el «no disponible» de siempre (404).
  */
 import Layout from '../../../../layouts/Layout.astro';
-import PersonalNav from '../../../../components/personal/PersonalNav.astro';
+import ListsNav from "../../../../components/personal/ListsNav.astro";
 import Stamp from '../../../../components/Stamp.astro';
 import MessagesShell from '../../../../components/social/messages/MessagesShell.astro';
 import ChatDialogs from '../../../../components/social/messages/ChatDialogs.astro';
@@ -76,8 +76,8 @@ const logInitial = chat ? logHtml(chat.messages, {
 const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
 ---
 <Layout title={chat ? `${chat.title} · Mensajes · YourFavs` : 'Mensajes · YourFavs'} robots="noindex, nofollow">
+    <ListsNav slot="aside" />
     <div class="am">
-        <div class="am-nav"><PersonalNav currentPage="/mislistas/amigos" /></div>
 
         {!user ? (
             <div class="so-emp am-guest">
