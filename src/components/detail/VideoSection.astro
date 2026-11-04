@@ -24,20 +24,17 @@ const groups = [
 ---
 {trailerUrl && (
     <section>
-        <h2 class="text-xl font-semibold text-gray-800 mb-4">Tráiler</h2>
-        <div class="aspect-video rounded-xl overflow-hidden shadow-lg">
+        <div class="fsec-h"><h2>Tráiler y vídeos</h2>{groups.length > 0 && <span class="n">{1 + groups.reduce((n, g) => n + g.items.length, 0)}</span>}</div>
+        <div class="aspect-video rounded-xl overflow-hidden fvid">
             <iframe src={formatTrailerUrl(trailerUrl)} class="w-full h-full" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
         </div>
     </section>
 )}
 
 {extrasTotal > 0 && (
-    <details class="bg-white rounded-xl border border-gray-200">
-        <summary class="p-5 cursor-pointer text-lg font-semibold text-gray-800 flex items-center justify-between">
-            <span>Más vídeos <span class="text-gray-400 font-normal">· {groups.map((g) => `${g.label} ${g.items.length}`).join(' · ')}</span></span>
-            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-        <div class="px-5 pb-5 space-y-5">
+    <details class="cdet fvid-more">
+        <summary>Más vídeos<span class="n">{groups.map((g) => `${g.label} ${g.items.length}`).join(' · ')}</span><svg class="cdet-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="cdet-b space-y-5">
             {groups.map((g) => (
                 <div>
                     <h3 class="vs-type">{g.label}</h3>

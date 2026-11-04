@@ -820,24 +820,24 @@ const jsonLd = item ? {
                     <!-- Temporadas (ancla de la barra de secciones): próximo y último episodio, calidad y acordeón -->
                     <div id="sec-temporadas" data-fs class="mo-3 space-y-8">
                     <!-- Temporadas con acordeón -->
-                    <div class="bg-white rounded-xl border border-gray-200 p-5">
-                        <div class="flex items-center justify-between gap-3 mb-2">
-                            <h2 class="text-xl font-semibold text-gray-800">Temporadas y Episodios</h2>
+                    <div class="fcard ftemps">
+                        <div class="fsec-h">
+                            <h2>Temporadas y episodios</h2>
                             {allRegularEpisodesFlat.length > 0 && (
-                                <form method="POST" class="flex-shrink-0">
+                                <form method="POST" class="fsec-r">
                                     <input type="hidden" name="actionType" value="watched_all" />
                                     <input type="hidden" name="allEpisodes" value={allEpisodesStr} />
                                     <input type="hidden" name="action" value={isAllWatched ? 'unmark' : 'mark'} />
-                                    <button type="submit" class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${isAllWatched ? 'bg-green-500 text-white hover:bg-green-600' : 'border border-gray-300 text-gray-500 hover:border-green-400 hover:text-green-600'}`}>
+                                    <button type="submit" class="btn btn--sm" data-tone="visto" aria-pressed={isAllWatched ? 'true' : 'false'}>
                                         {isAllWatched ? 'Desmarcar todo' : 'Marcar todo'}
                                     </button>
                                 </form>
                             )}
                         </div>
-                        <div class="flex flex-wrap items-center gap-2 mb-4">
-                            <span class="text-sm text-gray-500">{regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios{hasSpecialSeasons ? ` • ${specialSeasonsCount} especiales` : ''}</span>
+                        <div class="ftemps-meta">
+                            <span>{regularSeasonsCount} temporadas • {totalRegularEpisodes} episodios{hasSpecialSeasons ? ` • ${specialSeasonsCount} especiales` : ''}</span>
                             <span
-                                class="text-sm font-medium text-green-600"
+                                class="ftemps-seen"
                                 data-total-watched={totalWatchedEpisodes}
                                 data-total-regular={totalRegularEpisodes}
                                 style={totalWatchedEpisodes > 0 ? '' : 'display:none'}
@@ -850,7 +850,7 @@ const jsonLd = item ? {
                                         <input type="hidden" name="actionType" value="spoiler_pref" />
                                         <input type="hidden" name="value" value={spoilerFree ? 'off' : 'on'} />
                                         <button type="submit"
-                                            class={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg border transition-colors ${spoilerFree ? 'border-[#E63946] text-[#E63946] bg-red-50' : 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700'}`}
+                                            class="btn btn--sm" aria-pressed={spoilerFree ? 'true' : 'false'}
                                             title={spoilerPref !== null
                                                 ? 'Esta serie tiene su propio ajuste y no sigue el de tu perfil'
                                                 : 'Difumina el fotograma y la sinopsis de los episodios que no has visto en esta serie'}>
@@ -867,7 +867,7 @@ const jsonLd = item ? {
                                             <input type="hidden" name="actionType" value="spoiler_pref" />
                                             <input type="hidden" name="value" value="inherit" />
                                             <button type="submit"
-                                                class="inline-flex items-center gap-1 text-[11px] leading-none px-2 py-[5px] rounded-md bg-gray-50 border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 transition-colors"
+                                                class="chip-tag ftemps-own"
                                                 title="Esta serie tiene su propio ajuste y no sigue el de tu perfil. Quítalo para volver a seguirlo.">
                                                 solo en esta serie
                                                 <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
@@ -879,12 +879,12 @@ const jsonLd = item ? {
                         </div>
                         {/* Barra de progreso global */}
                         <div
-                            class="w-full bg-gray-200 rounded-full h-2 mb-6"
+                            class="ftemps-bar"
                             data-total-progress
                             style={totalWatchedEpisodes > 0 ? '' : 'display:none'}
                         >
                             <div
-                                class="bg-green-500 h-2 rounded-full transition-all"
+                                class="ftemps-bar-i"
                                 data-total-bar
                                 style={`width: ${totalRegularEpisodes > 0 ? Math.min(100, Math.round(totalWatchedEpisodes / totalRegularEpisodes * 100)) : 0}%`}
                             ></div>
@@ -986,7 +986,7 @@ const jsonLd = item ? {
                                                     <input type="hidden" name="season" value={season.season_number} />
                                                     <input type="hidden" name="episodes" value={seasonEpisodes.map((ep) => ep.episode_number).join(',')} />
                                                     <input type="hidden" name="action" value={isSeasonComplete ? 'unmark' : 'mark'} />
-                                                    <button type="submit" class={`w-full py-2 text-xs font-medium rounded-lg transition-colors ${isSeasonComplete ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
+                                                    <button type="submit" class="btn btn--sm sr-markall" data-tone="visto" aria-pressed={isSeasonComplete ? 'true' : 'false'}>
                                                         {isSeasonComplete ? 'Desmarcar temporada completa' : `Marcar toda la temporada como vista (${seasonTotal} episodios)`}
                                                     </button>
                                                 </form>
@@ -997,24 +997,24 @@ const jsonLd = item ? {
                                                 const credits = episodeCredits(episode);
                                                 return (
                                                 <div>
-                                                    <details class={`border-b pb-2 last:border-0 group ${season.season_number === 0 ? 'border-purple-100' : 'border-gray-100'}`}>
-                                                        <summary class={`cursor-pointer py-2 px-2 sm:px-3 rounded-lg flex items-center gap-2 sm:gap-3 ${season.season_number === 0 ? 'hover:bg-purple-50' : 'hover:bg-blue-50'} ${isWatched ? 'opacity-60' : ''}`}>
-                                                            <span class={`font-bold px-1.5 py-0.5 rounded text-xs flex-shrink-0 ${season.season_number === 0 ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                                    <details class="ep group">
+                                                        <summary class={`ep-row ${isWatched ? 'opacity-60' : ''}`}>
+                                                            <span class="ep-n">
                                                                 {season.season_number === 0 ? `E${episode.episode_number}` : episode.episode_number}
                                                             </span>
                                                             {mark && (
-                                                                <span class="text-[10px] font-bold tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 flex-shrink-0" title={mark.title}>{mark.label}</span>
+                                                                <span class="chip-state ep-mark" title={mark.title}>{mark.label}</span>
                                                             )}
                                                             <div class="flex-1 min-w-0">
                                                                 {/* TMDB D4: el título lleva a la ficha del episodio; «Visto» sigue marcando sin salir. */}
-                                                                <p class="font-medium text-gray-800 text-sm truncate group-open:whitespace-normal group-open:overflow-visible"><a href={episodeHref(id, season.season_number, episode.episode_number)} class="ep-link hover:underline underline-offset-2">{episode.name}</a></p>
-                                                                <p class="text-xs text-gray-500 mt-0.5 truncate">
+                                                                <p class="ep-t truncate group-open:whitespace-normal group-open:overflow-visible"><a href={episodeHref(id, season.season_number, episode.episode_number)} class="ep-link">{episode.name}</a></p>
+                                                                <p class="ep-m truncate">
                                                                     {formatDate(episode.air_date)}{episode.runtime ? `  ·  ${formatRuntime(episode.runtime)}` : ''}
-                                                                    {episode.vote_average > 0 && <span class="text-yellow-600">  ·  {episode.vote_average.toFixed(1)}</span>}
+                                                                    {episode.vote_average > 0 && <span class="ep-r">  ·  ★ {episode.vote_average.toFixed(1).replace('.', ',')}</span>}
                                                                 </p>
                                                             </div>
                                                             {/* TMDB D4: a la ficha del episodio, al lado de «Visto» y con su misma forma. */}
-                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class={`flex-shrink-0 flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md border transition-colors whitespace-nowrap ${season.season_number === 0 ? 'border-purple-200 bg-purple-50 text-purple-700 hover:bg-purple-100' : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}`} aria-label={`Abrir la ficha de «${episode.name}»`} onclick="event.stopPropagation()">
+                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class="btn btn--sm btn--ghost ep-btn" aria-label={`Abrir la ficha de «${episode.name}»`} onclick="event.stopPropagation()">
                                                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg>
                                                                 <span class="hidden sm:inline">Ficha</span>
                                                             </a>
@@ -1022,7 +1022,7 @@ const jsonLd = item ? {
                                                                 <input type="hidden" name="actionType" value="watched_episode" />
                                                                 <input type="hidden" name="season" value={season.season_number} />
                                                                 <input type="hidden" name="episode" value={episode.episode_number} />
-                                                                <button type="submit" class={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium rounded-md transition-all duration-200 whitespace-nowrap ${isWatched ? 'bg-green-500 text-white hover:bg-green-600' : 'border border-gray-300 text-gray-400 hover:border-green-400 hover:text-green-600'}`}>
+                                                                <button type="submit" class="btn btn--sm ep-btn" data-tone="visto" aria-pressed={isWatched ? 'true' : 'false'} aria-label={`${episode.name}: ${isWatched ? 'visto' : 'marcar como visto'}`}>
                                                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                                     </svg>
@@ -1030,7 +1030,7 @@ const jsonLd = item ? {
                                                                 </button>
                                                             </form>
                                                         </summary>
-                                                        <div class={`mt-2 mx-3 p-4 rounded-lg ${season.season_number === 0 ? 'bg-purple-50' : 'bg-blue-50'} ${(hideStills || hideSynopsis) && !isWatched ? 'yf-spoil' : ''}`}>
+                                                        <div class={`ep-body ${(hideStills || hideSynopsis) && !isWatched ? 'yf-spoil' : ''}`}>
                                                             {(hideStills || hideSynopsis) && !isWatched && (
                                                                 <button type="button" class="yf-spoil-btn" aria-label="Mostrar contenido con posibles spoilers">
                                                                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1039,13 +1039,13 @@ const jsonLd = item ? {
                                                             )}
                                                             {/* Dirección y guion (B2a): no es spoiler, va sin difuminar */}
                                                             {(credits.directors.length > 0 || credits.writers.length > 0) && (
-                                                                <p class="text-xs text-gray-600 mb-3">
+                                                                <p class="ep-cr">
                                                                     {credits.directors.length > 0 && (
-                                                                        <span><span class="font-semibold">Dirección:</span> {credits.directors.map((n, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`} class="hover:text-blue-600 hover:underline">{n}</a></>))}</span>
+                                                                        <span><span class="font-semibold">Dirección:</span> {credits.directors.map((n, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`} class="ep-a">{n}</a></>))}</span>
                                                                     )}
                                                                     {credits.directors.length > 0 && credits.writers.length > 0 && <span class="text-gray-400">  ·  </span>}
                                                                     {credits.writers.length > 0 && (
-                                                                        <span><span class="font-semibold">Guion:</span> {credits.writers.map((n, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`} class="hover:text-blue-600 hover:underline">{n}</a></>))}</span>
+                                                                        <span><span class="font-semibold">Guion:</span> {credits.writers.map((n, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(n)}`} class="ep-a">{n}</a></>))}</span>
                                                                     )}
                                                                 </p>
                                                             )}
@@ -1063,7 +1063,7 @@ const jsonLd = item ? {
                                                                 de un episodio cuenta tanto como el texto (o más). */}
                                                             {episode.guest_stars && episode.guest_stars.length > 0 && (
                                                                 <div class={hideSynopsis && !isWatched ? 'yf-blur' : ''}>
-                                                                    <p class={`text-sm font-semibold mb-2 ${season.season_number === 0 ? 'text-purple-700' : 'text-blue-700'}`}>Estrellas invitadas:</p>
+                                                                    <p class="ep-gh">Estrellas invitadas</p>
                                                                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                                         {episode.guest_stars.map((star: GuestStar) => (
                                                                             <a href={`/actor/${star.id}`} class="flex items-center gap-3 text-sm">
@@ -1077,7 +1077,7 @@ const jsonLd = item ? {
                                                                     </div>
                                                                 </div>
                                                             )}
-                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class={`mt-4 flex w-full items-center justify-center gap-1.5 py-2.5 text-xs font-semibold rounded-lg border transition-colors ${season.season_number === 0 ? 'border-purple-200 bg-white text-purple-700 hover:bg-purple-100' : 'border-blue-200 bg-white text-blue-700 hover:bg-blue-100'}`}>
+                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class="btn btn--sm ep-open">
                                                                 Abrir la ficha del episodio
                                                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
                                                             </a>

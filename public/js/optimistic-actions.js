@@ -76,10 +76,14 @@ function submitOptimistic(form, options) {
 function handleWatchedEpisodeForm(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (_f, btn, formData) {
-            var isWatched = btn.classList.contains('bg-green-500');
+            // Botón del sistema (rediseño 4.8): el estado va en aria-pressed; el texto no cambia.
+            var sysBtn = btn.classList.contains('btn');
+            var isWatched = sysBtn ? btn.getAttribute('aria-pressed') === 'true' : btn.classList.contains('bg-green-500');
             btn.dataset.wasWatched = isWatched ? '1' : '0';
 
-            if (isWatched) {
+            if (sysBtn) {
+                btn.setAttribute('aria-pressed', isWatched ? 'false' : 'true');
+            } else if (isWatched) {
                 btn.classList.remove('bg-green-500', 'text-white', 'hover:bg-green-600');
                 btn.classList.add('border', 'border-gray-300', 'text-gray-500', 'hover:border-green-400', 'hover:text-green-600');
                 btn.childNodes.forEach(function (n) { if (n.nodeType === 3 && n.textContent.trim()) n.textContent = ' Marcar visto'; });
