@@ -52,7 +52,9 @@ export function mapAuthError(code: string | undefined): string {
         case 'invalid_credentials':
             return 'Email o contraseña incorrectos.';
         case 'user_not_found':
-            return 'No hay ninguna cuenta con ese email.';
+            // Igual que una contraseña mal: decir «no hay cuenta» revela qué emails están registrados
+            // (handoff de acceso, duda 1). Recuperar contraseña ya responde ok exista o no.
+            return 'Email o contraseña incorrectos.';
         case 'user_banned':
             return 'Esta cuenta está deshabilitada.';
         case 'over_request_rate_limit':
