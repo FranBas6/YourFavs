@@ -91,7 +91,7 @@
 .so-list { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); }
 .so-row { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; }
 .so-row + .so-row { border-top: 1px solid var(--border); }
-.so-row-b { flex: 1; min-width: 0; }
+.so-row-b { flex: 1 1 160px; min-width: 0; }   /* con poco sitio, los botones bajan a otra línea (antes el nombre se encogía a una letra por línea) */
 .so-row-n { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font: 600 14px var(--font); color: var(--text); }
 .so-row-name { color: inherit; text-decoration: none; overflow-wrap: anywhere; }
 /* La fila entera lleva al perfil; los botones quedan por encima del enlace estirado. */
@@ -109,7 +109,9 @@ a.so-row-name:focus-visible::after { outline: 2px solid var(--primary); outline-
 .so-row-a:has([aria-expanded="true"]) { z-index: 5; }
 .so-row-a .pf-btn:not(.ico) { flex: 1; }
 @media (min-width: 1024px) {
-    .so-row { flex-wrap: nowrap; gap: 14px; padding: 14px 18px; }
+    /* Puede partirse también aquí: en columnas estrechas (Amigos con la columna de Mis listas) los
+       botones bajan a otra línea en vez de aplastar el nombre (5.4). Si cabe, sigue en una. */
+    .so-row { flex-wrap: wrap; gap: 14px; padding: 14px 18px; }
     .so-row-a { width: auto; padding-left: 0; flex-shrink: 0; }
     .so-row-a .pf-btn:not(.ico) { flex: 0 0 auto; }
 }

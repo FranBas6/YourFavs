@@ -6,6 +6,7 @@ import { calculateAge, processProductions } from "../../utils/constants/helpers/
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import { calculateTopActors } from "../../utils/topActorsLibrary";
 import ListsNav from "../../components/personal/ListsNav.astro";
+import ListTitle from "../../components/personal/ListTitle.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import type { Movie } from "../../types/ApiMovie";
 import type { Serie } from "../../types/ApiSerie";
@@ -84,19 +85,12 @@ try {
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Actores Favoritos</h1>
-            <p class="text-gray-500 text-base">{actorsWithDetails.length} actores en tu colección</p>
-        </header>
+        <ListTitle title="Actores favoritos" count={actorsWithDetails.length} subtitle="Las personas que sigues de cerca: sus estrenos te llegan a la campana" />
 
 
         {topLibraryActors.length > 0 && (
             <section class="mb-8">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-rose-500 rounded-full"></span>
-                    Top actores en tu biblioteca
-                    <span class="text-sm font-normal text-gray-400">según pelis y series que has añadido</span>
-                </h2>
+                <div class="lg-h"><h2>Los que más salen en tu biblioteca</h2><span class="n">según tus pelis y series</span></div>
                 <div class="flex gap-3 overflow-x-auto pb-3 -mx-1 px-1 snap-x snap-mandatory">
                     {topLibraryActors.map((a, idx) => (
                         <a href={`/actor/${a.id}`} class="snap-start group flex-shrink-0 w-32 sm:w-36">
@@ -148,11 +142,11 @@ try {
                             </div>
                             <div class="flex flex-wrap gap-1.5 text-xs">
                                 {actor.age && (
-                                    <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{actor.age} años</span>
+                                    <span class="chip-tag">{actor.age} años</span>
                                 )}
-                                <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full">{actor.totalMovies + actor.totalSeries} producciones</span>
+                                <span class="chip-tag">{actor.totalMovies + actor.totalSeries} producciones</span>
                                 {actor.details.popularidad && (
-                                    <span class="px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full">⭐ {actor.details.popularidad.toFixed(1)}</span>
+                                    <span class="chip-tag" title="Popularidad en TMDB">Popularidad {actor.details.popularidad.toFixed(1).replace('.', ',')}</span>
                                 )}
                             </div>
                         </div>

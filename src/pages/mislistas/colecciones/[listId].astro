@@ -28,18 +28,18 @@ const items = await getListItems(list.id);
         <header class="mb-6 flex items-start gap-4">
             <span class={`cover-badge cover-${list.colorStamp}`}>{list.icon}</span>
             <div class="flex-1 min-w-0">
-                <h1 class="text-2xl md:text-3xl font-bold text-gray-900 leading-tight">{list.name}</h1>
-                {list.description && <p class="text-gray-500 text-sm mt-1">{list.description}</p>}
-                <p class="font-mono text-[11px] text-gray-400 mt-1"><span id="item-count">{items.length}</span> títulos</p>
+                <h1 class="lc-h1">{list.name}</h1>
+                {list.description && <p class="lc-desc">{list.description}</p>}
+                <p class="lc-n"><span id="item-count">{items.length}</span> títulos</p>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 flex-shrink-0">
                 <button type="button" id="add-toggle"
-                        class="inline-flex items-center gap-2 px-3.5 py-2 bg-[#E63946] text-white rounded-lg text-sm font-semibold hover:bg-[#C7283A] transition-colors">
+                        class="btn btn--sm btn--pri">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
                     Añadir títulos
                 </button>
                 <button type="button" id="cover-btn"
-                        class="inline-flex items-center gap-2 px-3.5 py-2 bg-white border border-gray-200 text-gray-600 rounded-lg text-sm font-medium hover:border-gray-300 transition-colors">
+                        class="btn btn--sm">
                     <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
                     Portada
                 </button>
@@ -105,6 +105,11 @@ const items = await getListItems(list.id);
 </Layout>
 
 <style>
+    /* Rediseño 5.4: cabecera con tokens */
+    .lc-h1 { margin: 0; font: 700 var(--fs-sec) var(--font); color: var(--text); line-height: 1.2; }
+    @media (min-width: 768px) { .lc-h1 { font-size: var(--fs-page); } }
+    .lc-desc { margin: 4px 0 0; font-size: var(--fs-ui); color: var(--text-3); }
+    .lc-n { margin: 4px 0 0; font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); }
     .cover-badge {
         width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
         display: flex; align-items: center; justify-content: center; font-size: 26px;

@@ -11,6 +11,7 @@
 import { buildUrl } from '../../utils/buildUrl';
 import PersonalFilter from './PersonalFilter.astro';
 import StatsPanel from './StatsPanel.astro';
+import ListTitle from './ListTitle.astro';
 
 interface Props {
     title: string;
@@ -39,13 +40,9 @@ const base = { search: searchQuery, genre: genreFilter, platforms: platformFilte
 const TYPES = [{ key: 'todos', label: 'Todo' }, { key: 'peliculas', label: 'Películas' }, { key: 'series', label: 'Series' }];
 const curSort = sorts.find((o) => o.key === sort) ?? sorts[0];
 ---
-<header class="lh">
-    <div class="lh-t">
-        <h1>{title}<span class="lh-n">{total.toLocaleString('es-ES')}</span></h1>
-        {subtitle && <p>{subtitle}</p>}
-    </div>
-    <slot name="actions" />
-</header>
+<ListTitle title={title} subtitle={subtitle} count={total}>
+    <Fragment slot="actions"><slot name="actions" /></Fragment>
+</ListTitle>
 
 <div class="lh-bar">
     <nav class="lh-seg" aria-label="Tipo de título">
@@ -91,17 +88,8 @@ const curSort = sorts.find((o) => o.key === sort) ?? sorts[0];
 </script>
 
 <style is:global>
-    .lh { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-    .lh-t h1 { margin: 0; display: flex; align-items: baseline; gap: 12px; font: 700 var(--fs-page) var(--font); color: var(--text); line-height: 1.15; }
-    .lh-n { font: 500 var(--fs-body) var(--font-mono); color: var(--text-3); }
-    .lh-t p { margin: 6px 0 0; font-size: var(--fs-body); color: var(--text-3); }
     .lh-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
     .lh-sp { flex: 1; }
-    .lh-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); }
-    .lh-seg a { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: calc(var(--r-md) - 3px); font: 600 var(--fs-ui) var(--font); color: var(--text-2); text-decoration: none; white-space: nowrap; }
-    .lh-seg a:hover { color: var(--text); }
-    .lh-seg a[aria-current="page"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm, 0 1px 2px rgba(15, 23, 42, .08)); }
-    .lh-seg a:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
     .lh-sort { position: relative; }
     .lh-sort > summary { list-style: none; }
     .lh-sort > summary::-webkit-details-marker { display: none; }
@@ -112,10 +100,6 @@ const curSort = sorts.find((o) => o.key === sort) ?? sorts[0];
     .lh-menu a[aria-checked="true"] { font-weight: 600; }
     .lh-menu svg { width: 15px; height: 15px; color: var(--primary); }
     @media (max-width: 1023px) {
-        /* El título ya está en el botón de Mis listas: queda solo para lectores de pantalla. */
-        .lh-t h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-        .lh-t p { margin: 0; font-size: var(--fs-ui); }
-        .lh { margin-bottom: 12px; }
         .lh-bar { gap: 6px; }
         .lh-seg a { padding: 0 9px; }
         .lh-sort-l { display: none; }

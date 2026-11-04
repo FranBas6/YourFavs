@@ -1,0 +1,51 @@
+---
+/**
+ * ListTitle — título de una página de Mis listas (rediseño, Fase 5 · 5.2/5.4): «Favoritos 64» con su
+ * subtítulo y, a la derecha, las acciones de la página (slot «actions»). En móvil el título queda para
+ * lectores de pantalla: ya lo dice el botón de ListsNav («MIS LISTAS · Favoritos · 64»).
+ */
+interface Props {
+    title: string;
+    subtitle?: string;
+    /** Total que acompaña al título. */
+    count?: number | null;
+    /** id del número, si un script lo actualiza (p. ej. al quitar títulos de una colección). */
+    countId?: string;
+}
+const { title, subtitle, count = null, countId } = Astro.props;
+---
+<header class="lh">
+    <div class="lh-t">
+        <h1>{title}{count !== null && <span class="lh-n" id={countId}>{count.toLocaleString('es-ES')}</span>}</h1>
+        {subtitle && <p>{subtitle}</p>}
+        <slot name="below" />
+    </div>
+    <slot name="actions" />
+</header>
+
+<style is:global>
+    .lh { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .lh-t { min-width: 0; }
+    .lh-t h1 { margin: 0; display: flex; align-items: baseline; gap: 12px; font: 700 var(--fs-page) var(--font); color: var(--text); line-height: 1.15; }
+    .lh-n { font: 500 var(--fs-body) var(--font-mono); color: var(--text-3); }
+    .lh-t p { margin: 6px 0 0; font-size: var(--fs-body); color: var(--text-3); max-width: 70ch; }
+    .lh-sub { margin: 6px 0 0; font-size: var(--fs-body); color: var(--text-3); max-width: 70ch; }
+    /* Cabecera de sección dentro de una lista («Series 47») */
+    .lg-h { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0 0 14px; }
+    .lg-h h2 { margin: 0; font: 700 var(--fs-sec) var(--font); color: var(--text); }
+    .lg-h .n { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); }
+    /* Interruptor segmentado (Todo · Películas · Series, Cuadrícula · Lista…) */
+    .lh-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); }
+    .lh-seg a { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: calc(var(--r-md) - 3px); font: 600 var(--fs-ui) var(--font); color: var(--text-2); text-decoration: none; white-space: nowrap; }
+    .lh-seg a:hover { color: var(--text); }
+    .lh-seg a[aria-current="page"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm, 0 1px 2px rgba(15, 23, 42, .08)); }
+    .lh-seg a:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+    .lh-seg svg { width: 15px; height: 15px; margin-right: 6px; }
+    @media (max-width: 1023px) {
+        .lh-t h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+        .lh-t p { margin: 0; font-size: var(--fs-ui); }
+        .lh { margin-bottom: 12px; }
+        .lh-sub { margin: 0; font-size: var(--fs-ui); }
+        .lg-h h2 { font-size: var(--fs-sub); }
+    }
+</style>

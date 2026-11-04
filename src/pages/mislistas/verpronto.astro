@@ -11,6 +11,7 @@ import {getGenreName} from "../../utils/constants/genres";
 import {processBatch} from "../../utils/processBatch";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import ListsNav from "../../components/personal/ListsNav.astro";
+import ListTitle from "../../components/personal/ListTitle.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
 import type {Serie} from "../../types/ApiSerie";
@@ -109,10 +110,14 @@ const hasContent = hasSeries || hasMovies;
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Ver Pronto</h1>
-            <p class="text-gray-500 text-base">Contenido que quieres ver próximamente</p>
-        </header>
+        <ListTitle title="Ver pronto" subtitle="Contenido que quieres ver próximamente" />
+        {hasContent && (
+            <nav class="lh-seg mb-5" aria-label="Tipo de título">
+                <a href="?filter=todos" aria-current={showAll ? 'page' : undefined}>Todo</a>
+                <a href="?filter=peliculas" aria-current={showMovies && !showAll ? 'page' : undefined}>Películas</a>
+                <a href="?filter=series" aria-current={showSeries && !showAll ? 'page' : undefined}>Series</a>
+            </nav>
+        )}
 
 
         <PlansBlock plans={plans} today={todayKey} convs={hasConvs} />
@@ -123,7 +128,7 @@ const hasContent = hasSeries || hasMovies;
                 {hasSeries && hasMovies && showAll && (
                     <form method="POST">
                         <button type="submit" name="clear" value="todos"
-                            class="px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all">
+                            class="btn btn--sm btn--dgr">
                             Borrar todo
                         </button>
                     </form>
@@ -131,7 +136,7 @@ const hasContent = hasSeries || hasMovies;
                 {hasSeries && (showSeries || showAll) && (
                     <form method="POST">
                         <button type="submit" name="clear" value="series"
-                            class="px-3 py-2 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-all">
+                            class="btn btn--sm btn--dgr">
                             Borrar series
                         </button>
                     </form>
@@ -139,7 +144,7 @@ const hasContent = hasSeries || hasMovies;
                 {hasMovies && (showMovies || showAll) && (
                     <form method="POST">
                         <button type="submit" name="clear" value="peliculas"
-                            class="px-3 py-2 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-all">
+                            class="btn btn--sm btn--dgr">
                             Borrar películas
                         </button>
                     </form>
@@ -151,15 +156,11 @@ const hasContent = hasSeries || hasMovies;
             {/* Series */}
             {(showSeries || showAll) && (
                 <section id="series-section" class="scroll-mt-20">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                        Series
-                        <span class="text-sm font-normal text-gray-400">({seriesVerPronto.length})</span>
-                    </h2>
+                    <div class="lg-h"><h2>Series</h2><span class="n">{seriesVerPronto.length}</span></div>
 
                     {seriesVerPronto.length === 0 && (
                         <EmptyState size="sm" title="No tienes series para ver pronto">
-                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">Explorar tendencias</a>
+                            <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
                     {seriesVerPronto.length > 0 && (
@@ -199,15 +200,11 @@ const hasContent = hasSeries || hasMovies;
             {/* Películas */}
             {(showMovies || showAll) && (
                 <section id="movies-section" class="scroll-mt-20">
-                    <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                        <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                        Películas
-                        <span class="text-sm font-normal text-gray-400">({peliculasVerPronto.length})</span>
-                    </h2>
+                    <div class="lg-h"><h2>Películas</h2><span class="n">{peliculasVerPronto.length}</span></div>
 
                     {peliculasVerPronto.length === 0 && (
                         <EmptyState size="sm" title="No tienes películas para ver pronto">
-                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">Explorar tendencias</a>
+                            <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
                     {peliculasVerPronto.length > 0 && (
