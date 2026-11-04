@@ -18,6 +18,12 @@ function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 }
 
+/** Cuántos de `base` no están en ninguna de `minus` (por id). */
+function solo(base: any[], minus: any[][]): number {
+    const ex = new Set(minus.flat().map((x) => String(x.id)));
+    return base.filter((x) => !ex.has(String(x.id))).length;
+}
+
 export const GET: APIRoute = async ({ locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
@@ -25,7 +31,9 @@ export const GET: APIRoute = async ({ locals }) => {
         const counts = {
             favoritos:  snap.movFavs.length + snap.tvFavs.length,
             megusta:    snap.movLike.length + snap.tvLike.length,
-            vistos:     snap.movVistos.length + snap.tvVistos.length,
+            // Como la página de Vistos (getMoviesVistasSolo / getSeriesVistasSolo): lo visto SIN
+            // Me gusta ni Favorito — las listas van por niveles. Antes contaba todo (80 frente a 11).
+            vistos:     solo(snap.movVistos, [snap.movLike, snap.movFavs]) + solo(snap.tvVistos, [snap.tvLike, snap.tvFavs]),
             pendientes: snap.movPend.length + snap.tvPend.length,
             verpronto:  snap.movVerPronto.length + snap.tvVerPronto.length,
             siguiendo:  snap.tvSig.length,
