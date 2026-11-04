@@ -87,6 +87,12 @@ const I = {
                 <h2 class="auth-title" id="auth-title">Hola de nuevo</h2>
                 <p class="auth-sub" id="auth-sub">Entra para ver tus listas y seguir donde lo dejaste.</p>
             </div>
+            <!-- Las tres razones en una línea, en Crear cuenta cuando no cabe el lateral (< 860 px). -->
+            <div class="auth-line" id="auth-line" hidden>
+                <span><Fragment set:html={I.ccheck} />Series episodio a episodio</span>
+                <span><Fragment set:html={I.ccheck} />Tu año en cifras</span>
+                <span><Fragment set:html={I.ccheck} />Amigos sin spoilers</span>
+            </div>
 
             <!-- Avisos al volver (?auth=error|link|invite), encima de Google. -->
             <div class="auth-msg" id="auth-note" role="alert" hidden></div>
@@ -224,6 +230,10 @@ const I = {
     .auth-why li b { display: block; color: var(--text); font-weight: 600; }
     .auth-why svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--ok-ink); margin-top: 1px; }
     .auth-side-ft { margin: auto 0 0; font-size: var(--fs-meta); color: var(--text-3); }
+    .auth-line { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-meta); color: var(--text-2); }
+    .auth-line span { display: inline-flex; align-items: center; gap: 5px; }
+    .auth-line svg { width: 13px; height: 13px; color: var(--ok-ink); }
+    @media (min-width: 860px) { .auth-line { display: none !important; } }
 
     .auth-main { position: relative; flex: 1; min-width: 0; padding: 20px 28px 24px; display: flex; flex-direction: column; gap: 14px; }
 
@@ -352,12 +362,39 @@ const I = {
     .auth-other:hover { text-decoration: underline; }
     .auth-other svg { width: 13px; height: 13px; }
 
-    @media (max-width: 480px) {
-        .auth-overlay { padding: 5vh 12px 12px; }
-        .auth-main { padding: 18px 20px 20px; }
+    /* Móvil (< 640 px): hoja desde abajo (no pantalla completa), con asa, × de 44 px y el principal en un
+       pie fijo. Con el teclado abierto (visualViewport, en el script) se pega encima de él y esconde Google
+       y el divisor: quedan pestañas, campos y botón. */
+    @media (max-width: 639px) {
+        .auth-overlay { padding: 0; align-items: flex-end; overflow: hidden; }
+        .auth-card {
+            width: 100%; max-width: none; max-height: 92dvh; border-bottom: 0;
+            border-radius: var(--r-xl, 16px) var(--r-xl, 16px) 0 0; animation: auth-up .2s ease-out;
+        }
+        .auth-main { overflow-y: auto; overscroll-behavior: contain; padding: 8px 20px 0; gap: 12px; }
+        .auth-main::before { content: ''; flex-shrink: 0; width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); align-self: center; margin-bottom: 4px; }
+        .auth-main > :last-child { margin-bottom: calc(20px + env(safe-area-inset-bottom)); }
+        .auth-close { top: 6px; right: 4px; width: 44px; height: 44px; border: 0; background: none; }
         .auth-seg { align-self: stretch; }
-        .auth-seg button { flex: 1; justify-content: center; padding: 0 10px; }
+        .auth-seg button { flex: 1; justify-content: center; height: 40px; padding: 0 10px; }
+        .auth-title { font-size: var(--fs-sub); }
+        .auth-google, .auth-field input { height: 48px; }
+        .auth-foot {
+            position: sticky; bottom: 0; z-index: 1; margin: 2px -20px 0;
+            padding: 12px 20px calc(16px + env(safe-area-inset-bottom));
+            background: var(--bg-elev); border-top: 1px solid var(--border);
+        }
+        #auth-gate { margin-bottom: calc(20px + env(safe-area-inset-bottom)); }
+        .auth-submit { height: 48px; }
+        .auth-card.is-kb { border-radius: var(--r-xl, 16px) var(--r-xl, 16px) 0 0; }
+        .auth-card.is-kb .auth-google, .auth-card.is-kb .auth-divider, .auth-card.is-kb .auth-line { display: none !important; }
+        .auth-card.is-kb .auth-foot { padding-bottom: 12px; }
     }
+    @keyframes auth-up {
+        from { transform: translateY(24px); opacity: .6; }
+        to   { transform: none; opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) { .auth-card { animation: none; } }
 </style>
 
 <script>
@@ -597,6 +634,7 @@ const I = {
             submitL.textContent = submitText();
             forgotBtn.hidden = !isLogin;
             fineEl.hidden = isLogin;
+            $('auth-line').hidden = isLogin;
             clearFieldErrors();
             if (!isLogin) fillPosters();
             if (o.announce) liveEl.textContent = isLogin ? 'Entrar' : 'Crear cuenta';
@@ -611,6 +649,7 @@ const I = {
             standardEls.forEach((el) => { if (el) el.hidden = true; });
             pendingEl.hidden = false;
             pendingIco.hidden = false;
+            $('auth-line').hidden = true;
             pendingMsgEl.hidden = true;
             hadEl.hidden = unconfirmed;
             paintInviteExtras();
@@ -643,6 +682,19 @@ const I = {
             }, 1000);
         }
 
+        // ---- Móvil: la hoja encima del teclado (visualViewport) ----
+        const vv = window.visualViewport;
+        function fitKeyboard() {
+            const on = overlay!.classList.contains('is-open') && window.innerWidth < 640 && vv;
+            const kb = on ? Math.max(0, window.innerHeight - vv!.height - vv!.offsetTop) : 0;
+            const open = kb > 80;   // menos que eso son barras del navegador, no el teclado
+            card.classList.toggle('is-kb', open);
+            card.style.marginBottom = open ? `${kb}px` : '';
+            card.style.maxHeight = open ? `${Math.max(240, vv!.height - 8)}px` : '';
+        }
+        vv?.addEventListener('resize', fitKeyboard);
+        vv?.addEventListener('scroll', fitKeyboard);
+
         function focusFirstEmpty() {
             (emailInput.value ? passInput : emailInput).focus();
         }
@@ -656,6 +708,7 @@ const I = {
             gating = isGating;
             setMode('login');
             focusFirstEmpty();
+            fitKeyboard();
         }
         function close() {
             overlay!.classList.remove('is-open');
@@ -663,6 +716,7 @@ const I = {
             document.body.style.overflow = '';
             form.reset();
             gating = false;
+            fitKeyboard();
             // Si cierra sin loguearse, descarta la intención pendiente (no la
             // queremos disparar en un login posterior no relacionado).
             try { sessionStorage.removeItem('yf_pending_action'); } catch { /* noop */ }
