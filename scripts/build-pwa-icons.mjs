@@ -23,7 +23,8 @@
  *                                   sigue al tema del usuario.
  *   apple-touch-icon.png  ← iOS. SIN transparencia: Apple no la respeta, pone negro detrás.
  *
- * El FAVICON de la pestaña no se toca desde aquí: sigue siendo `logo_yourfavs.png` tal cual.
+ * El FAVICON de la pestaña no sale de aquí: es `public/favicon.svg` (+ PNG de 16 y 32), la misma
+ * claqueta redibujada en SVG (rediseño, Fase 8 · 8.1).
  *
  * Usa `sharp`, que ya viene con Astro. No añade ninguna dependencia.
  */
