@@ -1,116 +1,175 @@
 ---
 /**
- * Modal de login / registro — Fase B.2.
+ * Modal de login / registro — Fase B.2; rediseñado en la 7.4 (docs/Rediseño/design_handoff_auth).
  *
- * Montado en Layout (global). Se abre con cualquier disparador `[data-auth-open]`
- * y se cierra con Esc / backdrop / ✕. Login y registro comparten tarjeta y
- * alternan con un toggle. Google + email/contraseña + "¿olvidaste?".
+ * Montado en Layout (global). Se abre con cualquier disparador `[data-auth-open]` y se cierra con
+ * Esc / fondo / ✕. Entrar y Crear cuenta son dos pestañas (`role="tablist"`) y dos formas: Entrar es
+ * una tarjeta de 420 px; Crear cuenta, de 780 px con un lateral (pósters y tres razones) desde 860 px
+ * de ancho. Google + email/contraseña + «¿La has olvidado?».
  *
- * Las acciones (../utils/authActions) son `fetch` a /api/auth/*: el login lo hace el
- * servidor con Supabase y deja la sesión en cookies httpOnly. Google va por redirección
- * (no popup): al volver, /auth/callback trae `?auth=ok|new|error` y aquí se completa lo
- * mismo que antes tras el popup (acción pendiente del invitado u onboarding).
+ * Las acciones (../utils/authActions) son `fetch` a /api/auth/*: el login lo hace el servidor con
+ * Supabase y deja la sesión en cookies httpOnly. Google va por redirección (no popup): al volver,
+ * /auth/callback trae `?auth=ok|new|error|link|invite` y aquí se completa lo que toque (acción
+ * pendiente del invitado u onboarding).
  *
- * Confirmación de email (F0 de docs/PLAN_SOCIAL.md): si el registro queda pendiente de confirmar,
- * o alguien intenta entrar sin haber confirmado, la tarjeta pasa a la vista «Revisa tu correo»
- * (`#auth-pending`) con botón de reenviar. Al volver de un enlace caducado, `?auth=link`.
+ * Confirmación de email (F0 de docs/PLAN_SOCIAL.md): si el registro queda pendiente de confirmar, o
+ * alguien intenta entrar sin haber confirmado, la tarjeta pasa a «Revisa tu correo» / «Confirma tu
+ * email» (`#auth-pending`), con dos caminos: reenviar el enlace o, si ya tenías cuenta, entrar o
+ * recuperar la contraseña (registrarse con un email que ya existe responde igual que uno nuevo, a
+ * propósito: no se revela qué emails tienen cuenta).
  *
  * Invitaciones (F2 social, handoff D14): si el navegador trae la cookie `yf_ref` (visitó un perfil
- * público), el registro enseña «Te invita Ana · @ana» y que la seguirá al crear la cuenta. Con
- * `SIGNUP_MODE=invite` y sin invitación, el modal abre en «Entrar» y cambia «¿No tienes cuenta?
- * Regístrate» por la explicación, ANTES de que lo intente. `?auth=invite` = Google rechazado.
+ * público), el registro enseña «Te invita Ana · @ana». Con `SIGNUP_MODE=invite` y sin invitación, la
+ * pestaña Crear cuenta sale deshabilitada y el aviso lo explica. `?auth=invite` = Google rechazado.
  */
 import { signupMode } from '../lib/social/signupMode';
 const mode = signupMode();
+
+const svg = (d: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I = {
+    login: svg('<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/>'),
+    uplus: svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/>'),
+    lock: svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+    ccheck: svg('<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>'),
+    mail: svg('<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>'),
+    hist: svg('<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/>'),
+    key: svg('<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/>'),
+    send: svg('<path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/>'),
+    pen: svg('<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>'),
+    ticket: svg('<path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/>'),
+};
 ---
 <div class="auth-overlay" id="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title" data-signup-mode={mode} hidden>
     <div class="auth-card" role="document">
-        <button type="button" class="auth-close" data-auth-close aria-label="Cerrar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
+        <!-- Lateral del registro (escritorio ≥ 860 px): pósters de la portada y tres razones. -->
+        <aside class="auth-side" aria-hidden="true">
+            <span class="auth-k">Cuenta nueva · gratis</span>
+            <div class="auth-mos" id="auth-mos"></div>
+            <ul class="auth-why">
+                <li><Fragment set:html={I.ccheck} /><div><b>Episodio a episodio</b>Sabe qué te toca y cuándo sale el siguiente.</div></li>
+                <li><Fragment set:html={I.ccheck} /><div><b>Tu año en cifras</b>Lo que has visto, tus notas y tus horas.</div></li>
+                <li><Fragment set:html={I.ccheck} /><div><b>Con tus amigos</b>Recomendad y hablad sin spoilers.</div></li>
+            </ul>
+            <p class="auth-side-ft">Puedes importar tu historial después.</p>
+        </aside>
 
-        <h2 class="auth-title" id="auth-title">Entra en YourFavs</h2>
-        <p class="auth-sub" id="auth-sub">Guarda tus pelis y series, sigue actores y más.</p>
+        <div class="auth-main">
+            <button type="button" class="auth-close" data-auth-close aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
 
-        <!-- «Te invita…»: solo en «Crear cuenta» y si se llegó por el enlace de un perfil activo. -->
-        <div class="auth-inv" id="auth-inv" hidden>
-            <span class="auth-inv-av" id="auth-inv-av" aria-hidden="true"><img id="auth-inv-img" alt="" hidden /><span id="auth-inv-ini"></span></span>
-            <div>
-                <div class="auth-inv-t">Te invita <span id="auth-inv-name"></span> · @<span id="auth-inv-handle"></span></div>
-                <div class="auth-inv-s" id="auth-inv-s"></div>
+            <!-- Entrar · Crear cuenta: siempre a la vista (antes, una línea al pie). -->
+            <div class="auth-seg" role="tablist" aria-label="Entrar o crear cuenta">
+                <button type="button" role="tab" id="auth-tab-login" aria-selected="true" aria-controls="auth-form" data-auth-switch="login"><Fragment set:html={I.login} />Entrar</button>
+                <button type="button" role="tab" id="auth-tab-register" aria-selected="false" aria-controls="auth-form" tabindex="-1" data-auth-switch="register"><span class="auth-seg-ic" data-ic="reg"><Fragment set:html={I.uplus} /></span><span class="auth-seg-ic" data-ic="lock" hidden><Fragment set:html={I.lock} /></span>Crear cuenta<span class="auth-seg-pr" hidden>· invitación</span></button>
             </div>
-        </div>
+            <p class="sr-only" id="auth-live" aria-live="polite"></p>
 
-        <button type="button" class="auth-google" data-auth-google>
-            <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
-            </svg>
-            Continuar con Google
-        </button>
-
-        <div class="auth-divider"><span>o</span></div>
-
-        <form class="auth-form" id="auth-form" novalidate>
-            <label class="auth-field">
-                <span>Email</span>
-                <input type="email" name="email" id="auth-email" required autocomplete="email" placeholder="tu@email.com"/>
-            </label>
-            <label class="auth-field">
-                <span>Contraseña</span>
-                <div class="auth-pass-wrap">
-                    <input type="password" name="password" id="auth-password" required autocomplete="current-password" minlength="6" placeholder="Mínimo 6 caracteres"/>
-                    <button type="button" class="auth-pass-toggle" id="auth-pass-toggle" aria-label="Mostrar contraseña" aria-pressed="false">
-                        <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-                        <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                    </button>
+            <!-- El navegador ya entró antes (7.4c): aviso en Crear cuenta. -->
+            <div class="auth-msg is-wn" id="auth-known" role="status" hidden>
+                <Fragment set:html={I.hist} />
+                <div><b>Ya has entrado antes desde este navegador</b><span id="auth-known-t">Si es tu cuenta, entra en vez de crear otra.</span>
+                    <div class="auth-msg-act"><button type="button" class="btn btn--sm" data-auth-switch="login">Ir a Entrar</button></div>
                 </div>
-            </label>
-
-            <p class="auth-msg" id="auth-msg" role="alert" hidden></p>
-
-            <button type="submit" class="auth-submit" id="auth-submit">Entrar</button>
-        </form>
-
-        <button type="button" class="auth-forgot" data-auth-forgot>¿Olvidaste la contraseña?</button>
-
-        <p class="auth-toggle">
-            <span data-mode="login">¿No tienes cuenta? <button type="button" class="auth-link" data-auth-switch="register">Regístrate</button></span>
-            <span data-mode="register" hidden>¿Ya tienes cuenta? <button type="button" class="auth-link" data-auth-switch="login">Entra</button></span>
-        </p>
-
-        <!-- Modo invitación sin invitación: sustituye a «¿No tienes cuenta? Regístrate». -->
-        <div class="auth-gate" id="auth-gate" role="note" hidden>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2M13 17v2M13 11v2"/></svg>
-            <div>
-                <b>Ahora mismo, cuentas nuevas solo por invitación</b>
-                Durante una temporada solo se registra quien llega desde el enlace de alguien que ya está dentro. Pide a un amigo el enlace de su perfil. Si ya tienes cuenta, entra con normalidad.
             </div>
-        </div>
 
-        <!-- «Revisa tu correo»: sustituye a Google + formulario mientras falta confirmar el email. -->
-        <div class="auth-pending" id="auth-pending" hidden>
-            <span class="auth-pending-ico" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg>
-            </span>
-            <p class="auth-pending-text">
-                Te hemos enviado un enlace a <strong id="auth-pending-email"></strong>. Ábrelo para
-                activar tu cuenta: vale desde el móvil o desde cualquier navegador.
-            </p>
-            <p class="auth-pending-hint">
-                Si en un par de minutos no ha llegado, mira en spam. Si ese email ya tenía cuenta, no
-                te llegará nada: entra con tu contraseña o recupérala.
-            </p>
-            <p class="auth-msg" id="auth-pending-msg" role="status" hidden></p>
-            <button type="button" class="auth-submit" id="auth-resend">Reenviar el enlace</button>
-            <button type="button" class="auth-forgot" data-auth-pending-back>Volver a entrar</button>
+            <!-- «Te invita…»: solo en Crear cuenta y si se llegó por el enlace de un perfil activo. -->
+            <div class="auth-inv" id="auth-inv" hidden>
+                <span class="auth-inv-av" id="auth-inv-av" aria-hidden="true"><img id="auth-inv-img" alt="" hidden /><span id="auth-inv-ini"></span></span>
+                <div>
+                    <div class="auth-inv-t">Te invita <span id="auth-inv-name"></span> · @<span id="auth-inv-handle"></span></div>
+                    <div class="auth-inv-s" id="auth-inv-s"></div>
+                </div>
+            </div>
+
+            <span class="auth-pending-ico" id="auth-pending-ico" aria-hidden="true" hidden><Fragment set:html={I.mail} /></span>
+            <div class="auth-h">
+                <h2 class="auth-title" id="auth-title">Hola de nuevo</h2>
+                <p class="auth-sub" id="auth-sub">Entra para ver tus listas y seguir donde lo dejaste.</p>
+            </div>
+
+            <!-- Avisos al volver (?auth=error|link|invite), encima de Google. -->
+            <div class="auth-msg" id="auth-note" role="alert" hidden></div>
+
+            <button type="button" class="auth-google" data-auth-google>
+                <svg class="auth-g-logo" viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/>
+                </svg>
+                <span class="auth-spin" aria-hidden="true" hidden></span>
+                <span id="auth-google-l">Entrar con Google</span>
+                <span class="auth-last" id="auth-last-g" hidden>la última vez</span>
+            </button>
+
+            <div class="auth-divider"><span>o con tu email</span></div>
+
+            <form class="auth-form" id="auth-form" novalidate>
+                <div class="auth-field">
+                    <div class="auth-lb"><label for="auth-email">Email</label><span class="auth-last" id="auth-last-e" hidden>la última vez</span></div>
+                    <input type="email" name="email" id="auth-email" required autocomplete="email" placeholder="tu@email.com" aria-describedby="auth-email-err"/>
+                    <span class="auth-hint is-er" id="auth-email-err" hidden></span>
+                </div>
+                <div class="auth-field">
+                    <div class="auth-lb">
+                        <label for="auth-password" id="auth-pass-l">Contraseña</label>
+                        <button type="button" class="auth-forgot" data-auth-forgot>¿La has olvidado?</button>
+                    </div>
+                    <div class="auth-pass-wrap">
+                        <input type="password" name="password" id="auth-password" required autocomplete="current-password" minlength="6" placeholder="Tu contraseña" aria-describedby="auth-pass-hint"/>
+                        <button type="button" class="auth-pass-toggle" id="auth-pass-toggle" aria-label="Mostrar contraseña" aria-pressed="false">
+                            <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        </button>
+                    </div>
+                    <span class="auth-hint" id="auth-pass-hint" hidden></span>
+                </div>
+
+                <div class="auth-msg" id="auth-msg" role="alert" hidden></div>
+
+                <div class="auth-foot">
+                    <button type="submit" class="btn btn--pri auth-submit" id="auth-submit"><span class="auth-spin" aria-hidden="true" hidden></span><span id="auth-submit-l">Entrar</span></button>
+                    <p class="auth-fine" id="auth-fine" hidden>Te enviaremos un enlace para confirmar el email.</p>
+                </div>
+            </form>
+
+            <!-- Modo invitación sin invitación: la pestaña Crear cuenta está bloqueada y esto lo explica. -->
+            <div class="auth-msg is-wn" id="auth-gate" role="note" tabindex="-1" hidden>
+                <Fragment set:html={I.ticket} />
+                <div>
+                    <b>Cuentas nuevas, solo por invitación</b>
+                    Durante una temporada solo se registra quien llega desde el enlace de alguien que ya está dentro. Pide a un amigo el enlace de su perfil. Si ya tienes cuenta, entra con normalidad.
+                </div>
+            </div>
+
+            <!-- «Revisa tu correo» / «Confirma tu email»: sustituye a pestañas, Google y formulario. -->
+            <div class="auth-pending" id="auth-pending" hidden>
+                <div class="auth-msg is-ok" id="auth-pending-msg" role="status" hidden></div>
+                <div class="auth-two">
+                    <div>
+                        <b><Fragment set:html={I.hist} />¿No te llega?</b>
+                        <p>Puede tardar un par de minutos. Mira en spam o en Promociones.</p>
+                        <div class="auth-two-r"><button type="button" class="btn btn--sm" id="auth-resend"><Fragment set:html={I.send} /><span id="auth-resend-l">Reenviar el enlace</span></button></div>
+                    </div>
+                    <div id="auth-two-had">
+                        <b><Fragment set:html={I.key} />¿Ya tenías cuenta con este email?</b>
+                        <p>Entonces no te llegará nada. Entra con tu contraseña o recupérala.</p>
+                        <div class="auth-two-r">
+                            <button type="button" class="btn btn--sm" data-auth-pending-back>Entrar con este email</button>
+                            <button type="button" class="btn btn--sm btn--ghost" data-auth-pending-reset>Recuperar contraseña</button>
+                        </div>
+                    </div>
+                </div>
+                <button type="button" class="auth-other" data-auth-pending-other><Fragment set:html={I.pen} />Usar otro email</button>
+            </div>
         </div>
     </div>
 </div>
 
-<style>
+<style is:global>
+    /* Global (todo con prefijo auth-): los iconos van con set:html y el script crea avisos, y los estilos
+       con ámbito del componente no les llegarían. */
     .auth-overlay {
         position: fixed;
         inset: 0;
@@ -122,229 +181,181 @@ const mode = signupMode();
         align-items: flex-start;
         justify-content: center;
         padding: 8vh 16px 16px;
+        overflow-y: auto;
     }
     .auth-overlay.is-open { display: flex; }
 
+    /* `hidden` gana a los `display` de aquí (sin esto, «Revisa tu correo» salía bajo el formulario). */
+    #auth-modal [hidden] { display: none !important; }
+
+    /* Entrar: 420 px. Crear cuenta: 780 px con lateral (desde 860 px de ancho). Cambia la forma, no solo el título. */
     .auth-card {
         position: relative;
+        display: flex;
         width: 420px;
         max-width: 100%;
         background: var(--bg-elev);
         border: 1px solid var(--border);
         border-radius: var(--r-xl, 16px);
-        box-shadow: 0 30px 80px rgba(0, 0, 0, .5);
-        padding: 28px 28px 22px;
+        box-shadow: var(--sh-lg);
+        overflow: hidden;
         animation: auth-pop .14s ease-out;
     }
     @keyframes auth-pop {
         from { opacity: 0; transform: translateY(-8px) scale(.98); }
         to   { opacity: 1; transform: none; }
     }
+    .auth-side { display: none; }
+    @media (min-width: 860px) {
+        .auth-card.is-register { width: 780px; }
+        .auth-card.is-register .auth-side {
+            width: 300px; flex-shrink: 0; background: var(--bg-tint); border-right: 1px solid var(--border);
+            padding: 28px 24px; display: flex; flex-direction: column; gap: 18px;
+        }
+    }
+    .auth-k { font: 700 var(--fs-micro) var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); }
+    .auth-mos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .auth-mos:empty { display: none; }
+    .auth-mos span { aspect-ratio: 2 / 3; border-radius: var(--r-sm); overflow: hidden; box-shadow: var(--sh-md); background: var(--bg-elev); }
+    .auth-mos span:nth-child(even) { transform: translateY(10px); }
+    .auth-mos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .auth-why { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    .auth-why li { display: flex; gap: 10px; font-size: var(--fs-ui); line-height: 1.45; color: var(--text-2); }
+    .auth-why li b { display: block; color: var(--text); font-weight: 600; }
+    .auth-why svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--ok-ink); margin-top: 1px; }
+    .auth-side-ft { margin: auto 0 0; font-size: var(--fs-meta); color: var(--text-3); }
+
+    .auth-main { position: relative; flex: 1; min-width: 0; padding: 20px 28px 24px; display: flex; flex-direction: column; gap: 14px; }
 
     .auth-close {
-        position: absolute;
-        top: 14px;
-        right: 14px;
-        width: 32px;
-        height: 32px;
-        border-radius: var(--r-full, 999px);
-        border: 1px solid var(--border);
-        background: var(--bg-tint);
-        color: var(--text-3);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
+        position: absolute; top: 16px; right: 16px; width: 32px; height: 32px;
+        border-radius: var(--r-full, 999px); border: 1px solid var(--border); background: var(--bg-tint); color: var(--text-3);
+        display: flex; align-items: center; justify-content: center; cursor: pointer;
     }
     .auth-close:hover { color: var(--text); border-color: var(--border-strong); }
     .auth-close svg { width: 15px; height: 15px; }
 
-    .auth-title { margin: 0 0 6px; font-size: 22px; font-weight: 700; color: var(--text); }
-    .auth-sub { margin: 0 0 22px; font-size: 13.5px; color: var(--text-3); }
+    /* Selector de modo (como .lh-seg de Mis listas): el activo con fondo, sombra y borde, no solo color. */
+    .auth-seg { display: inline-flex; align-self: flex-start; padding: 3px; gap: 2px; margin-right: 44px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); }
+    .auth-seg button {
+        height: 36px; padding: 0 16px; border: 0; border-radius: 7px; background: none; cursor: pointer;
+        display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+        font: 600 var(--fs-ui) var(--font); color: var(--text-2);
+    }
+    .auth-seg svg { width: 15px; height: 15px; color: var(--text-3); }
+    .auth-seg-ic { display: inline-flex; }
+    .auth-seg button[aria-selected="true"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm); outline: 1px solid var(--border-strong); }
+    .auth-seg button[aria-selected="true"] svg { color: var(--text); }
+    .auth-seg button:hover:not([aria-selected="true"]):not([aria-disabled="true"]) { color: var(--text); }
+    .auth-seg button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+    .auth-seg button[aria-disabled="true"] { color: var(--text-4); cursor: not-allowed; }
+    .auth-seg button[aria-disabled="true"] svg { color: var(--text-4); }
+    .auth-seg-pr { font: 600 var(--fs-micro) var(--font-mono); color: var(--text-3); margin-left: 2px; }
+
+    .auth-h { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+    .auth-title { margin: 0; font: 700 var(--fs-sec)/1.2 var(--font); letter-spacing: -.01em; color: var(--text); }
+    .auth-sub { margin: 0; font-size: var(--fs-ui); line-height: 1.5; color: var(--text-2); }
+    .auth-sub strong { font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
 
     .auth-google {
-        width: 100%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 10px;
-        padding: 11px 16px;
-        border-radius: var(--r-full, 999px);
-        border: 1px solid var(--border-strong, var(--border));
-        background: var(--bg-elev);
-        color: var(--text);
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background .15s ease, border-color .15s ease;
+        width: 100%; height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+        border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+        font: 600 var(--fs-ui) var(--font); cursor: pointer; transition: background .15s ease;
     }
     .auth-google:hover { background: var(--bg-tint); }
+    .auth-google:disabled { color: var(--text-3); cursor: progress; }
+    .auth-last { font: 600 var(--fs-micro) var(--font-mono); color: var(--text-3); border: 1px solid var(--border); border-radius: var(--r-full); padding: 2px 7px; margin-left: 4px; font-weight: 600; }
 
-    .auth-divider {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin: 18px 0;
-        color: var(--text-4);
-        font-size: 12px;
-    }
-    .auth-divider::before, .auth-divider::after {
-        content: '';
-        flex: 1;
-        height: 1px;
-        background: var(--border);
-    }
+    .auth-divider { display: flex; align-items: center; gap: 12px; color: var(--text-3); font-size: var(--fs-meta); }
+    .auth-divider::before, .auth-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
-    /* `hidden` tiene que ganar a los `display` de aquí (Google, «o», formulario, «¿Olvidaste…?»): sin esto,
-       «Revisa tu correo» salía DEBAJO del formulario en vez de sustituirlo y «¿Olvidaste la contraseña?»
-       seguía en «Crear cuenta». */
-    #auth-modal [hidden] { display: none !important; }
-    .auth-form { display: flex; flex-direction: column; gap: 13px; }
-    .auth-field { display: flex; flex-direction: column; gap: 5px; }
-    .auth-field span { font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .auth-form { display: flex; flex-direction: column; gap: 14px; }
+    .auth-field { display: flex; flex-direction: column; gap: 6px; }
+    .auth-lb { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 600 var(--fs-meta) var(--font); color: var(--text-2); }
+    .auth-lb label { font: inherit; color: inherit; }
     .auth-field input {
-        width: 100%;
-        padding: 10px 12px;
-        border-radius: 9px;
-        border: 1px solid var(--border);
-        background: var(--bg);
-        color: var(--text);
-        font-size: 14px;
-        font-family: inherit;
+        width: 100%; height: 44px; padding: 0 12px; border-radius: var(--r-md); border: 1px solid var(--border-strong);
+        background: var(--bg); color: var(--text); font-size: var(--fs-body); font-family: inherit;
     }
-    .auth-field input:focus {
-        outline: none;
-        border-color: var(--accent);
-        box-shadow: 0 0 0 3px var(--accent-soft);
-    }
+    .auth-field input::placeholder { color: var(--text-4); }
+    /* Foco en azul (antes en rojo: se confundía con un error). El rojo queda para el principal y los errores. */
+    .auth-field input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
+    .auth-field input[aria-invalid="true"] { border-color: var(--accent-dark); box-shadow: 0 0 0 3px var(--accent-soft); }
 
     .auth-pass-wrap { position: relative; }
-    .auth-pass-wrap input { padding-right: 42px; } /* hueco para el ojo */
+    .auth-pass-wrap input { padding-right: 46px; }
     .auth-pass-toggle {
-        position: absolute;
-        top: 50%;
-        right: 8px;
-        transform: translateY(-50%);
-        width: 28px;
-        height: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border: none;
-        background: none;
-        color: var(--text-4);
-        cursor: pointer;
-        border-radius: 6px;
+        position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center; border: none; background: none;
+        color: var(--text-3); cursor: pointer; border-radius: var(--r-sm);
     }
-    .auth-pass-toggle:hover { color: var(--text-2); }
+    .auth-pass-toggle:hover { color: var(--text); }
+    .auth-pass-toggle[aria-pressed="true"] { color: var(--text); background: var(--bg-tint); }
     .auth-pass-toggle svg { width: 17px; height: 17px; }
     .auth-pass-toggle .eye-off { display: none; }
     .auth-pass-toggle[aria-pressed="true"] .eye { display: none; }
     .auth-pass-toggle[aria-pressed="true"] .eye-off { display: block; }
 
+    .auth-forgot { border: 0; background: none; padding: 0; font: 600 var(--fs-meta) var(--font); color: var(--primary); cursor: pointer; white-space: nowrap; }
+    .auth-forgot:hover { text-decoration: underline; }
+
+    .auth-hint { display: flex; align-items: center; gap: 6px; font-size: var(--fs-meta); color: var(--text-3); }
+    .auth-hint svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .auth-hint.is-ok { color: var(--ok-ink); }
+    .auth-hint.is-er { color: var(--accent-dark); }
+    [data-theme="dark"] .auth-hint.is-er { color: var(--stamp-red-ink); }
+
     .auth-msg {
-        margin: 0;
-        font-size: 12.5px;
-        padding: 9px 11px;
-        border-radius: 8px;
-        background: var(--stamp-red);
-        color: var(--stamp-red-ink);
+        display: flex; gap: 10px; padding: 10px 12px; border-radius: var(--r-md);
+        font-size: var(--fs-ui); line-height: 1.45; background: var(--stamp-red); color: var(--stamp-red-ink);
     }
+    .auth-msg > svg { width: 17px; height: 17px; flex-shrink: 0; margin-top: 1px; }
+    .auth-msg b { display: block; font-weight: 600; }
+    .auth-msg a, .auth-msg .auth-msg-link { font: inherit; font-weight: 600; color: inherit; text-decoration: underline; background: none; border: 0; padding: 0; cursor: pointer; }
     .auth-msg.is-ok { background: var(--ok-soft); color: var(--ok-ink); }
+    .auth-msg.is-wn { background: var(--stamp-amber); color: var(--stamp-amber-ink); }
+    .auth-msg-act { margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
 
-    .auth-submit {
-        margin-top: 3px;
-        width: 100%;
-        padding: 11px 16px;
-        border-radius: var(--r-full, 999px);
-        border: none;
-        /* --accent-dark en reposo: blanco sobre --accent da 4,2:1 y no pasa AA (handoff social §7.7). */
-        background: var(--accent-dark);
-        color: #fff;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background .15s ease;
-    }
-    .auth-submit:hover { background: var(--accent); }
-    .auth-submit:disabled, .auth-google:disabled { opacity: .6; cursor: progress; }
+    .auth-foot { display: flex; flex-direction: column; gap: 10px; margin-top: 2px; }
+    .auth-submit { width: 100%; height: 44px; }
+    .auth-submit[aria-busy="true"] { cursor: progress; }
+    .auth-fine { margin: 0; font-size: var(--fs-meta); color: var(--text-3); text-align: center; line-height: 1.45; }
+    .auth-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: auth-spin .7s linear infinite; }
+    @keyframes auth-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .auth-spin { animation-duration: 2s; } }
 
-    .auth-forgot {
-        display: block;
-        margin: 14px auto 0;
-        background: none;
-        border: none;
-        color: var(--text-3);
-        font-size: 12.5px;
-        cursor: pointer;
-        text-decoration: underline;
-    }
-    .auth-forgot:hover { color: var(--accent); }
-
-    .auth-toggle {
-        margin: 16px 0 0;
-        text-align: center;
-        font-size: 13px;
-        color: var(--text-3);
-        border-top: 1px solid var(--border);
-        padding-top: 16px;
-    }
-    .auth-link {
-        background: none;
-        border: none;
-        color: var(--accent-dark);
-        font-weight: 600;
-        font-size: 13px;
-        cursor: pointer;
-        padding: 0;
-    }
-    .auth-link:hover { text-decoration: underline; }
-    :global([data-theme="dark"]) .auth-link { color: var(--stamp-red-ink); }
-
-    /* Invitación (handoff social D14). */
-    .auth-inv {
-        display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 18px;
-        border-radius: var(--r-md); background: var(--stamp-green); color: var(--stamp-green-ink);
-    }
-    .auth-inv[hidden] { display: none; }
+    /* Invitación (handoff social D14): encima del título. */
+    .auth-inv { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--r-md); background: var(--stamp-green); color: var(--stamp-green-ink); }
     .auth-inv-av {
-        position: relative;
-        width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+        position: relative; width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
         display: grid; place-items: center; background: var(--sb, var(--bg-elev)); color: var(--si, var(--text));
-        font: 600 12px var(--font);
+        font: 700 var(--fs-ui) var(--font); border: 2px solid var(--bg-elev);
     }
     .auth-inv-av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-    .auth-inv-t { font: 600 13px var(--font); }
-    .auth-inv-s { font-size: 12px; line-height: 1.45; opacity: .95; }
-    .auth-gate {
-        display: flex; gap: 12px; padding: 14px; margin-top: 16px; border-radius: var(--r-md);
-        background: var(--stamp-amber); color: var(--stamp-amber-ink); font-size: 12.5px; line-height: 1.5;
-    }
-    .auth-gate[hidden] { display: none; }
-    .auth-gate b { display: block; font-weight: 600; font-size: 13px; margin-bottom: 2px; }
-    .auth-gate svg { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; }
+    .auth-inv-t { font: 600 var(--fs-ui) var(--font); }
+    .auth-inv-s { font-size: var(--fs-meta); line-height: 1.45; }
 
-    /* Vista «Revisa tu correo» (confirmación de email pendiente). */
-    .auth-pending { display: flex; flex-direction: column; gap: 12px; }
-    .auth-pending[hidden] { display: none; }
-    .auth-pending-ico {
-        width: 44px;
-        height: 44px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--r-full, 999px);
-        background: var(--accent-soft);
-        color: var(--accent);
-    }
+    /* «Revisa tu correo» / «Confirma tu email». */
+    .auth-pending-ico { width: 48px; height: 48px; border-radius: var(--r-full); display: grid; place-items: center; background: var(--stamp-blue); color: var(--stamp-blue-ink); }
     .auth-pending-ico svg { width: 22px; height: 22px; }
-    .auth-pending-text { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text-2); }
-    .auth-pending-text strong { color: var(--text); word-break: break-all; }
-    .auth-pending-hint { margin: 0; font-size: 12.5px; color: var(--text-3); }
+    .auth-pending { display: flex; flex-direction: column; gap: 14px; }
+    .auth-two { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; }
+    .auth-two > div { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .auth-two > div + div { border-top: 1px solid var(--border); }
+    .auth-two b { display: flex; align-items: center; gap: 8px; font: 600 var(--fs-ui) var(--font); color: var(--text); }
+    .auth-two b svg { width: 16px; height: 16px; color: var(--text-3); }
+    .auth-two p { margin: 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--text-2); }
+    .auth-two-r { display: flex; gap: 8px; flex-wrap: wrap; }
+    .auth-two-r svg { width: 14px; height: 14px; }
+    .auth-other { align-self: flex-start; display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 0; font: 500 var(--fs-meta) var(--font); color: var(--primary); cursor: pointer; }
+    .auth-other:hover { text-decoration: underline; }
+    .auth-other svg { width: 13px; height: 13px; }
 
     @media (max-width: 480px) {
         .auth-overlay { padding: 5vh 12px 12px; }
-        .auth-card { padding: 24px 20px 18px; }
+        .auth-main { padding: 18px 20px 20px; }
+        .auth-seg { align-self: stretch; }
+        .auth-seg button { flex: 1; justify-content: center; padding: 0 10px; }
     }
 </style>
 
@@ -354,35 +365,46 @@ const mode = signupMode();
 
     const overlay = document.getElementById('auth-modal') as HTMLElement | null;
     if (overlay) {
+        const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
         const card = overlay.querySelector('.auth-card') as HTMLElement;
-        const form = document.getElementById('auth-form') as HTMLFormElement;
-        const emailInput = document.getElementById('auth-email') as HTMLInputElement;
-        const passInput = document.getElementById('auth-password') as HTMLInputElement;
-        const submitBtn = document.getElementById('auth-submit') as HTMLButtonElement;
+        const form = $<HTMLFormElement>('auth-form');
+        const emailInput = $<HTMLInputElement>('auth-email');
+        const passInput = $<HTMLInputElement>('auth-password');
+        const submitBtn = $<HTMLButtonElement>('auth-submit');
+        const submitL = $('auth-submit-l');
         const googleBtn = overlay.querySelector('[data-auth-google]') as HTMLButtonElement;
-        const msgEl = document.getElementById('auth-msg') as HTMLElement;
-        const titleEl = document.getElementById('auth-title') as HTMLElement;
-        const subEl = document.getElementById('auth-sub') as HTMLElement;
-        const pendingEl = document.getElementById('auth-pending') as HTMLElement;
-        const pendingEmailEl = document.getElementById('auth-pending-email') as HTMLElement;
-        const pendingMsgEl = document.getElementById('auth-pending-msg') as HTMLElement;
-        const resendBtn = document.getElementById('auth-resend') as HTMLButtonElement;
+        const googleL = $('auth-google-l');
+        const msgEl = $('auth-msg');
+        const noteEl = $('auth-note');
+        const titleEl = $('auth-title');
+        const subEl = $('auth-sub');
+        const liveEl = $('auth-live');
+        const segEl = overlay.querySelector('.auth-seg') as HTMLElement;
+        const tabLogin = $<HTMLButtonElement>('auth-tab-login');
+        const tabReg = $<HTMLButtonElement>('auth-tab-register');
+        const passLabel = $('auth-pass-l');
+        const passHint = $('auth-pass-hint');
+        const emailErr = $('auth-email-err');
+        const fineEl = $('auth-fine');
+        const forgotBtn = overlay.querySelector('[data-auth-forgot]') as HTMLButtonElement;
+        const pendingEl = $('auth-pending');
+        const pendingIco = $('auth-pending-ico');
+        const pendingMsgEl = $('auth-pending-msg');
+        const hadEl = $('auth-two-had');
+        const resendBtn = $<HTMLButtonElement>('auth-resend');
+        const resendL = $('auth-resend-l');
+        const mosEl = $('auth-mos');
         // Lo que se esconde mientras se espera la confirmación (y vuelve con setMode).
-        const standardEls = [
-            googleBtn,
-            overlay.querySelector('.auth-divider') as HTMLElement,
-            form,
-            overlay.querySelector('[data-auth-forgot]') as HTMLElement,
-            overlay.querySelector('.auth-toggle') as HTMLElement,
-        ];
+        const standardEls = [segEl, noteEl, googleBtn, overlay.querySelector('.auth-divider') as HTMLElement, form];
         let pendingEmail = '';
         let resendTimer: number | undefined;
+        let gating = false;
 
         // ---- Invitaciones (F2 social) ----
         // Quién invita sale de la cookie `yf_ref` que dejó el perfil público visitado. Se pregunta
         // al cargar (si hay cookie y no hay sesión) para tenerlo listo antes de abrir el modal.
-        const invEl = document.getElementById('auth-inv') as HTMLElement;
-        const gateEl = document.getElementById('auth-gate') as HTMLElement;
+        const invEl = $('auth-inv');
+        const gateEl = $('auth-gate');
         const inviteMode = overlay.dataset.signupMode === 'invite';
         type Inviter = { name: string; firstName: string; handle: string; avatar: string | null; initials: string; color: string };
         let inviter: Inviter | null = null;
@@ -398,28 +420,31 @@ const mode = signupMode();
 
         function paintInviter() {
             if (!inviter) return;
-            (document.getElementById('auth-inv-name') as HTMLElement).textContent = inviter.name;
-            (document.getElementById('auth-inv-handle') as HTMLElement).textContent = inviter.handle;
-            (document.getElementById('auth-inv-s') as HTMLElement).textContent =
+            $('auth-inv-name').textContent = inviter.name;
+            $('auth-inv-handle').textContent = inviter.handle;
+            $('auth-inv-s').textContent =
                 `Al crear la cuenta seguirás a ${inviter.firstName}.` + (SOCIAL_PHASE.friends ? ' Si queréis ser amigos, se lo pides tú.' : '');
-            const av = document.getElementById('auth-inv-av') as HTMLElement;
+            const av = $('auth-inv-av');
             av.style.setProperty('--sb', `var(--stamp-${inviter.color})`);
             av.style.setProperty('--si', `var(--stamp-${inviter.color}-ink)`);
-            const img = document.getElementById('auth-inv-img') as HTMLImageElement;
-            const ini = document.getElementById('auth-inv-ini') as HTMLElement;
+            const img = $<HTMLImageElement>('auth-inv-img');
+            const ini = $('auth-inv-ini');
             if (inviter.avatar) { img.src = inviter.avatar; img.hidden = false; ini.hidden = true; }
             else { ini.textContent = inviter.initials; }
             paintInviteExtras();
         }
 
-        // Bloques de invitación según la vista: «Te invita…» en registro; la explicación del modo
-        // invitación en lugar de «¿No tienes cuenta? Regístrate».
+        // Invitación según la vista: «Te invita…» en registro; en modo invitación sin invitación, la
+        // pestaña Crear cuenta bloqueada (candado y «· invitación») y el aviso que lo explica.
         function paintInviteExtras() {
             const pending = !pendingEl.hidden;
             invEl.hidden = !(mode === 'register' && inviter && !pending);
             const gate = inviteOnly();
             gateEl.hidden = !(gate && mode === 'login' && !pending);
-            (overlay!.querySelector('[data-mode="login"]') as HTMLElement).hidden = mode !== 'login' || gate;
+            tabReg.setAttribute('aria-disabled', gate ? 'true' : 'false');
+            (tabReg.querySelector('[data-ic="reg"]') as HTMLElement).hidden = gate;
+            (tabReg.querySelector('[data-ic="lock"]') as HTMLElement).hidden = !gate;
+            (tabReg.querySelector('.auth-seg-pr') as HTMLElement).hidden = !gate;
         }
 
         let mode: 'login' | 'register' = 'login';
@@ -432,49 +457,135 @@ const mode = signupMode();
             return actions;
         }
 
-        function showMsg(text: string, ok = false) {
-            msgEl.textContent = text;
-            msgEl.classList.toggle('is-ok', ok);
-            msgEl.hidden = false;
+        // Aviso con título opcional y, si hace falta, un enlace que hace algo (recuperar la contraseña).
+        function paintMsg(el: HTMLElement, text: string, o: { kind?: 'er' | 'ok' | 'wn'; title?: string; link?: [string, () => void] } = {}) {
+            el.className = `auth-msg${o.kind && o.kind !== 'er' ? ` is-${o.kind}` : ''}`;
+            el.replaceChildren();
+            const body = document.createElement('div');
+            if (o.title) { const b = document.createElement('b'); b.textContent = o.title; body.append(b); }
+            body.append(text);
+            if (o.link) {
+                const a = document.createElement('button');
+                a.type = 'button'; a.className = 'auth-msg-link'; a.textContent = o.link[0];
+                a.addEventListener('click', o.link[1]);
+                body.append(' ', a, '.');
+            }
+            el.append(body);
+            el.hidden = false;
         }
-        function clearMsg() { msgEl.hidden = true; msgEl.textContent = ''; }
+        const showMsg = (text: string, ok = false) => paintMsg(msgEl, text, { kind: ok ? 'ok' : 'er' });
+        function clearMsg() { msgEl.hidden = true; msgEl.replaceChildren(); }
+        function clearNote() { noteEl.hidden = true; noteEl.replaceChildren(); }
 
+        // Errores por campo (aria-invalid + texto con aria-describedby).
+        function fieldError(input: HTMLInputElement, hint: HTMLElement, text: string) {
+            input.setAttribute('aria-invalid', 'true');
+            hint.className = 'auth-hint is-er';
+            hint.textContent = text;
+            hint.hidden = false;
+        }
+        function clearFieldErrors() {
+            emailInput.removeAttribute('aria-invalid');
+            passInput.removeAttribute('aria-invalid');
+            emailErr.hidden = true;
+            paintPassHint();
+        }
+
+        // Pista de la contraseña: en Crear cuenta, en vivo («te faltan 2» → «✓ Tiene 6 caracteres o más»).
+        const OK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+        function paintPassHint() {
+            if (mode !== 'register') { passHint.hidden = true; return; }
+            const n = passInput.value.length;
+            passHint.hidden = false;
+            if (n >= 6) { passHint.className = 'auth-hint is-ok'; passHint.innerHTML = `${OK_ICON}Tiene 6 caracteres o más`; }
+            else { passHint.className = 'auth-hint'; passHint.textContent = n ? `Mínimo 6 caracteres · te faltan ${6 - n}` : 'Mínimo 6 caracteres'; }
+        }
+        passInput.addEventListener('input', () => { if (passInput.getAttribute('aria-invalid')) passInput.removeAttribute('aria-invalid'); paintPassHint(); });
+        emailInput.addEventListener('input', () => { if (emailInput.getAttribute('aria-invalid')) { emailInput.removeAttribute('aria-invalid'); emailErr.hidden = true; } });
+
+        const submitText = () => (mode === 'login' ? 'Entrar' : 'Crear cuenta');
         function setLoading(on: boolean) {
             submitBtn.disabled = on;
             googleBtn.disabled = on;
-            submitBtn.textContent = on ? 'Un momento…' : (mode === 'login' ? 'Entrar' : 'Crear cuenta');
+            submitBtn.setAttribute('aria-busy', on ? 'true' : 'false');
+            (submitBtn.querySelector('.auth-spin') as HTMLElement).hidden = !on;
+            submitL.textContent = on ? 'Un momento…' : submitText();
+        }
+        function setGoogleLoading(on: boolean) {
+            googleBtn.disabled = on;
+            submitBtn.disabled = on;
+            (googleBtn.querySelector('.auth-g-logo') as SVGElement).style.display = on ? 'none' : '';
+            (googleBtn.querySelector('.auth-spin') as HTMLElement).hidden = !on;
+            googleL.textContent = on ? 'Abriendo Google…' : (mode === 'login' ? 'Entrar con Google' : 'Registrarte con Google');
         }
 
-        function setMode(next: 'login' | 'register') {
-            // Modo invitación sin invitación: no hay registro, se queda en «Entrar» con la explicación.
-            if (next === 'register' && inviteOnly()) next = 'login';
+        // Pósters del lateral: los de la portada sin sesión, si está a la vista (el registro se abre
+        // sobre todo desde ahí). Si no los hay, el lateral sale sin pósters.
+        function fillPosters() {
+            if (mosEl.childElementCount) return;
+            const srcs = Array.from(document.querySelectorAll<HTMLImageElement>('.wel-mos img')).slice(0, 4).map((i) => i.currentSrc || i.src);
+            srcs.forEach((src) => {
+                const s = document.createElement('span');
+                const img = document.createElement('img');
+                img.src = src; img.alt = ''; img.loading = 'lazy';
+                s.append(img); mosEl.append(s);
+            });
+        }
+
+        function setMode(next: 'login' | 'register', o: { announce?: boolean } = {}) {
+            // Modo invitación sin invitación: no hay registro; el foco va al aviso que lo explica.
+            if (next === 'register' && inviteOnly()) { next = 'login'; if (o.announce) gateEl.focus(); }
             mode = next;
             clearMsg();
+            clearNote();
             pendingEl.hidden = true;
+            pendingIco.hidden = true;
             standardEls.forEach((el) => { if (el) el.hidden = false; });
+            noteEl.hidden = true;
             const isLogin = next === 'login';
-            titleEl.textContent = isLogin ? 'Entra en YourFavs' : 'Crea tu cuenta';
-            subEl.textContent = isLogin
-                ? 'Guarda tus pelis y series, sigue actores y más.'
-                : 'Es gratis y guardas tus listas en un minuto.';
-            submitBtn.textContent = isLogin ? 'Entrar' : 'Crear cuenta';
+            card.classList.toggle('is-register', !isLogin);
+            tabLogin.setAttribute('aria-selected', String(isLogin));
+            tabReg.setAttribute('aria-selected', String(!isLogin));
+            tabLogin.tabIndex = isLogin ? 0 : -1;
+            tabReg.tabIndex = isLogin ? -1 : 0;
+            if (isLogin && gating) {
+                titleEl.textContent = 'Entra para guardar';
+                subEl.textContent = 'Lo guardamos en tus listas en cuanto entres.';
+            } else {
+                titleEl.textContent = isLogin ? 'Hola de nuevo' : 'Crea tu cuenta';
+                subEl.textContent = isLogin
+                    ? 'Entra para ver tus listas y seguir donde lo dejaste.'
+                    : 'Gratis. Solo un email y una contraseña, o tu cuenta de Google.';
+            }
+            googleL.textContent = isLogin ? 'Entrar con Google' : 'Registrarte con Google';
+            passLabel.textContent = isLogin ? 'Contraseña' : 'Elige una contraseña';
+            passInput.placeholder = isLogin ? 'Tu contraseña' : 'Mínimo 6 caracteres';
             passInput.setAttribute('autocomplete', isLogin ? 'current-password' : 'new-password');
-            (overlay!.querySelector('[data-mode="login"]') as HTMLElement).hidden = !isLogin;
-            (overlay!.querySelector('[data-mode="register"]') as HTMLElement).hidden = isLogin;
-            (overlay!.querySelector('[data-auth-forgot]') as HTMLElement).hidden = !isLogin;
+            submitL.textContent = submitText();
+            forgotBtn.hidden = !isLogin;
+            fineEl.hidden = isLogin;
+            clearFieldErrors();
+            if (!isLogin) fillPosters();
+            if (o.announce) liveEl.textContent = isLogin ? 'Entrar' : 'Crear cuenta';
             paintInviteExtras();
         }
 
-        // «Revisa tu correo». `note` sustituye al subtítulo (p. ej. al intentar entrar sin confirmar).
-        function showPending(email: string, note?: string) {
+        // «Revisa tu correo» (registro) o «Confirma tu email» (entrar sin confirmar). Sustituye a todo.
+        function showPending(email: string, unconfirmed = false) {
             pendingEmail = email;
+            card.classList.remove('is-register');   // vuelve a la tarjeta estrecha, sin el lateral
             standardEls.forEach((el) => { if (el) el.hidden = true; });
             pendingEl.hidden = false;
-            paintInviteExtras();
-            pendingEmailEl.textContent = email;
+            pendingIco.hidden = false;
             pendingMsgEl.hidden = true;
-            titleEl.textContent = 'Revisa tu correo';
-            subEl.textContent = note || 'Un paso más y tu cuenta está lista.';
+            hadEl.hidden = unconfirmed;
+            paintInviteExtras();
+            titleEl.textContent = unconfirmed ? 'Confirma tu email' : 'Revisa tu correo';
+            const strong = document.createElement('strong');
+            strong.textContent = email;
+            subEl.replaceChildren(...(unconfirmed
+                ? ['Aún no has confirmado ', strong, '. Usa el enlace que te enviamos o pide otro.']
+                : ['Si es una cuenta nueva, te hemos enviado un enlace a ', strong, '. Ábrelo para activarla, desde el móvil o desde cualquier navegador.']));
             setLoading(false);
             resendBtn.focus();
         }
@@ -484,39 +595,39 @@ const mode = signupMode();
             window.clearInterval(resendTimer);
             let left = seconds;
             resendBtn.disabled = true;
-            resendBtn.textContent = `Reenviar el enlace (${left})`;
+            resendL.textContent = `Reenviar el enlace (${left})`;
             resendTimer = window.setInterval(() => {
                 left -= 1;
                 if (left <= 0) {
                     window.clearInterval(resendTimer);
                     resendBtn.disabled = false;
-                    resendBtn.textContent = 'Reenviar el enlace';
+                    resendL.textContent = 'Reenviar el enlace';
                 } else {
-                    resendBtn.textContent = `Reenviar el enlace (${left})`;
+                    resendL.textContent = `Reenviar el enlace (${left})`;
                 }
             }, 1000);
         }
 
-        function open(gating = false) {
+        function focusFirstEmpty() {
+            (emailInput.value ? passInput : emailInput).focus();
+        }
+
+        function open(isGating = false) {
             if (overlay!.classList.contains('is-open')) return;
             lastFocus = document.activeElement as HTMLElement;
             overlay!.hidden = false;
             overlay!.classList.add('is-open');
             document.body.style.overflow = 'hidden';
+            gating = isGating;
             setMode('login');
-            if (gating) {
-                // Abierto desde una acción de guardar de un invitado (gating).
-                titleEl.textContent = 'Inicia sesión para guardar';
-                subEl.textContent = 'Entra o crea tu cuenta y guardamos esto en tus listas al instante.';
-            }
-            clearMsg();
-            emailInput.focus();
+            focusFirstEmpty();
         }
         function close() {
             overlay!.classList.remove('is-open');
             overlay!.hidden = true;
             document.body.style.overflow = '';
             form.reset();
+            gating = false;
             // Si cierra sin loguearse, descarta la intención pendiente (no la
             // queremos disparar en un login posterior no relacionado).
             try { sessionStorage.removeItem('yf_pending_action'); } catch { /* noop */ }
@@ -570,7 +681,7 @@ const mode = signupMode();
                 // `data-auth-open="register"` abre directamente en «Crear cuenta» (perfil público). Con
                 // invitación, también cualquier otro disparador salvo «login» explícito (handoff D14).
                 const want = opener.getAttribute('data-auth-open');
-                if (want === 'register' || (inviter && want !== 'login')) setMode('register');
+                if (want === 'register' || (inviter && want !== 'login')) { setMode('register'); focusFirstEmpty(); }
             }
             else if (t.closest('[data-auth-logout]')) {
                 e.preventDefault();
@@ -615,20 +726,32 @@ const mode = signupMode();
             const focusables = card.querySelectorAll<HTMLElement>(
                 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
             );
-            const list = Array.from(focusables).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+            const list = Array.from(focusables).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null && el.tabIndex !== -1);
             if (!list.length) return;
             const first = list[0], last = list[list.length - 1];
             if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
             else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
         });
 
-        // ---- toggle login/registro ----
-        overlay.querySelectorAll('[data-auth-switch]').forEach((btn) => {
-            btn.addEventListener('click', () => setMode(btn.getAttribute('data-auth-switch') as 'login' | 'register'));
+        // ---- pestañas (y «Ir a Entrar» del aviso) ----
+        overlay.querySelectorAll<HTMLButtonElement>('[data-auth-switch]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const want = btn.getAttribute('data-auth-switch') as 'login' | 'register';
+                setMode(want, { announce: true });
+                if (want === 'login' || !inviteOnly()) focusFirstEmpty();
+            });
+        });
+        // Flechas ← → entre pestañas (patrón tablist).
+        segEl.addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            const want = mode === 'login' ? 'register' : 'login';
+            setMode(want, { announce: true });
+            (mode === 'login' ? tabLogin : tabReg).focus();
         });
 
         // ---- ver/ocultar contraseña ----
-        const passToggle = document.getElementById('auth-pass-toggle') as HTMLButtonElement;
+        const passToggle = $<HTMLButtonElement>('auth-pass-toggle');
         passToggle.addEventListener('click', () => {
             const show = passInput.type === 'password';
             passInput.type = show ? 'text' : 'password';
@@ -640,21 +763,38 @@ const mode = signupMode();
         // ---- Google ----
         googleBtn.addEventListener('click', async () => {
             clearMsg();
-            setLoading(true);
+            clearNote();
+            setGoogleLoading(true);
             const a = await getActions();
             const res = await a.loginGoogle();
             if (res.ok) afterAuth(res);
-            else { showMsg(res.error); setLoading(false); }
+            else { paintMsg(noteEl, res.error, { title: 'No se ha podido entrar con Google' }); setGoogleLoading(false); }
+        });
+
+        // ---- reset de contraseña ----
+        async function sendReset(email: string, where: HTMLElement) {
+            const a = await getActions();
+            const res = await a.resetPassword(email);
+            if (res.ok) paintMsg(where, 'Si hay una cuenta con ese email, te llegará un enlace para cambiar la contraseña.', { kind: 'ok' });
+            else paintMsg(where, res.error);
+        }
+        forgotBtn.addEventListener('click', () => {
+            const email = emailInput.value.trim();
+            if (!email) { fieldError(emailInput, emailErr, 'Escribe tu email y vuelve a pulsar «¿La has olvidado?».'); emailInput.focus(); return; }
+            sendReset(email, msgEl);
         });
 
         // ---- email/contraseña (login o registro) ----
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearMsg();
+            clearFieldErrors();
             const email = emailInput.value.trim();
             const password = passInput.value;
-            if (!email || !password) { showMsg('Rellena email y contraseña.'); return; }
-            if (mode === 'register' && password.length < 6) { showMsg('La contraseña debe tener al menos 6 caracteres.'); return; }
+            if (!email) { fieldError(emailInput, emailErr, 'Escribe tu email'); emailInput.focus(); return; }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fieldError(emailInput, emailErr, 'Ese email no es válido'); emailInput.focus(); return; }
+            if (!password) { fieldError(passInput, passHint, 'Escribe tu contraseña'); passInput.focus(); return; }
+            if (mode === 'register' && password.length < 6) { fieldError(passInput, passHint, `La contraseña tiene que tener al menos 6 caracteres · te faltan ${6 - password.length}`); passInput.focus(); return; }
 
             setLoading(true);
             const a = await getActions();
@@ -662,42 +802,44 @@ const mode = signupMode();
             if (res.ok && res.pendingConfirmation) { showPending(email); return; }
             if (res.ok) { afterAuth(res); return; }
             if (res.code === 'invite_only') { setMode('login'); setLoading(false); showMsg(res.error); return; }
-            if (res.code === 'email_not_confirmed') {
-                showPending(email, 'Aún no has confirmado tu email. Usa el enlace que te enviamos o pide otro.');
+            if (res.code === 'email_not_confirmed') { showPending(email, true); return; }
+            setLoading(false);
+            if (res.code === 'invalid_credentials') {
+                // Se conserva el email, se vacía la contraseña y recibe el foco.
+                paintMsg(msgEl, 'Revisa los dos. Si no la recuerdas,', { title: 'Email o contraseña incorrectos', link: ['recupera la contraseña', () => sendReset(email, msgEl)] });
+                passInput.value = '';
+                passInput.setAttribute('aria-invalid', 'true');
+                passInput.focus();
                 return;
             }
             showMsg(res.error);
-            setLoading(false);
         });
 
-        // ---- confirmación pendiente: reenviar / volver ----
+        // ---- «Revisa tu correo»: reenviar, entrar con este email, recuperar, otro email ----
         resendBtn.addEventListener('click', async () => {
             if (!pendingEmail) return;
             resendBtn.disabled = true;
             const a = await getActions();
             const res = await a.resendConfirmation(pendingEmail);
-            pendingMsgEl.textContent = res.ok ? 'Enlace reenviado. Mira tu bandeja de entrada.' : res.error;
-            pendingMsgEl.classList.toggle('is-ok', res.ok);
-            pendingMsgEl.hidden = false;
+            paintMsg(pendingMsgEl, res.ok ? 'Enlace reenviado. Mira tu bandeja de entrada.' : res.error, { kind: res.ok ? 'ok' : 'er' });
             cooldownResend(res.ok ? 30 : 60);
         });
         overlay.querySelector('[data-auth-pending-back]')!.addEventListener('click', () => {
-            setMode('login');
+            setMode('login', { announce: true });
             emailInput.value = pendingEmail;
             passInput.focus();
         });
-
-        // ---- reset de contraseña ----
-        overlay.querySelector('[data-auth-forgot]')!.addEventListener('click', async () => {
-            const email = emailInput.value.trim();
-            if (!email) { showMsg('Escribe tu email arriba y vuelve a pulsar.'); emailInput.focus(); return; }
-            const a = await getActions();
-            const res = await a.resetPassword(email);
-            if (res.ok) showMsg('Te enviamos un email para restablecer la contraseña.', true);
-            else showMsg(res.error);
+        overlay.querySelector('[data-auth-pending-reset]')!.addEventListener('click', () => {
+            if (pendingEmail) sendReset(pendingEmail, pendingMsgEl);
+        });
+        overlay.querySelector('[data-auth-pending-other]')!.addEventListener('click', () => {
+            setMode('register', { announce: true });
+            emailInput.value = '';
+            passInput.value = '';
+            emailInput.focus();
         });
 
-        // ---- vuelta de Google: /auth/callback redirige aquí con ?auth=ok|new|error ----
+        // ---- vuelta de Google: /auth/callback redirige aquí con ?auth=ok|new|error|link|invite ----
         // (La "sesión continua" ya no necesita nada en cliente: el middleware refresca la
         // sesión de Supabase en cada request.)
         const authReturn = new URLSearchParams(location.search).get('auth');
@@ -707,16 +849,16 @@ const mode = signupMode();
             history.replaceState(history.state, '', clean.pathname + clean.search + clean.hash);
             if (authReturn === 'error') {
                 open();
-                showMsg('No se pudo entrar con Google. Inténtalo de nuevo.');
+                paintMsg(noteEl, 'Puede que cerraras la ventana o que caducara. Vuelve a intentarlo.', { title: 'No se ha podido entrar con Google' });
             } else if (authReturn === 'invite') {
                 // Cuenta nueva de Google sin invitación en modo invitación: el servidor no la creó.
                 open();
-                showMsg('Ahora mismo, las cuentas nuevas son solo por invitación. Si ya tienes cuenta, entra con normalidad.');
+                paintMsg(noteEl, 'Si ya tienes cuenta, entra con normalidad.', { kind: 'wn', title: 'Cuentas nuevas, solo por invitación' });
             } else if (authReturn === 'link') {
                 // Enlace del email caducado o ya usado. Si era de confirmar, al intentar entrar
                 // el login responde «sin confirmar» y el modal ofrece reenviarlo.
                 open();
-                showMsg('Ese enlace ha caducado o ya se usó. Entra con tu email y contraseña; si aún no habías confirmado, te ofreceremos otro.');
+                paintMsg(noteEl, 'Entra con tu email y contraseña; si aún no habías confirmado, te ofreceremos otro.', { kind: 'wn', title: 'Ese enlace ha caducado o ya se usó' });
             } else {
                 // La página ya llega con sesión: solo falta lo que el popup hacía después.
                 let pending: string | null = null;
