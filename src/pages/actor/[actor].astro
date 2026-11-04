@@ -6,10 +6,7 @@ import {
     getActorCrewCredits
 } from "../../services/API/Actors/InfoActor";
 import type { CrewCredit } from "../../services/API/Actors/InfoActor";
-import CardMovie from "../../components/Cards/CardMovie.astro";
-import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName, genresMap } from "../../utils/constants/genres";
-import { sortBycriterion } from "../../utils/sorting";
 import { calculateAge, getCareerRange } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
 import EmptyState from "../../components/EmptyState.astro";
@@ -69,7 +66,7 @@ const upcomingSeen = new Set<string>();
 const personUpcoming = [
     ...(credits.movies || []).map((c: any) => ({ id: String(c.id), media_type: 'movie' as const, title: c.title, poster_path: c.poster_path || null, date: c.release_date || '', kind: 'Película' })),
     ...(credits.series || []).map((c: any) => ({ id: String(c.id), media_type: 'tv' as const, title: c.name, poster_path: c.poster_path || null, date: c.first_air_date || '', kind: 'Serie' })),
-    ...crewCredits.map((c) => ({ id: String(c.id), media_type: c.media_type, title: c.title, poster_path: c.poster_path, date: c.year ? `${c.year}-01-01` : '', kind: c.media_type === 'movie' ? 'Película' : 'Serie' })),
+    ...crewCredits.map((c) => ({ id: String(c.id), media_type: c.media_type, title: c.title, poster_path: c.poster_path, date: c.date || (c.year ? `${c.year}-01-01` : ''), kind: c.media_type === 'movie' ? 'Película' : 'Serie' })),
 ]
     .filter((c) => c.title && c.date && c.date > todayStr)
     .filter((c) => {
@@ -81,20 +78,11 @@ const personUpcoming = [
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
-// Agrupar crew por job (Director, Producer, etc.)
-const JOB_ORDER = ['Director', 'Creator', 'Writer', 'Screenplay', 'Executive Producer', 'Producer'];
+// Nombres de los trabajos de equipo en la filmografía (6.3)
 const JOB_LABELS: Record<string, string> = {
-    Director: 'Director', Creator: 'Creador', Writer: 'Guionista',
-    Screenplay: 'Guion', 'Executive Producer': 'Productor ejecutivo', Producer: 'Productor',
+    Director: 'Dirección', Creator: 'Creación', Writer: 'Guion',
+    Screenplay: 'Guion', 'Executive Producer': 'Producción ejecutiva', Producer: 'Producción',
 };
-const crewByJob = new Map<string, CrewCredit[]>();
-for (const c of crewCredits) {
-    if (!crewByJob.has(c.job)) crewByJob.set(c.job, []);
-    crewByJob.get(c.job)!.push(c);
-}
-const crewSections = JOB_ORDER
-    .filter(job => crewByJob.has(job) && crewByJob.get(job)!.length > 0)
-    .map(job => ({ job, label: JOB_LABELS[job] || job, credits: crewByJob.get(job)! }));
 
 const actorInfo = actorDetails || {
     id: null, nombre: actor, biografia: null, lugarNacimiento: null,
@@ -123,24 +111,9 @@ const isInFavorites = !!favEntry;
 const currentPosition = favEntry?.position ?? null;
 const totalActorsFavorites = actorsFavs.length;
 
-// Ordenación
-const sortBy = Astro.url.searchParams.get('sort') || 'popularity';
-const moviesSorted = sortBycriterion(movies, sortBy, 'release_date');
-// B5: con el orden por defecto (popularidad), las apariciones sueltas van al final: un solo episodio
-// o «como él mismo» (programas, galas, entrevistas: personaje «Self», como el filtro de ruido de la
-// campana). El resto conserva el orden de siempre.
-const seriesSortedRaw = sortBycriterion(series, sortBy, 'first_air_date');
+// Cameos: un solo episodio o «como él mismo» (programas, galas, entrevistas). Van al final y fuera de «Conocido por».
 const SELF_ROLE = /\b(self|himself|herself|themselves|narrator|host|presenter)\b/i;
 const isCameo = (s: any) => Number(s.episode_count) <= 1 || SELF_ROLE.test(s.character || '');
-const seriesSorted = sortBy === 'popularity'
-    ? [...seriesSortedRaw.filter((s) => !isCameo(s)), ...seriesSortedRaw.filter(isCameo)]
-    : seriesSortedRaw;
-// «Tyrion Lannister · 73 ep.» (TMDB da `episode_count` por serie en combined_credits).
-const characterWithEpisodes = (s: any) => {
-    const n = Number(s.episode_count);
-    const eps = n > 0 ? `${n} ep.` : '';
-    return [s.character, eps].filter(Boolean).join(' · ') || undefined;
-};
 
 const hasSocial = actorInfo.redes && Object.values(actorInfo.redes).some(v => v);
 
@@ -149,6 +122,49 @@ const knownFor = [
     ...movies.map((m: any) => ({ id: String(m.id), mt: 'movie' as const, title: m.title, poster: m.poster_path, year: (m.release_date || '').slice(0, 4), pop: m.popularity || 0, cameo: SELF_ROLE.test(m.character || '') })),
     ...series.map((t: any) => ({ id: String(t.id), mt: 'tv' as const, title: t.name, poster: t.poster_path, year: (t.first_air_date || '').slice(0, 4), pop: t.popularity || 0, cameo: isCameo(t) })),
 ].filter((x) => x.poster && !x.cameo).sort((a, b) => b.pop - a.pop).slice(0, 4);
+// 6.3 · Filmografía como lista: una fila por título (reparto y equipo fundidos), con filtros por tipo
+// (película/serie) y por papel (actor/voz/producción), y orden por peso, fecha o nota.
+type FRow = { key: string; id: string; mt: 'movie' | 'tv'; title: string; poster: string | null; year: string;
+    date: string; roles: string[]; kinds: Set<string>; vote: number; votes: number; pop: number; eps: number; cameo: boolean };
+const VOICE = /\(voice\)|\(voz\)/i;
+const fRows = new Map<string, FRow>();
+const addRow = (mt: 'movie' | 'tv', c: any, role: string, kind: string, extra: Partial<FRow> = {}) => {
+    const key = `${mt}_${c.id}`;
+    const r: FRow = fRows.get(key) ?? { key, id: String(c.id), mt, title: c.title || c.name || '', poster: c.poster_path || null,
+        year: String(c.release_date || c.first_air_date || c.year || '').slice(0, 4), date: c.release_date || c.first_air_date || c.date || '',
+        roles: [], kinds: new Set<string>(), vote: Number(c.vote_average) || 0, votes: Number(c.vote_count) || 0, pop: Number(c.popularity) || 0, eps: 0, cameo: false };
+    if (role && !r.roles.includes(role)) r.roles.push(role);
+    r.kinds.add(kind);
+    Object.assign(r, extra);
+    fRows.set(key, r);
+};
+// «Captain Gutt (voz)»: la marca de doblaje va junto a su personaje, no al final de la línea.
+const roleOf = (ch: string) => { const c = String(ch || '').replace(VOICE, '').trim(); return VOICE.test(ch || '') ? (c ? `${c} (voz)` : 'Voz') : c; };
+for (const m of movies as any[]) addRow('movie', m, roleOf(m.character), VOICE.test(m.character || '') ? 'voz' : 'actor', { cameo: SELF_ROLE.test(m.character || '') });
+for (const t of series as any[]) {
+    const n = Number(t.episode_count) || 0;
+    addRow('tv', t, roleOf(t.character), VOICE.test(t.character || '') ? 'voz' : 'actor', { eps: n, cameo: isCameo(t) });
+}
+for (const c of crewCredits) addRow(c.media_type, c, JOB_LABELS[c.job] || c.job, 'prod');
+const filmSort = Astro.url.searchParams.get('sort') || 'peso';
+// Peso: lo conocido que es el título (votos en TMDB, más estable que la popularidad del día, que
+// dispara los estrenos), multiplicado por los episodios en series y hundido si es un cameo.
+const weight = (r: FRow) => (r.votes + 5 * r.pop) * (r.mt === 'tv' ? 1 + Math.min(r.eps, 120) / 12 : 1) * (r.cameo ? 0.05 : 1);
+const filmRows = [...fRows.values()].sort((a, b) =>
+    filmSort === 'fecha' ? (b.date || '').localeCompare(a.date || '')
+    : filmSort === 'nota' ? b.vote - a.vote
+    : weight(b) - weight(a));
+const fCount = {
+    todo: filmRows.length,
+    peliculas: filmRows.filter((r) => r.mt === 'movie').length,
+    series: filmRows.filter((r) => r.mt === 'tv').length,
+    actor: filmRows.filter((r) => r.kinds.has('actor')).length,
+    voz: filmRows.filter((r) => r.kinds.has('voz')).length,
+    prod: filmRows.filter((r) => r.kinds.has('prod')).length,
+};
+const FILM_SHOWN = 30;
+const FILM_SORTS = [{ key: 'peso', label: 'Por peso' }, { key: 'fecha', label: 'Más recientes' }, { key: 'nota', label: 'Mejor valoradas' }];
+const curFilmSort = FILM_SORTS.find((o) => o.key === filmSort) ?? FILM_SORTS[0];
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
 const SOCIAL_LINKS: [string, string | null | undefined][] = [
     ['IMDb', actorInfo.redes?.imdb], ['Wikipedia', actorInfo.redes?.wikipedia], ['Wikidata', actorInfo.redes?.wikidata],
@@ -187,6 +203,7 @@ if (Astro.locals.user) {
     } catch { /* sin biblioteca → sin caja */ }
 }
 const seenWithActorCount = seenWithActor.length;
+const seenKeys = new Set(seenWithActor.map((t) => `${t.media_type}_${t.id}`));
 const actorFirstName = String(actorInfo.nombre || '').split(' ')[0];
 
 // JSON-LD structured data (schema.org Person)
@@ -352,146 +369,90 @@ const jsonLd = {
                     </section>
                 )}
 
-        <!-- Navegación rápida -->
-        <div class="flex flex-wrap gap-2 mb-4">
-            {movies.length > 0 && (
-                <a href="#peliculas" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    Películas ({movies.length})
-                </a>
-            )}
-            {series.length > 0 && (
-                <a href="#series" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    Series ({series.length})
-                </a>
-            )}
-        </div>
-
-        <!-- Ordenación -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-            <h2 class="text-lg font-semibold text-gray-800">Filmografía ({totalProductions})</h2>
-            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
-                <a href="?sort=quality"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'quality' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Mejor Valoradas
-                </a>
-                <a href="?sort=popularity"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'popularity' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Populares
-                </a>
-                <a href="?sort=date"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'date' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Recientes
-                </a>
-            </div>
-        </div>
-
-        <div class="space-y-10">
-            <!-- Películas -->
-            <section id="peliculas" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                    Películas
-                    <span class="text-sm font-normal text-gray-400">({movies.length})</span>
-                </h3>
-
-                {movies.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron películas" />
-                )}
-                {movies.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {moviesSorted.map((item) => (
-                            <CardMovie
-                                id={item.id.toString()}
-                                img={item.poster_path ? posterUrl(item.poster_path) : "/placeholder.jpg"}
-                                title={item.title}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                release_date={item.release_date}
-                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                character={item.character}
-                            />
+        {/* 6.3 · Filmografía: una lista (antes, dos rejillas de pósters y el equipo aparte) */}
+        <section id="filmografia" class="afl" data-afl>
+            <div class="fsec-h"><h2>Filmografía</h2><span class="n">{fCount.todo} títulos</span></div>
+            <div class="afl-ctl">
+                <div class="afl-f" role="group" aria-label="Filtrar la filmografía">
+                    {[['todo', 'Todo'], ['peliculas', 'Películas'], ['series', 'Series'], ['actor', 'Actor'], ['voz', 'Voz'], ['prod', 'Producción']]
+                        .filter(([k]) => k === 'todo' || (fCount as any)[k] > 0)
+                        .map(([k, l]) => (
+                            <button type="button" class="chip-filter" data-afl-f={k} aria-pressed={k === 'todo' ? 'true' : 'false'}>{l}<span class="chip-n">{(fCount as any)[k]}</span></button>
                         ))}
-                    </div>
-                )}
-            </section>
-
-            <!-- Series -->
-            <section id="series" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                    Series
-                    <span class="text-sm font-normal text-gray-400">({series.length})</span>
-                </h3>
-
-                {series.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron series" />
-                )}
-                {series.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {seriesSorted.map((item) => (
-                            <CardSerie
-                                id={item.id.toString()}
-                                img={item.poster_path ? posterUrl(item.poster_path) : "/placeholder.jpg"}
-                                name={item.name}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                first_air_date={item.first_air_date}
-                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                character={characterWithEpisodes(item)}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <!-- C18: Créditos de crew (Director, Productor, Guionista...) -->
-            {crewSections.length > 0 && (
-                <details class="group bg-purple-50/40 rounded-xl border border-purple-200">
-                    <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer">
-                        <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
-                            También como director, productor o guionista
-                            <span class="text-sm font-normal text-gray-400">({crewCredits.length})</span>
-                        </h3>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                        </svg>
+                </div>
+                <details class="afl-sort" data-lh-sort>
+                    <summary class="btn btn--sm" aria-label={`Orden: ${curFilmSort.label}`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></svg>
+                        {curFilmSort.label}
                     </summary>
-                    <div class="px-4 pb-4 space-y-5">
-                        {crewSections.map(({ job, label, credits: items }) => (
-                            <div>
-                                <h4 class="text-sm font-semibold text-purple-700 mb-2 flex items-center gap-1.5">
-                                    <span class="w-1 h-4 bg-purple-500 rounded-full"></span>
-                                    {label}
-                                    <span class="text-xs font-normal text-gray-400">({items.length})</span>
-                                </h4>
-                                <div class="flex gap-2.5 overflow-x-auto pb-2 snap-x">
-                                    {items.map((c) => (
-                                        <a href={c.media_type === 'movie' ? `/movie/${c.id}` : `/serie/${c.id}`} class="snap-start flex-shrink-0 w-24 group/prod">
-                                            <div class="relative rounded-lg overflow-hidden shadow-sm group-hover/prod:shadow-md transition-shadow">
-                                                {c.poster_path ? (
-                                                    <img src={posterUrl(c.poster_path, 'w185') || ''} alt={c.title} class="w-full h-36 object-cover" loading="lazy"/>
-                                                ) : (
-                                                    <div class="w-full h-36 bg-gray-200 flex items-center justify-center text-gray-400 text-3xl">{c.media_type === 'movie' ? '🎬' : '📺'}</div>
-                                                )}
-                                                {c.vote_average > 0 && (
-                                                    <span class="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 bg-black/60 text-yellow-400 rounded">⭐ {c.vote_average.toFixed(1)}</span>
-                                                )}
-                                                <span class={`absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${c.media_type === 'movie' ? 'bg-red-500' : 'bg-blue-500'} text-white`}>{c.media_type === 'movie' ? 'Peli' : 'Serie'}</span>
-                                            </div>
-                                            <p class="mt-1 text-xs text-gray-700 line-clamp-2 leading-tight font-medium">{c.title}</p>
-                                            {c.year && <p class="text-[10px] text-gray-400">{c.year}</p>}
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
+                    <div class="afl-menu" role="menu">
+                        {FILM_SORTS.map((o) => (
+                            <a role="menuitemradio" aria-checked={o.key === curFilmSort.key ? 'true' : 'false'} href={`?sort=${o.key}#filmografia`}>{o.label}</a>
                         ))}
                     </div>
                 </details>
+            </div>
+            {filmRows.length === 0 && <EmptyState size="sm" title="No hay títulos en su filmografía" />}
+            <ol class:list={['afl-list', { 'is-bydate': filmSort === 'fecha' }]}>
+                {filmRows.map((r, i) => {
+                    const prevYear = i > 0 ? filmRows[i - 1].year : null;
+                    const href = r.mt === 'movie' ? `/movie/${r.id}` : `/serie/${r.id}`;
+                    const role = [r.roles.join(' · '), r.eps > 0 ? `${r.eps} ${r.eps === 1 ? 'episodio' : 'episodios'}` : ''].filter(Boolean).join(' · ');
+                    return (
+                        <li class="afl-r" data-mt={r.mt} data-k={[...r.kinds].join(' ')} data-new-year={filmSort === 'fecha' && r.year !== prevYear ? '1' : undefined}>
+                            <span class="afl-y">{r.year || '—'}</span>
+                            <a href={href} class="afl-po" tabindex="-1" aria-hidden="true">{r.poster ? <img src={posterUrl(r.poster, 'w154')} alt="" loading="lazy" /> : null}</a>
+                            <span class="afl-t"><a href={href}>{r.title}</a>{role && <span class="afl-role">{role}</span>}</span>
+                            <span class="afl-ty">{r.mt === 'movie' ? 'Película' : 'Serie'}</span>
+                            <span class="afl-nt">{r.vote > 0 ? `★ ${r.vote.toFixed(1).replace('.', ',')}` : ''}</span>
+                            <span class="afl-st">{seenKeys.has(r.key) && <span class="afl-seen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Vista</span>}</span>
+                        </li>
+                    );
+                })}
+            </ol>
+            {filmRows.length > FILM_SHOWN && (
+                <div class="afl-more"><button type="button" class="btn" data-afl-more>Ver los <span data-afl-n>{filmRows.length}</span></button></div>
             )}
+        </section>
 
+        <script is:inline>
+            (function () {
+                var root = document.querySelector('[data-afl]');
+                if (!root) return;
+                var SHOWN = 30, all = false, cur = 'todo';
+                var rows = Array.prototype.slice.call(root.querySelectorAll('.afl-r'));
+                var more = root.querySelector('[data-afl-more]');
+                function match(r) {
+                    if (cur === 'todo') return true;
+                    if (cur === 'peliculas') return r.dataset.mt === 'movie';
+                    if (cur === 'series') return r.dataset.mt === 'tv';
+                    return (' ' + r.dataset.k + ' ').indexOf(' ' + cur + ' ') >= 0;
+                }
+                function paint() {
+                    var n = 0, total = 0;
+                    rows.forEach(function (r) {
+                        var ok = match(r); if (ok) total++;
+                        var show = ok && (all || n < SHOWN); if (show) n++;
+                        r.hidden = !show;
+                    });
+                    if (more) { more.parentNode.hidden = all || total <= SHOWN; more.querySelector('[data-afl-n]').textContent = total; }
+                }
+                root.querySelectorAll('[data-afl-f]').forEach(function (b) {
+                    b.addEventListener('click', function () {
+                        cur = b.getAttribute('data-afl-f');
+                        root.querySelectorAll('[data-afl-f]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+                        paint();
+                    });
+                });
+                if (more) more.addEventListener('click', function () { all = true; paint(); });
+                document.addEventListener('click', function (e) {
+                    root.querySelectorAll('[data-lh-sort][open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+                });
+                paint();
+            })();
+        </script>
+
+        <div class="space-y-10">
             <!-- Doblajes (lazy, eldoblaje.com — solo si el actor es doblador) -->
             <ActorDubbingSection tmdbId={actor} name={actorInfo.nombre} />
         </div>

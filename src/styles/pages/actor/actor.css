@@ -62,3 +62,52 @@
     .ahd-acts { grid-column: 1 / -1; }
     .ahd-kng { gap: 8px; }
 }
+
+/* ---- 6.3 · Filmografía como lista ---- */
+.afl { scroll-margin-top: 80px; }
+.afl-ctl { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.afl-f { display: flex; gap: 6px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; padding: 4px 0; }
+.afl-f::-webkit-scrollbar { display: none; }
+.afl-sort { position: relative; flex-shrink: 0; }
+.afl-sort > summary { list-style: none; }
+.afl-sort > summary::-webkit-details-marker { display: none; }
+.afl-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 190px; padding: 6px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--sh-lg); }
+.afl-menu a { display: flex; align-items: center; min-height: 40px; padding: 0 10px; border-radius: var(--r-sm); font: 500 var(--fs-ui) var(--font); color: var(--text); text-decoration: none; }
+.afl-menu a:hover, .afl-menu a:focus-visible { background: var(--bg-tint); outline: none; }
+.afl-menu a[aria-checked="true"] { font-weight: 700; color: var(--primary); }
+
+.afl-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.afl-r { display: grid; grid-template-columns: 44px 60px minmax(0, 1fr) 72px 52px 64px; align-items: center; gap: 16px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+.afl-r[hidden] { display: none !important; }
+.afl-r:hover { background: var(--bg-tint); }
+.afl-y { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); }
+/* «Más recientes»: el año solo en la primera fila de cada año, como un índice. */
+.afl-list.is-bydate .afl-r:not([data-new-year]) .afl-y { visibility: hidden; }
+.afl-list.is-bydate .afl-r[data-new-year] .afl-y { color: var(--text); font-weight: 700; }
+.afl-po { display: block; width: 60px; aspect-ratio: 2 / 3; border-radius: var(--r-sm); box-shadow: var(--sh-sm); overflow: hidden; background: var(--bg-tint); }
+.afl-po img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.afl-t { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.afl-t a { font: 600 var(--fs-body) var(--font); color: var(--text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.afl-t a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.afl-role { font-size: var(--fs-ui); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.afl-ty { font-size: var(--fs-meta); color: var(--text-3); }
+.afl-nt { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-2); text-align: right; }
+.afl-st { display: flex; justify-content: flex-end; }
+.afl-seen { display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 7px; border-radius: var(--r-full); background: var(--a-visto-bg); color: var(--a-visto); font: 600 var(--fs-micro) var(--font); }
+.afl-seen svg { width: 11px; height: 11px; }
+.afl-more { display: flex; justify-content: center; margin-top: 14px; }
+.afl-more[hidden] { display: none; }
+
+@media (max-width: 639px) {
+    .afl-r { grid-template-columns: 34px 48px minmax(0, 1fr) auto; gap: 12px; padding: 8px 0; }
+    .afl-po { width: 48px; }
+    .afl-t a { font-size: var(--fs-ui); }
+    .afl-role { font-size: var(--fs-meta); }
+    /* Los filtros se deslizan: un fundido a la derecha lo avisa. */
+    .afl-f { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); padding-right: 24px; }
+    .afl-ty { display: none; }
+    .afl-st:empty { display: none; }
+    .afl-nt { display: none; }
+    .afl-y { font-size: var(--fs-micro); }
+    .afl-sort > summary span, .afl-sort > summary { font-size: var(--fs-meta); }
+}
