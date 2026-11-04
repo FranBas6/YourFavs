@@ -1,229 +1,167 @@
 ---
+/**
+ * Persona del equipo (dirección, guion, fotografía…) — rediseño, Fase 6 · 6.4: mismo esquema que el actor
+ * (6.1–6.3). Cabecera con foto, nombre, «Dirección · 54 años · Londres» y «Conocido por»; dos columnas:
+ * biografía plegable y la filmografía en lista (filtros por departamento); al lado, Datos y enlaces.
+ */
 import Layout from "../../layouts/Layout.astro";
 import { getMoviesAndSeriesByMemberName } from "../../services/API/Team/InfoMember";
-import CardMovie from "../../components/Cards/CardMovie.astro";
-import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName } from "../../utils/constants/genres";
-import { getMainRole, calculateAge } from "../../utils/constants/helpers/team-helpers";
-import { posterUrl } from "../../services/API/shared/tmdbClient";
-import EmptyState from "../../components/EmptyState.astro";
+import { calculateAge, departmentEs, jobEs } from "../../utils/constants/helpers/team-helpers";
+import { getCareerRange } from "../../utils/constants/helpers/actor-helpers";
+import { SOCIAL_PHASE } from "../../utils/constants/social";
+import { seenKeySet } from "../../utils/seenKeys";
+import FilmographyList, { type FilmRow } from "../../components/person/FilmographyList.astro";
+import '../../styles/shared/detail-common.css';
+import '../../styles/pages/actor/actor.css';
 
 const { name } = Astro.params;
-const { searchParams } = Astro.url;
-const sortBy = searchParams.get('sort') || 'quality';
-
 if (!name) {
     throw new Error("Nombre del miembro del equipo no encontrado en la URL");
 }
 
-const {
-    success,
-    memberInfo,
-    socialLinks,
-    movies,
-    series,
-    error
-} = await getMoviesAndSeriesByMemberName(name, sortBy);
+// Orden de la lista (los enlaces viejos ?sort=quality|popularity|date siguen valiendo).
+const OLD_SORT: Record<string, string> = { quality: 'nota', popularity: 'peso', date: 'fecha' };
+const rawSort = Astro.url.searchParams.get('sort') || 'peso';
+const filmSort = OLD_SORT[rawSort] || rawSort;
 
+const { success, memberInfo, socialLinks, movies, series, error } = await getMoviesAndSeriesByMemberName(name, 'quality');
 if (!success) {
     throw new Error(error || "Error al obtener información del miembro");
 }
 
-const mainRole = memberInfo ? getMainRole(memberInfo.known_for_department) : "";
+const displayName = memberInfo?.name || name;
 const age = memberInfo ? calculateAge(memberInfo.birthday, memberInfo.deathday) : null;
-const totalWorks = movies.length + series.length;
+const department = departmentEs(memberInfo?.known_for_department) || 'Equipo';
+const seen = await seenKeySet(!!Astro.locals.user);
 
-const hasSocial = socialLinks && Object.values(socialLinks).some(v => v);
+// Filas de la filmografía: un título con todos sus trabajos («Dirección · Guion»); los filtros son los
+// departamentos (Dirección, Guion, Producción…), con clave sin espacios para el filtro en cliente.
+// Oficios en orden de importancia («Dirección · Guion · Producción»), no en el que llegan de TMDB.
+const JOB_RANK = ['Director', 'Co-Director', 'Creator', 'Screenplay', 'Writer', 'Teleplay', 'Story', 'Novel', 'Characters', 'Producer', 'Executive Producer'];
+const rank = (j: string) => { const i = JOB_RANK.indexOf(j); return i < 0 ? 99 : i; };
+const slug = (d: string) => d.toLowerCase().replace(/[^a-z]+/g, '-');
+const deptCount = new Map<string, number>();
+const toRow = (p: any, mt: 'movie' | 'tv'): FilmRow => {
+    const date = (mt === 'movie' ? p.release_date : p.first_air_date) || '';
+    const depts: string[] = p.departments || [];
+    for (const d of depts) deptCount.set(d, (deptCount.get(d) || 0) + 1);
+    return {
+        key: `${mt}_${p.id}`, id: String(p.id), mt, title: (mt === 'movie' ? p.title : p.name) || '',
+        poster: p.poster_path ? String(p.poster_path).replace('/w500/', '/w154/') : null,
+        year: date.slice(0, 4), date,
+        roles: [...new Set<string>([...(p.jobs?.length ? p.jobs : [p.role])].sort((a: string, b: string) => rank(a) - rank(b)).map(jobEs).filter(Boolean))],
+        kinds: depts.map(slug),
+        vote: Number(p.vote_average) || 0, votes: Number(p.vote_count) || 0, pop: Number(p.popularity) || 0,
+        eps: mt === 'tv' ? Number(p.episode_count) || 0 : 0,
+        seen: seen.has(`${mt}_${p.id}`),
+    };
+};
+const filmRows = [...movies.map((m) => toRow(m, 'movie')), ...series.map((s) => toRow(s, 'tv'))];
+const deptFilters: [string, string][] = [...deptCount.entries()]
+    // Primero el departamento por el que se le conoce (Nolan: Dirección), luego por número de títulos.
+    .sort((a, b) => Number(b[0] === memberInfo?.known_for_department) - Number(a[0] === memberInfo?.known_for_department) || b[1] - a[1])
+    .map(([d]) => [slug(d), departmentEs(d)]);
+
+// «Conocido por»: sus 4 títulos con más peso (votos), como en el actor.
+const knownFor = [...filmRows].filter((r) => r.poster).sort((a, b) => (b.votes + 5 * b.pop) - (a.votes + 5 * a.pop)).slice(0, 4);
+
+// Datos
+const rated = filmRows.filter((r) => r.vote > 0);
+const avgRating = rated.length ? rated.reduce((s, r) => s + r.vote, 0) / rated.length : null;
+// «Mejor valorada»: con al menos 100 votos si hay alguna (como en la productora).
+const bestPool = rated.some((r) => r.votes >= 100) ? rated.filter((r) => r.votes >= 100) : rated;
+const best = bestPool.length ? bestPool.reduce((b, r) => (r.vote > b.vote ? r : b)) : null;
+const career = getCareerRange([...movies, ...series] as any[], memberInfo?.birthday, memberInfo?.deathday);
+const genreCounts: Record<number, number> = {};
+for (const p of [...movies, ...series] as any[]) for (const g of p.genre_ids || []) genreCounts[g] = (genreCounts[g] || 0) + 1;
+const topGenres = Object.entries(genreCounts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([g]) => getGenreName(Number(g))).filter(Boolean);
+const aliases: string[] = (memberInfo?.also_known_as || []).filter((a: string) => /^[\p{Script=Latin}\s.'-]+$/u.test(a)).slice(0, 3);
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+const LINKS: [string, string | null | undefined][] = [
+    ['IMDb', socialLinks?.imdb], ['Instagram', socialLinks?.instagram], ['X (Twitter)', socialLinks?.twitter],
+    ['Facebook', socialLinks?.facebook], ['TikTok', socialLinks?.tiktok], ['YouTube', socialLinks?.youtube], ['Web', memberInfo?.homepage],
+];
+const profile = memberInfo?.profile_path ? `https://image.tmdb.org/t/p/w342${memberInfo.profile_path}` : null;
 ---
-<Layout title={`${name}`}>
+<Layout title={displayName} description={memberInfo?.biography ? String(memberInfo.biography).slice(0, 200) : undefined} ogImage={profile || undefined} ogType="profile">
     <section class="px-1 sm:py-8">
-        <!-- Header -->
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">{name}</h1>
-            <p class="text-gray-500 text-base">{mainRole} · {totalWorks} producciones</p>
+        <header class="ahd">
+            <div class="ahd-ph">
+                {profile
+                    ? <img src={profile} alt={displayName} />
+                    : <span aria-hidden="true">{String(displayName).split(' ').map((w: string) => w[0]).slice(0, 2).join('')}</span>}
+            </div>
+            <div class="ahd-tx">
+                <h1>{displayName}</h1>
+                <p class="ahd-m">
+                    {department}
+                    {age && <> · {memberInfo?.deathday ? `falleció a los ${age} años` : `${age} años`}</>}
+                    {memberInfo?.place_of_birth && <> · {memberInfo.place_of_birth}</>}
+                </p>
+                {SOCIAL_PHASE.recommend && Astro.locals.user && memberInfo?.id && (
+                    <div class="ahd-acts">
+                        <button type="button" class="btn btn--ghost" data-recommend data-target-type="person" data-target-id={memberInfo.id} data-title={displayName} data-image={profile ?? ''} aria-haspopup="dialog" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                            Recomendar
+                        </button>
+                    </div>
+                )}
+            </div>
+            {knownFor.length > 0 && (
+                <div class="ahd-kn">
+                    <p class="ahd-k">Conocido por</p>
+                    <div class="ahd-kng">
+                        {knownFor.map((k) => (
+                            <a href={k.mt === 'movie' ? `/movie/${k.id}` : `/serie/${k.id}`} class="ahd-kc" title={k.title}>
+                                <img src={k.poster!.replace('/w154/', '/w185/')} alt="" loading="lazy" />
+                                <b>{k.title}</b>
+                                {k.year && <span>{k.year}</span>}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
         </header>
 
-        <!-- Info card -->
-        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                {memberInfo?.profile_path && (
-                    <img
-                        src={posterUrl(memberInfo.profile_path, 'w185')}
-                        alt={name}
-                        class="w-28 h-28 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
-                        loading="lazy"
-                    />
+        <div class="acols">
+            <div class="acols-main">
+                {memberInfo?.biography && (
+                    <section>
+                        <div class="fsec-h"><h2>Biografía</h2></div>
+                        <details class="abio">
+                            <summary><p>{memberInfo.biography}</p><span class="abio-more">Leer más</span></summary>
+                        </details>
+                    </section>
                 )}
-                <div class="flex-1 text-center sm:text-left">
-                    <div class="flex flex-wrap justify-center sm:justify-start gap-1.5 text-xs sm:text-sm mb-3">
-                        {age && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                {memberInfo?.deathday ? `Falleció a los ${age} años` : `${age} años`}
-                            </span>
-                        )}
-                        {memberInfo?.place_of_birth && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{memberInfo.place_of_birth}</span>
-                        )}
-                        {memberInfo?.birthday && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                {new Date(memberInfo.birthday).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </span>
-                        )}
-                        <span class="px-2 py-0.5 bg-red-50 text-red-600 rounded-full">{movies.length} películas</span>
-                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{series.length} series</span>
-                        {memberInfo?.popularity && (
-                            <span class="px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full">Pop. {memberInfo.popularity.toFixed(0)}</span>
-                        )}
-                    </div>
+                <FilmographyList rows={filmRows} filters={deptFilters} sort={filmSort} />
+            </div>
 
-                    {/* Redes sociales */}
-                    {hasSocial && (
-                        <div class="flex flex-wrap justify-center sm:justify-start gap-2 mb-3">
-                            {socialLinks.imdb && (
-                                <a href={socialLinks.imdb} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100 transition-colors">
-                                    IMDb
-                                </a>
-                            )}
-                            {socialLinks.instagram && (
-                                <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100 transition-colors">
-                                    Instagram
-                                </a>
-                            )}
-                            {socialLinks.twitter && (
-                                <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100 transition-colors">
-                                    Twitter
-                                </a>
-                            )}
-                            {socialLinks.facebook && (
-                                <a href={socialLinks.facebook} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">
-                                    Facebook
-                                </a>
-                            )}
-                            {socialLinks.tiktok && (
-                                <a href={socialLinks.tiktok} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                                    TikTok
-                                </a>
-                            )}
-                            {socialLinks.youtube && (
-                                <a href={socialLinks.youtube} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
-                                    YouTube
-                                </a>
-                            )}
+            <aside class="acols-side">
+                <div class="fcard">
+                    <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Datos</h3>
+                    <dl class="fdl">
+                        {memberInfo?.birthday && (<><dt>Nacimiento</dt><dd>{fmtDate(memberInfo.birthday)}{age && !memberInfo.deathday && <small> · {age} años</small>}</dd></>)}
+                        {memberInfo?.deathday && (<><dt>Fallecimiento</dt><dd>{fmtDate(memberInfo.deathday)}{age && <small> · a los {age} años</small>}</dd></>)}
+                        {memberInfo?.place_of_birth && (<><dt>Lugar</dt><dd>{memberInfo.place_of_birth}</dd></>)}
+                        <dt>Oficio</dt><dd>{department}</dd>
+                        <dt>Trabajos</dt><dd>{movies.length} {movies.length === 1 ? 'película' : 'películas'} · {series.length} {series.length === 1 ? 'serie' : 'series'}</dd>
+                        {avgRating && (<><dt>Nota media</dt><dd>{avgRating.toFixed(1).replace('.', ',')}</dd></>)}
+                        {career && (<><dt>En activo</dt><dd>{career.start === career.end ? career.start : `${career.start}–${career.end}`}</dd></>)}
+                        {best && (<><dt>Mejor valorada</dt><dd><a href={best.mt === 'movie' ? `/movie/${best.id}` : `/serie/${best.id}`}>{best.title}</a> <small>· ★ {best.vote.toFixed(1).replace('.', ',')}</small></dd></>)}
+                        {topGenres.length > 0 && (<><dt>Géneros</dt><dd>{topGenres.join(', ')}</dd></>)}
+                        {memberInfo?.popularity ? (<><dt>Popularidad</dt><dd>{Number(memberInfo.popularity).toFixed(0)}</dd></>) : null}
+                        {aliases.length > 0 && (<><dt>También como</dt><dd>{aliases.join(' · ')}</dd></>)}
+                    </dl>
+                    {LINKS.some(([, u]) => u) && (
+                        <div class="clinks">
+                            {LINKS.filter(([, u]) => u).map(([label, u]) => (
+                                <a href={u!} target="_blank" rel="noopener noreferrer" class="btn btn--sm">{label}</a>
+                            ))}
                         </div>
                     )}
-
-                    {/* Biografía */}
-                    {memberInfo?.biography && (
-                        <details class="text-sm">
-                            <summary class="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">
-                                Biografía
-                            </summary>
-                            <p class="mt-2 text-gray-600 leading-relaxed whitespace-pre-line">{memberInfo.biography}</p>
-                        </details>
-                    )}
                 </div>
-            </div>
-        </div>
-
-        <!-- Navegación rápida -->
-        <div class="flex flex-wrap gap-2 mb-4">
-            {movies.length > 0 && (
-                <a href="#peliculas" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    Películas ({movies.length})
-                </a>
-            )}
-            {series.length > 0 && (
-                <a href="#series" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    Series ({series.length})
-                </a>
-            )}
-        </div>
-
-        <!-- Ordenación -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-            <h2 class="text-lg font-semibold text-gray-800">Filmografía ({totalWorks})</h2>
-            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
-                <a href="?sort=quality"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'quality' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Mejor Valoradas
-                </a>
-                <a href="?sort=popularity"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'popularity' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Populares
-                </a>
-                <a href="?sort=date"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'date' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Recientes
-                </a>
-            </div>
-        </div>
-
-        <div class="space-y-10">
-            <!-- Películas -->
-            <section id="peliculas" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                    Películas
-                    <span class="text-sm font-normal text-gray-400">({movies.length})</span>
-                </h3>
-
-                {movies.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron películas" />
-                )}
-                {movies.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {movies.map((item) => (
-                            <CardMovie
-                                id={item.id.toString()}
-                                img={item.poster_path || "/placeholder.jpg"}
-                                title={item.title}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                release_date={item.release_date}
-                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                character={item.role}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <!-- Series -->
-            <section id="series" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                    Series
-                    <span class="text-sm font-normal text-gray-400">({series.length})</span>
-                </h3>
-
-                {series.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron series" />
-                )}
-                {series.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {series.map((item) => (
-                            <CardSerie
-                                id={item.id.toString()}
-                                img={item.poster_path || "/placeholder.jpg"}
-                                name={item.name}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                first_air_date={item.first_air_date}
-                                genres={item.genre_ids?.map((id: number) => ({id, name: getGenreName(id)}))}
-                                character={item.role}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
+            </aside>
         </div>
     </section>
 </Layout>

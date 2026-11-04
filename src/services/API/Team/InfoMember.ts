@@ -9,7 +9,7 @@ export async function getMoviesAndSeriesByMemberName(
     success: boolean;
     memberInfo?: any;
     socialLinks?: any;
-    movies: (Movie & { role?: string })[];
+    movies: (Movie & { role?: string; jobs?: string[]; departments?: string[] })[];
     series: (any & { role?: string })[];
     error?: string;
 }> {
@@ -46,8 +46,13 @@ export async function getMoviesAndSeriesByMemberName(
             const map = new Map<string, any>();
             for (const item of crew) {
                 const key = `${item.media_type}-${item.id}`;
-                if (!map.has(key)) {
-                    map.set(key, { ...item, role: item.job || '' });
+                const prev = map.get(key);
+                if (!prev) {
+                    map.set(key, { ...item, role: item.job || '', jobs: item.job ? [item.job] : [], departments: item.department ? [item.department] : [] });
+                } else {
+                    // Mismo título con varios trabajos (Dirección y Guion…): se guardan todos.
+                    if (item.job && !prev.jobs.includes(item.job)) prev.jobs.push(item.job);
+                    if (item.department && !prev.departments.includes(item.department)) prev.departments.push(item.department);
                 }
             }
             return Array.from(map.values());
@@ -82,6 +87,8 @@ export async function getMoviesAndSeriesByMemberName(
             release_date: movie.release_date,
             video: movie.video,
             role: movie.role || '',
+            jobs: movie.jobs || [],
+            departments: movie.departments || [],
         }));
 
         const series = filterSortDedupe(allCredits, 'tv').map((serie: any) => ({
@@ -100,6 +107,9 @@ export async function getMoviesAndSeriesByMemberName(
             vote_count: serie.vote_count,
             origin_country: serie.origin_country,
             role: serie.role || '',
+            jobs: serie.jobs || [],
+            departments: serie.departments || [],
+            episode_count: serie.episode_count || 0,
         }));
 
         // Formatear redes sociales

@@ -1,0 +1,143 @@
+---
+/**
+ * Filmografía como lista (rediseño, Fase 6 · 6.3–6.4): actor, equipo y productora.
+ * Una fila por título: año, póster, título, papel («Tyrion Lannister · 73 episodios», «Dirección · Guion»),
+ * tipo, nota y «✓ Vista». Filtros sin recargar (Todo · Películas · Series + los de `filters`, que miran
+ * `kinds` de cada fila) y orden con recarga (`?sort=peso|fecha|nota`, «Más recientes» agrupado por año).
+ */
+import EmptyState from '../EmptyState.astro';
+import '../../styles/components/filmography.css';
+
+export interface FilmRow {
+    key: string;              // `${mt}_${id}`
+    id: string;
+    mt: 'movie' | 'tv';
+    title: string;
+    poster: string | null;    // URL ya montada (w154)
+    year: string;
+    date: string;             // AAAA-MM-DD o ''
+    roles: string[];
+    kinds: string[];          // claves de `filters` que cumple la fila
+    vote: number;
+    votes: number;
+    pop: number;
+    eps?: number;
+    cameo?: boolean;
+    seen?: boolean;
+}
+
+interface Props {
+    rows: FilmRow[];
+    /** Filtros extra tras Todo · Películas · Series: [clave de kinds, etiqueta]. Los vacíos no se pintan. */
+    filters?: [string, string][];
+    sort: string;
+    /** Query extra que conservar al cambiar el orden (p. ej. `companyId=123`). */
+    keepQuery?: string;
+    title?: string;
+}
+
+const { rows, filters = [], sort, keepQuery = '', title = 'Filmografía' } = Astro.props;
+
+// Peso: lo conocido que es el título (votos en TMDB, más estable que la popularidad del día, que dispara
+// los estrenos), multiplicado por los episodios en series y hundido si es un cameo.
+const weight = (r: FilmRow) => (r.votes + 5 * r.pop) * (r.mt === 'tv' && r.eps ? 1 + Math.min(r.eps, 120) / 12 : 1) * (r.cameo ? 0.05 : 1);
+const SORTS = [{ key: 'peso', label: 'Por peso' }, { key: 'fecha', label: 'Más recientes' }, { key: 'nota', label: 'Mejor valoradas' }];
+const cur = SORTS.find((o) => o.key === sort) ?? SORTS[0];
+const list = [...rows].sort((a, b) =>
+    cur.key === 'fecha' ? (b.date || '').localeCompare(a.date || '')
+    : cur.key === 'nota' ? b.vote - a.vote
+    : weight(b) - weight(a));
+
+const count = (k: string) => k === 'todo' ? list.length
+    : k === 'peliculas' ? list.filter((r) => r.mt === 'movie').length
+    : k === 'series' ? list.filter((r) => r.mt === 'tv').length
+    : list.filter((r) => r.kinds.includes(k)).length;
+const chips = ([['todo', 'Todo'], ['peliculas', 'Películas'], ['series', 'Series'], ...filters] as [string, string][])
+    .map(([k, l]) => ({ k, l, n: count(k) }))
+    .filter((c) => c.k === 'todo' || c.n > 0);
+// Si solo hay películas (o solo series), el filtro por tipo sobra.
+const visibleChips = chips.filter((c) => !(['peliculas', 'series'].includes(c.k) && c.n === list.length));
+const SHOWN = 30;
+const sortHref = (k: string) => `?sort=${k}${keepQuery ? '&' + keepQuery : ''}#filmografia`;
+---
+<section id="filmografia" class="afl" data-afl>
+    <div class="fsec-h"><h2>{title}</h2><span class="n">{list.length} títulos</span></div>
+    <div class="afl-ctl">
+        <div class="afl-f" role="group" aria-label="Filtrar la filmografía">
+            {visibleChips.length > 1 && visibleChips.map((c) => (
+                <button type="button" class="chip-filter" data-afl-f={c.k} aria-pressed={c.k === 'todo' ? 'true' : 'false'}>{c.l}<span class="chip-n">{c.n}</span></button>
+            ))}
+        </div>
+        <details class="afl-sort" data-afl-sort>
+            <summary class="btn btn--sm" aria-label={`Orden: ${cur.label}`}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></svg>
+                {cur.label}
+            </summary>
+            <div class="afl-menu" role="menu">
+                {SORTS.map((o) => (
+                    <a role="menuitemradio" aria-checked={o.key === cur.key ? 'true' : 'false'} href={sortHref(o.key)}>{o.label}</a>
+                ))}
+            </div>
+        </details>
+    </div>
+    {list.length === 0 && <EmptyState size="sm" title="No hay títulos que mostrar" />}
+    <ol class:list={['afl-list', { 'is-bydate': cur.key === 'fecha' }]}>
+        {list.map((r, i) => {
+            const href = r.mt === 'movie' ? `/movie/${r.id}` : `/serie/${r.id}`;
+            const role = [r.roles.join(' · '), r.eps ? `${r.eps} ${r.eps === 1 ? 'episodio' : 'episodios'}` : ''].filter(Boolean).join(' · ');
+            return (
+                <li class="afl-r" data-mt={r.mt} data-k={r.kinds.join(' ')} data-new-year={cur.key === 'fecha' && r.year !== (i > 0 ? list[i - 1].year : null) ? '1' : undefined}>
+                    <span class="afl-y">{r.year || '—'}</span>
+                    <a href={href} class="afl-po" tabindex="-1" aria-hidden="true">{r.poster ? <img src={r.poster} alt="" loading="lazy" /> : null}</a>
+                    <span class="afl-t"><a href={href}>{r.title}</a>{role && <span class="afl-role">{role}</span>}</span>
+                    <span class="afl-ty">{r.mt === 'movie' ? 'Película' : 'Serie'}</span>
+                    <span class="afl-nt">{r.vote > 0 ? `★ ${r.vote.toFixed(1).replace('.', ',')}` : ''}</span>
+                    <span class="afl-st">{r.seen && <span class="afl-seen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Vista</span>}</span>
+                </li>
+            );
+        })}
+    </ol>
+    {list.length > SHOWN && (
+        <div class="afl-more"><button type="button" class="btn" data-afl-more>Ver los <span data-afl-n>{list.length}</span></button></div>
+    )}
+</section>
+
+<script is:inline>
+    (function () {
+        var root = document.querySelector('[data-afl]');
+        if (!root) return;
+        var SHOWN = 30, all = false, cur = 'todo';
+        var rows = Array.prototype.slice.call(root.querySelectorAll('.afl-r'));
+        var more = root.querySelector('[data-afl-more]');
+        function match(r) {
+            if (cur === 'todo') return true;
+            if (cur === 'peliculas') return r.dataset.mt === 'movie';
+            if (cur === 'series') return r.dataset.mt === 'tv';
+            return (' ' + r.dataset.k + ' ').indexOf(' ' + cur + ' ') >= 0;
+        }
+        function paint() {
+            var n = 0, total = 0;
+            rows.forEach(function (r) {
+                var ok = match(r); if (ok) total++;
+                var show = ok && (all || n < SHOWN); if (show) n++;
+                r.hidden = !show;
+            });
+            if (more) { more.parentNode.hidden = all || total <= SHOWN; more.querySelector('[data-afl-n]').textContent = total; }
+        }
+        root.querySelectorAll('[data-afl-f]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                cur = b.getAttribute('data-afl-f');
+                root.querySelectorAll('[data-afl-f]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+                paint();
+            });
+        });
+        if (more) more.addEventListener('click', function () { all = true; paint(); });
+        document.addEventListener('click', function (e) {
+            root.querySelectorAll('[data-afl-sort][open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') root.querySelectorAll('[data-afl-sort][open]').forEach(function (d) { d.open = false; });
+        });
+        paint();
+    })();
+</script>

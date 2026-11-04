@@ -9,7 +9,7 @@ import type { CrewCredit } from "../../services/API/Actors/InfoActor";
 import { getGenreName, genresMap } from "../../utils/constants/genres";
 import { calculateAge, getCareerRange } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
-import EmptyState from "../../components/EmptyState.astro";
+import FilmographyList, { type FilmRow } from "../../components/person/FilmographyList.astro";
 import ActorDubbingSection from "../../components/detail/ActorDubbingSection.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
@@ -124,17 +124,15 @@ const knownFor = [
 ].filter((x) => x.poster && !x.cameo).sort((a, b) => b.pop - a.pop).slice(0, 4);
 // 6.3 · Filmografía como lista: una fila por título (reparto y equipo fundidos), con filtros por tipo
 // (película/serie) y por papel (actor/voz/producción), y orden por peso, fecha o nota.
-type FRow = { key: string; id: string; mt: 'movie' | 'tv'; title: string; poster: string | null; year: string;
-    date: string; roles: string[]; kinds: Set<string>; vote: number; votes: number; pop: number; eps: number; cameo: boolean };
 const VOICE = /\(voice\)|\(voz\)/i;
-const fRows = new Map<string, FRow>();
-const addRow = (mt: 'movie' | 'tv', c: any, role: string, kind: string, extra: Partial<FRow> = {}) => {
+const fRows = new Map<string, FilmRow & { kindSet: Set<string> }>();
+const addRow = (mt: 'movie' | 'tv', c: any, role: string, kind: string, extra: Partial<FilmRow> = {}) => {
     const key = `${mt}_${c.id}`;
-    const r: FRow = fRows.get(key) ?? { key, id: String(c.id), mt, title: c.title || c.name || '', poster: c.poster_path || null,
+    const r = fRows.get(key) ?? { key, id: String(c.id), mt, title: c.title || c.name || '', poster: c.poster_path ? posterUrl(c.poster_path, 'w154') : null,
         year: String(c.release_date || c.first_air_date || c.year || '').slice(0, 4), date: c.release_date || c.first_air_date || c.date || '',
-        roles: [], kinds: new Set<string>(), vote: Number(c.vote_average) || 0, votes: Number(c.vote_count) || 0, pop: Number(c.popularity) || 0, eps: 0, cameo: false };
+        roles: [] as string[], kinds: [] as string[], kindSet: new Set<string>(), vote: Number(c.vote_average) || 0, votes: Number(c.vote_count) || 0, pop: Number(c.popularity) || 0, eps: 0, cameo: false };
     if (role && !r.roles.includes(role)) r.roles.push(role);
-    r.kinds.add(kind);
+    r.kindSet.add(kind);
     Object.assign(r, extra);
     fRows.set(key, r);
 };
@@ -147,24 +145,6 @@ for (const t of series as any[]) {
 }
 for (const c of crewCredits) addRow(c.media_type, c, JOB_LABELS[c.job] || c.job, 'prod');
 const filmSort = Astro.url.searchParams.get('sort') || 'peso';
-// Peso: lo conocido que es el título (votos en TMDB, más estable que la popularidad del día, que
-// dispara los estrenos), multiplicado por los episodios en series y hundido si es un cameo.
-const weight = (r: FRow) => (r.votes + 5 * r.pop) * (r.mt === 'tv' ? 1 + Math.min(r.eps, 120) / 12 : 1) * (r.cameo ? 0.05 : 1);
-const filmRows = [...fRows.values()].sort((a, b) =>
-    filmSort === 'fecha' ? (b.date || '').localeCompare(a.date || '')
-    : filmSort === 'nota' ? b.vote - a.vote
-    : weight(b) - weight(a));
-const fCount = {
-    todo: filmRows.length,
-    peliculas: filmRows.filter((r) => r.mt === 'movie').length,
-    series: filmRows.filter((r) => r.mt === 'tv').length,
-    actor: filmRows.filter((r) => r.kinds.has('actor')).length,
-    voz: filmRows.filter((r) => r.kinds.has('voz')).length,
-    prod: filmRows.filter((r) => r.kinds.has('prod')).length,
-};
-const FILM_SHOWN = 30;
-const FILM_SORTS = [{ key: 'peso', label: 'Por peso' }, { key: 'fecha', label: 'Más recientes' }, { key: 'nota', label: 'Mejor valoradas' }];
-const curFilmSort = FILM_SORTS.find((o) => o.key === filmSort) ?? FILM_SORTS[0];
 const fmtDate = (d: string) => new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
 const SOCIAL_LINKS: [string, string | null | undefined][] = [
     ['IMDb', actorInfo.redes?.imdb], ['Wikipedia', actorInfo.redes?.wikipedia], ['Wikidata', actorInfo.redes?.wikidata],
@@ -204,6 +184,7 @@ if (Astro.locals.user) {
 }
 const seenWithActorCount = seenWithActor.length;
 const seenKeys = new Set(seenWithActor.map((t) => `${t.media_type}_${t.id}`));
+const filmRows: FilmRow[] = [...fRows.values()].map(({ kindSet, ...r }) => ({ ...r, kinds: [...kindSet], seen: seenKeys.has(r.key) }));
 const actorFirstName = String(actorInfo.nombre || '').split(' ')[0];
 
 // JSON-LD structured data (schema.org Person)
@@ -370,87 +351,7 @@ const jsonLd = {
                 )}
 
         {/* 6.3 · Filmografía: una lista (antes, dos rejillas de pósters y el equipo aparte) */}
-        <section id="filmografia" class="afl" data-afl>
-            <div class="fsec-h"><h2>Filmografía</h2><span class="n">{fCount.todo} títulos</span></div>
-            <div class="afl-ctl">
-                <div class="afl-f" role="group" aria-label="Filtrar la filmografía">
-                    {[['todo', 'Todo'], ['peliculas', 'Películas'], ['series', 'Series'], ['actor', 'Actor'], ['voz', 'Voz'], ['prod', 'Producción']]
-                        .filter(([k]) => k === 'todo' || (fCount as any)[k] > 0)
-                        .map(([k, l]) => (
-                            <button type="button" class="chip-filter" data-afl-f={k} aria-pressed={k === 'todo' ? 'true' : 'false'}>{l}<span class="chip-n">{(fCount as any)[k]}</span></button>
-                        ))}
-                </div>
-                <details class="afl-sort" data-lh-sort>
-                    <summary class="btn btn--sm" aria-label={`Orden: ${curFilmSort.label}`}>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></svg>
-                        {curFilmSort.label}
-                    </summary>
-                    <div class="afl-menu" role="menu">
-                        {FILM_SORTS.map((o) => (
-                            <a role="menuitemradio" aria-checked={o.key === curFilmSort.key ? 'true' : 'false'} href={`?sort=${o.key}#filmografia`}>{o.label}</a>
-                        ))}
-                    </div>
-                </details>
-            </div>
-            {filmRows.length === 0 && <EmptyState size="sm" title="No hay títulos en su filmografía" />}
-            <ol class:list={['afl-list', { 'is-bydate': filmSort === 'fecha' }]}>
-                {filmRows.map((r, i) => {
-                    const prevYear = i > 0 ? filmRows[i - 1].year : null;
-                    const href = r.mt === 'movie' ? `/movie/${r.id}` : `/serie/${r.id}`;
-                    const role = [r.roles.join(' · '), r.eps > 0 ? `${r.eps} ${r.eps === 1 ? 'episodio' : 'episodios'}` : ''].filter(Boolean).join(' · ');
-                    return (
-                        <li class="afl-r" data-mt={r.mt} data-k={[...r.kinds].join(' ')} data-new-year={filmSort === 'fecha' && r.year !== prevYear ? '1' : undefined}>
-                            <span class="afl-y">{r.year || '—'}</span>
-                            <a href={href} class="afl-po" tabindex="-1" aria-hidden="true">{r.poster ? <img src={posterUrl(r.poster, 'w154')} alt="" loading="lazy" /> : null}</a>
-                            <span class="afl-t"><a href={href}>{r.title}</a>{role && <span class="afl-role">{role}</span>}</span>
-                            <span class="afl-ty">{r.mt === 'movie' ? 'Película' : 'Serie'}</span>
-                            <span class="afl-nt">{r.vote > 0 ? `★ ${r.vote.toFixed(1).replace('.', ',')}` : ''}</span>
-                            <span class="afl-st">{seenKeys.has(r.key) && <span class="afl-seen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Vista</span>}</span>
-                        </li>
-                    );
-                })}
-            </ol>
-            {filmRows.length > FILM_SHOWN && (
-                <div class="afl-more"><button type="button" class="btn" data-afl-more>Ver los <span data-afl-n>{filmRows.length}</span></button></div>
-            )}
-        </section>
-
-        <script is:inline>
-            (function () {
-                var root = document.querySelector('[data-afl]');
-                if (!root) return;
-                var SHOWN = 30, all = false, cur = 'todo';
-                var rows = Array.prototype.slice.call(root.querySelectorAll('.afl-r'));
-                var more = root.querySelector('[data-afl-more]');
-                function match(r) {
-                    if (cur === 'todo') return true;
-                    if (cur === 'peliculas') return r.dataset.mt === 'movie';
-                    if (cur === 'series') return r.dataset.mt === 'tv';
-                    return (' ' + r.dataset.k + ' ').indexOf(' ' + cur + ' ') >= 0;
-                }
-                function paint() {
-                    var n = 0, total = 0;
-                    rows.forEach(function (r) {
-                        var ok = match(r); if (ok) total++;
-                        var show = ok && (all || n < SHOWN); if (show) n++;
-                        r.hidden = !show;
-                    });
-                    if (more) { more.parentNode.hidden = all || total <= SHOWN; more.querySelector('[data-afl-n]').textContent = total; }
-                }
-                root.querySelectorAll('[data-afl-f]').forEach(function (b) {
-                    b.addEventListener('click', function () {
-                        cur = b.getAttribute('data-afl-f');
-                        root.querySelectorAll('[data-afl-f]').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-                        paint();
-                    });
-                });
-                if (more) more.addEventListener('click', function () { all = true; paint(); });
-                document.addEventListener('click', function (e) {
-                    root.querySelectorAll('[data-lh-sort][open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; });
-                });
-                paint();
-            })();
-        </script>
+        <FilmographyList rows={filmRows} filters={[['actor', 'Actor'], ['voz', 'Voz'], ['prod', 'Producción']]} sort={filmSort} />
 
         <div class="space-y-10">
             <!-- Doblajes (lazy, eldoblaje.com — solo si el actor es doblador) -->
