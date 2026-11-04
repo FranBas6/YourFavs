@@ -187,3 +187,60 @@ section:not(:has(> details.cg-more[open])) .cg-x { display: none; }
     /* El espaciado lo pone el gap de la lista, no los space-y de cada columna. */
     .ficha-cols > div > * { margin-top: 0 !important; margin-bottom: 0 !important; }
 }
+
+/* =====================================================================================
+   4.8 · Piel v2 de las fichas (Pantallas v2.html, P3·A / P4·A). Solo tokens.
+   ===================================================================================== */
+.fcard { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 18px 20px; }
+.fcard-h { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 600 var(--fs-sub) var(--font); color: var(--text); }
+.fcard-h h3 { margin: 0; font: inherit; color: inherit; }
+.fcard-h > svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--text-3); }
+.fcard-h .r { margin-left: auto; font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+.fcard-h .r.rate-val { font: 700 var(--fs-body) var(--font); color: var(--a-rating); }
+.fcard-h .r.rate-val .rating-scale { font: 500 var(--fs-micro) var(--font); color: var(--text-3); }
+/* Tarjeta plegable (palabras clave en móvil) */
+.fcard-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fcard-fold > summary::-webkit-details-marker { display: none; }
+.fcard-fold > summary .fcard-h { margin: 0; }
+.fcard-fold > summary > svg { width: 16px; height: 16px; color: var(--text-3); }
+.fcard-fold[open] > summary { margin-bottom: 12px; }
+
+/* Información: dos columnas */
+.fdl { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 8px 12px; margin: 0; font-size: var(--fs-ui); line-height: 1.45; }
+.fdl dt { color: var(--text-3); }
+.fdl dd { margin: 0; color: var(--text); font-weight: 500; overflow-wrap: anywhere; }
+.fdl dd small { color: var(--text-3); font-weight: 400; font-size: inherit; }
+.fdl dd a { color: var(--primary); font-weight: 600; text-decoration: none; }
+.fdl dd a:hover { text-decoration: underline; text-underline-offset: 2px; }
+.fdl .fdl-ok { color: var(--ok); font-weight: 600; }
+.fdl .fdl-bad { color: var(--accent-dark); font-weight: 600; }
+[data-theme="dark"] .fdl .fdl-bad { color: var(--stamp-red-ink); }
+.fdl-list { display: flex; flex-direction: column; gap: 4px; }
+.fdl-note { display: block; font-size: var(--fs-meta) !important; }
+.fdl-net { display: inline-flex; align-items: center; gap: 8px; }
+.fdl-net img { width: 36px; height: 18px; object-fit: contain; }
+/* Clasificación como sello */
+.cage-r { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); font-size: var(--fs-meta); color: var(--text-2); }
+.cage-r b { display: inline-grid; place-items: center; min-width: 28px; height: 26px; padding: 0 6px; border-radius: var(--r-sm); background: var(--stamp-red); color: var(--stamp-red-ink); font: 700 var(--fs-micro) var(--font-mono); flex-shrink: 0; }
+/* Enlaces */
+.clinks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.clinks .clinks-ext { width: 13px !important; height: 13px !important; opacity: .6; }
+/* Opinión, etiquetas: textos y formularios */
+.fquote { margin: 0; padding: 10px 12px; border-radius: var(--r-md); background: var(--bg-tint); color: var(--text-2); font-size: var(--fs-ui); line-height: 1.55; white-space: pre-wrap; }
+.fcard .fquote + * { margin-top: 10px; }
+.fchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.fcard .fchips + .fquote, .fcard .fchips + .fedit { margin-top: 12px; }
+.fform { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.cop { width: 100%; min-height: 84px; resize: vertical; padding: 10px 12px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--bg); color: var(--text); font: 400 var(--fs-ui)/1.5 var(--font); }
+.cop--line { min-height: 0; height: 40px; resize: none; }
+.cop:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.fhelp { margin: -2px 0 0; font-size: var(--fs-micro); color: var(--text-3); }
+.crow { display: flex; align-items: center; gap: 8px; }
+.crow--end { justify-content: flex-end; }
+.fsum { list-style: none; }
+.fsum::-webkit-details-marker { display: none; }
+.fedit { margin-top: 10px; }
+.fedit[open] > .fsum { display: none; }
+/* Botón de quitar en texto rojo, sin borde */
+.btn--ghost.btn--dgr { color: var(--accent-dark); }
+[data-theme="dark"] .btn--ghost.btn--dgr { color: var(--stamp-red-ink); }

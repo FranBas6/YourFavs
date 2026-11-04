@@ -626,77 +626,44 @@ const jsonLd = item ? {
                         <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
                     </div>
 
-                    <!-- Información (con clasificación, cadena, enlaces e idiomas; rediseño 4.4) -->
-                    <div id="sec-detalles" data-fs class="mo-1 bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-base font-semibold text-gray-800 mb-3">Información</h3>
-                        <ul class="space-y-2.5 text-sm sm:text-base">
-                            <li class="flex justify-between"><span class="text-gray-500">Estado</span><span class={`font-medium ${status === 'Returning Series' ? 'text-green-600' : status === 'Canceled' ? 'text-red-600' : 'text-gray-800'}`}>{status ? ((statusMap as any)[status] || status) : ''}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Emisión</span><span class="text-gray-800 font-medium">{yearsActive}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Temporadas</span><span class="text-gray-800 font-medium">{regularSeasonsCount}{hasSpecialSeasons ? ` + ${specialSeasonsCount} especiales` : ''}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Episodios</span><span class="text-gray-800 font-medium">{totalRegularEpisodes}</span></li>
-                            {episodeRuntime && (
-                                <li class="flex justify-between"><span class="text-gray-500">Duración</span><span class="text-gray-800 font-medium">{formatRuntime(episodeRuntime)} por episodio</span></li>
-                            )}
-                            {lastAirDate && (
-                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Última emisión</span><span class="text-gray-800 font-medium text-right">{formatDate(lastAirDate)}</span></li>
-                            )}
+                    <!-- Información (piel v2, 4.8): lista de dos columnas, clasificación como sello, enlaces como botones -->
+                    <div id="sec-detalles" data-fs class="mo-1 fcard">
+                        <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Información</h3>
+                        <dl class="fdl">
+                            {item?.original_name && item.original_name !== item.name && (<><dt>Título original</dt><dd>{item.original_name}</dd></>)}
                             {createdBy.length > 0 && (
-                                <li class="flex justify-between gap-2">
-                                    <span class="text-gray-500 flex-shrink-0">Creada por</span>
-                                    <span class="text-gray-800 font-medium text-right">
-                                        {createdBy.map((c, i) => (
-                                            <>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(c.name)}`} class="hover:text-blue-600 hover:underline">{c.name}</a></>
-                                        ))}
-                                    </span>
-                                </li>
+                                <><dt>Creada por</dt><dd>{createdBy.map((c, i) => (<>{i > 0 && ', '}<a href={`/team/${encodeURIComponent(c.name)}`}>{c.name}</a></>))}</dd></>
                             )}
-                            {/* Clasificación por edades (antes, tarjeta aparte) */}
-                            {(() => {
-                                const rating = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null;
-                                return rating ? <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">Clasificación</span><span class="text-gray-800 font-medium text-right">{rating.text}</span></li> : null;
-                            })()}
-                            {/* Cadenas (antes, tarjeta aparte) */}
                             {serieNetworks.length > 0 && (
-                                <li class="flex justify-between gap-3">
-                                    <span class="text-gray-500 flex-shrink-0">{serieNetworks.length === 1 ? 'Cadena' : 'Cadenas'}</span>
-                                    <span class="flex flex-col items-end gap-1.5">
+                                <>
+                                    <dt>{serieNetworks.length === 1 ? 'Cadena' : 'Cadenas'}</dt>
+                                    <dd class="fdl-list">
                                         {serieNetworks.map((network) => (
-                                            <span class="flex items-center gap-2 text-gray-800 font-medium">
-                                                {network.logo_path && <img src={posterUrl(network.logo_path, 'w92')} alt="" class="w-10 h-5 object-contain" loading="lazy" />}
-                                                {network.name}
-                                            </span>
+                                            <span class="fdl-net">{network.logo_path && <img src={posterUrl(network.logo_path, 'w92')} alt="" class="dark-logo-chip" loading="lazy" />}{network.name}</span>
                                         ))}
-                                    </span>
-                                </li>
+                                    </dd>
+                                </>
                             )}
-                            <li class="flex justify-between"><span class="text-gray-500">Valoración</span><span class="text-gray-800 font-medium">{item?.vote_average?.toFixed(1)} <span class="text-gray-400 text-xs">({item?.vote_count})</span></span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Popularidad</span><span class="text-gray-800 font-medium">{item?.popularity?.toFixed(0)}</span></li>
-                            <li class="flex justify-between"><span class="text-gray-500">Idioma</span><span class="text-gray-800 font-medium">{getLanguageDisplayName(item?.original_language)}</span></li>
-                            {item?.original_name && item.original_name !== item.name && (
-                                <li class="flex flex-col"><span class="text-gray-500">Título original</span><span class="text-gray-800 font-medium">{item.original_name}</span></li>
-                            )}
-                            {productionCountries.length > 0 && (
-                                <li class="flex justify-between gap-2"><span class="text-gray-500 flex-shrink-0">País</span><span class="text-gray-800 font-medium text-right">{productionCountries.join(', ')}</span></li>
-                            )}
-                        </ul>
-                        {(hasSocialLinks || imdbId || serieLanguages.length > 0) && (
-                            <div class="mt-4 pt-3 border-t border-gray-100 space-y-3">
+                            <dt>Estado</dt><dd><span class:list={{ 'fdl-ok': status === 'Returning Series', 'fdl-bad': status === 'Canceled' }}>{status ? ((statusMap as any)[status] || status) : ''}</span> <small>· {yearsActive}</small></dd>
+                            {lastAirDate && (<><dt>Última emisión</dt><dd>{formatDate(lastAirDate)}</dd></>)}
+                            <dt>Episodios</dt><dd>{totalRegularEpisodes} <small>· {regularSeasonsCount} {regularSeasonsCount === 1 ? 'temporada' : 'temporadas'}{hasSpecialSeasons ? ` + ${specialSeasonsCount} de especiales` : ''}</small></dd>
+                            {episodeRuntime && (<><dt>Duración</dt><dd>{formatRuntime(episodeRuntime)} por episodio</dd></>)}
+                            <dt>Valoración</dt><dd>{item?.vote_average?.toFixed(1)} <small>· {Number(item?.vote_count || 0).toLocaleString('es-ES')} votos · popularidad {item?.popularity?.toFixed(0)}</small></dd>
+                            <dt>Idioma</dt><dd>{getLanguageDisplayName(item?.original_language)}</dd>
+                            {(serieLanguages.length > 1 || (serieLanguages.length === 1 && serieLanguages[0].iso_639_1 !== item?.original_language)) && (<><dt>Idiomas</dt><dd>{serieLanguages.map((lang) => getLanguageDisplayName(lang.iso_639_1)).join(', ')}</dd></>)}
+                            {productionCountries.length > 0 && (<><dt>País</dt><dd>{productionCountries.join(', ')}</dd></>)}
+                        </dl>
+                        {/* Clasificación por edades, como sello */}
+                        {(() => {
+                            const rating = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null;
+                            return rating ? <div class="cage-r"><b>{rating.rating}</b><span>{rating.text}</span></div> : null;
+                        })()}
                         {(hasSocialLinks || imdbId) && (
-                            <div class="flex flex-wrap gap-2">
-                                {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100">IMDb</a>}
-                                {serieSocialLinks.facebook && <a href={serieSocialLinks.facebook} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">Facebook</a>}
-                                {serieSocialLinks.instagram && <a href={serieSocialLinks.instagram} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100">Instagram</a>}
-                                {serieSocialLinks.twitter && <a href={serieSocialLinks.twitter} target="_blank" rel="noopener" class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100">Twitter</a>}
-                            </div>
-                        )}
-                        {serieLanguages.length > 0 && (
-                            <div class="flex flex-wrap items-center gap-1.5">
-                                <span class="text-xs text-gray-500 mr-1">Idiomas</span>
-                                {serieLanguages.map((lang) => (
-                                    <span class="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">{getLanguageDisplayName(lang.iso_639_1)}</span>
-                                ))}
-                            </div>
-                        )}
+                            <div class="clinks">
+                                {imdbId && <a href={`https://www.imdb.com/title/${imdbId}`} target="_blank" rel="noopener" class="btn btn--sm">IMDb<svg class="clinks-ext" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg></a>}
+                                {serieSocialLinks.facebook && <a href={serieSocialLinks.facebook} target="_blank" rel="noopener" class="btn btn--sm">Facebook</a>}
+                                {serieSocialLinks.instagram && <a href={serieSocialLinks.instagram} target="_blank" rel="noopener" class="btn btn--sm">Instagram</a>}
+                                {serieSocialLinks.twitter && <a href={serieSocialLinks.twitter} target="_blank" rel="noopener" class="btn btn--sm">X (Twitter)</a>}
                             </div>
                         )}
                     </div>
@@ -737,37 +704,37 @@ const jsonLd = item ? {
                     <!-- Opinión -->
                     <div class="mo mo-8">
                     {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
-                        <div class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-base font-semibold text-gray-800 mb-3">Tu opinión</h3>
+                        <div class="fcard">
+                            <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>Tu opinión</h3>
                             {opinionFromAny ? (
                                 <div class="space-y-3">
-                                    <blockquote class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">{opinionFromAny}</blockquote>
-                                    <div class="flex items-center gap-2 justify-end">
+                                    <blockquote class="fquote">{opinionFromAny}</blockquote>
+                                    <div class="crow crow--end">
                                         <details>
-                                            <summary class="min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 text-xs rounded-lg bg-gray-900 hover:bg-gray-800 text-white cursor-pointer inline-flex items-center">Actualizar</summary>
-                                            <form method="POST" class="mt-3 space-y-2">
+                                            <summary class="btn btn--sm fsum">Editar</summary>
+                                            <form method="POST" class="fform">
                                                 <input type="hidden" name="id" value={item?.id} />
                                                 <input type="hidden" name="action" value="save_opinion" />
                                                 <input type="hidden" name="actionType" value="opinion" />
-                                                <textarea name="opinion" rows="3" class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400">{opinionFromAny}</textarea>
-                                                <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar</button>
+                                                <textarea name="opinion" rows="4" class="cop" aria-label="Tu opinión">{opinionFromAny}</textarea>
+                                                <button type="submit" class="btn btn--sm">Guardar opinión</button>
                                             </form>
                                         </details>
                                         <form method="POST">
                                             <input type="hidden" name="id" value={item?.id} />
                                             <input type="hidden" name="action" value="delete_opinion" />
                                             <input type="hidden" name="actionType" value="opinion" />
-                                            <button type="submit" class="min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 text-xs rounded-lg bg-red-50 text-red-600 border border-red-200 hover:bg-red-100">Eliminar</button>
+                                            <button type="submit" class="btn btn--sm btn--ghost btn--dgr">Eliminar</button>
                                         </form>
                                     </div>
                                 </div>
                             ) : (
-                                <form method="POST" class="space-y-2">
+                                <form method="POST" class="fform">
                                     <input type="hidden" name="id" value={item?.id} />
                                     <input type="hidden" name="action" value="save_opinion" />
                                     <input type="hidden" name="actionType" value="opinion" />
-                                    <textarea name="opinion" rows="3" class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400" placeholder="Escribe tu opinión..."></textarea>
-                                    <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-gray-900 text-white text-xs rounded-lg hover:bg-gray-800">Guardar opinión</button>
+                                    <textarea name="opinion" rows="3" class="cop" aria-label="Tu opinión" placeholder="Escribe tu opinión…"></textarea>
+                                    <div class="crow crow--end"><button type="submit" class="btn btn--sm">Guardar opinión</button></div>
                                 </form>
                             )}
                         </div>
@@ -777,26 +744,23 @@ const jsonLd = item ? {
                     <!-- Tus tags + notas (C15) -->
                     <div class="mo mo-9">
                     {inAnyCollection && (
-                        <div class="bg-white rounded-xl border border-gray-200 p-4">
-                            <h3 class="text-base font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                                <span class="w-1 h-5 bg-fuchsia-500 rounded-full"></span>
-                                Tus tags y notas
-                            </h3>
+                        <div class="fcard">
+                            <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>Tus etiquetas y notas</h3>
                             {userTags.length > 0 && (
-                                <div class="flex flex-wrap gap-1.5 mb-3">
+                                <div class="fchips">
                                     {userTags.map(t => (
-                                        <span class="px-2 py-0.5 text-xs bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 rounded-full">#{t}</span>
+                                        <span class="chip-tag">#{t}</span>
                                     ))}
                                 </div>
                             )}
                             {userNotes && (
-                                <blockquote class="p-3 mb-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 whitespace-pre-wrap">{userNotes}</blockquote>
+                                <blockquote class="fquote">{userNotes}</blockquote>
                             )}
-                            <details>
-                                <summary class="cursor-pointer text-xs text-fuchsia-600 hover:text-fuchsia-700 font-medium">
-                                    {userTags.length > 0 || userNotes ? 'Editar' : 'Añadir tags y notas'}
+                            <details class="fedit">
+                                <summary class="btn btn--sm btn--ghost fsum">
+                                    {userTags.length > 0 || userNotes ? 'Editar' : 'Añadir etiquetas y notas'}
                                 </summary>
-                                <form method="POST" class="mt-3 space-y-2">
+                                <form method="POST" class="fform">
                                     <input type="hidden" name="actionType" value="media_tags" />
                                     <input type="hidden" name="media_type" value="tv" />
                                     <input type="hidden" name="tmdb_id" value={item?.id} />
@@ -805,15 +769,15 @@ const jsonLd = item ? {
                                         name="tags"
                                         value={userTags.join(', ')}
                                         placeholder="comedia, true crime, 2026..."
-                                        class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-fuchsia-400"
+                                        class="cop cop--line" aria-label="Etiquetas"
                                     />
-                                    <p class="text-[11px] text-gray-400">Separados por comas. Máx 20.</p>
+                                    <p class="fhelp">Separadas por comas. Máximo 20.</p>
                                     <textarea
                                         name="notes"
                                         rows="3"
                                         placeholder="Notas más libres que la opinión..."
-                                        class="w-full p-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-fuchsia-400">{userNotes}</textarea>
-                                    <button type="submit" class="w-full min-h-[44px] md:min-h-0 px-4 py-2.5 md:px-3 md:py-1.5 bg-fuchsia-600 text-white text-xs rounded-lg hover:bg-fuchsia-700">Guardar</button>
+                                        class="cop" aria-label="Notas">{userNotes}</textarea>
+                                    <div class="crow crow--end"><button type="submit" class="btn btn--sm">Guardar</button></div>
                                 </form>
                             </details>
                             <HideFromProfileToggle mediaType="tv" tmdbId={item?.id} title={item?.name || ''} posterPath={item?.poster_path ?? null} />
@@ -825,22 +789,22 @@ const jsonLd = item ? {
                     <div class="mo mo-14">
                     {serieKeywords.length > 0 && (
                         <>
-                            <details class="bg-white rounded-xl border border-gray-200 sm:hidden">
-                                <summary class="p-4 cursor-pointer flex items-center justify-between">
-                                    <h3 class="text-base font-semibold text-gray-800">Palabras clave de TMDB ({serieKeywords.length})</h3>
+                            <details class="fcard fcard-fold sm:hidden">
+                                <summary>
+                                    <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>Palabras clave · TMDB ({serieKeywords.length})</h3>
                                     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                 </summary>
-                                <div class="px-4 pb-4 flex flex-wrap gap-1.5">
+                                <div class="fchips">
                                     {serieKeywords.map((kw) => (
-                                        <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
+                                        <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="chip-tag">{kw.name}</a>
                                     ))}
                                 </div>
                             </details>
-                            <div class="hidden sm:block bg-white rounded-xl border border-gray-200 p-4">
-                                <h3 class="text-base font-semibold text-gray-800 mb-2">Palabras clave de TMDB</h3>
-                                <div class="flex flex-wrap gap-1.5">
+                            <div class="hidden sm:block fcard">
+                                <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></svg>Palabras clave · TMDB</h3>
+                                <div class="fchips">
                                     {serieKeywords.map((kw) => (
-                                        <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="px-2 py-0.5 text-xs bg-gray-100 text-gray-500 rounded-full hover:bg-[#E63946]/10 hover:text-[#E63946] transition-colors">{kw.name}</a>
+                                        <a href={`/catalogo/keyword/${kw.id}?name=${encodeURIComponent(kw.name)}`} class="chip-tag">{kw.name}</a>
                                     ))}
                                 </div>
                             </div>
