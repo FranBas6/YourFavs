@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import {
     getLanguageDisplayName, getContentRating,
-    formatDate, getRatingStars, formatTrailerUrl, providerLinks
+    formatDate, formatTrailerUrl, providerLinks
 } from "../../utils/constants/helpers/media-helpers";
 import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
 import type { GuestStar } from "../../types/Media";
@@ -517,63 +517,54 @@ const jsonLd = item ? {
     <!-- Sin fondo propio: va sobre el gris de la página, como la ficha de episodio y el resto de la web
          (antes `bg-gray-50` hacía un «doble fondo», un panel más claro con franjas a los lados). -->
     <article>
-        <!-- Hero inmersivo -->
-        <div class="relative w-full min-h-[70vh] bg-cover bg-center bg-no-repeat" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}>
-            <div class="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/70 to-gray-900/40"></div>
-
-            <div class="relative z-10 max-w-6xl mx-auto px-4 pt-8 pb-16 flex flex-col justify-end min-h-[70vh]">
-                <nav class="absolute top-6 left-4 right-4" aria-label="Breadcrumb">
-                    <ol class="flex items-center space-x-2 text-sm">
-                        <li><a href="/" class="text-white/70 hover:text-white transition-colors">Inicio</a></li>
-                        <li class="text-white/40">/</li>
-                        <li><a href="/catalogo/topseries" class="text-white/70 hover:text-white transition-colors">Series</a></li>
-                        <li class="text-white/40">/</li>
-                        <li class="text-white/90 font-medium truncate max-w-xs">{item?.name}</li>
+        <!-- Hero inmersivo (piel v2, 4.8c): fondo oscuro de la casa con la imagen al 55 %, póster con borde,
+             línea de datos, géneros como chips y sinopsis ancha. En móvil, el póster va pequeño encima del título. -->
+        <div class="fh">
+            <div class="fh-bg" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}></div>
+            <div class="fh-in">
+                <nav class="fh-crumb" aria-label="Breadcrumb">
+                    <ol>
+                        <li><a href="/">Inicio</a></li>
+                        <li aria-hidden="true">/</li>
+                        <li><a href="/catalogo/topseries">Series</a></li>
+                        <li aria-hidden="true">/</li>
+                        <li><b>{item?.name}</b></li>
                     </ol>
                 </nav>
-
-                <div class="flex flex-col md:flex-row items-end gap-8">
-                    <div class="hidden md:block flex-shrink-0 w-56 rounded-xl overflow-hidden shadow-2xl ring-1 ring-white/10">
-                        <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
+                <div class="fh-row">
+                    <div class="fh-poster">
+                        <img src={posterUrl(item?.poster_path)} alt={item?.name} />
                     </div>
-                    <div class="flex-1 text-white">
+                    <div class="fh-tx">
                         <p class="ficha-kicker">
                             Serie{serieNetworks[0]?.name && <> · {serieNetworks[0].name}</>}{kickerYears && <> · {kickerYears}</>}
                             {createdBy.length > 0 && <> · Creada por {createdBy.slice(0, 3).map((c, i, arr) => (<>{i > 0 && (i === arr.length - 1 ? ' y ' : ', ')}<a href={`/team/${encodeURIComponent(c.name)}`}>{c.name}</a></>))}</>}
                         </p>
                         {serieLogo
-                            ? <h1 class="mb-3"><img src={serieLogo} alt={item?.name} class="h-auto max-h-20 md:max-h-28 w-auto max-w-[85%] md:max-w-[440px] object-contain drop-shadow-lg" /></h1>
-                            : <h1 class="text-4xl md:text-5xl font-bold mb-3 leading-tight">{item?.name}</h1>}
-                        {additionalInfo.tagline && (
-                            <p class="text-white/60 italic text-lg mb-4">"{additionalInfo.tagline}"</p>
-                        )}
-                        <div class="flex flex-wrap items-center gap-3 mb-4">
-                            <span class="text-yellow-400 text-lg font-bold">{item?.vote_average?.toFixed(1)} {getRatingStars(item?.vote_average)}</span>
-                            <span class={`px-2.5 py-0.5 rounded-full text-xs font-medium ${status === 'Returning Series' ? 'bg-green-500/80' : status === 'Ended' ? 'bg-gray-500/80' : status === 'Canceled' ? 'bg-red-500/80' : 'bg-blue-500/80'}`}>
-                                {status ? ((statusMap as any)[status] || status) : ''}
-                            </span>
-                            {seriesTypeLabel && (
-                                <span class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/20 text-white">{seriesTypeLabel}</span>
-                            )}
-                            <span class="text-white/70">{yearsActive}</span>
-                            <span class="text-white/70">{regularSeasonsCount} temporadas</span>
-                            <span class="text-white/70">{totalRegularEpisodes} episodios</span>
-                            {item?.availableInSpain && (
-                                <span title="Disponible en España"><svg viewBox="0 0 750 500" class="w-8 h-5 rounded"><rect width="750" height="500" fill="#AA151B"/><rect width="750" height="250" y="125" fill="#F1BF00"/></svg></span>
-                            )}
+                            ? <h1 class="fh-logo"><img src={serieLogo} alt={item?.name} /></h1>
+                            : <h1 class="fh-title">{item?.name}</h1>}
+                        {additionalInfo.tagline && <p class="fh-tag">“{additionalInfo.tagline}”</p>}
+                        <div class="fh-facts">
+                            {item?.vote_average > 0 && <span class="fh-rt"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{item.vote_average.toFixed(1).replace('.', ',')}</span>}
+                            {item?.vote_count > 0 && <span class="fh-vt">{Number(item.vote_count).toLocaleString('es-ES')} votos</span>}
+                            <span class:list={['fh-st', { 'is-on': status === 'Returning Series', 'is-off': status === 'Canceled' }]}>{status ? ((statusMap as any)[status] || status) : ''}</span>
+                            {seriesTypeLabel && <span class="fh-st">{seriesTypeLabel}</span>}
+                            <span>{yearsActive}</span>
+                            <span>{regularSeasonsCount} temporadas · {totalRegularEpisodes} episodios</span>
+                            {(() => { const r = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null; return r ? <span class="fh-age" title={r.text}>{r.rating}</span> : null; })()}
+                            <span class="fh-lang" title="Idioma original">{(item?.original_language || '').toUpperCase()} · {getLanguageDisplayName(item?.original_language).toLowerCase()}</span>
+                            {item?.availableInSpain && <span title="Disponible en España"><svg viewBox="0 0 750 500" class="fh-flag" aria-hidden="true"><rect width="750" height="500" fill="#AA151B"/><rect width="750" height="250" y="125" fill="#F1BF00"/></svg></span>}
                         </div>
-                        {item?.genres && (
-                            <div class="flex flex-wrap gap-2 mb-5">
-                                {item.genres.map((genre) => (
-                                    <span class="px-3 py-1 bg-white/10 backdrop-blur-sm text-white text-xs rounded-full border border-white/20">{genre.name}</span>
-                                ))}
+                        {item?.genres && item.genres.length > 0 && (
+                            <div class="fh-gs">
+                                {item.genres.map((genre: { id: number; name: string }) => <span>{genre.name}</span>)}
                             </div>
                         )}
                         {item?.overview && (
-                            <details class="max-w-2xl group">
-                                <summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-                                    <p class="text-white/80 text-sm md:text-base leading-relaxed line-clamp-3 group-open:line-clamp-none">{item.overview}</p>
-                                    <span class="inline-block mt-1 text-xs text-white/50 group-open:hidden">Pulsa para leer más</span>
+                            <details class="fh-syn group">
+                                <summary>
+                                    <p class="line-clamp-3 group-open:line-clamp-none">{item.overview}</p>
+                                    <span class="fh-more group-open:hidden">Pulsa para leer más</span>
                                 </summary>
                             </details>
                         )}
@@ -622,9 +613,7 @@ const jsonLd = item ? {
 
                 <!-- Sidebar izquierda -->
                 <div class="md:w-1/3 space-y-4">
-                    <div class="mo-1 md:hidden w-56 mx-auto rounded-xl overflow-hidden shadow-xl">
-                        <img src={posterUrl(item?.poster_path)} alt={item?.name} class="w-full aspect-[2/3] object-cover" />
-                    </div>
+                    
 
                     <!-- Información (piel v2, 4.8): lista de dos columnas, clasificación como sello, enlaces como botones -->
                     <div id="sec-detalles" data-fs class="mo-1 fcard">
