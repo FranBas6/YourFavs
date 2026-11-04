@@ -46,7 +46,7 @@ details[open] .season-overview {
 /* =====================================================================================
    4.6 · Temporadas fundidas (README del handoff D3). Una fila por temporada con su tira de
    episodios; al abrirla, los datos de la temporada y la lista de episodios de siempre.
-   Tira: color = nota de TMDB del episodio; visto = color pleno, sin ver = el mismo al 35 %.
+   Tira: azul por la nota de TMDB del episodio (--ep-q-*); visto = color pleno, sin ver = el mismo al 35 %.
    Solo tokens: el oscuro sale de ellos.
    ===================================================================================== */
 .sr { border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev); overflow: hidden; }
@@ -76,10 +76,11 @@ details[open] .season-overview {
 .sr-strip { display: flex; flex-wrap: wrap; gap: 4px; }
 .sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--border-strong); opacity: .35; }
 .sr-c.is-seen { opacity: 1; }
-.sr-c[data-b="high"] { background: var(--rating-high); }
-.sr-c[data-b="med"]  { background: var(--rating-med); }
-.sr-c[data-b="low"]  { background: var(--rating-low); }
-.sr-c[data-b="poor"] { background: var(--rating-poor); }
+/* Un solo tono (azul, elegido por Fran entre 5 muestras): cuanto más intenso, mejor nota. */
+.sr-c[data-b="high"] { background: var(--ep-q-high); }
+.sr-c[data-b="med"]  { background: var(--ep-q-med); }
+.sr-c[data-b="low"]  { background: var(--ep-q-low); }
+.sr-c[data-b="poor"] { background: var(--ep-q-poor); }
 .sr-n { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
 /* Sinopsis: oculta hasta abrir la temporada (Fran), y entonces entera. */
 .sr-main .sr-ov { display: none; margin: 0; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
