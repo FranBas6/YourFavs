@@ -36,7 +36,10 @@ export function relTime(ms: number, now = Date.now()): string {
     if (m < 60) return `hace ${m} min`;
     const h = Math.floor(m / 60);
     if (h < 24) return `hace ${h} h`;
-    const d = Math.floor(h / 24);
+    // Días de calendario en España (7.3): «ayer» es el día de antes, no «entre 24 y 48 horas», para
+    // que case con los grupos «Hoy · Ayer · Esta semana» de la campana.
+    const [a, b] = [madridDay(ms), madridDay(now)].map((x) => Date.UTC(+x.slice(0, 4), +x.slice(5, 7) - 1, +x.slice(8, 10)));
+    const d = Math.max(1, Math.round((b - a) / 86400000));
     if (d === 1) return 'ayer';
     if (d < 7) return `hace ${d} días`;
     const w = Math.floor(d / 7);
@@ -333,7 +336,7 @@ export function notifSentenceHtml(it: Pick<NotifView, 'type' | 'actor' | 'req'>)
     return { html: name, plain: p.name };
 }
 
-export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; now?: number }): string {
+export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; now?: number; nested?: boolean }): string {
     const when = relTime(it.created_at, o.now);
     const unread = !it.read;
     const st = NOTIF_STAMP[it.type] ?? ['blue', 'bell'];
@@ -371,19 +374,155 @@ export function notifItemHtml(it: NotifView, o: RelOpts & { mobile?: boolean; no
         ? `<img class="notif-poster" src="${POSTER_BASE}${esc(it.poster_path)}" alt="" loading="lazy">`
         : '<span class="notif-poster"></span>';
     return `<a href="${esc(it.href || '#')}" class="notif-item${unread ? ' is-unread' : ''}" data-id="${esc(it.id)}">`
-        + `<span class="notif-ico" style="${stampVars(st[0])}">${icon(st[1])}</span>${poster}`
-        + `<span class="notif-body"><span class="notif-sub">${esc(it.subtitle)}</span><span class="notif-name">${esc(it.title)}</span><span class="notif-when">${esc(when)}</span></span>`
+        + (o.nested ? '' : `<span class="notif-ico" style="${stampVars(st[0])}">${icon(st[1])}</span>`) + poster
+        + (o.nested
+            // Dentro de un grupo (7.3): solo lo que cambia. Sin la hora (la lleva el grupo) y, en plataformas,
+            // sin «Ya en Netflix» (también): «Lupin · de tu lista».
+            ? `<span class="notif-body"><span class="notif-name">${esc(it.title)}</span><span class="notif-sub">${esc(it.type === 'platform_change' ? (/ · (.+)$/.exec(it.subtitle || '')?.[1] ?? it.subtitle) : it.subtitle)}</span></span>`
+            : `<span class="notif-body"><span class="notif-sub">${esc(it.subtitle)}</span><span class="notif-name">${esc(it.title)}</span><span class="notif-when">${esc(when)}</span></span>`)
         + (unread ? `<span class="notif-dot" aria-hidden="true"></span>${srOnly('sin leer')}` : '')
         + `</a>`;
 }
 
-/** Grupos «Hoy / Esta semana / Antes» conservando el orden (ya llegan del más nuevo al más viejo). */
+// -------------------------------------------------------------------------------------
+// Avisos agrupados (rediseño 7.3, handoff P8): mismo tipo y mismo día = un aviso
+// -------------------------------------------------------------------------------------
+/** Día de calendario en España (el servidor va en UTC): «2026-11-04». */
+const madridDay = (ms: number) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(ms);
+
+/** Categoría de un aviso, para los filtros y el resumen de la semana. */
+export type NotifCat = 'episodios' | 'plataformas' | 'personas' | 'estrenos' | 'amigos' | 'otros';
+export function notifCat(type: string): NotifCat {
+    if (type === 'new_episode' || type === 'new_season') return 'episodios';
+    if (type === 'platform_change' || type === 'on_platform') return 'plataformas';
+    if (type === 'person_release') return 'personas';
+    if (type === 'premiere' || type === 'anniversary') return 'estrenos';
+    if (SOCIAL_NOTIF_TYPES.has(type) || PLAN_NOTIF_TYPES.has(type)) return 'amigos';
+    return 'otros';
+}
+export const NOTIF_CATS: [NotifCat, string, string][] = [
+    ['episodios', 'Episodios', 'tv'], ['plataformas', 'Plataformas', 'popcorn'], ['personas', 'Personas', 'clapperboard'],
+    ['estrenos', 'Estrenos', 'ticket'], ['amigos', 'Amigos', 'users'],
+];
+
+/** Solo se juntan los avisos de títulos; los sociales y los planes van siempre sueltos (tienen botones). */
+const GROUPABLE = new Set(['new_episode', 'new_season', 'platform_change', 'person_release', 'premiere']);
+const PLATFORM_RE = /^(Ya en|Salió de) (.+?) · (.+)$/;
+
+export interface NotifBundle { bundle: true; key: string; type: string; items: NotifView[]; created_at: number; read: boolean }
+export type NotifEntry = NotifView | NotifBundle;
+export const isBundle = (e: NotifEntry): e is NotifBundle => (e as NotifBundle).bundle === true;
+
+/**
+ * Junta los avisos del mismo tipo y del mismo día (y, en plataformas, de la misma plataforma y sentido:
+ * «Ya en Netflix»). Con uno solo, el aviso queda suelto. El orden se conserva: el grupo va donde estaba
+ * su aviso más nuevo. Solo cambia cómo se pintan: en la base siguen siendo avisos sueltos.
+ */
+export function bundleNotifs(items: NotifView[]): NotifEntry[] {
+    const out: NotifEntry[] = [];
+    const byKey = new Map<string, NotifBundle>();
+    for (const it of items) {
+        if (!GROUPABLE.has(it.type)) { out.push(it); continue; }
+        const m = it.type === 'platform_change' ? PLATFORM_RE.exec(it.subtitle || '') : null;
+        const key = [it.type, madridDay(it.created_at), m ? `${m[1]}|${m[2]}` : ''].join('|');
+        let b = byKey.get(key);
+        if (!b) {
+            b = { bundle: true, key, type: it.type, items: [], created_at: it.created_at, read: true };
+            byKey.set(key, b);
+            out.push(b);
+        }
+        b.items.push(it);
+        if (!it.read) b.read = false;
+    }
+    return out.map((e) => (isBundle(e) && e.items.length === 1 ? e.items[0] : e));
+}
+
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+const listNames = (names: string[], max = 3) => {
+    const u = [...new Set(names.filter(Boolean))];
+    if (u.length <= max) return u.length > 1 ? `${u.slice(0, -1).join(', ')} y ${u[u.length - 1]}` : (u[0] ?? '');
+    return `${u.slice(0, max).join(', ')} y ${u.length - max} más`;
+};
+
+/** La frase de un grupo: «Ya en Netflix: 12 títulos», «Nuevos episodios en 3 series»… */
+function bundleText(b: NotifBundle): { html: string; plain: string; more: string } {
+    const n = b.items.length;
+    const titles = b.items.map((i) => i.title);
+    if (b.type === 'platform_change') {
+        const m = PLATFORM_RE.exec(b.items[0].subtitle || '');
+        const head = m ? `${m[1]} ${m[2]}` : 'Cambios de plataforma';
+        const orig = { fav: 0, like: 0, list: 0 };
+        for (const it of b.items) {
+            const q = PLATFORM_RE.exec(it.subtitle || '')?.[3] ?? '';
+            if (/favorit/.test(q)) orig.fav++; else if (/gust/.test(q)) orig.like++; else orig.list++;
+        }
+        const parts = [orig.fav ? `${orig.fav} de tus favoritos` : '', orig.like ? `${orig.like} que te ${orig.like === 1 ? 'gustó' : 'gustaron'}` : '', orig.list ? `${orig.list} de tu lista` : ''].filter(Boolean);
+        // Un solo origen: «Ya en Netflix: 16 de tus favoritos» (handoff P8). Varios: «12 títulos · 9 de tus favoritos, 3 de tu lista».
+        const what = parts.length === 1 ? parts[0] : `${plural(n, 'título', 'títulos')} · ${parts.join(', ')}`;
+        return { html: `<b>${esc(head)}</b>: ${esc(what)}`, plain: `${head}: ${what}`, more: listNames(titles) };
+    }
+    if (b.type === 'new_episode') {
+        const series = [...new Set(titles)];
+        if (series.length === 1) {
+            const plain = `${n} episodios nuevos de ${series[0]}`;
+            return { html: `<b>${n} episodios nuevos</b> de ${esc(series[0])}`, plain, more: listNames(b.items.map((i) => (i.subtitle || '').split(' · ')[0])) };
+        }
+        return { html: `<b>Nuevos episodios</b> en ${series.length} series`, plain: `Nuevos episodios en ${series.length} series`, more: listNames(series) };
+    }
+    if (b.type === 'new_season') return { html: `<b>Temporadas nuevas</b> en ${n} series`, plain: `Temporadas nuevas en ${n} series`, more: listNames(titles) };
+    if (b.type === 'person_release') {
+        const people = b.items.map((i) => (i.subtitle || '').split(' · ')[0].replace(/ y \d+ más$/, ''));
+        return { html: `<b>${plural(n, 'estreno', 'estrenos')}</b> de personas que sigues`, plain: `${plural(n, 'estreno', 'estrenos')} de personas que sigues`, more: listNames(people) };
+    }
+    return { html: `<b>${plural(n, 'estreno', 'estrenos')}</b> de tu lista`, plain: `${plural(n, 'estreno', 'estrenos')} de tu lista`, more: listNames(titles) };
+}
+
+/** Un grupo: sello, pila de pósters, frase y, al abrirlo, sus avisos sueltos. Abrirlo los da por leídos. */
+export function notifBundleHtml(b: NotifBundle, o: RelOpts & { mobile?: boolean; now?: number }): string {
+    const st = NOTIF_STAMP[b.type] ?? ['blue', 'bell'];
+    const t = bundleText(b);
+    const posters = b.items.filter((i) => i.poster_path).slice(0, 4);
+    const extra = b.items.length - posters.length;
+    const stack = posters.length
+        ? `<span class="nt-stk" aria-hidden="true">${posters.map((i) => `<img src="${POSTER_BASE}${esc(i.poster_path!)}" alt="" loading="lazy">`).join('')}${extra > 0 ? `<em>+${extra}</em>` : ''}</span>`
+        : '';
+    const unread = b.items.filter((i) => !i.read).length;
+    const label = `${t.plain}: ${t.more}${unread ? `, ${unread} sin leer` : ''}`;
+    return `<details class="nt-grp${unread ? ' is-unread' : ''}" data-grp-ids="${esc(b.items.map((i) => i.id).join(','))}">`
+        + `<summary class="nt-grp-s" aria-label="${esc(label)}">`
+        + `<span class="notif-ico" style="${stampVars(st[0])}">${icon(st[1])}</span>`
+        + `<span class="notif-body"><span class="nt-grp-t">${t.html}</span><span class="notif-sub">${esc(t.more)}</span>`
+        + `<span class="notif-when">${esc(relTime(b.created_at, o.now))} · <span class="nt-grp-more">Ver ${b.items.length === 2 ? 'los 2' : `los ${b.items.length}`}</span></span></span>`
+        + stack
+        + (unread ? '<span class="notif-dot" aria-hidden="true"></span>' : '')
+        + `<span class="nt-grp-car">${icon('chevron-down')}</span>`
+        + `</summary><div class="nt-grp-b">${b.items.map((it) => notifItemHtml(it, { ...o, nested: true })).join('')}</div></details>`;
+}
+
+/**
+ * La lista entera, como la pintan la campana y la página: por días («Hoy · Ayer · Esta semana ·
+ * Antes»), con los avisos agrupados. Cada pieza lleva `data-cat` para los filtros de la página.
+ */
+export function notifFeedHtml(items: NotifView[], o: RelOpts & { mobile?: boolean; now?: number; wrap?: (label: string, html: string) => string }): string {
+    const now = o.now ?? Date.now();
+    const wrap = o.wrap ?? ((label, html) => `<p class="notif-group">${label}</p>${html}`);
+    return notifGroups(bundleNotifs(items), now).map(([label, entries]) => wrap(label, entries.map((e) => {
+        const cat = notifCat(e.type);
+        const html = isBundle(e) ? notifBundleHtml(e, { ...o, now }) : notifItemHtml(e, { ...o, now });
+        // La categoría va en el elemento raíz (el primer class="notif-item…" o "nt-grp").
+        return html.replace(/class="(notif-item|nt-grp)/, `data-cat="${cat}" class="$1`);
+    }).join(''))).join('');
+}
+
+/** Grupos «Hoy · Ayer · Esta semana · Antes» por día de calendario en España, conservando el orden. */
 export function notifGroups<T extends { created_at: number }>(items: T[], now = Date.now()): [string, T[]][] {
     const DAY = 86400000;
+    const today = madridDay(now);
+    const yesterday = madridDay(now - DAY);
     const groups: [string, T[]][] = [];
     for (const it of items) {
-        const age = now - it.created_at;
-        const label = age < DAY ? 'Hoy' : age < 7 * DAY ? 'Esta semana' : 'Antes';
+        const d = madridDay(it.created_at);
+        const label = d === today ? 'Hoy' : d === yesterday ? 'Ayer' : now - it.created_at < 7 * DAY ? 'Esta semana' : 'Antes';
         if (!groups.length || groups[groups.length - 1][0] !== label) groups.push([label, []]);
         groups[groups.length - 1][1].push(it);
     }
