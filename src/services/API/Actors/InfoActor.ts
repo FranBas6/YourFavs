@@ -38,7 +38,11 @@ export interface CrewCredit {
     poster_path: string | null;
     job: string;
     year: number | null;
+    /** Fecha completa (AAAA-MM-DD) si TMDB la da; '' si no. */
+    date: string;
     vote_average: number;
+    vote_count: number;
+    popularity: number;
 }
 
 const RELEVANT_JOBS = new Set(['Director', 'Producer', 'Executive Producer', 'Writer', 'Screenplay', 'Creator']);
@@ -63,7 +67,10 @@ export const getActorCrewCredits = async ({ id }: { id: string }): Promise<CrewC
                     poster_path: c.poster_path || null,
                     job: c.job,
                     year,
+                    date: dateStr,
                     vote_average: c.vote_average || 0,
+                    vote_count: c.vote_count || 0,
+                    popularity: c.popularity || 0,
                 });
             }
         }

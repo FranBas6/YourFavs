@@ -6,13 +6,10 @@ import {
     getActorCrewCredits
 } from "../../services/API/Actors/InfoActor";
 import type { CrewCredit } from "../../services/API/Actors/InfoActor";
-import CardMovie from "../../components/Cards/CardMovie.astro";
-import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName, genresMap } from "../../utils/constants/genres";
-import { sortBycriterion } from "../../utils/sorting";
 import { calculateAge, getCareerRange } from "../../utils/constants/helpers/actor-helpers";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
-import EmptyState from "../../components/EmptyState.astro";
+import FilmographyList, { type FilmRow } from "../../components/person/FilmographyList.astro";
 import ActorDubbingSection from "../../components/detail/ActorDubbingSection.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
@@ -69,7 +66,7 @@ const upcomingSeen = new Set<string>();
 const personUpcoming = [
     ...(credits.movies || []).map((c: any) => ({ id: String(c.id), media_type: 'movie' as const, title: c.title, poster_path: c.poster_path || null, date: c.release_date || '', kind: 'Película' })),
     ...(credits.series || []).map((c: any) => ({ id: String(c.id), media_type: 'tv' as const, title: c.name, poster_path: c.poster_path || null, date: c.first_air_date || '', kind: 'Serie' })),
-    ...crewCredits.map((c) => ({ id: String(c.id), media_type: c.media_type, title: c.title, poster_path: c.poster_path, date: c.year ? `${c.year}-01-01` : '', kind: c.media_type === 'movie' ? 'Película' : 'Serie' })),
+    ...crewCredits.map((c) => ({ id: String(c.id), media_type: c.media_type, title: c.title, poster_path: c.poster_path, date: c.date || (c.year ? `${c.year}-01-01` : ''), kind: c.media_type === 'movie' ? 'Película' : 'Serie' })),
 ]
     .filter((c) => c.title && c.date && c.date > todayStr)
     .filter((c) => {
@@ -81,20 +78,11 @@ const personUpcoming = [
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(0, 6);
 
-// Agrupar crew por job (Director, Producer, etc.)
-const JOB_ORDER = ['Director', 'Creator', 'Writer', 'Screenplay', 'Executive Producer', 'Producer'];
+// Nombres de los trabajos de equipo en la filmografía (6.3)
 const JOB_LABELS: Record<string, string> = {
-    Director: 'Director', Creator: 'Creador', Writer: 'Guionista',
-    Screenplay: 'Guion', 'Executive Producer': 'Productor ejecutivo', Producer: 'Productor',
+    Director: 'Dirección', Creator: 'Creación', Writer: 'Guion',
+    Screenplay: 'Guion', 'Executive Producer': 'Producción ejecutiva', Producer: 'Producción',
 };
-const crewByJob = new Map<string, CrewCredit[]>();
-for (const c of crewCredits) {
-    if (!crewByJob.has(c.job)) crewByJob.set(c.job, []);
-    crewByJob.get(c.job)!.push(c);
-}
-const crewSections = JOB_ORDER
-    .filter(job => crewByJob.has(job) && crewByJob.get(job)!.length > 0)
-    .map(job => ({ job, label: JOB_LABELS[job] || job, credits: crewByJob.get(job)! }));
 
 const actorInfo = actorDetails || {
     id: null, nombre: actor, biografia: null, lugarNacimiento: null,
@@ -123,26 +111,46 @@ const isInFavorites = !!favEntry;
 const currentPosition = favEntry?.position ?? null;
 const totalActorsFavorites = actorsFavs.length;
 
-// Ordenación
-const sortBy = Astro.url.searchParams.get('sort') || 'popularity';
-const moviesSorted = sortBycriterion(movies, sortBy, 'release_date');
-// B5: con el orden por defecto (popularidad), las apariciones sueltas van al final: un solo episodio
-// o «como él mismo» (programas, galas, entrevistas: personaje «Self», como el filtro de ruido de la
-// campana). El resto conserva el orden de siempre.
-const seriesSortedRaw = sortBycriterion(series, sortBy, 'first_air_date');
+// Cameos: un solo episodio o «como él mismo» (programas, galas, entrevistas). Van al final y fuera de «Conocido por».
 const SELF_ROLE = /\b(self|himself|herself|themselves|narrator|host|presenter)\b/i;
 const isCameo = (s: any) => Number(s.episode_count) <= 1 || SELF_ROLE.test(s.character || '');
-const seriesSorted = sortBy === 'popularity'
-    ? [...seriesSortedRaw.filter((s) => !isCameo(s)), ...seriesSortedRaw.filter(isCameo)]
-    : seriesSortedRaw;
-// «Tyrion Lannister · 73 ep.» (TMDB da `episode_count` por serie en combined_credits).
-const characterWithEpisodes = (s: any) => {
-    const n = Number(s.episode_count);
-    const eps = n > 0 ? `${n} ep.` : '';
-    return [s.character, eps].filter(Boolean).join(' · ') || undefined;
-};
 
 const hasSocial = actorInfo.redes && Object.values(actorInfo.redes).some(v => v);
+
+// 6.1 · «Conocido por»: sus 4 títulos más populares (sin cameos ni apariciones como sí mismo).
+const knownFor = [
+    ...movies.map((m: any) => ({ id: String(m.id), mt: 'movie' as const, title: m.title, poster: m.poster_path, year: (m.release_date || '').slice(0, 4), pop: m.popularity || 0, cameo: SELF_ROLE.test(m.character || '') })),
+    ...series.map((t: any) => ({ id: String(t.id), mt: 'tv' as const, title: t.name, poster: t.poster_path, year: (t.first_air_date || '').slice(0, 4), pop: t.popularity || 0, cameo: isCameo(t) })),
+].filter((x) => x.poster && !x.cameo).sort((a, b) => b.pop - a.pop).slice(0, 4);
+// 6.3 · Filmografía como lista: una fila por título (reparto y equipo fundidos), con filtros por tipo
+// (película/serie) y por papel (actor/voz/producción), y orden por peso, fecha o nota.
+const VOICE = /\(voice\)|\(voz\)/i;
+const fRows = new Map<string, FilmRow & { kindSet: Set<string> }>();
+const addRow = (mt: 'movie' | 'tv', c: any, role: string, kind: string, extra: Partial<FilmRow> = {}) => {
+    const key = `${mt}_${c.id}`;
+    const r = fRows.get(key) ?? { key, id: String(c.id), mt, title: c.title || c.name || '', poster: c.poster_path ? posterUrl(c.poster_path, 'w154') : null,
+        year: String(c.release_date || c.first_air_date || c.year || '').slice(0, 4), date: c.release_date || c.first_air_date || c.date || '',
+        roles: [] as string[], kinds: [] as string[], kindSet: new Set<string>(), vote: Number(c.vote_average) || 0, votes: Number(c.vote_count) || 0, pop: Number(c.popularity) || 0, eps: 0, cameo: false };
+    if (role && !r.roles.includes(role)) r.roles.push(role);
+    r.kindSet.add(kind);
+    Object.assign(r, extra);
+    fRows.set(key, r);
+};
+// «Captain Gutt (voz)»: la marca de doblaje va junto a su personaje, no al final de la línea.
+const roleOf = (ch: string) => { const c = String(ch || '').replace(VOICE, '').trim(); return VOICE.test(ch || '') ? (c ? `${c} (voz)` : 'Voz') : c; };
+for (const m of movies as any[]) addRow('movie', m, roleOf(m.character), VOICE.test(m.character || '') ? 'voz' : 'actor', { cameo: SELF_ROLE.test(m.character || '') });
+for (const t of series as any[]) {
+    const n = Number(t.episode_count) || 0;
+    addRow('tv', t, roleOf(t.character), VOICE.test(t.character || '') ? 'voz' : 'actor', { eps: n, cameo: isCameo(t) });
+}
+for (const c of crewCredits) addRow(c.media_type, c, JOB_LABELS[c.job] || c.job, 'prod');
+const filmSort = Astro.url.searchParams.get('sort') || 'peso';
+const fmtDate = (d: string) => new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: 'short', day: 'numeric' });
+const SOCIAL_LINKS: [string, string | null | undefined][] = [
+    ['IMDb', actorInfo.redes?.imdb], ['Wikipedia', actorInfo.redes?.wikipedia], ['Wikidata', actorInfo.redes?.wikidata],
+    ['Instagram', actorInfo.redes?.instagram], ['X (Twitter)', actorInfo.redes?.twitter], ['Facebook', actorInfo.redes?.facebook],
+    ['TikTok', actorInfo.redes?.tiktok], ['YouTube', actorInfo.redes?.youtube], ['Web', actorInfo.homepage],
+];
 
 // Stats calculadas de la filmografía
 const allProductions = [...movies, ...series];
@@ -175,6 +183,8 @@ if (Astro.locals.user) {
     } catch { /* sin biblioteca → sin caja */ }
 }
 const seenWithActorCount = seenWithActor.length;
+const seenKeys = new Set(seenWithActor.map((t) => `${t.media_type}_${t.id}`));
+const filmRows: FilmRow[] = [...fRows.values()].map(({ kindSet, ...r }) => ({ ...r, kinds: [...kindSet], seen: seenKeys.has(r.key) }));
 const actorFirstName = String(actorInfo.nombre || '').split(' ')[0];
 
 // JSON-LD structured data (schema.org Person)
@@ -198,235 +208,89 @@ const jsonLd = {
 >
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
     <section class="px-1 sm:py-8">
-        <!-- Header -->
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-1">{actorInfo.nombre}</h1>
-            <p class="text-gray-500 text-base">
-                {departmentEs(actorInfo.conocidoPor) || 'Interpretación'} · {totalProductions} producciones
-            </p>
-        </header>
-
-        <!-- Info card -->
-        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                {actorInfo.imagen ? (
-                    <img
-                        src={posterUrl(actorInfo.imagen, 'w185')}
-                        alt={actorInfo.nombre}
-                        class="w-28 h-28 rounded-full object-cover border-2 border-gray-200 flex-shrink-0"
-                        loading="lazy"
-                    />
-                ) : (
-                    <div class="w-28 h-28 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 border-2 border-gray-200">
-                        <svg class="w-12 h-12 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/>
-                        </svg>
-                    </div>
-                )}
-                <div class="flex-1 text-center sm:text-left">
-                    <!-- Pills de info -->
-                    <div class="flex flex-wrap justify-center sm:justify-start gap-1.5 text-xs sm:text-sm mb-3">
-                        {age && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                {actorInfo.fechaFallecimiento ? `Falleció a los ${age} años` : `${age} años`}
-                            </span>
-                        )}
-                        {actorInfo.lugarNacimiento && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{actorInfo.lugarNacimiento}</span>
-                        )}
-                        {actorInfo.fechaNacimiento && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">
-                                {new Date(actorInfo.fechaNacimiento).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </span>
-                        )}
-                        {actorInfo.fechaFallecimiento && (
-                            <span class="px-2 py-0.5 bg-gray-800 text-white rounded-full">
-                                † {new Date(actorInfo.fechaFallecimiento).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' })}
-                            </span>
-                        )}
-                        <span class="px-2 py-0.5 bg-red-50 text-red-600 rounded-full">{movies.length} películas</span>
-                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{series.length} series</span>
-                        {actorInfo.popularidad && (
-                            <span class="px-2 py-0.5 bg-yellow-50 text-yellow-700 rounded-full">Pop. {actorInfo.popularidad.toFixed(0)}</span>
-                        )}
-                        {avgRating && (
-                            <span class="px-2 py-0.5 bg-orange-50 text-orange-700 rounded-full">Nota media {avgRating.toFixed(1)}</span>
-                        )}
-                        {career && (
-                            <span class="px-2 py-0.5 bg-green-50 text-green-700 rounded-full" title="Rango de años de su filmografía según TMDB">
-                                {career.start === career.end ? `En activo en ${career.start}` : `En activo ${career.start} – ${career.end}`}
-                            </span>
-                        )}
-                    </div>
-
-                    <!-- Mejor película -->
-                    {bestMovie && (
-                        <div class="flex items-center gap-2 mb-3">
-                            <span class="text-xs sm:text-sm text-gray-400">Mejor valorada:</span>
-                            <a href={`/movie/${bestMovie.id}`} class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-2 py-1 hover:bg-gray-100 transition-colors">
-                                {bestMovie.poster_path && (
-                                    <img src={posterUrl(bestMovie.poster_path, 'w92')} alt="" class="w-5 h-7 rounded object-cover" />
-                                )}
-                                <span class="truncate max-w-[200px]">{bestMovie.title}</span>
-                                <span class="text-yellow-600 font-semibold">{bestMovie.vote_average.toFixed(1)}</span>
-                            </a>
-                        </div>
-                    )}
-
-                    <!-- Top géneros -->
-                    {topGenres.length > 0 && (
-                        <div class="flex flex-wrap justify-center sm:justify-start gap-1 text-xs sm:text-sm mb-3">
-                            {topGenres.map(genre => (
-                                <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full">{genre}</span>
-                            ))}
-                        </div>
-                    )}
-
-                    <!-- Redes sociales -->
-                    {hasSocial && (
-                        <div class="flex flex-wrap justify-center sm:justify-start gap-2 mb-3">
-                            {actorInfo.redes.imdb && (
-                                <a href={actorInfo.redes.imdb} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-yellow-50 text-yellow-800 rounded-lg hover:bg-yellow-100 transition-colors">IMDb</a>
-                            )}
-                            {actorInfo.redes.wikipedia && (
-                                <a href={actorInfo.redes.wikipedia} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors">Wikipedia</a>
-                            )}
-                            {actorInfo.redes.wikidata && (
-                                <a href={actorInfo.redes.wikidata} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 transition-colors">Wikidata</a>
-                            )}
-                            {actorInfo.redes.instagram && (
-                                <a href={actorInfo.redes.instagram} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-pink-50 text-pink-700 rounded-lg hover:bg-pink-100 transition-colors">Instagram</a>
-                            )}
-                            {actorInfo.redes.twitter && (
-                                <a href={actorInfo.redes.twitter} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-sky-50 text-sky-700 rounded-lg hover:bg-sky-100 transition-colors">Twitter</a>
-                            )}
-                            {actorInfo.redes.facebook && (
-                                <a href={actorInfo.redes.facebook} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors">Facebook</a>
-                            )}
-                            {actorInfo.redes.tiktok && (
-                                <a href={actorInfo.redes.tiktok} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">TikTok</a>
-                            )}
-                            {actorInfo.redes.youtube && (
-                                <a href={actorInfo.redes.youtube} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">YouTube</a>
-                            )}
-                            {actorInfo.homepage && (
-                                <a href={actorInfo.homepage} target="_blank" rel="noopener noreferrer"
-                                   class="px-2.5 py-1 text-xs sm:text-sm font-medium bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors">Web</a>
-                            )}
-                        </div>
-                    )}
-
-                    <!-- Alias -->
-                    {actorInfo.alias && actorInfo.alias.length > 0 && (
-                        <details class="text-xs mb-3">
-                            <summary class="cursor-pointer text-gray-400 hover:text-gray-600">
-                                También conocido como ({actorInfo.alias.length})
-                            </summary>
-                            <div class="flex flex-wrap gap-1 mt-1.5">
-                                {actorInfo.alias.map((a: string) => (
-                                    <span class="px-2 py-0.5 bg-gray-50 text-gray-500 rounded-full">{a}</span>
-                                ))}
-                            </div>
-                        </details>
-                    )}
-
-                    <!-- Biografía -->
-                    {actorInfo.biografia && (
-                        <details class="text-sm">
-                            <summary class="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">
-                                Biografía
-                            </summary>
-                            <p class="mt-2 text-gray-600 leading-relaxed whitespace-pre-line">{actorInfo.biografia}</p>
-                        </details>
-                    )}
-                </div>
+        {/* 6.1 · Cabecera tipo ficha (README del handoff, P7): foto, nombre, línea de datos, acciones y «Conocido por». */}
+        <header class="ahd">
+            <div class="ahd-ph">
+                {actorInfo.imagen
+                    ? <img src={posterUrl(actorInfo.imagen, 'w342')} alt={actorInfo.nombre} />
+                    : <span aria-hidden="true">{String(actorInfo.nombre || '?').split(' ').map((w: string) => w[0]).slice(0, 2).join('')}</span>}
             </div>
-        </div>
-
-        <!-- Favoritos -->
-        <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-            {!isInFavorites ? (
-                <form method="POST" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <input type="hidden" name="actor_id" value={actor} />
-                    <input type="hidden" name="action" value="add" />
-                    <input
-                        type="number"
-                        name="custom_position"
-                        min="1"
-                        placeholder={`Posición (1-${totalActorsFavorites + 1})`}
-                        class="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                    />
-                    <button type="submit"
-                        class="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors">
-                        Añadir a favoritos
-                    </button>
-                </form>
-            ) : (
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                    <span class="text-sm font-medium text-gray-600">Favorito #{currentPosition}</span>
-                    <form method="POST" class="flex items-center gap-2 flex-1 sm:flex-none">
-                        <input type="hidden" name="actor_id" value={actor} />
-                        <input type="hidden" name="action" value="update" />
-                        <input
-                            type="number"
-                            name="custom_position"
-                            min="1"
-                            max={totalActorsFavorites}
-                            value={currentPosition}
-                            required
-                            class="w-20 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400"
-                        />
-                        <button type="submit"
-                            class="px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 transition-colors">
-                            Mover
-                        </button>
-                    </form>
-                    <form method="POST" class="sm:ml-auto">
-                        <input type="hidden" name="actor_id" value={actor} />
-                        <input type="hidden" name="action" value="remove" />
-                        <button type="submit"
-                            class="w-full sm:w-auto px-3 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                            Quitar de favoritos
-                        </button>
-                    </form>
-                </div>
-            )}
-        </div>
-
-        <!-- Avisos de estrenos: seguir a la persona (handoff v2 §③) -->
-        <div class="bg-white rounded-xl border border-gray-200 p-4 mb-6">
-            <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-gray-800">Avisos de estrenos</p>
-                    <p class="text-xs text-gray-500">
-                        {isFollowingPerson
-                            ? 'Sus próximos estrenos aparecen en tu calendario.'
-                            : `Activa los avisos y los estrenos de ${actorInfo.nombre} aparecerán en tu calendario.`}
-                    </p>
-                </div>
-                <div class="flex flex-wrap gap-2">
+            <div class="ahd-tx">
+                <h1>{actorInfo.nombre}</h1>
+                <p class="ahd-m">
+                    {departmentEs(actorInfo.conocidoPor) || 'Interpretación'}
+                    {age && <> · {actorInfo.fechaFallecimiento ? `falleció a los ${age} años` : `${age} años`}</>}
+                    {actorInfo.lugarNacimiento && <> · {actorInfo.lugarNacimiento}</>}
+                </p>
+                <div class="ahd-acts">
                     <FollowPersonButton personId={actor} name={actorInfo.nombre} profilePath={actorInfo.imagen} isFollowing={isFollowingPerson} />
-                    {/* F4 social: recomendar esta persona a un amigo (misma talla que el botón de avisos). */}
+                    {/* Favoritos (Mis listas → Actores, posición 1–8): el botón despliega la posición */}
+                    <details class="ahd-fav">
+                        <summary class="btn" data-tone="fav" aria-pressed={isInFavorites ? 'true' : 'false'}>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z"/><path d="M5 21h14"/></svg>
+                            {isInFavorites ? `Favorito n.º ${currentPosition}` : 'Añadir a favoritos'}
+                        </summary>
+                        <div class="ahd-favp">
+                            {!isInFavorites ? (
+                                <form method="POST">
+                                    <input type="hidden" name="actor_id" value={actor} />
+                                    <input type="hidden" name="action" value="add" />
+                                    <label>Posición <small>(opcional, 1–{totalActorsFavorites + 1})</small>
+                                        <input type="number" name="custom_position" min="1" max={totalActorsFavorites + 1} placeholder={String(totalActorsFavorites + 1)} />
+                                    </label>
+                                    <button type="submit" class="btn btn--sm">Añadir</button>
+                                </form>
+                            ) : (
+                                <>
+                                    <form method="POST">
+                                        <input type="hidden" name="actor_id" value={actor} />
+                                        <input type="hidden" name="action" value="update" />
+                                        <label>Posición <small>(1–{totalActorsFavorites})</small>
+                                            <input type="number" name="custom_position" min="1" max={totalActorsFavorites} value={currentPosition} required />
+                                        </label>
+                                        <button type="submit" class="btn btn--sm">Mover</button>
+                                    </form>
+                                    <form method="POST">
+                                        <input type="hidden" name="actor_id" value={actor} />
+                                        <input type="hidden" name="action" value="remove" />
+                                        <button type="submit" class="btn btn--sm btn--dgr">Quitar de favoritos</button>
+                                    </form>
+                                </>
+                            )}
+                        </div>
+                    </details>
                     {SOCIAL_PHASE.recommend && Astro.locals.user && (
-                        <button type="button" class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-white text-gray-700 border border-gray-300 hover:border-gray-400"
-                                data-recommend data-target-type="person" data-target-id={actor} data-title={actorInfo.nombre} data-image={actorInfo.imagen} aria-haspopup="dialog" aria-expanded="false">
-                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                        <button type="button" class="btn btn--ghost" data-recommend data-target-type="person" data-target-id={actor} data-title={actorInfo.nombre} data-image={actorInfo.imagen} aria-haspopup="dialog" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                             Recomendar
                         </button>
                     )}
                 </div>
+                <p class="ahd-note">{isFollowingPerson ? 'Sus próximos estrenos aparecen en tu calendario.' : `Con los avisos, los estrenos de ${actorFirstName} aparecen en tu calendario.`}</p>
             </div>
+            {knownFor.length > 0 && (
+                <div class="ahd-kn">
+                    <p class="ahd-k">Conocido por</p>
+                    <div class="ahd-kng">
+                        {knownFor.map((k) => (
+                            <a href={k.mt === 'movie' ? `/movie/${k.id}` : `/serie/${k.id}`} class="ahd-kc" title={k.title}>
+                                <img src={posterUrl(k.poster, 'w185')} alt="" loading="lazy" />
+                                <b>{k.title}</b>
+                                {k.year && <span>{k.year}</span>}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </header>
 
+        <div class="acols">
+            <div class="acols-main">
+                {/* Próximos estrenos (con avisos activados) */}
+                {isFollowingPerson && (
+                    <div class="fcard">
             {isFollowingPerson && personUpcoming.length > 0 && (
-                <div class="mt-4 pt-3 border-t border-gray-100">
+                <div>
                     <p class="font-mono text-[10px] tracking-[.12em] text-gray-400 font-semibold mb-1">TE AVISAREMOS DE · PRÓXIMOS ESTRENOS</p>
                     {personUpcoming.map((u, i) => (
                         <a href={u.media_type === 'movie' ? `/movie/${u.id}` : `/serie/${u.id}`}
@@ -456,26 +320,94 @@ const jsonLd = {
             {isFollowingPerson && personUpcoming.length === 0 && (
                 <p class="mt-3 text-xs text-gray-500">Ahora mismo no tiene estrenos anunciados — aparecerán aquí y en el calendario cuando los haya.</p>
             )}
-        </div>
+                    </div>
+                )}
 
-        <!-- Galería -->
-        {posters.length > 0 && (
-            <details class="bg-white rounded-xl border border-gray-200 mb-6">
-                <summary class="p-4 cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900 flex items-center justify-between">
-                    <span>Galería ({posters.length} imágenes)</span>
-                    <svg class="w-5 h-5 text-gray-400 transition-transform [details[open]>&]:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </summary>
-                <div class="px-4 pb-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
-                    {posters.map((poster, index) => (
-                        <a href={`#img-${index}`} class="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity">
-                            <img src={poster.file_path} alt={`${actorInfo.nombre} - Imagen ${index + 1}`} loading="lazy" class="w-full aspect-[2/3] object-cover" />
-                        </a>
-                    ))}
+                {/* Tu historia con esta persona (§6 detalles con alma) */}
+                {seenWithActorCount > 0 && (
+                    <section>
+                        <div class="fsec-h"><h2>Tu historia con {actorFirstName}</h2><span class="n">{seenWithActorCount} {seenWithActorCount === 1 ? 'visto' : 'vistos'}</span></div>
+                        <div class="ahist">
+                            {seenWithActor.slice(0, 12).map((t) => (
+                                <a href={t.media_type === 'movie' ? `/movie/${t.id}` : `/serie/${t.id}`} title={t.title}>
+                                    {t.poster_path
+                                        ? <img src={posterUrl(t.poster_path, 'w154')} alt="" loading="lazy" />
+                                        : <span class="ahist-ph">Sin póster</span>}
+                                    <b>{t.title}</b>
+                                </a>
+                            ))}
+                        </div>
+                    </section>
+                )}
+
+                {/* Biografía, plegable */}
+                {actorInfo.biografia && (
+                    <section>
+                        <div class="fsec-h"><h2>Biografía</h2></div>
+                        <details class="abio">
+                            <summary><p>{actorInfo.biografia}</p><span class="abio-more">Leer más</span></summary>
+                        </details>
+                    </section>
+                )}
+
+        {/* 6.3 · Filmografía: una lista (antes, dos rejillas de pósters y el equipo aparte) */}
+        <FilmographyList rows={filmRows} filters={[['actor', 'Actor'], ['voz', 'Voz'], ['prod', 'Producción']]} sort={filmSort} />
+
+        <div class="space-y-10">
+            <!-- Doblajes (lazy, eldoblaje.com — solo si el actor es doblador) -->
+            <ActorDubbingSection tmdbId={actor} name={actorInfo.nombre} />
+        </div>
+            </div>
+
+            {/* Columna lateral: datos, fotos y «En películas y eventos» */}
+            <aside class="acols-side">
+                <div class="fcard">
+                    <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Datos</h3>
+                    <dl class="fdl">
+                        {actorInfo.fechaNacimiento && (<><dt>Nacimiento</dt><dd>{fmtDate(actorInfo.fechaNacimiento)}{age && !actorInfo.fechaFallecimiento && <small> · {age} años</small>}</dd></>)}
+                        {actorInfo.fechaFallecimiento && (<><dt>Fallecimiento</dt><dd>{fmtDate(actorInfo.fechaFallecimiento)}{age && <small> · a los {age} años</small>}</dd></>)}
+                        {actorInfo.lugarNacimiento && (<><dt>Lugar</dt><dd>{actorInfo.lugarNacimiento}</dd></>)}
+                        <dt>Trabajos</dt><dd>{movies.length} {movies.length === 1 ? 'película' : 'películas'} · {series.length} {series.length === 1 ? 'serie' : 'series'}</dd>
+                        {avgRating && (<><dt>Nota media</dt><dd>{avgRating.toFixed(1).replace('.', ',')}</dd></>)}
+                        {career && (<><dt>En activo</dt><dd>{career.start === career.end ? career.start : `${career.start}–${career.end}`}</dd></>)}
+                        {bestMovie && (<><dt>Mejor valorada</dt><dd><a href={`/movie/${bestMovie.id}`}>{bestMovie.title}</a> <small>· ★ {bestMovie.vote_average.toFixed(1).replace('.', ',')}</small></dd></>)}
+                        {topGenres.length > 0 && (<><dt>Géneros</dt><dd>{topGenres.join(', ')}</dd></>)}
+                        {actorInfo.popularidad && (<><dt>Popularidad</dt><dd>{actorInfo.popularidad.toFixed(0)}</dd></>)}
+                        {actorInfo.alias && actorInfo.alias.length > 0 && (<><dt>También como</dt><dd>{actorInfo.alias.join(' · ')}</dd></>)}
+                    </dl>
+                    {SOCIAL_LINKS.some(([, u]) => u) && (
+                        <div class="clinks">
+                            {SOCIAL_LINKS.filter(([, u]) => u).map(([label, u]) => (
+                                <a href={u!} target="_blank" rel="noopener noreferrer" class="btn btn--sm">{label}</a>
+                            ))}
+                        </div>
+                    )}
                 </div>
-            </details>
-        )}
+
+                {posters.length > 0 && (
+                    <details class="cdet">
+                        <summary>Fotos<span class="n">{posters.length}</span><svg class="cdet-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                        <div class="cdet-b agal">
+                            {posters.map((poster, index) => (
+                                <a href={`#img-${index}`}><img src={poster.file_path} alt={`${actorInfo.nombre} - Imagen ${index + 1}`} loading="lazy" /></a>
+                            ))}
+                        </div>
+                    </details>
+                )}
+                {taggedImages.length > 0 && (
+                    <details class="cdet">
+                        <summary>En películas y eventos<span class="n">{taggedImages.length}</span><svg class="cdet-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+                        <div class="cdet-b agal agal--wide">
+                            {taggedImages.map((img, index) => (
+                                <a href={`#tagged-${index}`} title={img.media?.title || img.media?.name || ''}>
+                                    <img src={img.file_path} alt={img.media?.title || img.media?.name || `Imagen ${index + 1}`} loading="lazy" />
+                                </a>
+                            ))}
+                        </div>
+                    </details>
+                )}
+            </aside>
+        </div>
 
         <!-- Lightbox modales (CSS :target) -->
         {posters.map((poster, index) => (
@@ -497,30 +429,6 @@ const jsonLd = {
             </div>
         ))}
 
-        <!-- Tagged images (fotos en películas/eventos) -->
-        {taggedImages.length > 0 && (
-            <details class="bg-white rounded-xl border border-gray-200 mb-6">
-                <summary class="p-4 cursor-pointer text-sm font-semibold text-gray-700 hover:text-gray-900 flex items-center justify-between">
-                    <span>En películas y eventos ({taggedImages.length})</span>
-                    <svg class="w-5 h-5 text-gray-400 transition-transform [details[open]>&]:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                    </svg>
-                </summary>
-                <div class="px-4 pb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-                    {taggedImages.map((img, index) => (
-                        <a href={`#tagged-${index}`} class="block rounded-lg overflow-hidden hover:opacity-80 transition-opacity relative group">
-                            <img src={img.file_path} alt={img.media?.title || img.media?.name || `Imagen ${index + 1}`} loading="lazy" class="w-full aspect-video object-cover" />
-                            {img.media && (img.media.title || img.media.name) && (
-                                <span class="absolute bottom-0 left-0 right-0 px-2 py-1 text-[10px] text-white bg-black/60 truncate">
-                                    {img.media.title || img.media.name}
-                                </span>
-                            )}
-                        </a>
-                    ))}
-                </div>
-            </details>
-        )}
-
         <!-- Lightbox tagged images -->
         {taggedImages.map((img, index) => (
             <div id={`tagged-${index}`} class="lightbox fixed inset-0 items-center justify-center bg-black/80 p-4" style="z-index: 9999;">
@@ -540,173 +448,5 @@ const jsonLd = {
                 )}
             </div>
         ))}
-
-        <!-- Tu historia con esta persona (§6 detalles con alma) -->
-        {seenWithActorCount > 0 && (
-            <div class="mb-6 rounded-xl border border-gray-200 bg-gray-50 p-4 sm:p-5">
-                <div class="flex items-center gap-2 mb-2">
-                    <svg class="w-4 h-4 text-[#E63946] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
-                    <h2 class="text-sm sm:text-base font-semibold text-gray-800">Tu historia con {actorFirstName}</h2>
-                </div>
-                <p class="text-sm text-gray-600 mb-3">
-                    Has visto <strong class="text-gray-900">{seenWithActorCount}</strong> {seenWithActorCount === 1 ? 'título' : 'títulos'} con {actorFirstName}.
-                </p>
-                <div class="flex gap-2 overflow-x-auto pb-1">
-                    {seenWithActor.slice(0, 12).map((t) => (
-                        <a href={t.media_type === 'movie' ? `/movie/${t.id}` : `/serie/${t.id}`} class="flex-shrink-0" title={t.title}>
-                            {t.poster_path ? (
-                                <img src={posterUrl(t.poster_path, 'w92')} alt={t.title} class="w-12 h-[72px] rounded-md object-cover border border-gray-200" loading="lazy"/>
-                            ) : (
-                                <span class="w-12 h-[72px] rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-300 text-[9px]">Sin póster</span>
-                            )}
-                        </a>
-                    ))}
-                </div>
-            </div>
-        )}
-
-        <!-- Navegación rápida -->
-        <div class="flex flex-wrap gap-2 mb-4">
-            {movies.length > 0 && (
-                <a href="#peliculas" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    Películas ({movies.length})
-                </a>
-            )}
-            {series.length > 0 && (
-                <a href="#series" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    Series ({series.length})
-                </a>
-            )}
-        </div>
-
-        <!-- Ordenación -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-            <h2 class="text-lg font-semibold text-gray-800">Filmografía ({totalProductions})</h2>
-            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
-                <a href="?sort=quality"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'quality' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Mejor Valoradas
-                </a>
-                <a href="?sort=popularity"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'popularity' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Populares
-                </a>
-                <a href="?sort=date"
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'date' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Recientes
-                </a>
-            </div>
-        </div>
-
-        <div class="space-y-10">
-            <!-- Películas -->
-            <section id="peliculas" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                    Películas
-                    <span class="text-sm font-normal text-gray-400">({movies.length})</span>
-                </h3>
-
-                {movies.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron películas" />
-                )}
-                {movies.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {moviesSorted.map((item) => (
-                            <CardMovie
-                                id={item.id.toString()}
-                                img={item.poster_path ? posterUrl(item.poster_path) : "/placeholder.jpg"}
-                                title={item.title}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                release_date={item.release_date}
-                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                character={item.character}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <!-- Series -->
-            <section id="series" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                    Series
-                    <span class="text-sm font-normal text-gray-400">({series.length})</span>
-                </h3>
-
-                {series.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron series" />
-                )}
-                {series.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {seriesSorted.map((item) => (
-                            <CardSerie
-                                id={item.id.toString()}
-                                img={item.poster_path ? posterUrl(item.poster_path) : "/placeholder.jpg"}
-                                name={item.name}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                first_air_date={item.first_air_date}
-                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                                character={characterWithEpisodes(item)}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <!-- C18: Créditos de crew (Director, Productor, Guionista...) -->
-            {crewSections.length > 0 && (
-                <details class="group bg-purple-50/40 rounded-xl border border-purple-200">
-                    <summary class="flex items-center justify-between gap-3 p-4 cursor-pointer">
-                        <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-purple-500 rounded-full"></span>
-                            También como director, productor o guionista
-                            <span class="text-sm font-normal text-gray-400">({crewCredits.length})</span>
-                        </h3>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform group-open:rotate-180 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                        </svg>
-                    </summary>
-                    <div class="px-4 pb-4 space-y-5">
-                        {crewSections.map(({ job, label, credits: items }) => (
-                            <div>
-                                <h4 class="text-sm font-semibold text-purple-700 mb-2 flex items-center gap-1.5">
-                                    <span class="w-1 h-4 bg-purple-500 rounded-full"></span>
-                                    {label}
-                                    <span class="text-xs font-normal text-gray-400">({items.length})</span>
-                                </h4>
-                                <div class="flex gap-2.5 overflow-x-auto pb-2 snap-x">
-                                    {items.map((c) => (
-                                        <a href={c.media_type === 'movie' ? `/movie/${c.id}` : `/serie/${c.id}`} class="snap-start flex-shrink-0 w-24 group/prod">
-                                            <div class="relative rounded-lg overflow-hidden shadow-sm group-hover/prod:shadow-md transition-shadow">
-                                                {c.poster_path ? (
-                                                    <img src={posterUrl(c.poster_path, 'w185') || ''} alt={c.title} class="w-full h-36 object-cover" loading="lazy"/>
-                                                ) : (
-                                                    <div class="w-full h-36 bg-gray-200 flex items-center justify-center text-gray-400 text-3xl">{c.media_type === 'movie' ? '🎬' : '📺'}</div>
-                                                )}
-                                                {c.vote_average > 0 && (
-                                                    <span class="absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 bg-black/60 text-yellow-400 rounded">⭐ {c.vote_average.toFixed(1)}</span>
-                                                )}
-                                                <span class={`absolute top-1 left-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${c.media_type === 'movie' ? 'bg-red-500' : 'bg-blue-500'} text-white`}>{c.media_type === 'movie' ? 'Peli' : 'Serie'}</span>
-                                            </div>
-                                            <p class="mt-1 text-xs text-gray-700 line-clamp-2 leading-tight font-medium">{c.title}</p>
-                                            {c.year && <p class="text-[10px] text-gray-400">{c.year}</p>}
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </details>
-            )}
-
-            <!-- Doblajes (lazy, eldoblaje.com — solo si el actor es doblador) -->
-            <ActorDubbingSection tmdbId={actor} name={actorInfo.nombre} />
-        </div>
     </section>
 </Layout>

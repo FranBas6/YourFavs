@@ -1,32 +1,36 @@
 ---
+/**
+ * Productora — rediseño, Fase 6 · 6.4: mismo esquema que actor y equipo. Cabecera con el logo, nombre,
+ * «Productora · Estados Unidos · Burbank», Recomendar y «Conocido por»; dos columnas: «Acerca de» plegable
+ * y la filmografía en lista; al lado, Datos (antes, tres tarjetas con emojis y barras naranjas: los
+ * mismos datos — géneros, década más activa, nota media, mejor película y serie — en lista sobria).
+ */
 import Layout from "../../layouts/Layout.astro";
 import { getMoviesAndSeriesByCompanyName } from "../../services/API/Productora/InfoProductora";
-import CardMovie from "../../components/Cards/CardMovie.astro";
-import CardSerie from "../../components/Cards/CardSerie.astro";
 import { getGenreName } from "../../utils/constants/genres";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
-import EmptyState from "../../components/EmptyState.astro";
-import { Icon } from "astro-icon/components";
 import { SOCIAL_PHASE } from "../../utils/constants/social";
+import { seenKeySet } from "../../utils/seenKeys";
+import FilmographyList, { type FilmRow } from "../../components/person/FilmographyList.astro";
+import '../../styles/shared/detail-common.css';
+import '../../styles/pages/actor/actor.css';
 
 const { name } = Astro.params;
 const { searchParams } = Astro.url;
-const sortBy = searchParams.get('sort') || 'quality';
 const companyIdParam = searchParams.get('companyId');
 
 if (!name) {
     throw new Error("Nombre de la productora no encontrado en la URL");
 }
 
-const {
-    success,
-    companyInfo,
-    movies,
-    series,
-    error
-} = await getMoviesAndSeriesByCompanyName(
+// Orden de la lista (los enlaces viejos ?sort=quality|popularity|date siguen valiendo).
+const OLD_SORT: Record<string, string> = { quality: 'nota', popularity: 'peso', date: 'fecha' };
+const rawSort = searchParams.get('sort') || 'peso';
+const filmSort = OLD_SORT[rawSort] || rawSort;
+
+const { success, companyInfo, movies, series, error } = await getMoviesAndSeriesByCompanyName(
     name,
-    sortBy,
+    'quality',
     undefined,
     companyIdParam ? parseInt(companyIdParam, 10) : undefined
 );
@@ -35,281 +39,134 @@ if (!success) {
     throw new Error(error || "Error al obtener información de la productora");
 }
 
-const totalWorks = movies.length + series.length;
+const displayName = companyInfo?.name || name;
 // F4 social: la productora se recomienda por su id de TMDB (la ruta va por nombre).
 const companyId = Number(companyInfo?.id ?? companyIdParam) || null;
-const sortUrl = (sort: string) => companyIdParam ? `?sort=${sort}&companyId=${companyIdParam}` : `?sort=${sort}`;
+const seen = await seenKeySet(!!Astro.locals.user);
+const countryName = (() => {
+    const cc = companyInfo?.origin_country;
+    if (!cc) return '';
+    try { return new Intl.DisplayNames(['es'], { type: 'region' }).of(cc) || cc; } catch { return cc; }
+})();
 
-// C22 — Stats analíticas (cálculo cliente sobre los arrays ya cargados)
-const allWorks: { vote_average: number; date?: string; genre_ids?: number[] }[] = [
-    ...movies.map((m: any) => ({ vote_average: m.vote_average, date: m.release_date, genre_ids: m.genre_ids })),
-    ...series.map((s: any) => ({ vote_average: s.vote_average, date: s.first_air_date, genre_ids: s.genre_ids })),
-];
+const toRow = (p: any, mt: 'movie' | 'tv'): FilmRow => {
+    const date = (mt === 'movie' ? p.release_date : p.first_air_date) || '';
+    return {
+        key: `${mt}_${p.id}`, id: String(p.id), mt, title: (mt === 'movie' ? p.title : p.name) || '',
+        poster: p.poster_path ? String(p.poster_path).replace('/w500/', '/w154/') : null,
+        year: date.slice(0, 4), date,
+        roles: (p.genre_ids || []).slice(0, 2).map((g: number) => getGenreName(g)).filter(Boolean),
+        kinds: [],
+        vote: Number(p.vote_average) || 0, votes: Number(p.vote_count) || 0, pop: Number(p.popularity) || 0,
+        seen: seen.has(`${mt}_${p.id}`),
+    };
+};
+const filmRows = [...movies.map((m) => toRow(m, 'movie')), ...series.map((s) => toRow(s, 'tv'))];
+const knownFor = [...filmRows].filter((r) => r.poster).sort((a, b) => (b.votes + 5 * b.pop) - (a.votes + 5 * a.pop)).slice(0, 4);
 
-// Géneros: histograma top 5
+// Datos (C22): géneros más producidos, década más activa, nota media y mejores.
 const genreHistogram: Record<number, number> = {};
-for (const w of allWorks) for (const g of (w.genre_ids || [])) genreHistogram[g] = (genreHistogram[g] || 0) + 1;
-const topGenresProduced = Object.entries(genreHistogram)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([id, count]) => ({ id: Number(id), name: getGenreName(Number(id)), count }));
-const maxGenreCount = topGenresProduced.length > 0 ? topGenresProduced[0].count : 0;
-
-// Década más activa
+for (const p of [...movies, ...series] as any[]) for (const g of p.genre_ids || []) genreHistogram[g] = (genreHistogram[g] || 0) + 1;
+const topGenres = Object.entries(genreHistogram).sort(([, a], [, b]) => b - a).slice(0, 5)
+    .map(([id, count]) => ({ name: getGenreName(Number(id)), count })).filter((g) => g.name);
 const decadeHistogram: Record<string, number> = {};
-for (const w of allWorks) {
-    if (!w.date) continue;
-    const y = Number(String(w.date).slice(0, 4));
+for (const r of filmRows) {
+    const y = Number(r.year);
     if (!y || y < 1900) continue;
     const dec = `${Math.floor(y / 10) * 10}s`;
     decadeHistogram[dec] = (decadeHistogram[dec] || 0) + 1;
 }
 const topDecade = Object.entries(decadeHistogram).sort(([, a], [, b]) => b - a)[0] || null;
-
-// Nota media (solo items con voto > 0)
-const ratedWorks = allWorks.filter(w => w.vote_average > 0);
-const avgRating = ratedWorks.length > 0
-    ? ratedWorks.reduce((sum, w) => sum + w.vote_average, 0) / ratedWorks.length
-    : null;
-
-// Mejor película + mejor serie
-const bestMovie = movies.length > 0
-    ? [...movies].sort((a: any, b: any) => b.vote_average - a.vote_average)[0]
-    : null;
-const bestSerie = series.length > 0
-    ? [...series].sort((a: any, b: any) => b.vote_average - a.vote_average)[0]
-    : null;
-
-const showStats = topGenresProduced.length > 0 || topDecade !== null || avgRating !== null || bestMovie || bestSerie;
+const years = filmRows.map((r) => Number(r.year)).filter((y) => y >= 1900 && y <= new Date().getFullYear() + 1);
+const active = years.length ? { start: Math.min(...years), end: Math.max(...years) } : null;
+const rated = filmRows.filter((r) => r.vote > 0);
+const avgRating = rated.length ? rated.reduce((s, r) => s + r.vote, 0) / rated.length : null;
+// «Mejor»: con al menos 100 votos (si no, una con 3 votos y un 8,9 gana a todo); si ninguna llega, cualquiera.
+const bestOf = (mt: 'movie' | 'tv') => {
+    const pool = filmRows.filter((r) => r.mt === mt && r.vote > 0);
+    const solid = pool.filter((r) => r.votes >= 100);
+    return (solid.length ? solid : pool).reduce<FilmRow | null>((b, r) => (!b || r.vote > b.vote ? r : b), null);
+};
+const bestMovie = bestOf('movie');
+const bestSerie = bestOf('tv');
+const logo = companyInfo?.logo_path ? posterUrl(companyInfo.logo_path, 'w300') : null;
+const keepQuery = companyIdParam ? `companyId=${companyIdParam}` : '';
 ---
-<Layout title={`${name}`}>
+<Layout title={displayName} description={companyInfo?.description ? String(companyInfo.description).slice(0, 200) : undefined}>
     <section class="px-1 sm:py-8">
-        <!-- Header -->
-        <header class="mb-6">
-            <div class="flex items-center gap-3 flex-wrap mb-1">
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">{name}</h1>
+        <header class="ahd">
+            <div class="ahd-ph ahd-ph--logo dark-logo-chip">
+                {logo
+                    ? <img src={logo} alt={displayName} />
+                    : <span aria-hidden="true">{String(displayName).split(' ').map((w: string) => w[0]).slice(0, 2).join('')}</span>}
+            </div>
+            <div class="ahd-tx">
+                <h1>{displayName}</h1>
+                <p class="ahd-m">
+                    Productora
+                    {countryName && <> · {countryName}</>}
+                    {companyInfo?.headquarters && <> · {companyInfo.headquarters}</>}
+                </p>
                 {SOCIAL_PHASE.recommend && Astro.locals.user && companyId && (
-                    <button type="button" class="pf-btn sm" data-recommend data-target-type="company" data-target-id={companyId} data-title={name} data-image={companyInfo?.logo_path ?? ''} aria-haspopup="dialog" aria-expanded="false">
-                        <Icon name="lucide:send" />Recomendar
-                    </button>
+                    <div class="ahd-acts">
+                        <button type="button" class="btn btn--ghost" data-recommend data-target-type="company" data-target-id={companyId} data-title={displayName} data-image={companyInfo?.logo_path ?? ''} aria-haspopup="dialog" aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                            Recomendar
+                        </button>
+                    </div>
                 )}
             </div>
-            <p class="text-gray-500 text-base">Productora · {totalWorks} producciones</p>
+            {knownFor.length > 0 && (
+                <div class="ahd-kn">
+                    <p class="ahd-k">Conocida por</p>
+                    <div class="ahd-kng">
+                        {knownFor.map((k) => (
+                            <a href={k.mt === 'movie' ? `/movie/${k.id}` : `/serie/${k.id}`} class="ahd-kc" title={k.title}>
+                                <img src={k.poster!.replace('/w154/', '/w185/')} alt="" loading="lazy" />
+                                <b>{k.title}</b>
+                                {k.year && <span>{k.year}</span>}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            )}
         </header>
 
-        <!-- Info card -->
-        <div class="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <div class="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-                {companyInfo?.logo_path && (
-                    <div class="dark-logo-chip w-28 h-28 bg-gray-50 flex items-center justify-center p-3 rounded-xl border border-gray-100 flex-shrink-0">
-                        <img
-                            src={posterUrl(companyInfo.logo_path, 'w300')}
-                            alt={name}
-                            class="max-w-full max-h-full object-contain"
-                            loading="lazy"
-                        />
-                    </div>
-                )}
-                <div class="flex-1 text-center sm:text-left">
-                    <div class="flex flex-wrap justify-center sm:justify-start gap-1.5 text-xs sm:text-sm mb-3">
-                        {companyInfo?.headquarters && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{companyInfo.headquarters}</span>
-                        )}
-                        {companyInfo?.origin_country && (
-                            <span class="px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">{companyInfo.origin_country}</span>
-                        )}
-                        <span class="px-2 py-0.5 bg-red-50 text-red-600 rounded-full">{movies.length} películas</span>
-                        <span class="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full">{series.length} series</span>
-                        {companyInfo?.parent_company && (
-                            <span class="px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full">
-                                Parte de {companyInfo.parent_company.name}
-                            </span>
-                        )}
-                    </div>
-
-                    {/* Descripción */}
-                    {companyInfo?.description && (
-                        <details class="text-sm">
-                            <summary class="cursor-pointer text-gray-500 hover:text-gray-700 font-medium">
-                                Acerca de la productora
-                            </summary>
-                            <p class="mt-2 text-gray-600 leading-relaxed">{companyInfo.description}</p>
+        <div class="acols">
+            <div class="acols-main">
+                {companyInfo?.description && (
+                    <section>
+                        <div class="fsec-h"><h2>Acerca de la productora</h2></div>
+                        <details class="abio">
+                            <summary><p>{companyInfo.description}</p><span class="abio-more">Leer más</span></summary>
                         </details>
-                    )}
-                </div>
-            </div>
-        </div>
-
-        <!-- C22: Stats analíticas -->
-        {showStats && (
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <!-- Top géneros producidos -->
-                {topGenresProduced.length > 0 && (
-                    <div class="bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                            <span class="text-base">🎭</span> Géneros más producidos
-                        </h3>
-                        <div class="space-y-2">
-                            {topGenresProduced.map((g) => (
-                                <div class="flex items-center gap-3">
-                                    <span class="text-xs font-medium text-gray-600 w-20 truncate">{g.name}</span>
-                                    <div class="flex-1 h-5 bg-gray-100 rounded overflow-hidden">
-                                        <div class="h-full bg-orange-500 rounded" style={`width: ${(g.count / maxGenreCount) * 100}%`}></div>
-                                    </div>
-                                    <span class="text-xs font-semibold text-gray-700 w-8 text-right">{g.count}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
+                    </section>
                 )}
+                <FilmographyList rows={filmRows} sort={filmSort} keepQuery={keepQuery} title="Producciones" />
+            </div>
 
-                <!-- Resumen numérico -->
-                <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-                    <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                        <span class="text-base">📊</span> Resumen
-                    </h3>
-                    {topDecade && (
-                        <div>
-                            <div class="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Década más activa</div>
-                            <div class="text-2xl font-bold text-cyan-600">{topDecade[0]}</div>
-                            <div class="text-[11px] text-gray-500">{topDecade[1]} producciones</div>
-                        </div>
-                    )}
-                    {avgRating !== null && (
-                        <div>
-                            <div class="text-[11px] uppercase tracking-wide text-gray-500 font-medium">Nota media</div>
-                            <div class="text-2xl font-bold text-yellow-600">⭐ {avgRating.toFixed(1)}</div>
-                            <div class="text-[11px] text-gray-500">{ratedWorks.length} con votos</div>
+            <aside class="acols-side">
+                <div class="fcard">
+                    <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Datos</h3>
+                    <dl class="fdl">
+                        {companyInfo?.headquarters && (<><dt>Sede</dt><dd>{companyInfo.headquarters}</dd></>)}
+                        {countryName && (<><dt>País</dt><dd>{countryName}</dd></>)}
+                        {companyInfo?.parent_company && (<><dt>Parte de</dt><dd>{companyInfo.parent_company.name}</dd></>)}
+                        <dt>Producciones</dt><dd>{movies.length} {movies.length === 1 ? 'película' : 'películas'} · {series.length} {series.length === 1 ? 'serie' : 'series'}</dd>
+                        {avgRating !== null && (<><dt>Nota media</dt><dd>{avgRating.toFixed(1).replace('.', ',')} <small>· {rated.length} con votos</small></dd></>)}
+                        {active && (<><dt>En activo</dt><dd>{active.start === active.end ? active.start : `${active.start}–${active.end}`}</dd></>)}
+                        {topDecade && (<><dt>Década más activa</dt><dd>{topDecade[0]} <small>· {topDecade[1]} producciones</small></dd></>)}
+                        {bestMovie && (<><dt>Mejor película</dt><dd><a href={`/movie/${bestMovie.id}`}>{bestMovie.title}</a> <small>· ★ {bestMovie.vote.toFixed(1).replace('.', ',')}</small></dd></>)}
+                        {bestSerie && (<><dt>Mejor serie</dt><dd><a href={`/serie/${bestSerie.id}`}>{bestSerie.title}</a> <small>· ★ {bestSerie.vote.toFixed(1).replace('.', ',')}</small></dd></>)}
+                        {topGenres.length > 0 && (<><dt>Géneros</dt><dd>{topGenres.map((g) => `${g.name} ${g.count}`).join(' · ')}</dd></>)}
+                    </dl>
+                    {companyInfo?.homepage && (
+                        <div class="clinks">
+                            <a href={companyInfo.homepage} target="_blank" rel="noopener noreferrer" class="btn btn--sm">Web</a>
                         </div>
                     )}
                 </div>
-
-                <!-- Mejores producciones -->
-                {(bestMovie || bestSerie) && (
-                    <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-                        <h3 class="text-sm font-semibold text-gray-800 uppercase tracking-wide flex items-center gap-2">
-                            <span class="text-base">🏆</span> Mejor valoradas
-                        </h3>
-                        {bestMovie && (
-                            <a href={`/movie/${bestMovie.id}`} class="flex items-center gap-2 group/best">
-                                {bestMovie.poster_path && (
-                                    <img src={bestMovie.poster_path} alt={bestMovie.title} class="w-10 h-14 rounded object-cover flex-shrink-0" loading="lazy"/>
-                                )}
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-[10px] uppercase tracking-wide text-red-600 font-bold">Película</div>
-                                    <div class="text-sm font-semibold text-gray-800 line-clamp-1 group-hover/best:text-red-600 transition">{bestMovie.title}</div>
-                                    <div class="text-xs text-yellow-600 font-semibold">⭐ {bestMovie.vote_average?.toFixed(1)}</div>
-                                </div>
-                            </a>
-                        )}
-                        {bestSerie && (
-                            <a href={`/serie/${bestSerie.id}`} class="flex items-center gap-2 group/best">
-                                {bestSerie.poster_path && (
-                                    <img src={bestSerie.poster_path} alt={bestSerie.name} class="w-10 h-14 rounded object-cover flex-shrink-0" loading="lazy"/>
-                                )}
-                                <div class="flex-1 min-w-0">
-                                    <div class="text-[10px] uppercase tracking-wide text-blue-600 font-bold">Serie</div>
-                                    <div class="text-sm font-semibold text-gray-800 line-clamp-1 group-hover/best:text-blue-600 transition">{bestSerie.name}</div>
-                                    <div class="text-xs text-yellow-600 font-semibold">⭐ {bestSerie.vote_average?.toFixed(1)}</div>
-                                </div>
-                            </a>
-                        )}
-                    </div>
-                )}
-            </div>
-        )}
-
-        <!-- Navegación rápida -->
-        <div class="flex flex-wrap gap-2 mb-4">
-            {movies.length > 0 && (
-                <a href="#peliculas" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    Películas ({movies.length})
-                </a>
-            )}
-            {series.length > 0 && (
-                <a href="#series" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                    Series ({series.length})
-                </a>
-            )}
-        </div>
-
-        <!-- Ordenación -->
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-            <h2 class="text-lg font-semibold text-gray-800">Producciones ({totalWorks})</h2>
-            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
-                <a href={sortUrl('quality')}
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'quality' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Mejor Valoradas
-                </a>
-                <a href={sortUrl('popularity')}
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'popularity' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Populares
-                </a>
-                <a href={sortUrl('date')}
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${sortBy === 'date' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
-                    Más Recientes
-                </a>
-            </div>
-        </div>
-
-        <div class="space-y-10">
-            <!-- Películas -->
-            <section id="peliculas" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                    Películas
-                    <span class="text-sm font-normal text-gray-400">({movies.length})</span>
-                </h3>
-
-                {movies.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron películas" />
-                )}
-                {movies.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {movies.map((item) => (
-                            <CardMovie
-                                id={item.id.toString()}
-                                img={item.poster_path || "/placeholder.jpg"}
-                                title={item.title}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                release_date={item.release_date}
-                                genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <!-- Series -->
-            <section id="series" class="scroll-mt-20">
-                <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                    <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                    Series
-                    <span class="text-sm font-normal text-gray-400">({series.length})</span>
-                </h3>
-
-                {series.length === 0 && (
-                    <EmptyState size="sm" title="No se encontraron series" />
-                )}
-                {series.length > 0 && (
-                    <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
-                        {series.map((item) => (
-                            <CardSerie
-                                id={item.id.toString()}
-                                img={item.poster_path || "/placeholder.jpg"}
-                                name={item.name}
-                                vote_average={item.vote_average}
-                                overview={item.overview}
-                                first_air_date={item.first_air_date}
-                                genres={item.genre_ids?.map((id: number) => ({id, name: getGenreName(id)}))}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
+            </aside>
         </div>
     </section>
 </Layout>
