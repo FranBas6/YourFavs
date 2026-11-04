@@ -13,7 +13,7 @@ import { syncNotifications } from '../../services/API/notifications/generator';
 import { listNotifications } from '../../services/BD/notifications/notifications';
 import { withSocialState } from '../../services/BD/social/notifState';
 import { syncPlanToday } from '../../services/BD/social/plans';
-import { notifGroups, notifItemHtml } from '../../lib/social/ui';
+import { notifFeedHtml, notifCat, NOTIF_CATS, icon } from '../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
 import type { NotifView } from '../../lib/social/types';
 
@@ -25,32 +25,61 @@ if (user) {
     items = await withSocialState(user.uid, await listNotifications(100));
 }
 const now = Date.now();
-const groups = notifGroups(items, now);
-const hasUnread = items.some((it) => !it.read);
+const unreadN = items.filter((it) => !it.read).length;
+const hasUnread = unreadN > 0;
+// 7.3 (handoff P8): lista agrupada (mismo tipo y día = un aviso), filtros por categoría y resumen de la semana.
+const feed = notifFeedHtml(items, {
+    phase: SOCIAL_PHASE, mobile: true, now,
+    wrap: (label, html) => `<div class="ntp-group" data-day><p class="notif-group">${label}</p><div class="ntp-card">${html}</div></div>`,
+});
+const catCount = (k: string, since = 0) => items.filter((it) => notifCat(it.type) === k && it.created_at >= since).length;
+const chips = NOTIF_CATS.map(([k, l]) => ({ k, l, n: catCount(k) })).filter((c) => c.n > 0);
+const weekAgo = now - 7 * 86400000;
+const week = NOTIF_CATS.map(([k, l, i]) => ({ k, l, i, n: catCount(k, weekAgo) }));
 ---
 <Layout title="Notificaciones">
     <ListsNav slot="aside" />
     <section class="ntp" data-notif-page>
+        <div class="ntp-grid">
+        <div class="ntp-main">
         <header class="ntp-head">
             <div>
-                <h1 class="ntp-h1">Notificaciones</h1>
+                <h1 class="ntp-h1">Notificaciones{hasUnread && <span class="ntp-new" id="notif-page-new">{unreadN} {unreadN === 1 ? 'nueva' : 'nuevas'}</span>}</h1>
                 <p class="ntp-sub">Novedades de lo que sigues y de tu gente.</p>
             </div>
             {hasUnread && (
-                <button id="notif-page-markall" type="button" class="ntp-markall">Marcar leídas</button>
+                <button id="notif-page-markall" type="button" class="btn btn--sm btn--ghost ntp-all" aria-label="Marcar todo como leído"><Fragment set:html={icon('check-check')} /><span>Marcar todo como leído</span></button>
             )}
         </header>
+
+        {chips.length > 1 && (
+            <div class="ntp-f" role="group" aria-label="Filtrar avisos">
+                <button type="button" class="chip-filter" data-ntp-f="todo" aria-pressed="true">Todo<span class="chip-n">{items.length}</span></button>
+                {chips.map((c) => <button type="button" class="chip-filter" data-ntp-f={c.k} aria-pressed="false">{c.l}<span class="chip-n">{c.n}</span></button>)}
+            </div>
+        )}
 
         {!user && <p class="notif-empty">Inicia sesión para ver tus notificaciones.</p>}
         {user && items.length === 0 && <p class="notif-empty">No hay notificaciones por ahora.</p>}
 
-        <div id="notif-page-list">
-            {groups.map(([label, its]) => (
-                <div class="ntp-group">
-                    <p class="notif-group">{label}</p>
-                    <div class="ntp-card" set:html={its.map((it) => notifItemHtml(it, { phase: SOCIAL_PHASE, mobile: true, now })).join('')} />
+        <div id="notif-page-list" set:html={feed} />
+        </div>
+
+        {user && items.length > 0 && (
+            <aside class="ntp-side">
+                <div class="ntp-box">
+                    <h2>Esta semana</h2>
+                    {week.map((w) => (
+                        <div class="ntp-wr"><span set:html={icon(w.i)} />{w.l}<b>{w.n}</b></div>
+                    ))}
                 </div>
-            ))}
+                <div class="ntp-box">
+                    <h2><Fragment set:html={icon('bell')} />Qué te avisamos</h2>
+                    <p>Los avisos del mismo tipo y del mismo día se juntan en uno: ábrelo para verlos todos.</p>
+                    <a href="/perfil/notificaciones" class="btn btn--sm">Ajustes de avisos</a>
+                </div>
+            </aside>
+        )}
         </div>
     </section>
 </Layout>
@@ -63,25 +92,66 @@ const hasUnread = items.some((it) => !it.read);
     const all = document.getElementById('notif-page-markall');
     all?.addEventListener('click', () => {
         if (!list) return;
-        markAllRead(list).then(() => all.remove());
+        markAllRead(list).then(() => { all.remove(); document.getElementById('notif-page-new')?.remove(); });
     });
+
+    // Filtros (7.3): sin recargar; un día sin avisos visibles se oculta entero.
+    const chips = document.querySelectorAll<HTMLButtonElement>('[data-ntp-f]');
+    chips.forEach((b) => b.addEventListener('click', () => {
+        const f = b.dataset.ntpF!;
+        chips.forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+        list?.querySelectorAll<HTMLElement>('[data-day]').forEach((day) => {
+            let any = false;
+            day.querySelectorAll<HTMLElement>('.ntp-card > [data-cat]').forEach((el) => {
+                const ok = f === 'todo' || el.dataset.cat === f;
+                el.hidden = !ok;
+                if (ok) any = true;
+            });
+            day.hidden = !any;
+        });
+    }));
 </script>
 
 <style>
-    .ntp { max-width: 42rem; margin: 0; padding: 16px 4px 28px; }   /* a la izquierda, junto a la columna de Mis listas (5.4) */
+    .ntp { max-width: 66rem; margin: 0; padding: 16px 4px 28px; }   /* a la izquierda, junto a la columna de Mis listas (5.4) */
+    .ntp-grid { display: grid; grid-template-columns: minmax(0, 42rem) 260px; gap: 28px; align-items: start; }
+    .ntp-main { min-width: 0; }
+    .ntp-new { margin-left: 10px; vertical-align: middle; font: 600 var(--fs-meta) var(--font); color: var(--primary); }
+    .ntp-f { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+    .ntp-side { position: sticky; top: 88px; display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
+    .ntp-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px; }
+    .ntp-box h2 { display: flex; align-items: center; gap: 7px; font: 600 var(--fs-ui) var(--font); color: var(--text); margin: 0 0 10px; }
+    .ntp-box h2 :global(svg) { width: 15px; height: 15px; color: var(--text-3); }
+    .ntp-box p { font-size: var(--fs-ui); line-height: 1.5; color: var(--text-2); margin: 0 0 12px; }
+    .ntp-wr { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: var(--fs-ui); color: var(--text-2); border-top: 1px solid var(--border); }
+    .ntp-wr:first-of-type { border-top: 0; }
+    .ntp-wr :global(svg) { width: 15px; height: 15px; color: var(--text-3); }
+    .ntp-wr b { margin-left: auto; font: 600 var(--fs-ui) var(--font-mono); color: var(--text); }
+    [hidden] { display: none !important; }
+    @media (max-width: 1279px) {
+        .ntp-grid { grid-template-columns: minmax(0, 1fr); }
+        .ntp-side { position: static; display: none; }
+    }
+    .ntp-all { flex-shrink: 0; }
+    .ntp-head > div { min-width: 0; }
+    .ntp-new { white-space: nowrap; }
+    @media (max-width: 639px) {
+        .ntp-all span { display: none; }   /* solo el icono: con el texto, la página se salía de ancho */
+    }
+    @media (max-width: 1023px) {
+        .ntp-f { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin-inline: -4px; padding: 2px 4px; }
+        .ntp-f::-webkit-scrollbar { display: none; }
+    }
     @media (min-width: 640px) { .ntp { padding: 32px 12px; } }
     .ntp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
     .ntp-h1 { font: 700 24px var(--font); letter-spacing: -.02em; color: var(--text); margin: 0; }
     @media (min-width: 1024px) { .ntp-h1 { font-size: 28px; } }
     .ntp-sub { font-size: 13px; color: var(--text-2); margin: 4px 0 0; }
-    .ntp-markall {
-        border: 0; background: none; padding: 8px 0 0; white-space: nowrap; cursor: pointer;
-        font: 600 13px var(--font); color: var(--primary);
-    }
-    .ntp-markall:hover { text-decoration: underline; }
     .ntp-group { margin-bottom: 18px; }
     .ntp-group .notif-group { padding: 4px 2px 8px; }
     .ntp-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
-    .ntp-card :global(.notif-item + .notif-item) { border-top: 1px solid var(--border); }
+    .ntp-card > :global(* + *) { border-top: 1px solid var(--border); }
     .ntp-card :global(.notif-item) { padding: 13px 14px; }
+    .ntp-card :global(.nt-grp > summary) { padding: 13px 14px; }
+    .ntp-card :global(.nt-grp-b .notif-item) { padding: 7px 14px 7px 57px; }
 </style>

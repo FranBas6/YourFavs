@@ -1,127 +1,71 @@
 ---
+/**
+ * Acerca de (rediseño, Fase 7 · 7.2; handoff P9). Texto nuevo desde el README: qué es y 8 bloques con lo
+ * que hay hoy. Fuera «Construido con» y las «7 plataformas» (eran de otra época). Al pie, de dónde salen
+ * los datos (atribución obligatoria de TMDB, con su logo, y de JustWatch) y qué pasa con los tuyos.
+ */
 import Layout from "../layouts/Layout.astro";
+import Stamp from "../components/Stamp.astro";
+import '../styles/pages/about.css';
+
+type Color = 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
+const BLOCKS: [Color, string, string, string][] = [
+    ['green', 'tv', 'Episodio a episodio', 'Marca episodios desde la serie, desde cada episodio o desde «Estás viendo», que siempre enseña el siguiente. Finales y parones señalados, y un modo sin spoilers que oculta lo que aún no has visto.'],
+    ['amber', 'crown', 'Listas que significan algo', 'Favoritos con tu propio ranking, Me gusta, Vistos, Pendientes, Ver pronto y Siguiendo, que nunca se contradicen. Colecciones propias, notas del 0,5 al 10 y un diario con cada vez que vuelves a ver algo.'],
+    ['purple', 'sparkles', 'Qué ver', '«Para ti» a partir de tus notas, tus listas y tus géneros; filas con criterio («Nuevo en streaming», «Hecho en España», joyas escondidas) y una ruleta para las noches de duda.'],
+    ['slate', 'play', 'Dónde verlo', 'Disponibilidad por país y por temporada, con tus plataformas primero, y la fecha de estreno en tu país junto a la mundial.'],
+    ['blue', 'calendar-days', 'Calendario', 'Estrenos y episodios de lo que sigues, por mes o en lista, y una dirección privada para suscribirte desde Google Calendar o el iPhone.'],
+    ['pink', 'users', 'Con amigos', 'Amigos y seguidos, perfil público, recomendaciones, chats de dos y de grupo con tarjetas de títulos, «¿Qué vemos?» y planes con fecha. Los avisos se quedan dentro de la web.'],
+    ['green', 'download', 'Trae tu biblioteca', 'Importa desde IMDb, Letterboxd o una cuenta de TMDB, revisa las coincidencias dudosas y deshazlo con un clic.'],
+    ['red', 'chart-column', 'Tu año', 'Películas, series, episodios y horas de cada año, mes a mes, tu día con más visionados y una vista de siempre.'],
+];
+const user = Astro.locals.user;
 ---
-<Layout title="Sobre YourFavs">
-    <div class="max-w-4xl mx-auto px-4 py-10">
-
-        <!-- Hero -->
-        <div class="text-center mb-16">
-            <img src="/logo_yourfavs.png" alt="YourFavs Logo" class="w-28 h-28 mx-auto mb-6 drop-shadow-xl"/>
-            <h1 class="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-                Tu universo cinematográfico
-            </h1>
-            <p class="text-lg text-gray-500 max-w-2xl mx-auto leading-relaxed">
-                Organiza, descubre y disfruta de películas y series. Todo lo que ves, en un solo lugar.
+<Layout title="Acerca de YourFavs" description="YourFavs es donde llevas todo lo que ves: episodio a episodio, listas, qué ver, dónde verlo, calendario y amigos.">
+    <div class="ab">
+        <header class="ab-h">
+            <span class="ab-k">Acerca de</span>
+            <h1>YourFavs es donde llevas todo lo que ves</h1>
+            <p>
+                Empezó como una lista de películas favoritas y creció hasta guardar lo que has visto, lo que
+                tienes a medias, lo que quieres ver y lo que te recomiendan tus amigos. Sabe qué episodio toca
+                en cada serie, dónde se puede ver cada título en tu país y qué se estrena este mes. Se instala
+                en el móvil como una app.
             </p>
-        </div>
+        </header>
 
-        <!-- Qué es -->
-        <section class="mb-16">
-            <div class="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-                <h2 class="text-2xl font-bold text-gray-800 mb-4">¿Qué es YourFavs?</h2>
-                <p class="text-gray-600 leading-relaxed mb-4">
-                    YourFavs es tu espacio personal para organizar todo lo que ves: marca favoritas, guarda pendientes,
-                    lleva el seguimiento de series en emisión y descubre nuevos títulos basados en tus gustos.
+        <section class="ab-g" aria-label="Qué puedes hacer">
+            {BLOCKS.map(([c, i, h, p]) => (
+                <article>
+                    <Stamp color={c} icon={i} size={36} />
+                    <h2>{h}</h2>
+                    <p>{p}</p>
+                </article>
+            ))}
+        </section>
+
+        <section class="ab-x">
+            <div>
+                <h2>De dónde salen los datos</h2>
+                <a class="ab-tmdb" href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database (TMDB)">
+                    <img src="/logos/tmdb.svg" alt="TMDB" width="150" height="20" loading="lazy" />
+                </a>
+                <p>
+                    Fichas, imágenes, reparto y equipo vienen de <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">The Movie Database (TMDB)</a>.
+                    Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB.
                 </p>
-                <p class="text-gray-600 leading-relaxed">
-                    Con datos en tiempo real de <strong>TMDB</strong>, información de 7 plataformas de streaming
-                    en España, y un sistema de listas inteligente respaldado por <strong>Supabase</strong>.
+                <p>
+                    Dónde ver cada título lo aporta <a href="https://www.justwatch.com/" target="_blank" rel="noopener">JustWatch</a>, a través de TMDB.
+                </p>
+            </div>
+            <div>
+                <h2>Tus datos</h2>
+                <p>
+                    Tus listas, notas y mensajes son tuyos. Nada se ve fuera de tu cuenta si no activas tu
+                    {user ? <a href="/perfil/publico"> perfil público</a> : ' perfil público'}, y puedes borrar la cuenta con todo lo que
+                    contiene desde {user ? <a href="/perfil/cuenta">Ajustes</a> : 'Ajustes'}.
                 </p>
             </div>
         </section>
-
-        <!-- Features grid -->
-        <section class="mb-16">
-            <h2 class="text-2xl font-bold text-gray-800 text-center mb-8">Lo que puedes hacer</h2>
-            <div class="grid sm:grid-cols-2 gap-4">
-                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-800 mb-2">Explora</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">
-                        Tendencias, populares, top rated, cartelera en España, búsqueda por título, filtros por plataforma y más de 20 géneros.
-                    </p>
-                </div>
-
-                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                        </svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-800 mb-2">Organiza</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">
-                        Favoritos, pendientes, vistos, me gusta, ver pronto, siguiendo series en emisión. Escribe opiniones personales sobre cada título.
-                    </p>
-                </div>
-
-                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                        </svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-800 mb-2">Descubre</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">
-                        Recomendaciones basadas en tus favoritos, fichas de actores con filmografía completa, trailers, productoras y equipo técnico.
-                    </p>
-                </div>
-
-                <div class="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
-                    <div class="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center mb-4">
-                        <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                        </svg>
-                    </div>
-                    <h3 class="font-semibold text-gray-800 mb-2">Estadísticas</h3>
-                    <p class="text-sm text-gray-500 leading-relaxed">
-                        Panel de stats con tus géneros favoritos, décadas más vistas, totales de temporadas/episodios y nota media de tu colección.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Tech -->
-        <section class="mb-16">
-            <div class="bg-gradient-to-br from-gray-50 to-white rounded-2xl p-8 border border-gray-100">
-                <h2 class="text-xl font-bold text-gray-800 mb-6 text-center">Construido con</h2>
-                <div class="flex flex-wrap justify-center gap-3">
-                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-blue-50 text-blue-700 border border-blue-100">Astro 5</span>
-                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-cyan-50 text-cyan-700 border border-cyan-100">Tailwind CSS</span>
-                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-purple-50 text-purple-700 border border-purple-100">TypeScript</span>
-                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-yellow-50 text-yellow-700 border border-yellow-100">Supabase</span>
-                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-red-50 text-red-700 border border-red-100">TMDB API</span>
-                    <span class="px-4 py-2 rounded-full text-sm font-medium bg-emerald-50 text-emerald-700 border border-emerald-100">Netlify</span>
-                </div>
-                <!-- Atribución obligatoria de TMDB (logo + aviso) y de JustWatch («Dónde ver»). -->
-                <div class="mt-8 flex flex-col items-center gap-3 text-center">
-                    <a href="https://www.themoviedb.org/" target="_blank" rel="noopener" aria-label="The Movie Database (TMDB)">
-                        <img src="/logos/tmdb.svg" alt="TMDB" width="150" height="20" class="h-5 w-auto" loading="lazy" />
-                    </a>
-                    <p class="text-sm text-gray-500 max-w-xl">
-                        Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB.
-                        Los datos de películas, series y personas vienen de The Movie Database.
-                    </p>
-                    <p class="text-sm text-gray-500 max-w-xl">
-                        La disponibilidad en plataformas de streaming la aporta
-                        <a href="https://www.justwatch.com/" target="_blank" rel="noopener" class="underline hover:text-blue-600">JustWatch</a>.
-                    </p>
-                </div>
-            </div>
-        </section>
-
-        <!-- CTA -->
-        <div class="text-center">
-            <a href="/"
-               class="inline-flex items-center gap-2 px-8 py-3.5 rounded-full text-white font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5">
-                Explorar catálogo
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
-                </svg>
-            </a>
-        </div>
     </div>
 </Layout>

@@ -90,6 +90,8 @@ const { user } = Astro.props;
             const res = await fetch('/api/auth/delete-account', { method: 'POST' });
             if (!res.ok) throw new Error();
             // El servidor ya ha borrado las cookies de sesión junto con la cuenta.
+            // La cuenta ya no existe: el navegador deja de recordar que entraste (aviso del modal de acceso, 7.4c).
+            try { localStorage.removeItem('yf_auth_seen'); } catch { /* noop */ }
             location.href = '/';
         } catch {
             delBtn.disabled = false;

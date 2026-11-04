@@ -39,6 +39,7 @@ import { fetchCatalogRow, markRowPlatforms } from "../services/API/shared/catalo
 import { streamingRowDef } from "../utils/constants/catalogRows";
 import '../styles/components/catalog-row.css';
 import '../styles/pages/index.css';
+import Welcome from '../components/home/Welcome.astro';
 
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
 const pageStr = page.toString();
@@ -253,6 +254,8 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
 ---
 <Layout title="YourFavs">     
     <main class="main-container">
+        {/* 7.1 · Sin sesión: bienvenida (handoff P2) con Tendencias y la banda de Importar. Con sesión, la portada de siempre. */}
+        {Astro.locals.user ? (<Fragment>
         <!-- Hero: Brief diario "Hoy en tu cine" (con sesión y señales) + Trending; con
              ambos disponibles, un toggle deja elegir cuál ver (preferencia recordada). -->
         {(brief.signals.length > 0 || heroMovie) ? (
@@ -406,5 +409,14 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 )}
             </Fragment>
         ))}
+        </Fragment>) : (
+            <Welcome movies={trendingMovies} series={trendingSeries}>
+                {sectionByKey.tendencias && (sectionByKey.tendencias.movies.length > 0 || sectionByKey.tendencias.series.length > 0) && (
+                    <div class="content-wrapper">
+                        <CatalogRow section={sectionByKey.tendencias} />
+                    </div>
+                )}
+            </Welcome>
+        )}
     </main>
 </Layout>

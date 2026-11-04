@@ -947,6 +947,27 @@ a.notif-item:hover { background: var(--bg-tint); }
 .notif-sub { font-size: 11.5px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .notif-name { font-size: 13px; font-weight: 600; color: var(--text, #16130f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .notif-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+
+/* Avisos agrupados (rediseño 7.3, handoff P8): mismo tipo y día = uno, con pila de pósters; al abrirlo,
+   los sueltos debajo (sin repetir el sello). Valen para el desplegable y para la página. */
+.nt-grp > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 11px; padding: 11px 16px; }
+.nt-grp > summary::-webkit-details-marker { display: none; }
+.nt-grp > summary:hover, .nt-grp.is-unread > summary { background: var(--bg-tint); }
+.nt-grp > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.nt-grp-t { font-size: 13px; line-height: 1.35; color: var(--text); }
+.nt-grp-t b { font-weight: 600; }
+.nt-grp-more { color: var(--primary); font-weight: 600; }
+.nt-stk { display: flex; flex-shrink: 0; padding-left: 10px; }
+.nt-stk img, .nt-stk em { width: 24px; height: 36px; margin-left: -10px; border-radius: 4px; border: 2px solid var(--bg-elev); object-fit: cover; background: var(--bg-tint); box-shadow: var(--sh-sm); }
+.nt-stk em { display: grid; place-items: center; font: 600 10px var(--font-mono, monospace); font-style: normal; color: var(--text-2); }
+.nt-grp-car { display: flex; flex-shrink: 0; color: var(--text-3); }
+.nt-grp-car svg { width: 16px; height: 16px; transition: transform .15s ease; }
+.nt-grp[open] .nt-grp-car svg { transform: rotate(180deg); }
+.nt-grp-b { border-top: 1px dashed var(--border); padding: 2px 0 4px; }
+.nt-grp-b .notif-item { padding: 6px 16px 6px 59px; }
+.nt-grp-b .notif-poster { width: 22px; height: 33px; }
+.nt-grp-b .notif-item.is-unread { background: transparent; }
+.notif-list .notif-item + .nt-grp, .notif-list .nt-grp + .notif-item, .notif-list .nt-grp + .nt-grp { border-top: 1px solid var(--border); }
 .notif-footer { display: block; text-align: center; padding: 11px 16px; border-top: 1px solid var(--border, #efeae0); font-size: 12.5px; font-weight: 600; color: var(--primary, #3b82f6); text-decoration: none; }
 .notif-footer:hover { text-decoration: underline; }
 

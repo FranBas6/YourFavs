@@ -16,7 +16,7 @@
  *   · Desplegable (≥1024 px): se piden los avisos CADA vez que se abre, con el estado actual de
  *     cada relación. En móvil la campana lleva a la página.
  */
-import { notifGroups, notifItemHtml } from '../../lib/social/ui';
+import { notifFeedHtml } from '../../lib/social/ui';
 import { SOCIAL_PHASE } from '../../utils/constants/social';
 import type { NotifView } from '../../lib/social/types';
 
@@ -134,12 +134,20 @@ document.addEventListener('yf:pending-delta', (e) => {
     setCounts({ ...counts, pending: counts.pending + delta });
 });
 
+function clearUnread(el: HTMLElement) {
+    el.classList.remove('is-unread');
+    el.querySelector('.notif-dot')?.remove();
+    el.querySelectorAll(':scope > .sr-only').forEach((x) => { if (x.textContent === 'sin leer') x.remove(); });
+    const label = el.getAttribute('aria-label');
+    if (label) el.setAttribute('aria-label', label.replace(/, sin leer$/, ''));
+}
+
 function markRead(item: HTMLElement) {
     if (!item.classList.contains('is-unread')) return;
-    item.classList.remove('is-unread');
-    item.querySelector('.notif-dot')?.remove();
-    const label = item.getAttribute('aria-label');
-    if (label) item.setAttribute('aria-label', label.replace(/, sin leer$/, ''));
+    clearUnread(item);
+    // Si era el último sin leer de su grupo, el grupo también.
+    const g = item.closest<HTMLElement>('.nt-grp.is-unread');
+    if (g && !g.querySelector('.notif-item.is-unread')) { g.classList.remove('is-unread'); g.querySelector(':scope > summary .notif-dot')?.remove(); }
     setCounts({ ...counts, unread: counts.unread - 1 });
     fetch('/api/notifications', {
         method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
@@ -153,6 +161,21 @@ function markRead(item: HTMLElement) {
  * cuando sale bien.
  */
 export function wireNotifList(list: HTMLElement) {
+    // Abrir un grupo (7.3) da por leídos todos sus avisos de una vez. `toggle` no burbujea: en captura.
+    list.addEventListener('toggle', (e) => {
+        const g = e.target as HTMLDetailsElement;
+        if (!g.classList?.contains('nt-grp') || !g.open || !g.classList.contains('is-unread')) return;
+        const unread = Array.from(g.querySelectorAll<HTMLElement>('.notif-item.is-unread'));
+        g.classList.remove('is-unread');
+        g.querySelector(':scope > summary .notif-dot')?.remove();
+        unread.forEach(clearUnread);
+        if (!unread.length) return;
+        setCounts({ ...counts, unread: counts.unread - unread.length });
+        fetch('/api/notifications', {
+            method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ op: 'read_many', ids: unread.map((el) => el.dataset.id) }),
+        }).catch(() => {});
+    }, true);
     list.addEventListener('click', (e) => {
         const t = e.target as Element;
         if (t.closest('[data-sa]')) return;
@@ -166,12 +189,8 @@ export function markAllRead(scope: ParentNode): Promise<void> {
     return fetch('/api/notifications', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'read_all' }),
     }).then(() => {
-        scope.querySelectorAll<HTMLElement>('.notif-item.is-unread').forEach((el) => {
-            el.classList.remove('is-unread');
-            el.querySelector('.notif-dot')?.remove();
-            const label = el.getAttribute('aria-label');
-            if (label) el.setAttribute('aria-label', label.replace(/, sin leer$/, ''));
-        });
+        scope.querySelectorAll<HTMLElement>('.notif-item.is-unread').forEach(clearUnread);
+        scope.querySelectorAll<HTMLElement>('.nt-grp.is-unread').forEach((g) => { g.classList.remove('is-unread'); g.querySelector(':scope > summary .notif-dot')?.remove(); });
         setCounts({ ...counts, unread: 0 });
     }).catch(() => {});
 }
@@ -188,10 +207,7 @@ if (btn && drop && list) {
 
     const render = (items: NotifView[]) => {
         if (!items.length) { list.innerHTML = '<p class="notif-empty">No hay notificaciones.</p>'; return; }
-        const now = Date.now();
-        list.innerHTML = notifGroups(items, now).map(([label, its]) =>
-            `<p class="notif-group">${label}</p>` + its.map((it) => notifItemHtml(it, { phase: SOCIAL_PHASE, now })).join(''),
-        ).join('');
+        list.innerHTML = notifFeedHtml(items, { phase: SOCIAL_PHASE, now: Date.now() });
     };
 
     const load = () => {

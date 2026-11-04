@@ -112,6 +112,14 @@ export async function markRead(id: string): Promise<void> {
     if (error) throw new Error(error.message);
 }
 
+/** Varias de golpe (abrir un grupo de la campana, 7.3). Tope de 100 ids. */
+export async function markReadMany(ids: string[]): Promise<void> {
+    const list = [...new Set(ids.map(String).filter(Boolean))].slice(0, 100);
+    if (!list.length) return;
+    const { error } = await db().from('notifications').update({ read: true }).eq('user_id', requireAuthId()).in('id', list);
+    if (error) throw new Error(error.message);
+}
+
 export async function markAllRead(): Promise<void> {
     const { error } = await db().from('notifications').update({ read: true }).eq('user_id', requireAuthId()).eq('read', false);
     if (error) throw new Error(error.message);

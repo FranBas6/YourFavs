@@ -4,7 +4,8 @@
  *  GET  → materializa (una vez/día) desde las señales y devuelve { ok, items, unread }. Los avisos
  *         entre personas (`follow`…) llegan con la persona y la relación ACTUAL para pintar sus
  *         botones o su estado final (`withSocialState`).
- *  POST → { op: 'read', id }  marca una leída · { op: 'read_all' } marca todas.
+ *  POST → { op: 'read', id }  marca una leída · { op: 'read_many', ids } varias (abrir un grupo) ·
+ *         { op: 'read_all' } marca todas.
  *
  * Invitado → 401. El uid sale de la sesión.
  */
@@ -12,7 +13,7 @@ import type { APIRoute } from 'astro';
 import { syncNotifications } from '../../../services/API/notifications/generator';
 import { syncPlanToday } from '../../../services/BD/social/plans';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
-import { listNotifications, unreadCount, markRead, markAllRead } from '../../../services/BD/notifications/notifications';
+import { listNotifications, unreadCount, markRead, markReadMany, markAllRead } from '../../../services/BD/notifications/notifications';
 import { withSocialState } from '../../../services/BD/social/notifState';
 
 export const prerender = false;
@@ -45,6 +46,12 @@ export const POST: APIRoute = async ({ request, locals }) => {
             const id = String(body?.id || '');
             if (!id) return json({ ok: false, error: 'id requerido' }, 400);
             await markRead(id);
+            return json({ ok: true });
+        }
+        if (op === 'read_many') {
+            const ids = Array.isArray(body?.ids) ? body.ids.map(String) : [];
+            if (!ids.length) return json({ ok: false, error: 'ids requeridos' }, 400);
+            await markReadMany(ids);
             return json({ ok: true });
         }
         if (op === 'read_all') {
