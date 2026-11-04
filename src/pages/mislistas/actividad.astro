@@ -1,6 +1,6 @@
 ---
 import Layout from "../../layouts/Layout.astro";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import { fetchAllActivityEvents, type ActivityEvent } from "../../services/BD/shared/activityFeed";
 import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
@@ -292,6 +292,7 @@ const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
 const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.icon, tone: t.cat }));
 ---
 <Layout title="Actividad">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         <header class="act-head flex items-end justify-between gap-4 flex-wrap">
             <div>
@@ -304,9 +305,6 @@ const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.ic
             </span>
         </header>
 
-        <div class="mb-6">
-            <PersonalNav currentPage="/mislistas/actividad" />
-        </div>
 
         <div class="act-grid">
             <aside class="act-rail">

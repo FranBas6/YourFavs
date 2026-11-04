@@ -1,5 +1,7 @@
 ---
 import Layout from "../../layouts/Layout.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
+import ListTitle from "../../components/personal/ListTitle.astro";
 import { getCalendarData, hideEpisodeTitlesFor } from "../../services/API/Calendar/calendarService";
 import type { CalendarEvent } from "../../services/API/Calendar/calendarService";
 import EmptyState from "../../components/EmptyState.astro";
@@ -130,6 +132,7 @@ const notificationGroups = Array.from(groupsMap.entries())
     .sort((a, b) => a.nextDate.localeCompare(b.nextDate));
 ---
 <Layout title="Calendario de Estrenos">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -137,27 +140,24 @@ const notificationGroups = Array.from(groupsMap.entries())
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Calendario</h1>
-            <p class="text-gray-500 text-base">Estrenos de películas y episodios de tus series</p>
-        </header>
+        <ListTitle title="Calendario" subtitle="Estrenos de películas y episodios de tus series" />
 
         <!-- Toggle vista + Suscripción ICS -->
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1 self-start">
+            <nav class="lh-seg self-start" aria-label="Vista del calendario">
                 <a href={buildViewUrl('grid')}
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${view === 'grid' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
+                   aria-current={view === 'grid' ? 'page' : undefined}>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     Cuadrícula
                 </a>
                 <a href={buildViewUrl('list')}
-                   class={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${view === 'list' ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>
+                   aria-current={view === 'list' ? 'page' : undefined}>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
                     Lista
                 </a>
-            </div>
+            </nav>
             <button id="ics-subscribe-btn" data-ics-url={icsUrl ?? undefined}
-                    class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 transition self-start">
+                    class="btn btn--sm self-start">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 Suscribir en Google/Apple Calendar
             </button>

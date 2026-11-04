@@ -6,7 +6,8 @@ import { getPersonalRecommendations } from "../../utils/personalRecommendations"
 import { getGenreName } from "../../utils/constants/genres";
 import { safeFetch } from "../../utils/safeFetch";
 import { withTimeout, isTimeout } from "../../utils/withTimeout";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
+import ListTitle from "../../components/personal/ListTitle.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import RecoRow, { type RecoRowItem } from "../../components/personal/RecoRow.astro";
 import type { SeedInfo } from "../../utils/personalRecommendations";
@@ -142,6 +143,7 @@ const trendingRow = claim(interleave(tag('movie', rowsData?.movies.trending), ta
 const anyRow = forYouToday.length + seedRows.length + outsideZone.length + moreGenres.length + trendingRow.length > 0;
 ---
 <Layout title="Recomendaciones">
+    <ListsNav slot="aside" />
     {isWarming && (
         <Fragment slot="head">
             <meta http-equiv="refresh" content="3" />
@@ -167,18 +169,12 @@ const anyRow = forYouToday.length + seedRows.length + outsideZone.length + moreG
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Recomendaciones</h1>
-            <p class="text-gray-500 text-base">
-                {hasLibrary
+        <ListTitle title="Para ti">
+            <p slot="below" class="lh-sub">{hasLibrary
                     ? 'A partir de tus favoritos, lo que te gusta, tus notas altas y lo último que has visto. Cambian cada día.'
-                    : 'Añade contenido a tu biblioteca para generar recomendaciones'}
-            </p>
-        </header>
+                    : 'Añade contenido a tu biblioteca para generar recomendaciones'}</p>
+        </ListTitle>
 
-        <div class="mb-4">
-            <PersonalNav currentPage="/mislistas/recomendaciones" />
-        </div>
 
         {debug && prefs && (
             <div class="mb-8 border border-amber-300 bg-amber-50 rounded-xl p-4 text-sm">
@@ -325,13 +321,11 @@ const anyRow = forYouToday.length + seedRows.length + outsideZone.length + moreG
 
         {/* Filtro tipo */}
         {totalRecs > 0 && (
-            <div class="flex justify-center mb-6">
-                <div class="inline-flex gap-1 bg-gray-100 rounded-xl p-1">
-                    <a href="?filter=todos" class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'todos' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>Todo</a>
-                    <a href="?filter=series" class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'series' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>Series</a>
-                    <a href="?filter=peliculas" class={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === 'peliculas' ? 'bg-red-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-900 hover:bg-white'}`}>Películas</a>
-                </div>
-            </div>
+            <nav class="lh-seg mb-6" aria-label="Tipo de título">
+                <a href="?filter=todos" aria-current={filter === 'todos' ? 'page' : undefined}>Todo</a>
+                <a href="?filter=peliculas" aria-current={filter === 'peliculas' ? 'page' : undefined}>Películas</a>
+                <a href="?filter=series" aria-current={filter === 'series' ? 'page' : undefined}>Series</a>
+            </nav>
         )}
 
         {!hasLibrary && (

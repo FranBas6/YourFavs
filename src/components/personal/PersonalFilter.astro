@@ -12,9 +12,11 @@ interface Props {
     availableTags?: string[];
     /** Plataformas del perfil (3.2): habilita el atajo "Solo en mis plataformas". */
     myPlatforms?: number[];
+    /** Rediseño 5.2: el tipo (Todo · Películas · Series) va en la barra de ListHeader, no en el panel. */
+    hideType?: boolean;
 }
 
-const { pageUrl, filter, searchQuery = '', genreFilter = '', platformFilter = '', availableGenres = [], tagsFilter = '', availableTags = [], myPlatforms = [] } = Astro.props;
+const { pageUrl, filter, searchQuery = '', genreFilter = '', platformFilter = '', availableGenres = [], tagsFilter = '', availableTags = [], myPlatforms = [], hideType = false } = Astro.props;
 
 const PLATFORM_OPTIONS = [
     { id: 8, label: 'Netflix' },
@@ -65,24 +67,21 @@ const toggleTag = (tag: string) => {
 };
 
 const hasActiveFilters = searchQuery || activeGenres.length > 0 || activePlatforms.length > 0 || activeTags.length > 0 || filter !== 'todos';
-const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatforms.length + activeTags.length + (filter !== 'todos' ? 1 : 0);
+const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatforms.length + activeTags.length + (filter !== 'todos' && !hideType ? 1 : 0);
 ---
 <details class="group relative" data-personal-filter>
-    <summary class="flex items-center gap-2 px-3.5 py-2 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer hover:shadow-md transition-all text-sm font-medium text-gray-600 whitespace-nowrap">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-        </svg>
+    {/* Rediseño 5.2 (README D4): botón secundario neutro, cerrado por defecto, contador en píldora gris. */}
+    <summary class="btn btn--sm pf-sum" aria-label={activeCount > 0 ? `Filtros · ${activeCount} ${activeCount === 1 ? 'activo' : 'activos'}` : 'Filtros'}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4H14M10 4H3M21 12h-9M8 12H3M21 20h-5M12 20H3M14 2v4M8 10v4M16 18v4"/></svg>
         Filtros
-        {activeCount > 0 && (
-            <span class="text-xs px-1.5 py-0.5 bg-red-500 text-white rounded-full font-medium leading-none">{activeCount}</span>
-        )}
+        {activeCount > 0 && <span class="pf-count" aria-hidden="true">{activeCount}</span>}
     </summary>
 
     <div class="pf-backdrop" aria-hidden="true"></div>
     <div class="pf-panel absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-lg">
         <div class="pf-handle" hidden aria-hidden="true"></div>
         <!-- Tipo -->
-        <div class="flex flex-wrap gap-1.5 justify-center">
+        {!hideType && <div class="flex flex-wrap gap-1.5 justify-center">
             {typeFilters.map(f => (
                 <a href={buildUrl(pageUrl, { filter: f.key, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter })}
                    class={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200
@@ -95,7 +94,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
                     {f.label}
                 </a>
             ))}
-        </div>
+        </div>}
 
         <!-- Búsqueda -->
         <form method="get" class="relative">
@@ -281,6 +280,10 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
     /* Por defecto (desktop) el panel es el dropdown de siempre; el backdrop oculto
        (el asa usa el atributo `hidden` para no contar en el space-y del panel). */
     .pf-backdrop { display: none; }
+    .pf-sum { list-style: none; }
+    .pf-sum::-webkit-details-marker { display: none; }
+    [data-personal-filter][open] > .pf-sum { border-color: var(--text-3); background: var(--bg-tint); }
+    .pf-count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: var(--r-full); display: inline-grid; place-items: center; background: var(--text); color: var(--bg-elev); font: 700 var(--fs-micro) var(--font); }
 
     /* Móvil: el panel se presenta como hoja inferior (presentación; instant-apply intacto). */
     @media (max-width: 1023px) {

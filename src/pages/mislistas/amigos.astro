@@ -13,7 +13,7 @@
  * Todo es tuyo y de nadie más: ni el perfil público ni nadie enseña a quién sigues o quién te sigue.
  */
 import Layout from '../../layouts/Layout.astro';
-import PersonalNav from '../../components/personal/PersonalNav.astro';
+import ListsNav from "../../components/personal/ListsNav.astro";
 import Stamp from '../../components/Stamp.astro';
 import { Icon } from 'astro-icon/components';
 import { listTab, tabCounts } from '../../services/BD/social/graph';
@@ -55,8 +55,9 @@ if (user) {
 const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
 ---
 <Layout title="Amigos · YourFavs" robots="noindex, nofollow">
+    {/* Estas páginas ya tienen su columna: Mis listas va como botón (también en escritorio) */}
+    <ListsNav compact />
     <div class="am" data-am data-tab={tab} data-my-handle={myHandle ?? ''} data-url={publicUrl}>
-        <div class="am-nav"><PersonalNav currentPage="/mislistas/amigos" /></div>
 
         {!user ? (
             <div class="so-emp am-guest">

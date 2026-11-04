@@ -7,7 +7,8 @@
  * Crear/editar/borrar se hace por fetch a /api/lists (op create|update|delete).
  */
 import Layout from "../../layouts/Layout.astro";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
+import ListTitle from "../../components/personal/ListTitle.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import { getCustomLists, LIST_COLORS } from "../../services/BD/lists/customLists";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
@@ -20,23 +21,15 @@ const profileOn = Boolean(Astro.locals.user?.publicHandle && Astro.locals.user?.
 const EMOJIS = ['🎬','🌧️','👽','🍿','🎭','🔥','❤️','⭐','📺','🎞️','🏆','🌟','🎃','💀','🧠','🌍'];
 ---
 <Layout title="Mis colecciones">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
-        <header class="mb-6 flex items-end justify-between gap-4">
-            <div>
-                <p class="text-xs font-mono uppercase tracking-widest text-gray-400 mb-1">Mi espacio</p>
-                <h1 class="text-3xl md:text-4xl font-bold text-gray-900">Mis colecciones</h1>
-                <p class="text-gray-500 text-base mt-1">{lists.length} {lists.length === 1 ? 'colección' : 'colecciones'}</p>
-            </div>
-            <button type="button" id="new-list-btn"
-                    class="inline-flex items-center gap-2 px-4 py-2.5 bg-[#E63946] text-white rounded-full text-sm font-semibold hover:bg-[#C7283A] transition-colors flex-shrink-0">
-                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+        <ListTitle title="Colecciones" count={lists.length} subtitle="Listas a tu medida para guardar pelis y series">
+            <button slot="actions" type="button" id="new-list-btn" class="btn btn--pri">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
                 Nueva colección
             </button>
-        </header>
+        </ListTitle>
 
-        <div class="mb-6">
-            <PersonalNav currentPage="/mislistas/colecciones" />
-        </div>
 
         {lists.length === 0 ? (
             <EmptyState

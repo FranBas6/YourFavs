@@ -7,9 +7,8 @@ import {getMovieFav} from "../../services/BD/movies/yourfavsMovie";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {fetchPersonalPageData} from "../../utils/personalPageHelper";
-import StatsPanel from "../../components/personal/StatsPanel.astro";
-import PersonalNav from "../../components/personal/PersonalNav.astro";
-import PersonalFilter from "../../components/personal/PersonalFilter.astro";
+import ListHeader from "../../components/personal/ListHeader.astro";
+import ListsNav from "../../components/personal/ListsNav.astro";
 import PersonalResultsBar from "../../components/personal/PersonalResultsBar.astro";
 import EmptyState from "../../components/EmptyState.astro";
 import HoverPreview from "../../components/HoverPreview.astro";
@@ -33,6 +32,7 @@ const {
 } = data;
 ---
 <Layout title="Favoritos">
+    <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
             <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-xl text-sm mb-6">
@@ -40,19 +40,14 @@ const {
             </div>
         )}
 
-        <header class="mb-6">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">Favoritos</h1>
-            <p class="text-gray-500 text-base">Tu colección de películas y series favoritas</p>
-        </header>
-
-        <div class="flex items-start gap-3 mb-6">
-            <div class="flex-1 min-w-0">
-                <PersonalNav currentPage="/mislistas/favoritos" />
-            </div>
-            <PersonalFilter pageUrl={pageUrl} filter={filter} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter} availableGenres={availableGenres} tagsFilter={tagsFilter} availableTags={availableTags} myPlatforms={Astro.locals.user?.platforms ?? []} />
-        </div>
-        <StatsPanel stats={stats} />
-
+        {/* Cabecera de lista (rediseño 5.2): título con total, Todo · Películas · Series, Filtros y un solo orden */}
+        <ListHeader
+            title="Favoritos" subtitle="Tu colección de películas y series favoritas" total={stats?.general?.totalContent ?? (filteredSeries.length + filteredMovies.length)}
+            pageUrl={pageUrl} filter={filter} sort={sort} searchQuery={searchQuery} genreFilter={genreFilter} platformFilter={platformFilter}
+            tagsFilter={tagsFilter} availableGenres={availableGenres} availableTags={availableTags}
+            myPlatforms={Astro.locals.user?.platforms ?? []} stats={stats}
+        >
+        </ListHeader>
         <PersonalResultsBar
             shown={seriesPaginadas.length + peliculasPaginadas.length}
             total={filteredSeries.length + filteredMovies.length}
@@ -60,41 +55,15 @@ const {
             series={filteredSeries.length}
         />
 
-        {/* Orden: por defecto (recientes) o por tu nota personal. El #n de
-            favorito se calcula contra la lista original → no cambia al ordenar. */}
-        <div class="flex items-center justify-end gap-1.5 mb-5">
-            <span class="font-mono text-[10px] tracking-widest text-gray-400 mr-1">ORDEN</span>
-            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: '' })}
-               class={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium transition-all border
-                   ${sort !== 'mi-nota'
-                       ? 'bg-gray-800 text-white border-gray-800'
-                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
-                Recientes
-            </a>
-            <a href={buildUrl(pageUrl, { filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter, sort: 'mi-nota' })}
-               class={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-all border
-                   ${sort === 'mi-nota'
-                       ? 'bg-amber-400 text-amber-950 border-amber-400'
-                       : 'bg-white text-gray-500 border-gray-200 hover:border-gray-400 hover:text-gray-700'}`}>
-                ★ Tu nota ↓
-            </a>
-        </div>
-
         <div class="space-y-10">
             {/* Series */}
             {(showSeries || showAll) && (
                 <section id="series-section" class="scroll-mt-20">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-blue-500 rounded-full"></span>
-                            Series
-                            <span class="text-sm font-normal text-gray-400">({filteredSeries.length})</span>
-                        </h2>
-                    </div>
+                    <div class="lg-h"><h2>Series</h2><span class="n">{filteredSeries.length}</span></div>
 
                     {seriesPaginadas.length === 0 && (
                         <EmptyState size="sm" title="Aún no tienes series en esta colección">
-                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">Explorar tendencias</a>
+                            <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
                     {seriesPaginadas.length > 0 && (
@@ -122,18 +91,13 @@ const {
                         </div>
                     )}
                     {hasMoreSeries && (
-                        <div class="flex justify-center mt-6">
-                            <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, sort,
-                                    seriesPage: Math.ceil(filteredSeries.length / itemsPerPage).toString(),
-                                    moviesPage: moviesPage.toString()
-                                }) + '#series-section'}
-                               class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 shadow-sm hover:shadow-md transition-all">
-                                Mostrar {filteredSeries.length - seriesItemsToShow} series más
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                </svg>
+                        <div class="lg-more">
+                            <span class="lg-more-n">Mostrando <b>{seriesPaginadas.length}</b> de {filteredSeries.length}</span>
+                            <a class="btn" href={buildUrl(pageUrl, { seriesPage: (seriesPage + 1).toString(), moviesPage: moviesPage.toString() }) + '#series-section'}>
+                                Mostrar {Math.min(itemsPerPage, filteredSeries.length - seriesItemsToShow)} más
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </a>
+                            <a class="lg-more-all" href={buildUrl(pageUrl, { seriesPage: Math.ceil(filteredSeries.length / itemsPerPage).toString(), moviesPage: moviesPage.toString() }) + '#series-section'}>Ver todas</a>
                         </div>
                     )}
                 </section>
@@ -142,17 +106,11 @@ const {
             {/* Películas */}
             {(showMovies || showAll) && (
                 <section id="movies-section" class="scroll-mt-20">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2">
-                            <span class="w-1 h-6 bg-red-500 rounded-full"></span>
-                            Películas
-                            <span class="text-sm font-normal text-gray-400">({filteredMovies.length})</span>
-                        </h2>
-                    </div>
+                    <div class="lg-h"><h2>Películas</h2><span class="n">{filteredMovies.length}</span></div>
 
                     {peliculasPaginadas.length === 0 && (
                         <EmptyState size="sm" title="Aún no tienes películas en esta colección">
-                            <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] transition-colors text-sm font-medium">Explorar tendencias</a>
+                            <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
                     {peliculasPaginadas.length > 0 && (
@@ -172,18 +130,13 @@ const {
                         </div>
                     )}
                     {hasMoreMovies && (
-                        <div class="flex justify-center mt-6">
-                            <a href={buildUrl(pageUrl, {
-                                    filter: filter, search: searchQuery, genre: genreFilter, platforms: platformFilter, sort,
-                                    seriesPage: seriesPage.toString(),
-                                    moviesPage: Math.ceil(filteredMovies.length / itemsPerPage).toString()
-                                }) + '#movies-section'}
-                               class="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium text-white bg-red-600 hover:bg-red-700 shadow-sm hover:shadow-md transition-all">
-                                Mostrar {filteredMovies.length - moviesItemsToShow} películas más
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
-                                </svg>
+                        <div class="lg-more">
+                            <span class="lg-more-n">Mostrando <b>{peliculasPaginadas.length}</b> de {filteredMovies.length}</span>
+                            <a class="btn" href={buildUrl(pageUrl, { moviesPage: (moviesPage + 1).toString(), seriesPage: seriesPage.toString() }) + '#movies-section'}>
+                                Mostrar {Math.min(itemsPerPage, filteredMovies.length - moviesItemsToShow)} más
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                             </a>
+                            <a class="lg-more-all" href={buildUrl(pageUrl, { moviesPage: Math.ceil(filteredMovies.length / itemsPerPage).toString(), seriesPage: seriesPage.toString() }) + '#movies-section'}>Ver todas</a>
                         </div>
                     )}
                 </section>

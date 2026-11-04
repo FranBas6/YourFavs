@@ -1,0 +1,208 @@
+---
+/**
+ * ListsNav — navegación de Mis listas (rediseño, Fase 5 · 5.1; README del handoff §3.8 «S7» y D4).
+ * Sustituye a las píldoras de PersonalNav en todas las páginas de /mislistas/*, también Calendario
+ * y Notificaciones. Se coloca en la columna lateral del Layout (`slot="aside"`).
+ *
+ *   Escritorio (≥ 1024 px): columna de 240 px con los tres grupos (Listas · Social · Tus números),
+ *   filas de 38 px con icono, nombre y contador; la activa con el tono de su lista y
+ *   aria-current="page" (Social y Números, tinte neutro). Pegada arriba al hacer scroll.
+ *   Móvil: un botón de 48 px «MIS LISTAS · Favoritos · 24 ▾» que abre una hoja con los tres grupos
+ *   en dos columnas de filas de 44.
+ *
+ * Contadores: /api/lists/counts (ya lo usa la hoja del tab bar), pedido una vez al cargar; nada en
+ * el SSR. Los globos de Amigos y Notificaciones los rellena bell.ts por sus clases de siempre.
+ */
+import BottomSheet from '../BottomSheet.astro';
+import { LISTS_NAV, activeListsNavItem, type ListsNavItem } from '../../utils/constants/listsNav';
+
+interface Props {
+    /** Ruta de la página (por defecto, la actual). */
+    current?: string;
+    /**
+     * Botón en vez de columna también en escritorio (abre la lista como desplegable). Para páginas
+     * que ya tienen su propia columna lateral (Amigos, Mensajes): con las dos no cabía el contenido.
+     */
+    compact?: boolean;
+}
+const current = Astro.props.current ?? Astro.url.pathname;
+const compact = !!Astro.props.compact;
+const active = activeListsNavItem(current);
+
+const ICON: Record<string, string> = {
+    crown: '<path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3z"/><path d="M5 21h14"/>',
+    heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+    check: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+    folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+    user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    calday: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+    chart: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+    spark: '<path d="M12 3l1.9 5.8L20 10l-5 3.6L16.5 20 12 16.3 7.5 20 9 13.6 4 10l6.1-1.2z"/>',
+    chev: '<path d="m6 9 6 6 6-6"/>',
+};
+const svg = (k: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k] ?? ''}</svg>`;
+const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
+---
+
+<div class:list={["ln-wrap", { "is-compact": compact }]}>
+{/* Móvil: botón + hoja */}
+<button type="button" class:list={['ln-m', { 'ln-m--always': compact }]} aria-haspopup="dialog" aria-expanded={compact ? 'false' : undefined} data-ln-open>
+    <span class="ln-m-k">Mis listas</span>
+    <span class="ln-m-v">
+        {active && <Fragment set:html={svg(active.icon)} />}
+        <b>{active?.label ?? 'Mis listas'}</b>
+        {active?.countKey && <span class="ln-m-c" data-ln-count={active.countKey} data-ln-prefix="· "></span>}
+    </span>
+    <Fragment set:html={svg('chev')} />
+</button>
+{/* Escritorio: columna (en compacto, desplegable bajo el botón) */}
+<nav class:list={['ln-col', { 'ln-col--pop': compact }]} aria-label="Mis listas" id={compact ? 'ln-pop' : undefined} hidden={compact}>
+    {LISTS_NAV.map((g) => (
+        <div class="ln-g">
+            <p class="ln-gt">{g.label}</p>
+            {g.items.map((it) => (
+                <a href={it.href} class:list={['ln-it', { 'is-on': isActive(it) }]} data-tone={it.tone} aria-current={isActive(it) ? 'page' : undefined}>
+                    <Fragment set:html={svg(it.icon)} />
+                    <span class="ln-l">{it.label}</span>
+                    {it.badge === 'pending' && <span class="ln-b js-pending-badge" hidden></span>}
+                    {it.badge === 'notif' && <span class="ln-n js-notif-badge" hidden></span>}
+                    {it.countKey && <span class="ln-c" data-ln-count={it.countKey}></span>}
+                </a>
+            ))}
+        </div>
+    ))}
+</nav>
+</div>
+<BottomSheet id="listsnav" title="Mis listas">
+    {LISTS_NAV.map((g) => (
+        <div class="ln-sg">
+            <p class="ln-gt">{g.label}</p>
+            <div class="ln-sgrid">
+                {g.items.map((it) => (
+                    <a href={it.href} class:list={['ln-it', 'ln-it--s', { 'is-on': isActive(it) }]} data-tone={it.tone} aria-current={isActive(it) ? 'page' : undefined}>
+                        <Fragment set:html={svg(it.icon)} />
+                        <span class="ln-l">{it.label}</span>
+                        {it.badge === 'pending' && <span class="ln-b js-pending-badge" hidden></span>}
+                        {it.badge === 'notif' && <span class="ln-n js-notif-badge" hidden></span>}
+                        {it.countKey && <span class="ln-c" data-ln-count={it.countKey}></span>}
+                    </a>
+                ))}
+            </div>
+        </div>
+    ))}
+</BottomSheet>
+
+<script is:inline>
+    (function () {
+        if (window.__yfLn) return; window.__yfLn = true;
+        document.addEventListener('click', function (e) {
+            var pop = document.getElementById('ln-pop');
+            var b = e.target.closest && e.target.closest('[data-ln-open]');
+            if (!b) {
+                // Clic fuera del desplegable compacto: se cierra.
+                if (pop && !pop.hidden && !pop.contains(e.target)) { pop.hidden = true; document.querySelectorAll('[data-ln-open]').forEach(function (x) { x.setAttribute('aria-expanded', 'false'); }); }
+                return;
+            }
+            // Compacto en escritorio: desplegable. En móvil (o sin compacto): la hoja.
+            if (pop && window.innerWidth >= 1024) {
+                pop.hidden = !pop.hidden;
+                b.setAttribute('aria-expanded', pop.hidden ? 'false' : 'true');
+                return;
+            }
+            document.dispatchEvent(new CustomEvent('yf:sheet-open', { detail: { id: 'listsnav' } }));
+        });
+        document.addEventListener('keydown', function (e) {
+            var pop = document.getElementById('ln-pop');
+            if (e.key === 'Escape' && pop && !pop.hidden) { pop.hidden = true; var b = document.querySelector('[data-ln-open]'); if (b) { b.setAttribute('aria-expanded', 'false'); b.focus(); } }
+        });
+        function fill() {
+            fetch('/api/lists/counts', { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (res) {
+                    if (!res || !res.ok) return;
+                    var c = res.counts || {};
+                    document.querySelectorAll('[data-ln-count]').forEach(function (el) {
+                        var k = el.getAttribute('data-ln-count');
+                        if (c[k] == null) return;
+                        el.textContent = (el.getAttribute('data-ln-prefix') || '') + Number(c[k]).toLocaleString('es-ES');
+                    });
+                })
+                .catch(function () {});
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
+    })();
+</script>
+
+<style is:global>
+    /* Columna de escritorio (mismas piezas que la de Ajustes). Solo tokens. */
+    .ln-col {
+        background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
+        padding: 14px 10px; position: sticky; top: 84px;
+    }
+    .ln-g + .ln-g { margin-top: 10px; }
+    .ln-gt { margin: 8px 8px 6px; font: 600 var(--fs-micro) var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); }
+    .ln-it {
+        --tone: var(--text-2); --tone-bg: var(--bg-tint);
+        display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 8px; border-radius: var(--r-md);
+        font: 500 var(--fs-ui) var(--font); color: var(--text-2); text-decoration: none;
+        transition: background-color .15s ease, color .15s ease;
+    }
+    .ln-it svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-3); }
+    .ln-it:hover { background: var(--bg-tint); color: var(--text); }
+    .ln-it:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+    .ln-it.is-on { background: var(--tone-bg); color: var(--text); font-weight: 600; }
+    .ln-it.is-on svg { color: var(--tone); }
+    .ln-it[data-tone="fav"]    { --tone: var(--a-fav);    --tone-bg: var(--a-fav-bg); }
+    .ln-it[data-tone="like"]   { --tone: var(--a-like);   --tone-bg: var(--a-like-bg); }
+    .ln-it[data-tone="visto"]  { --tone: var(--a-visto);  --tone-bg: var(--a-visto-bg); }
+    .ln-it[data-tone="pend"]   { --tone: var(--a-pend);   --tone-bg: var(--a-pend-bg); }
+    .ln-it[data-tone="pronto"] { --tone: var(--a-pronto); --tone-bg: var(--a-pronto-bg); }
+    .ln-it[data-tone="seguir"] { --tone: var(--a-seguir); --tone-bg: var(--a-seguir-bg); }
+    .ln-it[data-tone="ep"]     { --tone: var(--a-ep);     --tone-bg: var(--a-ep-bg); }
+    .ln-it[data-tone="person"] { --tone: var(--a-person); --tone-bg: var(--a-person-bg); }
+    .ln-it[data-tone="tint"]   { --tone: var(--text); --tone-bg: var(--bg-tint); }
+    .ln-l { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ln-c { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); flex-shrink: 0; }
+    .ln-it.is-on .ln-c { color: var(--text-2); }
+    .ln-b, .ln-n { min-width: 18px; height: 18px; padding: 0 5px; border-radius: var(--r-full); display: inline-grid; place-items: center; font: 700 10px var(--font); flex-shrink: 0; }
+    .ln-b { background: var(--accent); color: var(--on-accent); }
+    .ln-n { background: var(--bg-tint); color: var(--text-2); border: 1px solid var(--border-strong); }
+    .ln-b[hidden], .ln-n[hidden] { display: none; }
+
+    /* Botón de móvil */
+    .ln-m {
+        display: none; width: 100%; min-height: 48px; padding: 6px 14px; margin-bottom: 16px;
+        align-items: center; gap: 10px; text-align: left; cursor: pointer;
+        background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: var(--r-md); color: var(--text);
+    }
+    .ln-m > svg { width: 18px; height: 18px; color: var(--text-3); flex-shrink: 0; }
+    .ln-m-k { font: 600 var(--fs-micro) var(--font-mono); letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); flex-shrink: 0; }
+    .ln-m-v { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font: 500 var(--fs-body) var(--font); }
+    .ln-m-v svg { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; }
+    .ln-m-v b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ln-m-c { color: var(--text-3); font-size: var(--fs-ui); white-space: nowrap; }
+    /* Hoja: tres grupos, dos columnas de filas de 44 */
+    .ln-sg { padding: 0 12px; }
+    .ln-sg + .ln-sg { margin-top: 8px; }
+    .ln-sgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+    .ln-it--s { min-height: 44px; }
+
+    @media (max-width: 1023px) {
+        .ln-col { display: none; }
+        .ln-m { display: flex; }
+    }
+    /* Compacto: botón también en escritorio y la columna como desplegable debajo */
+    .ln-m--always { display: flex; max-width: 360px; }
+    /* El envoltorio no existe en modo columna (si no, la columna dejaría de quedarse fija). */
+    .ln-wrap { display: contents; }
+    .ln-wrap.is-compact { display: block; position: relative; }
+    .ln-col--pop { position: absolute; left: 0; top: calc(100% - 8px); z-index: 70; width: 260px; box-shadow: var(--sh-lg); }
+    .ln-col--pop[hidden] { display: none; }
+</style>
