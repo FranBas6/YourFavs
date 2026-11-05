@@ -1,0 +1,57 @@
+/* =====================================================================================
+   Paletas de la tira de episodios (rediseño, Fase 9 · 9.4 · Ajustes → Apariencia).
+
+   La tira de las temporadas (serie.css, .sr-c) pinta cada episodio con --ep-q-high / med / low /
+   fair / poor según su nota de TMDB (≥ 9 · 8–8,9 · 7–7,9 · 6,5–6,9 · < 6,5). Cada paleta solo
+   redefine esos tokens, en claro y en oscuro (en oscuro, más claro = mejor nota).
+
+   `data-strip` va en <html> (lo pone el Layout desde el perfil) y en cada vista previa de Ajustes,
+   así que una tarjeta enseña SU paleta aunque la elegida sea otra. Sin atributo = azul (tokens.css).
+   ===================================================================================== */
+
+/* Azul (por defecto, la que eligió Fran el 4-11) */
+[data-strip="azul"], [data-strip="contorno"] {
+    --ep-q-high: #1E3A8A; --ep-q-med: #3B82F6; --ep-q-low: #93C5FD; --ep-q-fair: #93C5FD; --ep-q-poor: #DBEAFE;
+}
+/* Verde: un solo tono, cuanto más intenso, mejor */
+[data-strip="verde"] {
+    --ep-q-high: #065F46; --ep-q-med: #10B981; --ep-q-low: #6EE7B7; --ep-q-fair: #6EE7B7; --ep-q-poor: #D1FAE5;
+}
+/* 4 colores (valor «semaforo»): la de antes, con los colores de nota de la app (verde, azul, ámbar, gris) */
+[data-strip="semaforo"] {
+    --ep-q-high: var(--rating-high); --ep-q-med: var(--rating-med); --ep-q-low: var(--rating-low);
+    --ep-q-fair: var(--rating-low); --ep-q-poor: var(--rating-poor);
+}
+/* Gris → verde: solo destacan los buenos */
+[data-strip="grisverde"] {
+    --ep-q-high: #059669; --ep-q-med: #6EE7B7; --ep-q-low: #CBD5E1; --ep-q-fair: #CBD5E1; --ep-q-poor: #E2E8F0;
+}
+/* Verde 9 · 8 · 7: verde a partir de 7; por debajo, gris */
+[data-strip="verde987"] {
+    --ep-q-high: #047857; --ep-q-med: #10B981; --ep-q-low: #A7F3D0; --ep-q-fair: #E2E8F0; --ep-q-poor: #E2E8F0;
+}
+
+/* ---- Oscuro ---- */
+[data-theme="dark"][data-strip="azul"], [data-theme="dark"] [data-strip="azul"],
+[data-theme="dark"][data-strip="contorno"], [data-theme="dark"] [data-strip="contorno"] {
+    --ep-q-high: #BFDBFE; --ep-q-med: #60A5FA; --ep-q-low: #1D4ED8; --ep-q-fair: #1D4ED8; --ep-q-poor: #1E3A5F;
+}
+[data-theme="dark"][data-strip="verde"], [data-theme="dark"] [data-strip="verde"] {
+    --ep-q-high: #A7F3D0; --ep-q-med: #34D399; --ep-q-low: #047857; --ep-q-fair: #047857; --ep-q-poor: #064E3B;
+}
+[data-theme="dark"][data-strip="grisverde"], [data-theme="dark"] [data-strip="grisverde"] {
+    --ep-q-high: #6EE7B7; --ep-q-med: #059669; --ep-q-low: #475569; --ep-q-fair: #475569; --ep-q-poor: #334155;
+}
+[data-theme="dark"][data-strip="verde987"], [data-theme="dark"] [data-strip="verde987"] {
+    --ep-q-high: #A7F3D0; --ep-q-med: #34D399; --ep-q-low: #065F46; --ep-q-fair: #334155; --ep-q-poor: #334155;
+}
+
+/* Contorno: los episodios sin ver, como hueco con borde de su color (en vez de color apagado). */
+[data-strip="contorno"] .sr-c:not(.is-seen) { opacity: 1; background: transparent !important; box-shadow: inset 0 0 0 1.5px var(--c, var(--border-strong)); }
+
+/* Franja → color (lo usan la tira de la ficha de serie y las muestras de Ajustes). */
+.sr-c[data-b="high"] { --c: var(--ep-q-high); }
+.sr-c[data-b="med"]  { --c: var(--ep-q-med); }
+.sr-c[data-b="low"]  { --c: var(--ep-q-low); }
+.sr-c[data-b="fair"] { --c: var(--ep-q-fair); }
+.sr-c[data-b="poor"] { --c: var(--ep-q-poor); }

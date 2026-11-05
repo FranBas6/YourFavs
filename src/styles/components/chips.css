@@ -9,12 +9,11 @@
    .chip-state   dice algo del título: FINAL, PARÓN, NUEVO, EN NETFLIX, TRENDING, #n. Mono, mayúsculas,
                  sobre el sello de su color (--sb fondo / --si tinta, en línea o con data-tone).
 
-   Alias durante la migración: .etag (ficha de episodio y «Estás viendo») = .chip-state;
-   .act-filters .chip (Actividad) = .chip-filter.
+   Alias durante la migración: .etag (ficha de episodio y «Estás viendo») = .chip-state.
    ===================================================================================== */
 
 /* ---- Filtro ---- */
-.chip-filter, .act-filters .chip {
+.chip-filter {
     position: relative;
     height: 32px; padding: 0 12px; border-radius: var(--r-full);
     border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text-2);
@@ -24,18 +23,17 @@
 }
 .chip-filter svg { width: 13px; height: 13px; flex-shrink: 0; }
 .chip-filter .chip-n { font: 500 var(--fs-micro) var(--font-mono); opacity: .75; }
-.chip-filter:hover, .act-filters .chip:hover { border-color: var(--text-3); color: var(--text); }
-.chip-filter:focus-visible, .act-filters .chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
-.chip-filter.is-on, .chip-filter.active, .chip-filter[aria-pressed="true"],
-.act-filters .chip.active { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
+.chip-filter:hover { border-color: var(--text-3); color: var(--text); }
+.chip-filter:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.chip-filter.is-on, .chip-filter.active, .chip-filter[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--bg-elev); }
 .chip-filter .chip-check { display: none; }
 .chip-filter.is-on .chip-check, .chip-filter.active .chip-check,
 .chip-filter[aria-pressed="true"] .chip-check { display: inline-block; }
 .chip-filter[disabled] { opacity: .45; cursor: not-allowed; }
 @media (max-width: 1023.98px) {
-    .chip-filter, .act-filters .chip { height: 36px; }
+    .chip-filter { height: 36px; }
     /* 44 px de área táctil sin agrandar el chip. */
-    .chip-filter::before, .act-filters .chip::before { content: ""; position: absolute; inset: -4px 0; }
+    .chip-filter::before { content: ""; position: absolute; inset: -4px 0; }
 }
 
 /* ---- Etiqueta ---- */

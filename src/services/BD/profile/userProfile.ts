@@ -45,12 +45,18 @@ export function resolveSpoilerSettings(
     };
 }
 
+/** Paletas de la tira de episodios (9.4). El orden es el de Ajustes. */
+export const STRIP_PALETTES = ['azul', 'verde', 'semaforo', 'grisverde', 'verde987', 'contorno'] as const;
+export type StripPalette = (typeof STRIP_PALETTES)[number];
+
 export interface UserProfile {
     display_name?: string;
     avatar_url?: string | null;
     region?: string;            // código país, p.ej. 'ES' (SUPPORTED_COUNTRIES)
     language?: string;          // p.ej. 'es-ES'
     theme?: 'light' | 'dark' | 'system';
+    /** Paleta de la tira de episodios (Ajustes → Apariencia, 9.4). Sin valor = azul. */
+    stripPalette?: StripPalette;
     email?: string;             // espejo del email (informativo)
     onboarding?: 'done' | 'skipped';  // estado del onboarding de gustos (Fase F)
     platforms?: number[];       // provider_ids TMDB de "mis plataformas" (Auditoría v2 · 3.2)
@@ -93,6 +99,7 @@ const COLUMN: Record<Exclude<keyof UserProfile, 'updated_at'>, string> = {
     region: 'region',
     language: 'language',
     theme: 'theme',
+    stripPalette: 'strip_palette',
     email: 'email',
     onboarding: 'onboarding',
     platforms: 'platforms',

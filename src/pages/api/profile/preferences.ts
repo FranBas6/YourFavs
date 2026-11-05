@@ -11,7 +11,7 @@
  * esté declarado en `UserProfile`.
  */
 import type { APIRoute } from 'astro';
-import { setUserProfile, type UserProfile } from '../../../services/BD/profile/userProfile';
+import { setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from '../../../services/BD/profile/userProfile';
 import { sanitizePlatformIds } from '../../../services/API/shared/watchProviders';
 import { CONTENT_LANGUAGE_CODES } from '../../../utils/constants/languages';
 import { SUPPORTED_COUNTRIES } from '../../../services/API/shared/tmdbInfoService';
@@ -52,6 +52,11 @@ function buildPatch(body: Record<string, unknown>): { patch: Partial<UserProfile
 
     if (body.theme === 'light' || body.theme === 'dark' || body.theme === 'system') {
         patch.theme = body.theme;
+    }
+
+    // 9.4 · paleta de la tira de episodios (Ajustes → Apariencia)
+    if (typeof body.stripPalette === 'string' && (STRIP_PALETTES as readonly string[]).includes(body.stripPalette)) {
+        patch.stripPalette = body.stripPalette as StripPalette;
     }
 
     if (body.avatar_url === null || typeof body.avatar_url === 'string') {

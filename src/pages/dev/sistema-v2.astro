@@ -8,7 +8,6 @@
 import Layout from '../../layouts/Layout.astro';
 import TitleCard from '../../components/Cards/TitleCard.astro';
 import Row from '../../components/Row.astro';
-import HoverPreview from '../../components/HoverPreview.astro';
 import SectionHeader from '../../components/SectionHeader.astro';
 import { getTrending } from '../../services/API/shared/tmdbDiscoverService';
 import { posterUrl } from '../../services/API/shared/tmdbClient';
@@ -40,9 +39,9 @@ const m0 = movies[0] ? mv(movies[0]) : null;
         <SectionHeader title="Tendencias de la semana" icon="trending-up" color="red" count={mix.length} link="/catalogo/tendencias" railId="dev-rail-1" subtitle="Lo más visto en TMDB estos 7 días" why="actualizada el lunes" />
         <Row id="dev-rail-1" label="Tendencias de la semana" moreHref="/catalogo/tendencias" moreCount={mix.length}>
             {mix.map((c) => (
-                <HoverPreview tmdbId={c.id} tmdbType={c.mediaType} title={c.title} backdropPath={c.backdrop} href={`/${c.mediaType === 'tv' ? 'serie' : 'movie'}/${c.id}`} year={c.date?.slice(0, 4)} rating={c.vote_average}>
+                
                     <TitleCard {...c} context="home" />
-                </HoverPreview>
+                
             ))}
         </Row>
 

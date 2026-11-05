@@ -16,7 +16,6 @@ import { catalogUrls, resolveCatalogMode } from "../../utils/catalogUrl";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import {safeFetch} from "../../utils/safeFetch";
@@ -174,7 +173,7 @@ function buildCategoryUrl(slug: string) {
                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                     {latestMovies.map((item) => (
                         <div class="card-wrapper group">
-                            <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}><CardMovie
+                            <CardMovie
                                 id={item.id.toString()}
                                 img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                 title={item.title}
@@ -182,7 +181,7 @@ function buildCategoryUrl(slug: string) {
                                 overview={item.overview}
                                 release_date={item.release_date}
                                 genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            /></HoverPreview>
+                            />
                         </div>
                     ))}
                 </div>
@@ -199,7 +198,7 @@ function buildCategoryUrl(slug: string) {
                 <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                     {latestSeries.map((item) => (
                         <div class="card-wrapper group">
-                            <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}><CardSerie
+                            <CardSerie
                                 id={item.id.toString()}
                                 img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                 name={item.name}
@@ -210,7 +209,7 @@ function buildCategoryUrl(slug: string) {
                                 last_episode_to_air={item.last_episode_to_air}
                                 next_episode_to_air={item.next_episode_to_air}
                                 genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
-                            /></HoverPreview>
+                            />
                         </div>
                     ))}
                 </div>

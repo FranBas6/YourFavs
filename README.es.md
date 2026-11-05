@@ -31,7 +31,7 @@
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/movil-serie-oscuro.jpg" />
-    <img src=".github/readme/movil-serie-claro.jpg" alt="Ficha de serie: logo, nota, temporadas y tus listas" width="250" />
+    <img src=".github/readme/movil-serie-claro.jpg" alt="Ficha de serie: temporadas con tu progreso y la tira de episodios coloreada por su nota" width="250" />
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/movil-episodio-oscuro.jpg" />
@@ -58,6 +58,13 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/escritorio-pelicula-oscuro.jpg" />
     <img src=".github/readme/escritorio-pelicula-claro.jpg" alt="Escritorio: ficha de película con su hero, el logo del título y la barra de acciones" width="860" />
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/escritorio-actividad-oscuro.jpg" />
+    <img src=".github/readme/escritorio-actividad-claro.jpg" alt="Escritorio: Actividad, un mes de todo lo que hiciste en su orden, con tu racha, el calendario del mes y el tiempo en pantalla" width="860" />
   </picture>
 </p>
 
@@ -101,8 +108,9 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 
 - 📺 **Episodio a episodio.** Marcas episodios desde la ficha de la serie, desde la ficha de cada
   episodio o desde «Estás viendo» en la portada, que siempre enseña el siguiente, con deshacer.
-  Progreso por temporada y por serie, finales y parones señalados, y un modo sin spoilers que
-  oculta fotogramas y sinopsis de lo que no has visto.
+  Progreso por temporada y por serie, una tira de episodios coloreada por su nota (con seis paletas
+  a elegir en Ajustes), finales y parones señalados, y un modo sin spoilers que oculta fotogramas y
+  sinopsis de lo que no has visto.
 - 🗂️ **Listas con sentido.** Favoritos (con tu propio ranking), Me gusta, Vistas, Pendientes, Ver
   pronto y Siguiendo, como niveles que nunca se contradicen, y además tus colecciones propias.
   Notas del 0,5 al 10, opiniones y un diario con cada vez que vuelves a ver algo.
@@ -121,6 +129,10 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 - 📥 **Trae tu biblioteca.** Importa desde IMDb (CSV), Letterboxd (ZIP: vistas, notas,
   pendientes, diario y listas) o una cuenta de TMDB, con un paso para revisar las coincidencias
   dudosas y deshacer con un clic.
+- 🕒 **Tu actividad.** Una línea de tiempo de todo lo que haces, en su orden y por meses que se
+  encadenan al bajar: lo que viste en tarjetas, los cambios de listas en una línea, el tiempo en
+  pantalla de cada día, tu racha (solo cuentan los días en que viste algo), un calendario del mes,
+  hitos («Tu episodio 2.100») y filtros que viajan en la URL.
 - 📊 **Tu año.** Películas, series, episodios y horas por año, mes a mes, tu día de la semana más
   activo y una vista «de siempre».
 
@@ -143,6 +155,13 @@ renderizada en el servidor que se instala como una app. Está en español; es la
   que siguen frescos (`Cache-Control: max-age`), nunca más, así que lo que se enseña es siempre lo
   último de TMDB. Las peticiones se autentican con un token Bearer y, si falla, pasan solas a la
   clave de API.
+- **Un sistema de diseño, no un tema.** Un rediseño completo en nueve fases sobre tokens
+  (tipografía, color, radios, sombras) y componentes compartidos (tarjeta de título, filas,
+  cabeceras de sección, chips, cifras), en claro y en oscuro. Cada fase se diseñó en Claude Design,
+  se contrastó con un inventario de lo que ya había para no perder ni un dato ni una función y se
+  comprobó con una auditoría automática antes y después: las doce páginas más largas pasaron de
+  267.405 a 84.354 px de alto en móvil (−68 %), y las clases de color de Tailwind escritas a mano,
+  de 2.289 a 988.
 - **Un service worker prudente.** Se instala como una app, pero el HTML no se guarda nunca en
   caché, porque cada página lleva la sesión del usuario. Solo se guardan los recursos con hash,
   los iconos y los pósters, cada uno con su estrategia.
@@ -171,7 +190,7 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 
 | Commits | Páginas | Rutas de API | Migraciones | Tests de base de datos |
 | :-----: | :-----: | :----------: | :---------: | :--------------------: |
-|   327   |   48    |     113      |     23      |          344           |
+|   422   |   48    |     118      |     27      |          344           |
 
 ## Stack
 

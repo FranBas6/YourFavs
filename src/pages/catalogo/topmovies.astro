@@ -9,7 +9,6 @@ import {posterUrl} from "../../services/API/shared/tmdbClient";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import Pagination from "../../components/Pagination.astro";
 import EmptyState from "../../components/EmptyState.astro";
-import HoverPreview from "../../components/HoverPreview.astro";
 import type {Movie} from "../../types/ApiMovie";
 import '../../styles/pages/catalogo/shared.css';
 import { resolveMineFilter } from "../../utils/platformFilter";
@@ -82,7 +81,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
             <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full transition-all duration-300">
                 {popularMovies.map((item) => (
                     <div class="card-wrapper group">
-                        <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}>
+                        
                             <CardMovie
                                     id={item.id.toString()}
                                     img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -92,7 +91,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
                                     release_date={item.release_date}
                                     genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}
                             />
-                        </HoverPreview>
+                        
                     </div>
                 ))}
             </div>

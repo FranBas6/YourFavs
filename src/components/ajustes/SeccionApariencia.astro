@@ -18,6 +18,19 @@ const { profile } = Astro.props;
 // "según el sistema" por defecto haría que el panel dijese algo que no está pasando.
 const theme = profile.theme || 'light';
 
+// 9.4 · Paleta de la tira de episodios (las 6 muestras del 4-11). La azul es la de siempre.
+const strip = profile.stripPalette || 'azul';
+const STRIPS = [
+    { value: 'azul', label: 'Azul', desc: 'Un tono: cuanto más intenso, mejor nota.' },
+    { value: 'verde', label: 'Verde', desc: 'Lo mismo, en verde.' },
+    { value: 'semaforo', label: '4 colores', desc: 'La de antes: verde, azul, ámbar y gris.' },
+    { value: 'grisverde', label: 'Gris → verde', desc: 'Solo destacan los buenos.' },
+    { value: 'verde987', label: 'Verde 9 · 8 · 7', desc: 'Verde desde el 7; por debajo, gris.' },
+    { value: 'contorno', label: 'Contorno', desc: 'Azul; lo que no has visto, como hueco.' },
+] as const;
+// Tira de muestra: una temporada con de todo (las 7 primeras vistas).
+const SAMPLE: [string, boolean][] = [['high', true], ['med', true], ['low', true], ['fair', true], ['med', true], ['low', true], ['poor', true], ['high', false], ['med', false], ['low', false]];
+
 const OPTIONS = [
     { value: 'light', label: 'Claro', prev: 'is-light' },
     { value: 'dark', label: 'Oscuro', prev: 'is-dark' },
@@ -45,6 +58,26 @@ const OPTIONS = [
         ))}
     </div>
 
+    {/* 9.4 · Paleta de la tira de episodios (temporadas de las series). Se aplica al instante. */}
+    <div class="aj-strip">
+        <p class="aj-strip-h">Tira de episodios</p>
+        <p class="aj-strip-d">Los colores con los que las temporadas de una serie pintan cada episodio según su nota. Color pleno = visto; apagado = sin ver.</p>
+        <div class="aj-strips" id="aj-strip-cards" role="radiogroup" aria-label="Paleta de la tira de episodios">
+            {STRIPS.map((o) => (
+                <label class="aj-theme aj-strip-opt">
+                    <input type="radio" name="strip_palette" value={o.value} checked={strip === o.value} data-save="stripPalette" />
+                    <span class="aj-strip-prev" data-strip={o.value} aria-hidden="true">
+                        {SAMPLE.map(([b, seen]) => <i class:list={['sr-c', { 'is-seen': seen }]} data-b={b}></i>)}
+                    </span>
+                    <span class="aj-theme-foot">
+                        <span class="aj-theme-radio"></span>
+                        <span class="aj-strip-tx"><b>{o.label}</b><small>{o.desc}</small></span>
+                    </span>
+                </label>
+            ))}
+        </div>
+    </div>
+
     <div class="aj-fallback">
         <button type="submit" class="aj-fallback-btn">Guardar cambios</button>
     </div>
@@ -62,5 +95,10 @@ const OPTIONS = [
         // 'system' se resuelve contra el SO dentro de yfApplyTheme. Antes se traducía a
         // 'light' aquí mismo, así que "según el sistema" nunca seguía al sistema.
         window.yfApplyTheme?.(el.value as 'light' | 'dark' | 'system');
+    });
+    // 9.4 · la paleta de la tira, al instante en toda la página (el guardado lo hace el autosave).
+    document.getElementById('aj-strip-cards')?.addEventListener('change', (e) => {
+        const el = e.target as HTMLInputElement;
+        if (el?.name === 'strip_palette') document.documentElement.dataset.strip = el.value;
     });
 </script>

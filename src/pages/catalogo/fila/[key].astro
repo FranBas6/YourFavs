@@ -16,7 +16,6 @@ import CatalogHeader from "../../../components/CatalogHeader.astro";
 import AdvancedFilters from "../../../components/AdvancedFilters.astro";
 import CardMovie from "../../../components/Cards/CardMovie.astro";
 import CardSerie from "../../../components/Cards/CardSerie.astro";
-import HoverPreview from "../../../components/HoverPreview.astro";
 import Pagination from "../../../components/Pagination.astro";
 import EmptyState from "../../../components/EmptyState.astro";
 import { parseAdvancedFilters, hasActiveFilters } from "../../../services/API/shared/tmdbDiscoverService";
@@ -143,7 +142,7 @@ const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {movies.map((item) => (
                                 <div class="card-wrapper group">
-                                    <HoverPreview tmdbId={item.id} tmdbType="movie" title={item.title} backdropPath={item.backdrop_path} href={`/movie/${item.id}`} year={item.release_date?.slice(0,4)} rating={item.vote_average}>
+                                    
                                         <CardMovie
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -154,7 +153,7 @@ const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
                                             release_date={item.release_date}
                                             genres={item.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }))}
                                         />
-                                    </HoverPreview>
+                                    
                                 </div>
                             ))}
                         </div>
@@ -167,7 +166,7 @@ const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
                         <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
                             {series.map((item) => (
                                 <div class="card-wrapper group">
-                                    <HoverPreview tmdbId={item.id} tmdbType="tv" title={item.name} backdropPath={item.backdrop_path} href={`/serie/${item.id}`} year={item.first_air_date?.slice(0,4)} rating={item.vote_average}>
+                                    
                                         <CardSerie
                                             id={item.id.toString()}
                                             img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -178,7 +177,7 @@ const backHref = `/catalogo${mode === 'all' ? '' : `?type=${mode}`}`;
                                             first_air_date={item.first_air_date}
                                             genres={item.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }))}
                                         />
-                                    </HoverPreview>
+                                    
                                 </div>
                             ))}
                         </div>

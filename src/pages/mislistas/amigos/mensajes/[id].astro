@@ -89,12 +89,13 @@ const data = chat ? JSON.stringify(chat).replace(/</g, '\\u003c') : '';
             </div>
         ) : !chat ? (
             <MessagesShell on="chat" convs={convs} active={id} noInfo canGroup={friends > 0}>
-                <section class="ms-main" slot="main" aria-label="Conversación" set:html={missingHtml} />
+                <section class="ms-main" slot="main" aria-label="Conversación"><h1 class="sr-only">Mensajes</h1><Fragment set:html={missingHtml} /></section>
             </MessagesShell>
         ) : (
             <>
             <MessagesShell on="chat" convs={convs} active={chat.id} canGroup={friends > 0}>
                 <section class="ms-main ms-chat" slot="main" aria-label={`Conversación con ${chat.title}`} data-ms-chat>
+                    <h1 class="sr-only">Conversación con {chat.title}</h1>{/* título de la página para lectores de pantalla (9.3) */}
                     <header class="ms-h">
                         <a class="pf-btn ico ms-back" href="/mislistas/amigos/mensajes" aria-label="Volver a Mensajes"><Icon name="lucide:chevron-left" /></a>
                         <Fragment set:html={group ? gavHtml(faces, 36) : avatarHtml(other, 36)} />

@@ -2,32 +2,37 @@
 import Layout from "../../layouts/Layout.astro";
 import ListsNav from "../../components/personal/ListsNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
+import BottomSheet from "../../components/BottomSheet.astro";
+import { getNextEpisode } from "../../services/API/Series/nextEpisode";
 import { fetchAllActivityEvents, type ActivityEvent } from "../../services/BD/shared/activityFeed";
 import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
 import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
 import { processBatch } from "../../utils/processBatch";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
-import StatRow from "../../components/StatRow.astro";
-import ActivityHeatmap from "../../components/personal/ActivityHeatmap.astro";
+import { getSeasonRuntimes, seasonKey } from "../../services/API/Series/seasonRuntimes";
+import Stamp from "../../components/Stamp.astro";
 import { Icon } from "astro-icon/components";
 import { appDateParts, APP_TZ } from "../../utils/appTime";
 import "../../styles/pages/personal/actividad.css";
 
 const url = new URL(Astro.request.url);
-const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
-const DAYS_PER_PAGE = 30;
 const DAY_MS = 24 * 3600 * 1000;
-
 const now = Date.now();
-const windowEnd = now - (page - 1) * DAYS_PER_PAGE * DAY_MS;
-const windowStart = now - page * DAYS_PER_PAGE * DAY_MS;
+
+// 9.5c · El periodo es el MES NATURAL (?mes=2026-10; sin él, el mes en curso), en hora de Madrid.
+// Un evento cae en el mes del día en que se archiva (el de inicio de su sesión), como en el feed.
+const curMonth = appDateParts(now).key.slice(0, 7);
+const mesParam = url.searchParams.get('mes') ?? '';
+const mes = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesParam) && mesParam <= curMonth ? mesParam : curMonth;
 
 const allEvents = await fetchAllActivityEvents();
+const anchorKeyOf = (e: ActivityEvent) => appDateParts(e.startTs ?? e.timestamp).key;
 const windowEvents = allEvents
-    .filter(e => e.timestamp >= windowStart && e.timestamp < windowEnd)
+    .filter((e) => anchorKeyOf(e).startsWith(mes))
     .sort((a, b) => b.timestamp - a.timestamp);
-
-const hasOlder = allEvents.some(e => e.timestamp < windowStart);
+// Meses con actividad: el selector les pone un punto y al acabar el mes se sigue con el anterior que tenga.
+const activeMonths = new Set(allEvents.map((e) => anchorKeyOf(e).slice(0, 7)));
+const prevActive = [...activeMonths].filter((m) => m < mes).sort().pop() ?? null;
 
 const uniqueItems = new Map<string, { id: string; type: 'movie' | 'serie' }>();
 for (const ev of windowEvents) {
@@ -36,15 +41,14 @@ for (const ev of windowEvents) {
     if (!uniqueItems.has(key)) uniqueItems.set(key, { id: ev.id, type: ev.type as 'movie' | 'serie' });
 }
 
-interface Detail { key: string; title: string; poster: string | null; seasons?: Record<number, number> }
+// runtime: película → su duración; serie → la media de un episodio (para estimar lo que TMDB no da por episodio).
+interface Detail { key: string; title: string; poster: string | null; seasons?: Record<number, number>; runtime?: number | null; ended?: boolean }
 const fetchers = Array.from(uniqueItems.values());
-const details: Detail[] = await processBatch(
-    fetchers,
-    async (item: { id: string; type: 'movie' | 'serie' }): Promise<Detail> => {
+const loadDetail = async (item: { id: string; type: 'movie' | 'serie' }): Promise<Detail> => {
         try {
             if (item.type === 'movie') {
                 const d = await fetchMovieDetails(item.id);
-                return { key: `movie:${item.id}`, title: d?.title || 'Sin título', poster: d?.poster_path || null };
+                return { key: `movie:${item.id}`, title: d?.title || 'Sin título', poster: d?.poster_path || null, runtime: Number(d?.runtime) > 0 ? Number(d.runtime) : null };
             }
             const d = await fetchSerieDetails(item.id);
             // Total de episodios por temporada (para la regla por volumen de los binges)
@@ -52,13 +56,13 @@ const details: Detail[] = await processBatch(
             for (const s of d?.seasons ?? []) {
                 if (s.season_number > 0 && s.episode_count > 0) seasons[s.season_number] = s.episode_count;
             }
-            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null, seasons };
+            const avg = Number(d?.episode_run_time?.[0]) || Number(d?.last_episode_to_air?.runtime) || null;
+            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null, seasons, runtime: avg, ended: d?.status === 'Ended' || d?.status === 'Canceled' };
         } catch {
             return { key: `${item.type}:${item.id}`, title: 'Sin título', poster: null };
         }
-    },
-    10
-);
+};
+const details: Detail[] = await processBatch(fetchers, loadDetail, 10);
 const detailsMap = new Map<string, Detail>(details.map(d => [d.key, d]));
 
 // El cubo de día se calcula en hora de Madrid (appDateParts), NO con
@@ -91,16 +95,7 @@ for (const ev of windowEvents) {
 // de inserción: anclar al inicio puede crear el grupo de ayer antes que el de hoy.
 const groupEntries = Array.from(groups.entries())
     .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
-    .map(([, g]) => [g.label, g.events] as [string, ActivityEvent[]]);
-
-// Medianoche local del servidor — la usa el heatmap/racha de abajo (se conserva
-// su cálculo previo; el agrupado del feed ya no depende de esto).
-const todayStart = new Date();
-todayStart.setHours(0, 0, 0, 0);
-
-const windowLabel = page === 1
-    ? `Últimos ${DAYS_PER_PAGE} días`
-    : `Entre hace ${(page - 1) * DAYS_PER_PAGE} y ${page * DAYS_PER_PAGE} días`;
+    .map(([k, g]) => [g.label, g.events, k] as [string, ActivityEvent[], string]);
 
 // Categoría de acción por colección (rediseño "timeline con momentum")
 type Cat = 'visto' | 'fav' | 'like' | 'ep' | 'pend' | 'pronto' | 'seguir' | 'rewatch' | 'rating' | 'person'
@@ -131,15 +126,6 @@ const CAT_ICON: Record<Cat, string> = {
     remove: 'circle-minus', unfollow: 'user-minus', abandon: 'pause', resume: 'rotate-ccw', reorder: 'arrow-up-down',
 };
 
-// Badges-resumen de cada día (conteo por categoría, en orden de aparición)
-function daySummary(events: ActivityEvent[]): [Cat, number][] {
-    const counts = new Map<Cat, number>();
-    for (const ev of events) {
-        const c = catOf(ev);
-        counts.set(c, (counts.get(c) ?? 0) + 1);
-    }
-    return Array.from(counts.entries());
-}
 
 // Chips de la fila-binge: episodios agrupados por temporada (ya vienen ordenados).
 // Se conserva el `ts` de cada episodio para poder desplegar su hora exacta.
@@ -160,12 +146,6 @@ function seasonGroups(eps: { season: number; episode: number; ts?: number }[]): 
  */
 const RANGE_MIN_MS = 2 * 60 * 1000;
 const fmtHm = (ts: number) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: APP_TZ });
-function timeText(ev: ActivityEvent): string {
-    const end = fmtHm(ev.timestamp);
-    if (ev.startTs == null || ev.timestamp - ev.startTs < RANGE_MIN_MS) return end;
-    const start = fmtHm(ev.startTs);
-    return start === end ? end : `${start}–${end}`;
-}
 
 // Regla por volumen de los binges (§6 del handoff): el render depende de CUÁNTO
 // se marcó ese día — texto / chips de episodio / chips de temporada / resumen+barra.
@@ -222,74 +202,416 @@ function bingeView(ev: ActivityEvent, detail?: Detail): BingeView {
     return { mode: 'summary', verb, meta, pct, breakdown };
 }
 
-// Heatmap de racha — SIEMPRE actual (de allEvents, independiente de la ventana)
-const HEAT_WEEKS = 16;
-const dayCounts = new Map<number, number>();
+// =====================================================================================
+// 9.5a · Actividad v2 (docs/Rediseño/design_handoff_actividad) con el ajuste de Fran: TODO en su
+// orden (la gracia es ver qué hiciste y cuándo). Lo que viste (vistas, episodios, valoraciones,
+// re-visionados, favoritas, me gusta y personas) en filas grandes; los cambios de listas en filas
+// finas de una línea, en su hora, sin plegar. Varias acciones SEGUIDAS del mismo título en ≤ 30 min y
+// del mismo peso van en una fila, en su orden con flechas («Dejaste de seguir ×2 → Quitada de
+// Pendientes»). Dos tandas seguidas de episodios de la misma serie se juntan antes de bingeView.
+// =====================================================================================
+const LIST_CATS = new Set<Cat>(['pend', 'pronto', 'seguir', 'remove', 'unfollow', 'abandon', 'resume', 'reorder']);
+const GROUP_MS = 30 * 60 * 1000;
+// La acción que da el icono y el color del punto de una fila (la primera de esta lista que tenga).
+const PRIMARY_ORDER: Cat[] = ['ep', 'rating', 'rewatch', 'visto', 'fav', 'like', 'person'];
+// Texto de cada acción en la fila: el completo de siempre («Marcada como vista», «Añadida a Favoritos»…; Fran, 5-11).
+const SHORT_ACTION: Record<string, string> = { 'Vuelto a ver': 'Volviste a verla' };
+const shortAction = (ev: ActivityEvent) => SHORT_ACTION[ev.action] ?? ev.action.replace(/ · ★ .*$/, '');
+const KIND_LABEL = { movie: 'Película', serie: 'Serie', person: 'Persona' } as const;
+const isBingeEv = (ev: ActivityEvent) => ev.collection === 'WatchedEpisodes' && (ev.episodes?.length ?? 0) > 0;
+const ratingOf = (ev: ActivityEvent) => {
+    const m = /★\s*([\d.,]+)/.exec(ev.action);
+    return m ? Number(m[1].replace(',', '.')) : null;
+};
+const fmtScore = (n: number) => (Math.round(n * 10) / 10).toString().replace('.', ',');
+
+// Re-visionados: «3.ª vez» = la primera vez + los re-visionados hasta ese (de toda la historia).
+const rewatchNth = new Map<ActivityEvent, number>();
+{
+    const byTitle = new Map<string, ActivityEvent[]>();
+    for (const ev of allEvents) if (ev.collection === 'Rewatch') {
+        const k = `${ev.type}:${ev.id}`;
+        (byTitle.get(k) ?? byTitle.set(k, []).get(k)!).push(ev);
+    }
+    for (const list of byTitle.values()) list.sort((a, b) => a.timestamp - b.timestamp).forEach((ev, i) => rewatchNth.set(ev, i + 2));
+}
+
+/** Un paso de la secuencia de una fila: una acción (o la misma repetida seguida, «×2»). */
+interface TlStep { ev: ActivityEvent; cat: Cat; label: string; n: number }
+interface TlRow {
+    key: string;
+    type: ActivityEvent['type'];
+    id: string;
+    list: boolean;                // fila fina de cambios de listas
+    events: ActivityEvent[];      // del más nuevo al más antiguo
+    primary: ActivityEvent;       // da el punto (icono y color) y, si es un maratón, la regla bingeView
+    cats: Cat[];                  // para el filtro
+    steps: TlStep[];              // en su orden, del más antiguo al más nuevo
+}
+function buildRow(events: ActivityEvent[], list: boolean): TlRow {
+    const cats = [...new Set(events.map(catOf))];
+    const primary = list ? events[0] : (PRIMARY_ORDER.map((c) => events.find((e) => catOf(e) === c)).find(Boolean) ?? events[0]);
+    const steps: TlStep[] = [];
+    for (const ev of [...events].reverse()) {
+        const label = shortAction(ev);
+        const last = steps[steps.length - 1];
+        // La misma acción repetida seguida (salvo valoraciones, cada una con su nota) → «×2».
+        if (last && last.label === label && catOf(ev) !== 'rating') last.n++;
+        else steps.push({ ev, cat: catOf(ev), label, n: 1 });
+    }
+    return { key: `${primary.type}:${primary.id}`, type: primary.type, id: primary.id, list, events, primary, cats, steps };
+}
+/** Junta dos tandas seguidas de episodios de la misma serie (≤ 30 min): «Death Note · 4 episodios». */
+function mergeBinges(events: ActivityEvent[]): ActivityEvent[] {
+    const out: ActivityEvent[] = [];
+    for (const ev of events) {
+        const prev = out[out.length - 1];
+        if (prev && isBingeEv(prev) && isBingeEv(ev) && prev.id === ev.id && (prev.startTs ?? prev.timestamp) - ev.timestamp <= GROUP_MS) {
+            const eps = [...(ev.episodes ?? []), ...(prev.episodes ?? [])]
+                .sort((a, b) => a.season - b.season || a.episode - b.episode);
+            out[out.length - 1] = { ...prev, startTs: Math.min(ev.startTs ?? ev.timestamp, prev.startTs ?? prev.timestamp), episodes: eps };
+        } else out.push(ev);
+    }
+    return out;
+}
+/** Un día, en su orden: filas grandes (lo que viste) y finas (cambios de listas). */
+function buildDay(rawEvents: ActivityEvent[]) {
+    const events = mergeBinges(rawEvents);
+    const rows: TlRow[] = [];
+    let cur: { key: string; list: boolean; binge: boolean; events: ActivityEvent[] } | null = null;
+    for (const ev of events) {
+        const key = `${ev.type}:${ev.id}`;
+        const list = LIST_CATS.has(catOf(ev));
+        const binge = isBingeEv(ev);
+        if (cur && !binge && !cur.binge && cur.key === key && cur.list === list && cur.events[cur.events.length - 1].timestamp - ev.timestamp <= GROUP_MS) {
+            cur.events.push(ev);
+        } else {
+            if (cur) rows.push(buildRow(cur.events, cur.list));
+            cur = { key, list, binge, events: [ev] };
+        }
+    }
+    if (cur) rows.push(buildRow(cur.events, cur.list));
+    // Cabecera del día: lo que viste (películas, episodios, valoraciones, re-visionados) y personas.
+    let pelis = 0, eps = 0, vals = 0, revs = 0, changes = 0;
+    const people = new Set<string>();
+    for (const ev of events) {
+        const c = catOf(ev);
+        if (c === 'visto' && ev.type === 'movie') pelis++;
+        else if (c === 'ep') eps += ev.episodes?.length ?? 1;
+        else if (c === 'rating') vals++;
+        else if (c === 'rewatch') revs++;
+        else if (c === 'person') people.add(ev.id);
+        else if (LIST_CATS.has(c)) changes++;
+    }
+    const plural = (n: number, a: string, b: string) => `${n} ${n === 1 ? a : b}`;
+    const seen = [
+        pelis ? plural(pelis, 'película', 'películas') : '', eps ? plural(eps, 'episodio', 'episodios') : '',
+        vals ? plural(vals, 'valoración', 'valoraciones') : '', revs ? plural(revs, 're-visionado', 're-visionados') : '',
+    ].filter(Boolean);
+    const dur = fmtDur(screenTime(events));
+    const meta = seen.length ? (dur ? [dur, ...seen] : seen) : ['Nada visto'];
+    if (people.size) meta.push(plural(people.size, 'persona', 'personas'));
+    if (changes) meta.push(plural(changes, 'cambio en tus listas', 'cambios en tus listas'));
+    return { rows, meta };
+}
+const isoOf = (ts: number) => new Date(ts).toISOString();
+
+// =====================================================================================
+// 9.5d · Tiempo en pantalla: duración de las películas vistas (y re-vistas) y de cada episodio visto.
+// Los episodios salen de `/tv/{id}/season/{n}` (una llamada por temporada distinta del mes, con caché);
+// si falta alguno, se usa la media de la serie y la cifra lleva «≈». Los marcados en bloque cuentan.
+// =====================================================================================
+const seasonRt = await getSeasonRuntimes(
+    windowEvents.filter((e) => catOf(e) === 'ep' && e.episodes?.length).flatMap((e) => e.episodes!.map((x) => ({ id: e.id, season: x.season }))),
+);
+function screenTime(events: ActivityEvent[]) {
+    let min = 0, approx = false;
+    for (const ev of events) {
+        const c = catOf(ev);
+        if (c === 'ep') {
+            const avg = detailsMap.get(`serie:${ev.id}`)?.runtime ?? 0;
+            if (!ev.episodes?.length) { min += avg; approx = true; continue; }
+            for (const e of ev.episodes) {
+                const exact = seasonRt.get(seasonKey(ev.id, e.season))?.[e.episode];
+                if (exact) min += exact; else { min += avg; approx = true; }
+            }
+        } else if ((c === 'visto' || c === 'rewatch') && ev.type === 'movie') {
+            const r = detailsMap.get(`movie:${ev.id}`)?.runtime;
+            if (r) min += r; else approx = true;
+        }
+    }
+    return { min, approx };
+}
+/** «2 h 16 min», «45 min», «31 h»; con «≈» si hay algo estimado. Vacío si no hay nada. */
+function fmtDur({ min, approx }: { min: number; approx: boolean }, short = false) {
+    if (!min) return '';
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    const txt = short ? (h ? `${h} h` : `${m} min`) : [h ? `${h} h` : '', m || !h ? `${m} min` : ''].filter(Boolean).join(' ');
+    return `${approx ? '≈ ' : ''}${txt}`;
+}
+
+// =====================================================================================
+// 9.5b · Panel del periodo (derecha) y filtros. Todo sale de allEvents (ya cargados): racha con la
+// regla nueva (solo cuenta lo que VISTE: vistas, episodios y re-visionados; hoy no la rompe hasta
+// que acaba), la mejor racha, el calendario del mes, sus cifras con contexto, lo más visto y
+// «hace un año». Fechas siempre en hora de Madrid (claves YYYY-MM-DD), como los días del feed.
+// =====================================================================================
+const WATCH_CATS = new Set<Cat>(['visto', 'ep', 'rewatch']);
+const plural = (n: number, a: string, b: string) => `${n} ${n === 1 ? a : b}`;
+/** Nº de día absoluto de una clave YYYY-MM-DD (y vuelta), para contar días seguidos. */
+const dayNum = (key: string) => { const [y, m, d] = key.split('-').map(Number); return Math.round(Date.UTC(y, m - 1, d) / DAY_MS); };
+const keyOf = (n: number) => new Date(n * DAY_MS).toISOString().slice(0, 10);
+const fmtN = (n: number, o: Intl.DateTimeFormatOptions) => new Date(n * DAY_MS).toLocaleDateString('es-ES', { ...o, timeZone: 'UTC' });
+const todayN = dayNum(todayKey);
+const thisYear = Number(todayKey.slice(0, 4));
+/** «2 de octubre» (con el año si no es este). */
+const dateLong = (n: number) => fmtN(n, { day: 'numeric', month: 'long', ...(Number(keyOf(n).slice(0, 4)) !== thisYear ? { year: 'numeric' } : {}) });
+/** «el martes» si fue esta semana; si no, «el 2 de octubre». */
+const dayWord = (n: number) => (todayN - n < 7 ? `el ${fmtN(n, { weekday: 'long' })}` : `el ${dateLong(n)}`);
+
+// Lo que viste por día (cada episodio cuenta) y días con otra actividad (listas, notas, favoritas…).
+const seenPerDay = new Map<number, number>();
+const otherDays = new Set<number>();
 for (const ev of allEvents) {
-    const d = new Date(ev.timestamp);
-    d.setHours(0, 0, 0, 0);
-    dayCounts.set(d.getTime(), (dayCounts.get(d.getTime()) ?? 0) + 1);
-}
-
-// Racha: días consecutivos con ≥1 evento hasta hoy (si hoy aún no hay, desde ayer)
-let streak = 0;
-{
-    const cursor = new Date(todayStart);
-    if (!dayCounts.has(cursor.getTime())) cursor.setDate(cursor.getDate() - 1);
-    while (dayCounts.has(cursor.getTime())) {
-        streak++;
-        cursor.setDate(cursor.getDate() - 1);
-    }
-}
-
-// Celdas: 16 semanas completas L-D acabando en la actual (columna = semana)
-function heatLevel(n: number): string {
-    if (n >= 6) return 'l4';
-    if (n >= 4) return 'l3';
-    if (n >= 2) return 'l2';
-    if (n >= 1) return 'l1';
-    return '';
-}
-const heatStart = new Date(todayStart);
-heatStart.setDate(heatStart.getDate() - ((heatStart.getDay() + 6) % 7) - (HEAT_WEEKS - 1) * 7);
-const heatCells: { level: string; off: boolean }[] = [];
-{
-    const cursor = new Date(heatStart);
-    for (let i = 0; i < HEAT_WEEKS * 7; i++) {
-        const ts = cursor.getTime();
-        heatCells.push({ level: heatLevel(dayCounts.get(ts) ?? 0), off: ts > todayStart.getTime() });
-        cursor.setDate(cursor.getDate() + 1);
-    }
-}
-
-// Chips de filtro (Todo + las 5 categorías con tile propio)
-const FILTERS: [Cat, string][] = [
-    ['visto', 'Vistas'], ['fav', 'Favoritos'], ['like', 'Me gusta'],
-    ['ep', 'Episodios'], ['rating', 'Valoraciones'], ['rewatch', 'Re-visionado'], ['pend', 'Pendientes'],
-    ['person', 'Personas'], ['remove', 'Quitados'], ['abandon', 'Abandonadas'],
-];
-
-// KPIs del periodo (episodios = nº real de episodios, no de eventos)
-const kpis = { visto: 0, fav: 0, like: 0, ep: 0, pend: 0, rewatch: 0, rating: 0, person: 0 };
-for (const ev of windowEvents) {
     const c = catOf(ev);
-    if (c === 'ep') kpis.ep += ev.episodes?.length ?? 1;
-    else if (c in kpis) kpis[c as 'visto' | 'fav' | 'like' | 'pend' | 'rewatch' | 'rating' | 'person']++;
+    if (WATCH_CATS.has(c)) {
+        const stamps = c === 'ep' && ev.episodes?.length ? ev.episodes.map((e) => e.ts ?? ev.timestamp) : [ev.timestamp];
+        for (const ts of stamps) { const n = dayNum(appDateParts(ts).key); seenPerDay.set(n, (seenPerDay.get(n) ?? 0) + 1); }
+    } else if (c !== 'person') otherDays.add(dayNum(appDateParts(ev.timestamp).key));
 }
 
-// Tiles KPI (se renderizan dos veces: banda desktop y colapsable móvil)
-const KPI_TILES: { cat: Cat; icon: string; n: number; label: string }[] = [
-    { cat: 'visto',   icon: 'eye',       n: kpis.visto,   label: 'Vistas' },
-    { cat: 'fav',     icon: 'star',      n: kpis.fav,     label: 'Favoritos' },
-    { cat: 'like',    icon: 'heart',     n: kpis.like,    label: 'Me gusta' },
-    { cat: 'ep',      icon: 'play',      n: kpis.ep,      label: 'Episodios' },
-    { cat: 'rating',  icon: 'medal',     n: kpis.rating,  label: 'Valoraciones' },
-    { cat: 'rewatch', icon: 'repeat',    n: kpis.rewatch, label: 'Re-visionados' },
-    { cat: 'pend',    icon: 'bookmark',  n: kpis.pend,    label: 'Pendientes' },
-    { cat: 'person',  icon: 'user-plus', n: kpis.person,  label: 'Personas' },
+// Racha: tramos de días seguidos viendo algo.
+type Run = { start: number; end: number };
+const runs: Run[] = [];
+for (const n of [...seenPerDay.keys()].sort((a, b) => a - b)) {
+    const last = runs[runs.length - 1];
+    if (last && n === last.end + 1) last.end = n; else runs.push({ start: n, end: n });
+}
+const runLen = (r: Run) => r.end - r.start + 1;
+const lastRun = runs[runs.length - 1];
+const curRun = lastRun && lastRun.end >= todayN - 1 ? lastRun : null;   // hoy aún no la rompe
+let bestRun: Run | null = null;
+for (const r of runs) if (!bestRun || runLen(r) >= runLen(bestRun)) bestRun = r;   // empate: la más reciente
+const streak = curRun ? runLen(curRun) : 0;
+const streakText = curRun
+    ? (streak === 1
+        ? (curRun.end === todayN ? 'Hoy has visto algo. Mañana, el segundo día.' : 'Ayer viste algo; hoy, todavía no.')
+        : `Viendo algo cada día desde el ${dateLong(curRun.start)}.${curRun.end < todayN ? ' Hoy, todavía no.' : ''}`)
+    : lastRun
+        ? `Ahora mismo sin racha. La última: ${plural(runLen(lastRun), 'día', 'días')}, ${runLen(lastRun) === 1 ? dayWord(lastRun.end) : `del ${dateLong(lastRun.start)} al ${dateLong(lastRun.end)}`}.`
+        : 'Aún no has visto nada.';
+const bestText = !bestRun || runLen(bestRun) < 2 ? null
+    : bestRun === curRun ? { pre: 'Es tu mejor racha', b: '', post: ' hasta ahora' }
+    : { pre: 'Tu mejor: ', b: plural(runLen(bestRun), 'día', 'días'), post: `, en ${fmtN(bestRun.end, { month: 'long', year: 'numeric' })}` };
+
+// El mes del panel: el de la página (al bajar a otro mes, el navegador cambia al panel de ese mes).
+const monthKey = mes;
+const [vy, vm] = monthKey.split('-').map(Number);
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+const monthName = MONTHS[vm - 1];
+const prevMonthKey = vm === 1 ? `${vy - 1}-12` : `${vy}-${String(vm - 1).padStart(2, '0')}`;
+const prevMonthName = MONTHS[(vm + 10) % 12] + (vm === 1 ? ` de ${vy - 1}` : '');
+const isThisMonth = monthKey === todayKey.slice(0, 7);
+const todayDay = Number(todayKey.slice(8));
+
+// Calendario del mes (L-D): intensidad por lo que viste, punto si solo hubo otra actividad.
+const groupKeys = new Set(groupEntries.map((g) => g[2]));
+const firstN = dayNum(`${monthKey}-01`);
+const daysInMonth = new Date(Date.UTC(vy, vm, 0)).getUTCDate();
+const calLead = (new Date(firstN * DAY_MS).getUTCDay() + 6) % 7;
+const seenLevel = (v: number) => (v >= 5 ? 3 : v >= 2 ? 2 : v ? 1 : 0);
+const calCells = Array.from({ length: daysInMonth }, (_, i) => {
+    const n = firstN + i, v = seenPerDay.get(n) ?? 0, key = keyOf(n);
+    return { d: i + 1, key, v, lv: seenLevel(v), ch: !v && otherDays.has(n), fut: n > todayN, today: n === todayN, here: groupKeys.has(key) };
+});
+// 16 semanas (L-D, columna = semana), acabando en la actual.
+const HEAT_WEEKS = 16;
+const heatFirst = todayN - ((new Date(todayN * DAY_MS).getUTCDay() + 6) % 7) - (HEAT_WEEKS - 1) * 7;
+const heatCells = Array.from({ length: HEAT_WEEKS * 7 }, (_, i) => {
+    const n = heatFirst + i, v = seenPerDay.get(n) ?? 0;
+    return { lv: seenLevel(v), fut: n > todayN, label: `${dateLong(n)}${v ? `: ${plural(v, 'cosa vista', 'cosas vistas')}` : ''}` };
+});
+
+// Cifras del mes (hasta el día `maxDay`, para comparar «a día 5»).
+function monthStats(mk: string, maxDay = 31) {
+    const st = { eps: 0, pelis: 0, vals: 0, revs: 0 };
+    const inside = (ts: number) => { const k = appDateParts(ts).key; return k.startsWith(mk) && Number(k.slice(8)) <= maxDay; };
+    for (const ev of allEvents) {
+        const c = catOf(ev);
+        if (c === 'ep') { for (const e of ev.episodes?.length ? ev.episodes : [{ ts: ev.timestamp }]) if (inside(e.ts ?? ev.timestamp)) st.eps++; continue; }
+        if (!inside(ev.timestamp)) continue;
+        if (c === 'visto' && ev.type === 'movie') st.pelis++;
+        else if (c === 'rating') st.vals++;
+        else if (c === 'rewatch') st.revs++;
+    }
+    return st;
+}
+const mStats = monthStats(monthKey);
+const MONTH_NUMS = ([
+    ['eps', 'ep', 'play', 'episodio', 'episodios'], ['pelis', 'visto', 'eye', 'película', 'películas'],
+    ['vals', 'rating', 'medal', 'valoración', 'valoraciones'], ['revs', 'rewatch', 'repeat', 're-visionado', 're-visionados'],
+] as const).filter(([k]) => mStats[k] > 0).map(([k, cat, icon, one, many]) => ({ cat, icon, n: mStats[k], label: mStats[k] === 1 ? one : many }));
+// Contexto: en el mes en curso, frente al mes anterior A ESTE MISMO DÍA; en uno pasado, frente al anterior entero.
+const cmp = (() => {
+    const prev = monthStats(prevMonthKey, isThisMonth ? todayDay : 31);
+    const m = mStats.eps || prev.eps ? (['eps', 'episodio', 'episodios'] as const) : mStats.pelis || prev.pelis ? (['pelis', 'película', 'películas'] as const) : null;
+    if (!m) return null;
+    const [k, one, many] = m;
+    if (isThisMonth) return prev[k]
+        ? { pre: `A día ${todayDay} de ${prevMonthName} llevabas `, b: plural(prev[k], one, many), post: '.' }
+        : { pre: `A día ${todayDay} de ${prevMonthName} aún no llevabas `, b: k === 'eps' ? 'ningún episodio' : 'ninguna película', post: '.' };
+    const diff = mStats[k] - prev[k];
+    if (diff === 0) return { pre: '', b: `Los mismos ${many}`, post: ` que en ${prevMonthName}.` };
+    return diff > 0
+        ? { pre: '', b: `+${plural(diff, one, many)}`, post: ` que en ${prevMonthName}.` }
+        : { pre: '', b: `${plural(-diff, one, many)} menos`, post: ` que en ${prevMonthName}.` };
+})();
+
+// Lo más visto del mes: títulos con más episodios o vistas.
+const topMap = new Map<string, { type: 'movie' | 'serie'; id: string; eps: number; views: number; last: number }>();
+for (const ev of allEvents) {
+    const c = catOf(ev);
+    if (!WATCH_CATS.has(c) || ev.type === 'person') continue;
+    const k = `${ev.type}:${ev.id}`;
+    const stamps = c === 'ep' && ev.episodes?.length ? ev.episodes.map((e) => e.ts ?? ev.timestamp) : [ev.timestamp];
+    for (const ts of stamps) {
+        if (!appDateParts(ts).key.startsWith(monthKey)) continue;
+        const t = topMap.get(k) ?? topMap.set(k, { type: ev.type as 'movie' | 'serie', id: ev.id, eps: 0, views: 0, last: 0 }).get(k)!;
+        if (c === 'ep') t.eps++; else t.views++;
+        t.last = Math.max(t.last, ts);
+    }
+}
+const topList = [...topMap.entries()]
+    .sort((a, b) => (b[1].eps + b[1].views) - (a[1].eps + a[1].views) || b[1].last - a[1].last)
+    .slice(0, 3)
+    .map(([key, t]) => ({ key, ...t, value: t.eps ? plural(t.eps, 'episodio', 'episodios') : t.views === 1 ? 'vista' : `${t.views} veces` }));
+const showTop = topMap.size >= 2;
+
+// Hace un año (solo en la página de hoy): ese día o, si no hubo nada, el más cercano en ±3 días.
+const agoView = (() => {
+    if (!isThisMonth) return null;
+    const target = dayNum(`${thisYear - 1}${todayKey.slice(4)}`);
+    for (const off of [0, -1, 1, -2, 2, -3, 3]) {
+        const n = target + off;
+        const evs = allEvents.filter((ev) => ev.type !== 'person' && (WATCH_CATS.has(catOf(ev)) || catOf(ev) === 'rating') && dayNum(appDateParts(ev.timestamp).key) === n);
+        if (!evs.length) continue;
+        const rank = (ev: ActivityEvent) => ({ visto: ev.type === 'movie' ? 0 : 3, rewatch: 1, ep: 2, rating: 4 } as Record<string, number>)[catOf(ev)] ?? 5;
+        const ev = [...evs].sort((a, b) => rank(a) - rank(b) || (b.episodes?.length ?? 0) - (a.episodes?.length ?? 0))[0];
+        const c = catOf(ev);
+        const score = ratingOf(evs.find((e) => catOf(e) === 'rating' && e.id === ev.id && e.type === ev.type) ?? ({ action: '' } as ActivityEvent));
+        const scoreTxt = score != null ? fmtScore(score) : null;
+        const verb = c === 'rewatch' ? 'volviste a ver'
+            : c === 'ep' ? `viste ${plural(ev.episodes?.length || 1, 'episodio', 'episodios')} de`
+            : c === 'rating' ? 'valoraste' : 'viste';
+        const tail = c === 'rating' ? (scoreTxt ? ` con un ${scoreTxt}` : '') : scoreTxt ? ` y le pusiste un ${scoreTxt}` : '';
+        return { key: `${ev.type}:${ev.id}`, type: ev.type, id: ev.id, date: fmtN(n, { day: 'numeric', month: 'long', year: 'numeric' }), verb, tail };
+    }
+    return null;
+})();
+
+// Títulos del panel que no salen en la ventana: se piden aparte (misma caché que el resto).
+{
+    const extra = new Map<string, { id: string; type: 'movie' | 'serie' }>();
+    for (const t of [...(showTop ? topList : []), ...(agoView ? [agoView] : [])])
+        if (!detailsMap.has(t.key)) extra.set(t.key, { id: t.id, type: t.type as 'movie' | 'serie' });
+    if (extra.size) for (const d of await processBatch(Array.from(extra.values()), loadDetail, 6)) detailsMap.set(d.key, d);
+}
+const hrefOf = (type: string, id: string) => (type === 'movie' ? `/movie/${id}` : `/serie/${id}`);
+
+// ---- 9.5e · Momentos ----
+// Hitos en el eje, contando desde el principio y en orden: cada 100 episodios («Tu episodio 2.100»),
+// cada 100 películas («Tu película 500») y cada 25 películas en un año («50 películas este año»).
+// Un marcado en bloque que cruza varios cientos se queda con el más alto.
+const fmtInt = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const milestones = new Map<ActivityEvent, string[]>();
+{
+    let eps = 0, movies = 0;
+    const perYear = new Map<number, number>();
+    for (const ev of [...allEvents].sort((a, b) => a.timestamp - b.timestamp)) {
+        const c = catOf(ev), out: string[] = [];
+        if (c === 'ep') {
+            const before = eps; eps += ev.episodes?.length || 1;
+            const hit = Math.floor(eps / 100) * 100;
+            if (hit > before && hit > 0) out.push(`Tu episodio ${fmtInt(hit)}`);
+        } else if (c === 'visto' && ev.type === 'movie') {
+            movies++;
+            if (movies % 100 === 0) out.push(`Tu película ${fmtInt(movies)}`);
+            const y = appDateParts(ev.timestamp).year, ny = (perYear.get(y) ?? 0) + 1;
+            perYear.set(y, ny);
+            if (ny % 25 === 0) out.push(`${ny} películas ${y === thisYear ? 'este año' : `en ${y}`}`);
+        }
+        if (out.length) milestones.set(ev, out);
+    }
+}
+/** «Serie terminada»: en esta fila cae el último episodio de una serie que ya acabó (Ended/Canceled). */
+const finishesSeries = (r: TlRow) => {
+    const d = detailsMap.get(r.key);
+    if (r.type !== 'serie' || !d?.ended || !d.seasons) return false;
+    const last = Math.max(...Object.keys(d.seasons).map(Number));
+    if (!Number.isFinite(last)) return false;
+    return r.events.some((e) => e.episodes?.some((x) => x.season === last && x.episode === d.seasons![last]));
+};
+// Hoy sin nada (en el mes en curso): «Aún nada hoy.» y el siguiente episodio de lo último que estabas viendo.
+const todayEmpty = isThisMonth && windowEvents.length > 0 && !groupKeys.has(todayKey);
+const nextUp = todayEmpty
+    ? await (async () => {
+        const lastEp = allEvents.filter((e) => catOf(e) === 'ep').sort((a, b) => b.timestamp - a.timestamp)[0];
+        return lastEp ? await getNextEpisode(lastEp.id).catch(() => null) : null;
+    })()
+    : null;
+
+// ---- Filtros: segmentado Todo · Lo que viste · Listas · Personas + «Más filtros» (casillas por tipo) ----
+const CAT_LABEL: Record<Cat, string> = {
+    visto: 'Vista', ep: 'Episodios', rating: 'Valoración', rewatch: 'Re-visionado', fav: 'Favorita', like: 'Me gusta',
+    pend: 'Pendiente', pronto: 'Ver pronto', seguir: 'Siguiendo', remove: 'Quitada de una lista', unfollow: 'Dejaste de seguir',
+    abandon: 'Abandonada', resume: 'Retomada', reorder: 'Reordenada', person: 'Personas',
+};
+const FILTER_GROUPS: [string, Cat[]][] = [
+    ['Lo que viste', ['visto', 'ep', 'rating', 'rewatch', 'fav', 'like']],
+    ['Listas', ['pend', 'pronto', 'seguir', 'remove', 'unfollow', 'abandon', 'resume', 'reorder']],
+    ['Personas', ['person']],
 ];
-// Cifras del periodo en la fila única del sistema v2 (los ceros se agrupan en una línea).
-const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.icon, tone: t.cat }));
+const days = groupEntries.map(([label, events, dkey]) => ({ label, events, dkey, day: buildDay(events) }));
+const allRows = days.flatMap((d) => d.day.rows);
+const countRows = (cats: Cat[]) => allRows.filter((r) => cats.length === 0 || r.cats.some((c) => cats.includes(c))).length;
+const catCount = new Map<Cat, number>(FILTER_GROUPS.flatMap(([, cs]) => cs).map((c) => [c, countRows([c])]));
+const SEGMENTS: { id: string; label: string; cats: Cat[] }[] = [
+    { id: 'all', label: 'Todo', cats: [] },
+    { id: 'seen', label: 'Lo que viste', cats: ['visto', 'ep', 'rating'] },   // por defecto; el resto, desde «Más filtros»
+    { id: 'lists', label: 'Listas', cats: FILTER_GROUPS[1][1] },
+    { id: 'people', label: 'Personas', cats: ['person'] },
+];
+// El filtro viaja en la URL (?f=visto,ep,rating) y se aplica ya en el servidor (sin parpadeo).
+const activeF = (url.searchParams.get('f') ?? '').split(',').filter((c): c is Cat => c in CAT_LABEL);
+const activeSeg = activeF.length === 0 ? 'all'
+    : SEGMENTS.find((sg) => sg.id !== 'all' && sg.cats.length === activeF.length && sg.cats.every((c) => activeF.includes(c)))?.id ?? null;
+// Con solo cambios de listas en pantalla (filtro «Listas» o casillas solo de listas), esas filas pasan a
+// tarjeta compacta: sin las tarjetas grandes alrededor, las líneas finas sueltas perdían el estilo (Fran).
+const onlyLists = activeF.length > 0 && activeF.every((c) => LIST_CATS.has(c));
+const showRow = (cats: Cat[]) => activeF.length === 0 || cats.some((c) => activeF.includes(c));
+const visibleRows = allRows.filter((r) => showRow(r.cats)).length;
+// ---- 9.5c · Moverse por meses ----
+const monthHref = (mk: string | null, hash = '') => {
+    const q: string[] = [];
+    if (mk && mk !== curMonth) q.push(`mes=${mk}`);
+    if (activeF.length) q.push(`f=${activeF.join(',')}`);
+    return `/mislistas/actividad${q.length ? `?${q.join('&')}` : ''}${hash}`;
+};
+const shiftMonth = (mk: string, d: number) => { const [y, m] = mk.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1 + d, 1)); return t.toISOString().slice(0, 7); };
+const monthTitle = (mk: string) => { const [y, m] = mk.split('-').map(Number); return `${MONTHS[m - 1].charAt(0).toUpperCase()}${MONTHS[m - 1].slice(1)} ${y}`; };
+const prevMonth = shiftMonth(mes, -1), nextMonth = mes < curMonth ? shiftMonth(mes, 1) : null;
+// Selector: de el primer año con actividad a este; cada mes con punto si tuvo algo, los futuros fuera.
+const firstYear = Math.min(vy, ...[...activeMonths].map((m) => Number(m.slice(0, 4))));
+const pickerYears = Array.from({ length: thisYear - firstYear + 1 }, (_, i) => firstYear + i);
+const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+// Separador al seguir con este mes debajo del siguiente: «Octubre 2026 · 64 episodios · 6 películas».
+const mTime = screenTime(windowEvents);
+const mTimeTxt = fmtDur(mTime);
+const monthSep = [
+    mTimeTxt,
+    mStats.eps ? plural(mStats.eps, 'episodio', 'episodios') : '', mStats.pelis ? plural(mStats.pelis, 'película', 'películas') : '',
+    mStats.vals ? plural(mStats.vals, 'valoración', 'valoraciones') : '', mStats.revs ? plural(mStats.revs, 're-visionado', 're-visionados') : '',
+].filter(Boolean);
 ---
 <Layout title="Actividad">
     <ListsNav slot="aside" />
@@ -299,336 +621,591 @@ const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.ic
                 <h1>Actividad</h1>
                 <p>Tu historial en pantalla, día a día</p>
             </div>
-            <span class="act-live">
-                {page === 1 && <span class="pulse"></span>}
-                {page === 1 ? `EN VIVO · ${windowLabel.toUpperCase()}` : windowLabel.toUpperCase()}
-            </span>
+            {/* 9.5c · ‹ Noviembre 2026 › — el del medio abre el selector de mes. */}
+            <nav class="ac-per" aria-label="Elegir mes">
+                <a class="ar" href={monthHref(prevMonth)} aria-label={`Mes anterior: ${monthTitle(prevMonth)}`}><Icon name="lucide:chevron-left" /></a>
+                <details class="ac-mpk">
+                    <summary class="mo" aria-label={`${monthTitle(mes)}. Elegir otro mes`}><Icon name="lucide:calendar" />{monthTitle(mes)}<Icon name="lucide:chevron-down" class="car" /></summary>
+                    <div class="ac-pop ac-mp" role="dialog" aria-label="Elegir mes">
+                        {pickerYears.map((y) => (
+                            <div class="yr" data-y={y} hidden={y !== vy}>
+                                <div class="hd">
+                                    <button type="button" data-go={y - 1} disabled={y === firstYear} aria-label={`Año ${y - 1}`}><Icon name="lucide:chevron-left" /></button>
+                                    <b>{y}</b>
+                                    <button type="button" data-go={y + 1} disabled={y === thisYear} aria-label={`Año ${y + 1}`}><Icon name="lucide:chevron-right" /></button>
+                                </div>
+                                <div class="g">
+                                    {MONTH_SHORT.map((m, i) => {
+                                        const mk = `${y}-${String(i + 1).padStart(2, '0')}`;
+                                        const label = `${MONTHS[i]} de ${y}${activeMonths.has(mk) ? '' : ', sin actividad'}`;
+                                        return mk > curMonth
+                                            ? <span class="fut" aria-hidden="true">{m}<i></i></span>
+                                            : <a href={monthHref(mk)} class:list={{ on: mk === mes, nil: !activeMonths.has(mk) }} aria-current={mk === mes ? 'date' : undefined} aria-label={label}>{m}<i></i></a>;
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                        <div class="ft">
+                            <a href={monthHref(curMonth)}>Este mes</a>
+                            <a href={monthHref(shiftMonth(curMonth, -1))}>El mes pasado</a>
+                            <label class="go">Ir a un día… <input type="date" min={`${firstYear}-01-01`} max={todayKey} /></label>
+                        </div>
+                    </div>
+                </details>
+                {nextMonth
+                    ? <a class="ar" href={monthHref(nextMonth)} aria-label={`Mes siguiente: ${monthTitle(nextMonth)}`}><Icon name="lucide:chevron-right" /></a>
+                    : <span class="ar off" aria-disabled="true" aria-label="No hay mes siguiente"><Icon name="lucide:chevron-right" /></span>}
+                {mes !== curMonth && <a class="q" href={monthHref(curMonth)}>Volver a hoy</a>}
+            </nav>
         </header>
 
 
         <div class="act-grid">
-            <aside class="act-rail">
-                <ActivityHeatmap cells={heatCells} weeks={HEAT_WEEKS} streak={streak} />
-                <div class="act-filters">
-                    <button class="chip active" data-filter="all">Todo</button>
-                    {FILTERS.map(([c, l]) => (
-                        <button class="chip" data-filter={c}>
-                            <span class="dot" style={`background: var(--a-${c});`}></span>{l}
-                        </button>
-                    ))}
-                </div>
-            </aside>
-
             <div class="act-main">
-                <details class="act-collapse">
-                    <summary>
-                        <Icon name="lucide:play" /> Ver mi resumen del periodo
-                        <span class="chev"><Icon name="lucide:chevron-down" /></span>
-                    </summary>
-                    <div class="panel">
-                        <StatRow class="act-summary" items={KPI_ITEMS} />
-                        <ActivityHeatmap cells={heatCells} weeks={HEAT_WEEKS} streak={streak} />
+                {/* 9.5b · Filtros: segmentado + «Más filtros» con una casilla por tipo (los 15). Van en la URL. */}
+                {windowEvents.length > 0 && (
+                <div class="ac-fl" role="toolbar" aria-label="Filtrar la actividad">
+                    <div class="ac-seg" role="radiogroup" aria-label="Qué enseñar">
+                        {SEGMENTS.map((sg) => (
+                            <button type="button" role="radio" data-seg={sg.id} data-cats={sg.cats.join(' ')} aria-checked={activeSeg === sg.id ? 'true' : 'false'} class:list={{ on: activeSeg === sg.id }}>
+                                {sg.label}<span class="n">{countRows(sg.cats)}</span>
+                            </button>
+                        ))}
                     </div>
-                </details>
-
-                <div class="act-filters is-mobile">
-                    <button class="chip active" data-filter="all">Todo</button>
-                    {FILTERS.map(([c, l]) => (
-                        <button class="chip" data-filter={c}>
-                            <span class="dot" style={`background: var(--a-${c});`}></span>{l}
-                        </button>
-                    ))}
-                </div>
-
-                <StatRow class="act-summary is-desktop" items={KPI_ITEMS} />
-
-        {windowEvents.length === 0 && (
-            <EmptyState
-                size="lg"
-                title="Sin actividad en este periodo"
-                description={page === 1 ? 'Añade algo a tus colecciones para empezar tu historial.' : 'Retrocede más en el tiempo o vuelve al principio.'}
-            >
-                {page === 1
-                    ? <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] text-sm font-medium transition-colors">Explorar tendencias</a>
-                    : <a slot="cta" href="/mislistas/actividad" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors">Volver al inicio</a>
-                }
-            </EmptyState>
-        )}
-
-        <div class="act-timeline">
-            {groupEntries.map(([label, events]) => (
-                <div class="tl-day">
-                    <div class="tl-day-head">
-                        <span class="d">{label}</span>
-                        <span class="c">({events.length})</span>
-                        <span class="sum">
-                            {daySummary(events).map(([c, n]) => (
-                                <span class="b" style={`background: var(--a-${c}-bg); color: var(--a-${c});`}>
-                                    <Icon name={`lucide:${CAT_ICON[c]}`} /> {n}
-                                </span>
+                    <details class="ac-fx">
+                        <summary class="ac-more"><Icon name="lucide:sliders-horizontal" /><span class="lb">{activeSeg ? 'Más filtros' : 'Filtros'}</span><span class="b" hidden={!!activeSeg}>{activeF.length}</span></summary>
+                        <div class="ac-pop ac-fp" role="group" aria-label="Filtrar por tipo">
+                            {FILTER_GROUPS.map(([g, cats]) => (
+                                <fieldset>
+                                    <legend>{g}</legend>
+                                    {cats.map((c) => (
+                                        <label class="ac-cb">
+                                            <input type="checkbox" value={c} checked={activeF.includes(c)} />
+                                            <span class="ci" style={`--c: var(--a-${c}); --cb: var(--a-${c}-bg);`}><Icon name={`lucide:${CAT_ICON[c]}`} /></span>
+                                            {CAT_LABEL[c]}
+                                            <span class="n">{catCount.get(c) ?? 0}</span>
+                                        </label>
+                                    ))}
+                                </fieldset>
                             ))}
-                        </span>
-                    </div>
-                    {events.map(ev => {
-                        const d = detailsMap.get(`${ev.type}:${ev.id}`);
-                        const title = d?.title || 'Título desconocido';
-                        const poster = d?.poster;
-                        const href = ev.type === 'movie' ? `/movie/${ev.id}` : `/serie/${ev.id}`;
-                        const time = timeText(ev);
-                        const cat = catOf(ev);
-                        const isBinge = ev.collection === 'WatchedEpisodes' && (ev.episodes?.length ?? 0) > 0;
-                        const binge = isBinge ? bingeView(ev, d) : null;
-                        return binge ? (
-                            binge.mode === 'single' ? (
-                                <a href={href} class="ev" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="meta">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                            <span class="sep"></span>
-                                            <span>Serie</span>
+                        </div>
+                    </details>
+                    <button type="button" class="clr" hidden={!!activeSeg}>Quitar filtro</button>
+                </div>
+                )}
+
+        {windowEvents.length === 0 && (allEvents.length === 0 ? (
+            <EmptyState size="lg" title="Aún no hay actividad" description="Añade algo a tus colecciones para empezar tu historial.">
+                <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] text-sm font-medium transition-colors">Explorar tendencias</a>
+            </EmptyState>
+        ) : (
+            <EmptyState size="lg" title={`Nada en ${monthName} de ${vy}`} description={isThisMonth ? 'Este mes aún no has hecho nada. Lo que veas o guardes saldrá aquí.' : 'Ese mes no hiciste nada en tus listas.'}>
+                <a slot="cta" href={prevActive ? monthHref(prevActive) : monthHref(curMonth)} class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors">
+                    {prevActive ? `Ir a ${monthTitle(prevActive).toLowerCase()}` : 'Volver a hoy'}
+                </a>
+            </EmptyState>
+        ))}
+
+        {/* 9.5a · Línea de tiempo v2: días como secciones, filas planas con la hora en el eje, lo que
+            viste delante y los cambios de listas plegados al final de cada día. */}
+        <div class:list={['act-timeline', 'ac-tl', { 'only-lists': onlyLists }]}>
+          {/* Un bloque por mes: al bajar se añaden los anteriores (con su separador) sin cambiar de página. */}
+          <div class="ac-mblock" data-mes={mes}>
+            <div class="ac-mo"><h2>{monthTitle(mes)}</h2>{monthSep.length > 0 && <span>{monthSep.join(' · ')}</span>}</div>
+            {todayEmpty && (
+                <section class="ac-day ac-today" id={`d-${todayKey}`} aria-labelledby="d-hoy-h">
+                    <div class="ac-ax" aria-hidden="true"></div>
+                    <header class="ac-dh"><h2 id="d-hoy-h" class="d">Hoy</h2></header>
+                    <p class="ac-nil">
+                        Aún nada hoy.
+                        {nextUp && <> Lo siguiente: <a href={`/serie/${nextUp.id}/t${nextUp.next_season}/e${nextUp.next_episode}`}><b>{nextUp.name}</b> · T{nextUp.next_season} E{nextUp.next_episode}<Icon name="lucide:arrow-right" /></a></>}
+                    </p>
+                </section>
+            )}
+            {days.map(({ label, events, dkey, day }) => {
+                const anchorTs = events[events.length - 1].startTs ?? events[events.length - 1].timestamp;
+                return (
+                <section class="ac-day tl-day" id={`d-${dkey}`} aria-labelledby={`d-${dkey}-h`} hidden={!day.rows.some((r) => showRow(r.cats))}>
+                    <div class="ac-ax" aria-hidden="true"></div>
+                    <header class="ac-dh">
+                        <h2 id={`d-${dkey}-h`} class="d" data-day-ts={anchorTs}>{label}</h2>
+                        <span class="m">{day.meta.map((m, i) => <span>{i > 0 && '· '}{m}</span>)}</span>
+                    </header>
+                    <ul class="ac-list">
+                        {day.rows.map((r) => {
+                            const ev = r.primary;
+                            const cat = catOf(ev);
+                            const d = detailsMap.get(r.key);
+                            const isPerson = r.type === 'person';
+                            const title = isPerson ? (ev.name || 'Persona') : (d?.title || 'Título desconocido');
+                            const img = isPerson ? ev.profile_path : d?.poster;
+                            const href = isPerson ? `/actor/${r.id}` : r.type === 'movie' ? `/movie/${r.id}` : `/serie/${r.id}`;
+                            const end = r.events[0].timestamp;
+                            const start = Math.min(...r.events.map((e) => e.startTs ?? e.timestamp));
+                            const ranged = end - start >= RANGE_MIN_MS && fmtHm(start) !== fmtHm(end);
+                            const abbr = title.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+                            // Fila fina: un cambio de listas (o varios seguidos del mismo título, en su orden).
+                            if (r.list) return (
+                                <li class="ac-ln" data-cats={r.cats.join(' ')} hidden={!showRow(r.cats)}>
+                                    <time datetime={isoOf(end)} data-ts={end} data-ts-start={ranged ? start : undefined}>{ranged ? `${fmtHm(start)}–${fmtHm(end)}` : fmtHm(end)}</time>
+                                    <span class="ac-pip" style={`--c: var(--a-${cat});`} aria-hidden="true"></span>
+                                    <div class="ac-ln-b">
+                                        <a href={href} class:list={['ac-p', 'is-xs', { pr: isPerson }]} tabindex="-1" aria-hidden="true"><b>{abbr}</b>{img && <img src={posterUrl(img, 'w92')} alt="" loading="lazy" />}</a>
+                                        <p>
+                                            <a href={href}>{title}</a>
+                                            <span class="ac-seq">
+                                                {r.steps.map((st, i) => (
+                                                    <span class="ac-step">{i > 0 && <span class="ar" aria-label="y luego">→</span>}<Icon name={`lucide:${CAT_ICON[st.cat]}`} style={`color: var(--a-${st.cat})`} />{st.label}{st.n > 1 && <span class="x">×{st.n}</span>}</span>
+                                                ))}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </li>
+                            );
+                            const binge = isBingeEv(ev) ? bingeView(ev, d) : null;
+                            const epHref = (sn: number, en: number) => `/serie/${r.id}/t${sn}/e${en}`;
+                            // Un paso de la secuencia de lo que viste (la valoración, con sus estrellas).
+                            const stepView = (st: TlStep) => {
+                                if (st.cat === 'rating') {
+                                    const score = ratingOf(st.ev);
+                                    return score == null ? <span class="ac-lb" style="--c: var(--a-rating)">{st.label}</span> : (
+                                        <span class="ac-step">
+                                            <span class="ac-lb" style="--c: var(--a-rating)">{st.ev.action.startsWith('Nota actualizada') ? 'Cambiaste tu nota' : 'Has valorado'}</span>
+                                            <span class="ac-st" aria-label={`Tu nota: ${fmtScore(score)} de 10`}>
+                                                <span class="ac-stars" aria-hidden="true">★★★★★<span style={`width: ${Math.max(0, Math.min(100, score * 10))}%`}>★★★★★</span></span>
+                                                <b>{fmtScore(score)}</b><small>/10</small>
+                                            </span>
                                         </span>
-                                    </span>
-                                    <span class="time">{time}</span>
-                                    <Icon name="lucide:chevron-right" class="chev" />
-                                </a>
-                            ) : binge.mode === 'episodes' ? (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="body">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                        </span>
-                                        <span class="ep-chips">
-                                            {binge.groups.map(([season, eps]) => (
+                                    );
+                                }
+                                if (st.cat === 'rewatch') return <span class="ac-step"><span class="ac-lb" style="--c: var(--a-rewatch)">Volviste a verla</span>{rewatchNth.get(st.ev) ? ` · ${rewatchNth.get(st.ev)}.ª vez` : ''}</span>;
+                                return <span class="ac-step"><span class="ac-lb" style={`--c: var(--a-${st.cat})`}>{st.label}</span>{st.n > 1 && <span class="x">×{st.n}</span>}</span>;
+                            };
+                            const note = r.steps.find((st) => st.cat === 'rewatch' && st.ev.note)?.ev.note;
+                            const ms = r.events.flatMap((e) => milestones.get(e) ?? []);
+                            const msWith = (() => {
+                                const last = r.events[0];
+                                if (catOf(last) === 'ep' && last.episodes?.length) { const x = last.episodes[last.episodes.length - 1]; return `${title} · T${x.season} E${x.episode}`; }
+                                return title;
+                            })();
+                            const done = finishesSeries(r);
+                            return (<>
+                                {ms.length > 0 && (
+                                    <li class="ac-ms" data-cats={r.cats.join(' ')} hidden={!showRow(r.cats)}>
+                                        <span></span>
+                                        <span class="ac-dot" style="--c: var(--stamp-amber-ink); --cb: var(--stamp-amber);" aria-hidden="true"><Icon name="lucide:trophy" /></span>
+                                        <p>{ms.join(' · ')} <small>con {msWith}</small></p>
+                                    </li>
+                                )}
+                                <li class:list={['ac-ev', { 'is-person': isPerson }]} data-cats={r.cats.join(' ')} hidden={!showRow(r.cats)}>
+                                    <time class:list={{ rg: ranged }} datetime={isoOf(end)} data-ts={end} data-ts-start={ranged ? start : undefined}>
+                                        {ranged ? <>{fmtHm(start)}<br />{fmtHm(end)}</> : fmtHm(end)}
+                                    </time>
+                                    <span class="ac-dot" style={`--c: var(--a-${cat}); --cb: var(--a-${cat}-bg);`} aria-hidden="true"><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
+                                    <div class="ac-row">
+                                        <a href={href} class:list={['ac-p', { pr: isPerson }]} tabindex="-1" aria-hidden="true">
+                                            <b>{abbr}</b>
+                                            {img && <img src={posterUrl(img, 'w92')} alt="" loading="lazy" />}
+                                        </a>
+                                        <div class="ac-b">
+                                            <a class="ac-tt" href={href}>{title}</a>
+                                            <div class="ac-a">
+                                                {binge ? (
+                                                    binge.mode === 'single'
+                                                        ? <><span class="ac-lb" style="--c: var(--a-ep)">Episodio visto</span> <a class="ac-e" href={epHref(ev.episodes![0].season, ev.episodes![0].episode)}>T{ev.episodes![0].season} · E{ev.episodes![0].episode}</a></>
+                                                        : <span class="ac-lb" style="--c: var(--a-ep)">{binge.verb}</span>
+                                                ) : (
+                                                    <span class="ac-seq">
+                                                        {r.steps.map((st, i) => <>{i > 0 && <span class="ar" aria-label="y luego">→</span>}{stepView(st)}</>)}
+                                                    </span>
+                                                )}
+                                                <span class="ac-ty">{KIND_LABEL[r.type]}</span>
+                                            </div>
+                                            {binge && binge.mode === 'episodes' && (
                                                 <>
-                                                    <span class="ep-chip season">T{season}</span>
-                                                    {eps.map(e => <span class="ep-chip">E{e.episode}</span>)}
-                                                </>
-                                            ))}
-                                        </span>
-                                        {binge.times.length > 1 && (
-                                            <>
-                                                <button class="ev-disclose" type="button">Ver horas <Icon name="lucide:chevron-down" /></button>
-                                                <span class="ev-times">
-                                                    {binge.times.map(t => (
-                                                        <span class="ev-time-row"><b>{t.label}</b><i data-ts={t.ts}>{fmtHm(t.ts)}</i></span>
-                                                    ))}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <span class="time">{time}</span>
-                                </a>
-                            ) : binge.mode === 'season' ? (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="body">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                        </span>
-                                        <span class="ep-chips">
-                                            <span class="ep-chip season done">T{binge.season} ✓</span>
-                                        </span>
-                                    </span>
-                                    <span class="time">{time}</span>
-                                </a>
-                            ) : (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="body">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                        </span>
-                                        <span class="ev-roll">
-                                            <span class="roll-meta">{binge.meta}</span>
-                                            {binge.pct !== null && (
-                                                <>
-                                                    <span class="roll-bar"><i style={`width: ${binge.pct}%;`}></i></span>
-                                                    <span class="roll-pct">{binge.pct}%</span>
+                                                    <div class="ac-eps">
+                                                        {binge.groups.map(([sn, list]) => (
+                                                            <>
+                                                                <span class="ac-sn">T{sn}</span>
+                                                                {list.map((e) => <a class="ac-e" href={epHref(sn, e.episode)} aria-label={`Episodio T${sn}·E${e.episode}`}>E{e.episode}</a>)}
+                                                            </>
+                                                        ))}
+                                                    </div>
+                                                    {binge.times.length > 1 && (
+                                                        <>
+                                                            <button type="button" class="ac-hrs" aria-expanded="false">Ver horas <Icon name="lucide:chevron-down" /></button>
+                                                            <div class="ac-htab" hidden>
+                                                                {binge.times.map((t) => <><span>{t.label}</span><time data-ts={t.ts} datetime={isoOf(t.ts)}>{fmtHm(t.ts)}</time></>)}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </>
                                             )}
-                                        </span>
-                                        <button class="ev-disclose" type="button">Ver desglose <Icon name="lucide:chevron-down" /></button>
-                                        <span class="ev-grid">
-                                            {binge.breakdown.map(ch => (
-                                                <span class:list={["ep-chip", "season", { done: ch.done }]}>{ch.label}</span>
-                                            ))}
-                                        </span>
-                                    </span>
-                                    <span class="time">{time}</span>
-                                </a>
-                            )
-                        ) : ev.type === 'person' ? (
-                            <a href={`/actor/${ev.id}`} class="ev" data-cat={cat} data-ts={ev.timestamp}>
-                                <span class="act-ico" style={`background: var(--a-${cat}-bg); color: var(--a-${cat});`}><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
-                                {ev.profile_path ? (
-                                    <img src={posterUrl(ev.profile_path, 'w92')} alt={ev.name} class="poster avatar" loading="lazy"/>
-                                ) : (
-                                    <span class="poster avatar"></span>
-                                )}
-                                <span class="meta">
-                                    <span class="t">{ev.name}</span>
-                                    <span class="sub">
-                                        <span class="verb" style={`color: var(--a-${cat});`}>{ev.action}</span>
-                                        <span class="sep"></span>
-                                        <span>Persona</span>
-                                    </span>
-                                </span>
-                                <span class="time">{time}</span>
-                                <Icon name="lucide:chevron-right" class="chev" />
-                            </a>
-                        ) : (
-                            <a href={href} class="ev" data-cat={cat} data-ts={ev.timestamp}>
-                                <span class="act-ico" style={`background: var(--a-${cat}-bg); color: var(--a-${cat});`}><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
-                                {poster ? (
-                                    <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                ) : (
-                                    <span class="poster"></span>
-                                )}
-                                <span class="meta">
-                                    <span class="t">{title}</span>
-                                    <span class="sub">
-                                        <span class="verb" style={`color: var(--a-${cat});`}>{ev.action}</span>
-                                        <span class="sep"></span>
-                                        <span>{ev.type === 'serie' ? 'Serie' : 'Película'}</span>
-                                    </span>
-                                    {ev.note && <span class="ev-note" title={ev.note}>“{ev.note}”</span>}
-                                </span>
-                                <span class="time">{time}</span>
-                                <Icon name="lucide:chevron-right" class="chev" />
-                            </a>
-                        );
-                    })}
-                </div>
-            ))}
+                                            {binge && binge.mode === 'season' && (
+                                                <div class="ac-eps"><a class="ac-e sc done" href={`/serie/${r.id}#season-${binge.season}`}>T{binge.season} <Icon name="lucide:check" /></a></div>
+                                            )}
+                                            {binge && binge.mode === 'summary' && (
+                                                <>
+                                                    <span class="ac-meta">{binge.meta}</span>
+                                                    {binge.pct !== null && <div class="ac-bar"><i><b style={`width: ${binge.pct}%`}></b></i><span>{binge.pct} %</span></div>}
+                                                    <button type="button" class="ac-hrs" aria-expanded="false">Ver desglose <Icon name="lucide:chevron-down" /></button>
+                                                    <div class="ac-eps ac-break" hidden>
+                                                        {binge.breakdown.map((ch) => <a class:list={['ac-e', 'sc', { done: ch.done }]} href={`/serie/${r.id}#season-${ch.label.match(/T(\d+)/)?.[1] ?? ''}`}>{ch.label}</a>)}
+                                                    </div>
+                                                </>
+                                            )}
+                                            {note && <p class="ac-note">«{note}»</p>}
+                                            {done && <span class="ac-fin"><Icon name="lucide:check-check" />Serie terminada</span>}
+                                        </div>
+                                        <a class="ac-go" href={href} aria-label={`Ficha de ${title}`}><Icon name="lucide:chevron-right" /></a>
+                                    </div>
+                                </li>
+                            </>);
+                        })}
+                    </ul>
+                </section>
+                );
+            })}
+          </div>
         </div>
 
-                <div class="act-more">
-                    {page > 1 && (
-                        <a href={page === 2 ? '/mislistas/actividad' : `/mislistas/actividad?page=${page - 1}`}>
-                            <Icon name="lucide:chevron-left" />
-                            Más reciente
-                        </a>
-                    )}
-                    {hasOlder && (
-                        <a href={`/mislistas/actividad?page=${page + 1}`}>
-                            Más antiguo
-                            <Icon name="lucide:chevron-right" />
-                        </a>
-                    )}
-                </div>
+                {allRows.length > 0 && (
+                    <p class="ac-none" hidden={visibleRows > 0}>Nada de esto en estos días. <button type="button" class="clr">Quitar filtro</button></p>
+                )}
+
+                {prevActive && windowEvents.length > 0 && (
+                    <div class="ac-loadw">
+                        <a class="ac-load" href={monthHref(prevActive)} data-mes={prevActive}><Icon name="lucide:chevrons-down" />Seguir con {monthTitle(prevActive).toLowerCase()}</a>
+                    </div>
+                )}
             </div>
+
+            {/* 9.5b · Panel del periodo: a la derecha y fijo en escritorio ancho; por debajo, plegado en
+                «Ver resumen del mes» (la hoja inferior llega en la 9.5e). */}
+            <details class="ac-pnw">
+                <summary class="ac-pns">
+                    <span class="t">Resumen de {monthName}</span>
+                    <span class="q">
+                        <span><Icon name="lucide:flame" />{plural(streak, 'día', 'días')}</span>
+                        {mTimeTxt && <span><Icon name="lucide:clock" />{fmtDur(mTime, true)}</span>}
+                        {MONTH_NUMS.slice(0, mTimeTxt ? 1 : 2).map((x) => <span><Icon name={`lucide:${x.icon}`} style={`color: var(--a-${x.cat})`} />{x.n}</span>)}
+                    </span>
+                    <Icon name="lucide:chevron-down" class="car" />
+                </summary>
+                <aside class="ac-pn" data-mes={mes} aria-label={`Resumen de ${monthName} de ${vy}`}>
+                    <div class="ac-blk">
+                        <span class="ac-k">Racha</span>
+                        <div class="ac-rc">
+                            <Stamp color={streak ? 'amber' : 'slate'} icon="flame" size={40} />
+                            <div><b>{plural(streak, 'día', 'días')}{streak > 1 && <small>seguidos</small>}</b><span>{streakText}</span></div>
+                        </div>
+                        {bestText && <span class="ac-best"><Icon name="lucide:trophy" /><span>{bestText.pre}{bestText.b && <b>{bestText.b}</b>}{bestText.post}</span></span>}
+                    </div>
+
+                    <div class="ac-blk">
+                        <div class="ac-calh">
+                            <h3 data-mes={`${monthName.charAt(0).toUpperCase() + monthName.slice(1)} ${vy}`} data-heat="Últimas 16 semanas">{monthName.charAt(0).toUpperCase() + monthName.slice(1)} {vy}</h3>
+                            <span class="ac-mini" role="radiogroup" aria-label="Vista del calendario">
+                                <button type="button" role="radio" class="on" aria-checked="true" data-cal="mes">Mes</button>
+                                <button type="button" role="radio" aria-checked="false" data-cal="heat">16 semanas</button>
+                            </span>
+                        </div>
+                        <div class="ac-cal" data-view="mes">
+                            {['L', 'M', 'X', 'J', 'V', 'S', 'D'].map((w) => <span class="wd" aria-hidden="true">{w}</span>)}
+                            {Array.from({ length: calLead }, () => <span class="d o" aria-hidden="true"></span>)}
+                            {calCells.map((c) => {
+                                const cls = ['d', c.lv ? `l${c.lv}` : '', c.fut ? 'f' : '', c.ch ? 'ch' : '', c.today ? 'td' : ''];
+                                const lab = `${c.d} de ${monthName}${c.v ? `: ${plural(c.v, 'cosa vista', 'cosas vistas')}` : c.ch ? ': solo otros cambios' : ''}`;
+                                return c.here && !c.fut
+                                    ? <a class:list={cls} href={`#d-${c.key}`} aria-label={lab}>{c.d}</a>
+                                    : <span class:list={cls} aria-label={lab}>{c.d}</span>;
+                            })}
+                        </div>
+                        <div class="ac-hm" data-view="heat" hidden aria-label="Lo que viste en las últimas 16 semanas">
+                            {heatCells.map((c) => <i class:list={[c.lv ? `l${c.lv}` : '', { f: c.fut }]} title={c.label}></i>)}
+                        </div>
+                        <div class="ac-lg" aria-hidden="true">menos<i></i><i class="l1"></i><i class="l2"></i><i class="l3"></i>más<i class="dt"></i>otros cambios</div>
+                    </div>
+
+                    <div class="ac-blk">
+                        <span class="ac-k">{isThisMonth ? 'Este mes, de momento' : monthName}</span>
+                        {mTimeTxt && (
+                            <div class="ac-big" title={mTime.approx ? 'Aproximado: de algún episodio o película no hay duración y se usa la media de la serie' : undefined}>
+                                {mTimeTxt}<small>{isThisMonth ? `en pantalla · del 1 al ${todayDay} de ${monthName}` : `en pantalla en ${monthName}`}</small>
+                            </div>
+                        )}
+                        {MONTH_NUMS.length ? (
+                            <div class="ac-nums">
+                                {MONTH_NUMS.map((x) => <div><b style={`--c: var(--a-${x.cat})`}><Icon name={`lucide:${x.icon}`} />{x.n}</b><span>{x.label}</span></div>)}
+                            </div>
+                        ) : <p class="ac-zero">{isThisMonth ? 'Nada visto todavía este mes.' : `Nada visto en ${monthName}.`}</p>}
+                        {cmp && <p class="ac-cmp">{cmp.pre}<b>{cmp.b}</b>{cmp.post}</p>}
+                    </div>
+
+                    {showTop && (
+                        <div class="ac-blk">
+                            <span class="ac-k">Lo más visto</span>
+                            <div class="ac-top3">
+                                {topList.map((t) => {
+                                    const dt = detailsMap.get(t.key);
+                                    return (
+                                        <a href={hrefOf(t.type, t.id)}>
+                                            <span class="ac-p">{dt?.poster && <img src={posterUrl(dt.poster, 'w92')} alt="" loading="lazy" />}</span>
+                                            <span class="t">{dt?.title ?? 'Título'}</span>
+                                            <span class="v">{t.value}</span>
+                                        </a>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {agoView && (() => {
+                        const dt = detailsMap.get(agoView.key);
+                        return (
+                            <div class="ac-blk">
+                                <span class="ac-k">Hace un año</span>
+                                <a class="ac-ago" href={hrefOf(agoView.type, agoView.id)}>
+                                    <span class="ac-p">{dt?.poster && <img src={posterUrl(dt.poster, 'w92')} alt="" loading="lazy" />}</span>
+                                    <p>El <b>{agoView.date}</b> {agoView.verb} <b>{dt?.title ?? 'un título'}</b>{agoView.tail}.</p>
+                                </a>
+                            </div>
+                        );
+                    })()}
+
+                    <div class="ac-blk">
+                        <a class="ac-lk" href="/mislistas/year"><Icon name="lucide:sparkles" />Tu año completo<Icon name="lucide:arrow-right" /></a>
+                    </div>
+                </aside>
+            </details>
         </div>
     </section>
+    {/* 9.5e · En móvil, «Resumen de noviembre» abre el panel en una hoja inferior (copia del panel del mes en pantalla). */}
+    <BottomSheet id="act-resumen" title={`Resumen de ${monthName}`}><div class="ac-pnsheet"></div></BottomSheet>
 
     <script is:inline>
-        // Filtros por acción: oculta filas que no coinciden y días que quedan vacíos.
-        // Soporta varios bloques .act-filters (rail desktop + móvil) con estado sincronizado.
         (function () {
-            // Zona horaria del NAVEGADOR: el servidor renderiza en UTC, así que la
-            // hora y la etiqueta de día (Hoy/Ayer/fecha) se recalculan aquí con la
-            // zona del visitante. El valor del servidor queda como fallback sin-JS.
-            const dayKey = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD, zona local
-            const todayKey = dayKey(new Date());
-            const yKey = (() => { const y = new Date(); y.setDate(y.getDate() - 1); return dayKey(y); })();
-            const fmtTime = (ts) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            const fmtDay = (d) => {
-                const k = dayKey(d);
+            var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+            var tl = document.querySelector('.act-timeline');
+            var pnw = document.querySelector('.ac-pnw');
+            var wide = matchMedia('(min-width: 1200px)');
+
+            // ---- Lo que hay que preparar en cada mes que entra en la página (el primero y los que se cargan) ----
+            // Zona horaria del NAVEGADOR: el servidor pinta en hora de Madrid; aquí se repintan horas y
+            // etiquetas de día con la del visitante (sin JS se queda lo del servidor).
+            var dayKey = function (d) { return d.toLocaleDateString('en-CA'); };
+            var todayKey = dayKey(new Date());
+            var yKey = (function () { var y = new Date(); y.setDate(y.getDate() - 1); return dayKey(y); })();
+            var fmtTime = function (ts) { return new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); };
+            var fmtDay = function (d) {
+                var k = dayKey(d);
                 if (k === todayKey) return 'Hoy';
                 if (k === yKey) return 'Ayer';
-                return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+                var s = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+                return s.charAt(0).toUpperCase() + s.slice(1);
             };
-            // Una sesión de episodios se pinta como RANGO ("00:47–00:53"): data-ts es el
-            // último episodio y data-ts-start el primero. Umbral igual al del servidor.
-            const RANGE_MIN_MS = 2 * 60 * 1000;
-            document.querySelectorAll('.act-timeline .ev[data-ts]').forEach((ev) => {
-                const ts = Number(ev.dataset.ts);
-                if (!ts) return;
-                const t = ev.querySelector('.time');
-                if (!t) return;
-                const start = Number(ev.dataset.tsStart || 0);
-                const end = fmtTime(ts);
-                if (start && ts - start >= RANGE_MIN_MS) {
-                    const from = fmtTime(start);
-                    t.textContent = from === end ? end : from + '–' + end;
-                } else {
-                    t.textContent = end;
+            var initBlock = function (root) {
+                $$('time[data-ts]', root).forEach(function (t) {
+                    var end = Number(t.dataset.ts); if (!end) return;
+                    var start = Number(t.dataset.tsStart || 0);
+                    if (start && fmtTime(start) !== fmtTime(end)) {
+                        if (t.classList.contains('rg')) t.innerHTML = fmtTime(start) + '<br>' + fmtTime(end);
+                        else t.textContent = fmtTime(start) + '–' + fmtTime(end);
+                    } else t.textContent = fmtTime(end);
+                });
+                $$('.ac-dh .d[data-day-ts]', root).forEach(function (h) {
+                    var ts = Number(h.dataset.dayTs); if (ts) h.textContent = fmtDay(new Date(ts));
+                });
+            };
+            if (tl) initBlock(tl);
+            // «Ver horas» / «Ver desglose»: abre lo que tiene justo debajo (delegado: vale para los meses cargados).
+            if (tl) tl.addEventListener('click', function (e) {
+                var btn = e.target.closest('.ac-hrs'); if (!btn) return;
+                var box = btn.nextElementSibling; if (!box) return;
+                var open = box.hidden;
+                box.hidden = !open;
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+
+            // ---- 9.5b · Filtros: el segmentado y las casillas son lo mismo (un conjunto de tipos). Sin casillas = Todo ----
+            var boxes = $$('.ac-fx input[type=checkbox]');
+            var segs = $$('.ac-seg [data-seg]');
+            var fx = document.querySelector('.ac-fx');
+            var curF = (new URL(location.href).searchParams.get('f') || '').split(',').filter(Boolean);
+            var matches = function (r, F) { var cats = (r.dataset.cats || '').split(' '); return F.length === 0 || cats.some(function (c) { return F.indexOf(c) >= 0; }); };
+            var withF = function (href) {
+                var u = new URL(href, location.href);
+                if (curF.length) u.searchParams.set('f', curF.join(',')); else u.searchParams.delete('f');
+                return u.pathname + u.search.replace(/%2C/gi, ',') + u.hash;   // ?f=visto,ep,rating, legible
+            };
+            // Contadores del segmentado y de las casillas: de todos los meses que haya en pantalla.
+            var recount = function () {
+                var rows = $$('.act-timeline .ac-ev, .act-timeline .ac-ln');
+                segs.forEach(function (sg) { var n = sg.querySelector('.n'); if (n) n.textContent = rows.filter(function (r) { return matches(r, sg.dataset.cats ? sg.dataset.cats.split(' ') : []); }).length; });
+                boxes.forEach(function (b) { var n = b.parentElement.querySelector('.n'); if (n) n.textContent = rows.filter(function (r) { return matches(r, [b.value]); }).length; });
+            };
+            var applyFilter = function (F) {
+                curF = F;
+                boxes.forEach(function (b) { b.checked = F.indexOf(b.value) >= 0; });
+                var segId = F.length === 0 ? 'all' : null;
+                segs.forEach(function (sg) {
+                    var cs = sg.dataset.cats ? sg.dataset.cats.split(' ') : [];
+                    if (!segId && cs.length === F.length && cs.every(function (c) { return F.indexOf(c) >= 0; })) segId = sg.dataset.seg;
+                });
+                segs.forEach(function (sg) { var on = sg.dataset.seg === segId; sg.classList.toggle('on', on); sg.setAttribute('aria-checked', on ? 'true' : 'false'); });
+                if (fx) {
+                    fx.querySelector('.lb').textContent = segId ? 'Más filtros' : 'Filtros';
+                    var badge = fx.querySelector('.b'); badge.hidden = !!segId; badge.textContent = String(F.length);
                 }
-            });
-            // Hora de cada episodio dentro del desplegable "Ver horas".
-            document.querySelectorAll('.act-timeline .ev-times i[data-ts]').forEach((el) => {
-                const ts = Number(el.dataset.ts);
-                if (ts) el.textContent = fmtTime(ts);
-            });
-            document.querySelectorAll('.act-timeline .tl-day').forEach((day) => {
-                // ts representativo del grupo = el INICIO más temprano de sus filas: una
-                // sesión que cruza medianoche se archiva en la noche en que empezó, y el
-                // servidor ya la agrupó así.
-                let minTs = Infinity;
-                day.querySelectorAll('.ev[data-ts]').forEach((ev) => {
-                    const ts = Number(ev.dataset.tsStart || ev.dataset.ts);
-                    if (ts && ts < minTs) minTs = ts;
+                var shown = 0;
+                $$('.act-timeline .ac-day:not(.ac-today)').forEach(function (day) {
+                    var v = 0;
+                    $$('.ac-ev, .ac-ln, .ac-ms', day).forEach(function (r) { var ok = matches(r, F); r.hidden = !ok; if (ok) v++; });
+                    day.hidden = v === 0; shown += v;
                 });
-                const label = day.querySelector('.tl-day-head .d');
-                if (minTs !== Infinity && label) label.textContent = fmtDay(new Date(minTs));
+                var listCats = ' ' + ((document.querySelector('.ac-seg [data-seg="lists"]') || { dataset: {} }).dataset.cats || '') + ' ';
+                if (tl) tl.classList.toggle('only-lists', F.length > 0 && F.every(function (c) { return listCats.indexOf(' ' + c + ' ') >= 0; }));
+                $$('.ac-fl .clr').forEach(function (b) { b.hidden = !!segId; });
+                var none = document.querySelector('.ac-none'); if (none) none.hidden = shown > 0;
+                // En la URL y en los enlaces de mes, para volver con el mismo filtro.
+                history.replaceState(history.state, '', withF(location.href));
+                $$('.ac-load, .ac-per a, .ac-mp a').forEach(function (a) { a.setAttribute('href', withF(a.getAttribute('href'))); });
+            };
+            segs.forEach(function (sg) { sg.addEventListener('click', function () { applyFilter(sg.dataset.cats ? sg.dataset.cats.split(' ') : []); }); });
+            boxes.forEach(function (b) { b.addEventListener('change', function () { applyFilter(boxes.filter(function (x) { return x.checked; }).map(function (x) { return x.value; })); }); });
+            $$('.clr').forEach(function (b) { b.addEventListener('click', function () { applyFilter([]); }); });
+
+            // ---- Ventanas emergentes («Más filtros» y el selector de mes): se cierran al tocar fuera o con Escape ----
+            $$('.ac-fx, .ac-mpk').forEach(function (d) {
+                document.addEventListener('click', function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
+                d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { d.open = false; d.querySelector('summary').focus(); } });
             });
 
-            const groups = document.querySelectorAll('.act-filters');
-            if (!groups.length) return;
-            groups.forEach((group) => {
-                group.addEventListener('click', (e) => {
-                    const chip = e.target.closest('.chip');
-                    if (!chip) return;
-                    const filter = chip.dataset.filter;
-                    document.querySelectorAll('.act-filters .chip').forEach((c) => {
-                        c.classList.toggle('active', c.dataset.filter === filter);
-                    });
-                    document.querySelectorAll('.act-timeline .tl-day').forEach((day) => {
-                        let visible = 0;
-                        day.querySelectorAll('.ev').forEach((ev) => {
-                            const show = filter === 'all' || ev.dataset.cat === filter;
-                            ev.style.display = show ? '' : 'none';
-                            if (show) visible++;
-                        });
-                        day.style.display = visible ? '' : 'none';
-                    });
+            // ---- 9.5c · Selector de mes: año con flechas e «Ir a un día…» ----
+            var mpk = document.querySelector('.ac-mpk');
+            if (mpk) {
+                mpk.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-go]'); if (!b || b.disabled) return;
+                    $$('.yr', mpk).forEach(function (y) { y.hidden = y.dataset.y !== b.dataset.go; });
                 });
-            });
+                var dateIn = mpk.querySelector('input[type=date]');
+                if (dateIn) dateIn.addEventListener('change', function () {
+                    var v = dateIn.value; if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+                    var u = new URL('/mislistas/actividad', location.href);
+                    u.searchParams.set('mes', v.slice(0, 7));
+                    if (curF.length) u.searchParams.set('f', curF.join(','));
+                    location.href = u.pathname + u.search.replace(/%2C/gi, ',') + '#d-' + v;
+                });
+            }
+            // Llegar a un día (#d-2026-10-27) sin actividad: baja al anterior que tenga.
+            if (/^#d-\d{4}-\d{2}-\d{2}$/.test(location.hash) && !document.getElementById(location.hash.slice(1))) {
+                var target = location.hash.slice(3);
+                var near = $$('.act-timeline .ac-day').filter(function (d) { return d.id.slice(2) < target; })[0];
+                if (near) near.scrollIntoView();
+            }
 
-            // "Ver desglose" de los binges-resumen: el botón vive dentro del <a>
-            // de la fila, así que hay que frenar la navegación.
-            document.querySelectorAll('.ev-disclose').forEach((btn) => {
-                btn.addEventListener('click', (e) => {
+            // ---- Panel del periodo: abierto en escritorio ancho; uno por mes cargado, se ve el del mes en pantalla ----
+            var summaries = {};
+            if (pnw) {
+                var first = pnw.querySelector('.ac-pn'), pns = pnw.querySelector('.ac-pns');
+                if (first && pns) summaries[first.dataset.mes] = pns.innerHTML;
+                var sync = function () { if (wide.matches) pnw.open = true; };
+                sync(); wide.addEventListener('change', sync);
+                pnw.addEventListener('click', function (e) { panelClick(e, pnw); });
+            }
+            // Lo que se toca dentro de un panel (el de la derecha o su copia en la hoja de móvil).
+            function panelClick(e, box) {
+                    // Mes · 16 semanas
+                    var b = e.target.closest('[data-cal]');
+                    if (b) {
+                        var pn = b.closest('.ac-pn');
+                        $$('[data-cal]', pn).forEach(function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on ? 'true' : 'false'); });
+                        $$('[data-view]', pn).forEach(function (v) { v.hidden = v.dataset.view !== b.dataset.cal; });
+                        var h = pn.querySelector('.ac-calh h3'); if (h) h.textContent = h.dataset[b.dataset.cal] || h.textContent;
+                        return;
+                    }
+                    // Tocar un día del calendario: baja a él y lo marca.
+                    var a = e.target.closest('.ac-cal a.d');
+                    if (a) {
+                        var day = document.getElementById(a.hash.slice(1));
+                        if (day && day.hidden) applyFilter([]);   // si el filtro lo escondía, se quita
+                        $$('.ac-cal .sel', box).forEach(function (x) { x.classList.remove('sel'); });
+                        a.classList.add('sel');
+                        if (box !== pnw) document.dispatchEvent(new CustomEvent('yf:sheet-close'));
+                        else if (!wide.matches) pnw.open = false;
+                    }
+            }
+            // 9.5e · Por debajo de 1024 px, «Resumen de …» abre una hoja inferior con el panel del mes en pantalla.
+            var sheetBox = document.querySelector('.ac-pnsheet');
+            var narrow = matchMedia('(max-width: 1023px)');
+            if (pnw && sheetBox) {
+                pnw.querySelector('.ac-pns').addEventListener('click', function (e) {
+                    if (!narrow.matches) return;   // de 1024 a 1199 px, se despliega en su sitio
                     e.preventDefault();
-                    e.stopPropagation();
-                    btn.closest('.ev').classList.toggle('open');
+                    var pn = pnw.querySelector('.ac-pn:not([hidden])'); if (!pn) return;
+                    sheetBox.innerHTML = pn.outerHTML;
+                    var t = pnw.querySelector('.ac-pns .t'), title = sheetBox.closest('.yf-sheet');
+                    if (t && title) { var tt = title.querySelector('.yf-sheet-title'); if (tt) tt.textContent = t.textContent; title.setAttribute('aria-label', t.textContent); }
+                    document.dispatchEvent(new CustomEvent('yf:sheet-open', { detail: { id: 'act-resumen' } }));
                 });
-            });
+                sheetBox.addEventListener('click', function (e) { panelClick(e, sheetBox); });
+            }
+            var shownMes = pnw && pnw.querySelector('.ac-pn') ? pnw.querySelector('.ac-pn').dataset.mes : null;
+            var showPanel = function (mes) {
+                if (!pnw || mes === shownMes || !pnw.querySelector('.ac-pn[data-mes="' + mes + '"]')) return;
+                shownMes = mes;
+                $$('.ac-pn', pnw).forEach(function (p) { p.hidden = p.dataset.mes !== mes; });
+                var pns = pnw.querySelector('.ac-pns'); if (pns && summaries[mes]) pns.innerHTML = summaries[mes];
+            };
+
+            // ---- 9.5c · Al acabar el mes, sigue el anterior con actividad (se trae su página y se añade debajo) ----
+            var loading = false;
+            var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
+                es.forEach(function (en) { if (en.isIntersecting) loadPrev(en.target); });
+            }, { rootMargin: '0px 0px 500px 0px' }) : null;
+            var loadPrev = function (a) {
+                if (loading || !a.isConnected) return;
+                loading = true;
+                a.classList.add('is-loading'); a.setAttribute('aria-busy', 'true');
+                fetch(a.getAttribute('href'), { credentials: 'same-origin' })
+                    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+                    .then(function (html) {
+                        var doc = new DOMParser().parseFromString(html, 'text/html');
+                        var blk = doc.querySelector('.ac-mblock');
+                        if (blk && tl) { var node = document.importNode(blk, true); tl.appendChild(node); initBlock(node); }
+                        var pn = doc.querySelector('.ac-pn'), pns = doc.querySelector('.ac-pns');
+                        if (pn && pnw) { var p2 = document.importNode(pn, true); p2.hidden = true; pnw.appendChild(p2); if (pns) summaries[pn.dataset.mes] = pns.innerHTML; }
+                        var nxt = doc.querySelector('.ac-load');
+                        if (nxt) {
+                            a.setAttribute('href', nxt.getAttribute('href')); a.dataset.mes = nxt.dataset.mes; a.innerHTML = nxt.innerHTML;
+                            a.classList.remove('is-loading'); a.removeAttribute('aria-busy');
+                        } else a.parentElement.remove();
+                        recount(); applyFilter(curF);
+                        loading = false;
+                        if (io && a.isConnected) { io.unobserve(a); io.observe(a); }   // si aún se ve, a por el siguiente
+                    })
+                    .catch(function () { location.href = a.getAttribute('href'); });   // sin suerte: a la página de ese mes
+            };
+            var loadA = document.querySelector('.ac-load');
+            if (loadA) {
+                loadA.addEventListener('click', function (e) { e.preventDefault(); loadPrev(loadA); });
+                if (io) io.observe(loadA);
+            }
+
+            // ---- Al bajar: cabecera de día fija con su línea y el panel del mes que tienes en pantalla ----
+            var tick = false;
+            var paint = function () {
+                tick = false;
+                $$('.act-timeline .ac-dh').forEach(function (h) {
+                    var top = h.getBoundingClientRect().top, sec = h.parentElement.getBoundingClientRect();
+                    h.classList.toggle('stuck', top <= 1 && sec.bottom > h.offsetHeight + 8);
+                });
+                var blocks = $$('.act-timeline .ac-mblock'), cur = blocks[0];
+                blocks.forEach(function (b) { if (b.getBoundingClientRect().top <= 140) cur = b; });
+                if (cur) showPanel(cur.dataset.mes);
+            };
+            addEventListener('scroll', function () { if (!tick) { tick = true; requestAnimationFrame(paint); } }, { passive: true });
+            paint();
         })();
     </script>
 </Layout>
