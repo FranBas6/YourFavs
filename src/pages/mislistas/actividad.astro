@@ -2,6 +2,8 @@
 import Layout from "../../layouts/Layout.astro";
 import ListsNav from "../../components/personal/ListsNav.astro";
 import EmptyState from "../../components/EmptyState.astro";
+import BottomSheet from "../../components/BottomSheet.astro";
+import { getNextEpisode } from "../../services/API/Series/nextEpisode";
 import { fetchAllActivityEvents, type ActivityEvent } from "../../services/BD/shared/activityFeed";
 import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
 import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
@@ -40,7 +42,7 @@ for (const ev of windowEvents) {
 }
 
 // runtime: película → su duración; serie → la media de un episodio (para estimar lo que TMDB no da por episodio).
-interface Detail { key: string; title: string; poster: string | null; seasons?: Record<number, number>; runtime?: number | null }
+interface Detail { key: string; title: string; poster: string | null; seasons?: Record<number, number>; runtime?: number | null; ended?: boolean }
 const fetchers = Array.from(uniqueItems.values());
 const loadDetail = async (item: { id: string; type: 'movie' | 'serie' }): Promise<Detail> => {
         try {
@@ -55,7 +57,7 @@ const loadDetail = async (item: { id: string; type: 'movie' | 'serie' }): Promis
                 if (s.season_number > 0 && s.episode_count > 0) seasons[s.season_number] = s.episode_count;
             }
             const avg = Number(d?.episode_run_time?.[0]) || Number(d?.last_episode_to_air?.runtime) || null;
-            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null, seasons, runtime: avg };
+            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null, seasons, runtime: avg, ended: d?.status === 'Ended' || d?.status === 'Canceled' };
         } catch {
             return { key: `${item.type}:${item.id}`, title: 'Sin título', poster: null };
         }
@@ -516,6 +518,48 @@ const agoView = (() => {
 }
 const hrefOf = (type: string, id: string) => (type === 'movie' ? `/movie/${id}` : `/serie/${id}`);
 
+// ---- 9.5e · Momentos ----
+// Hitos en el eje, contando desde el principio y en orden: cada 100 episodios («Tu episodio 2.100»),
+// cada 100 películas («Tu película 500») y cada 25 películas en un año («50 películas este año»).
+// Un marcado en bloque que cruza varios cientos se queda con el más alto.
+const fmtInt = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const milestones = new Map<ActivityEvent, string[]>();
+{
+    let eps = 0, movies = 0;
+    const perYear = new Map<number, number>();
+    for (const ev of [...allEvents].sort((a, b) => a.timestamp - b.timestamp)) {
+        const c = catOf(ev), out: string[] = [];
+        if (c === 'ep') {
+            const before = eps; eps += ev.episodes?.length || 1;
+            const hit = Math.floor(eps / 100) * 100;
+            if (hit > before && hit > 0) out.push(`Tu episodio ${fmtInt(hit)}`);
+        } else if (c === 'visto' && ev.type === 'movie') {
+            movies++;
+            if (movies % 100 === 0) out.push(`Tu película ${fmtInt(movies)}`);
+            const y = appDateParts(ev.timestamp).year, ny = (perYear.get(y) ?? 0) + 1;
+            perYear.set(y, ny);
+            if (ny % 25 === 0) out.push(`${ny} películas ${y === thisYear ? 'este año' : `en ${y}`}`);
+        }
+        if (out.length) milestones.set(ev, out);
+    }
+}
+/** «Serie terminada»: en esta fila cae el último episodio de una serie que ya acabó (Ended/Canceled). */
+const finishesSeries = (r: TlRow) => {
+    const d = detailsMap.get(r.key);
+    if (r.type !== 'serie' || !d?.ended || !d.seasons) return false;
+    const last = Math.max(...Object.keys(d.seasons).map(Number));
+    if (!Number.isFinite(last)) return false;
+    return r.events.some((e) => e.episodes?.some((x) => x.season === last && x.episode === d.seasons![last]));
+};
+// Hoy sin nada (en el mes en curso): «Aún nada hoy.» y el siguiente episodio de lo último que estabas viendo.
+const todayEmpty = isThisMonth && windowEvents.length > 0 && !groupKeys.has(todayKey);
+const nextUp = todayEmpty
+    ? await (async () => {
+        const lastEp = allEvents.filter((e) => catOf(e) === 'ep').sort((a, b) => b.timestamp - a.timestamp)[0];
+        return lastEp ? await getNextEpisode(lastEp.id).catch(() => null) : null;
+    })()
+    : null;
+
 // ---- Filtros: segmentado Todo · Lo que viste · Listas · Personas + «Más filtros» (casillas por tipo) ----
 const CAT_LABEL: Record<Cat, string> = {
     visto: 'Vista', ep: 'Episodios', rating: 'Valoración', rewatch: 'Re-visionado', fav: 'Favorita', like: 'Me gusta',
@@ -668,6 +712,16 @@ const monthSep = [
           {/* Un bloque por mes: al bajar se añaden los anteriores (con su separador) sin cambiar de página. */}
           <div class="ac-mblock" data-mes={mes}>
             <div class="ac-mo"><h2>{monthTitle(mes)}</h2>{monthSep.length > 0 && <span>{monthSep.join(' · ')}</span>}</div>
+            {todayEmpty && (
+                <section class="ac-day ac-today" id={`d-${todayKey}`} aria-labelledby="d-hoy-h">
+                    <div class="ac-ax" aria-hidden="true"></div>
+                    <header class="ac-dh"><h2 id="d-hoy-h" class="d">Hoy</h2></header>
+                    <p class="ac-nil">
+                        Aún nada hoy.
+                        {nextUp && <> Lo siguiente: <a href={`/serie/${nextUp.id}/t${nextUp.next_season}/e${nextUp.next_episode}`}><b>{nextUp.name}</b> · T{nextUp.next_season} E{nextUp.next_episode}<Icon name="lucide:arrow-right" /></a></>}
+                    </p>
+                </section>
+            )}
             {days.map(({ label, events, dkey, day }) => {
                 const anchorTs = events[events.length - 1].startTs ?? events[events.length - 1].timestamp;
                 return (
@@ -728,7 +782,21 @@ const monthSep = [
                                 return <span class="ac-step"><span class="ac-lb" style={`--c: var(--a-${st.cat})`}>{st.label}</span>{st.n > 1 && <span class="x">×{st.n}</span>}</span>;
                             };
                             const note = r.steps.find((st) => st.cat === 'rewatch' && st.ev.note)?.ev.note;
-                            return (
+                            const ms = r.events.flatMap((e) => milestones.get(e) ?? []);
+                            const msWith = (() => {
+                                const last = r.events[0];
+                                if (catOf(last) === 'ep' && last.episodes?.length) { const x = last.episodes[last.episodes.length - 1]; return `${title} · T${x.season} E${x.episode}`; }
+                                return title;
+                            })();
+                            const done = finishesSeries(r);
+                            return (<>
+                                {ms.length > 0 && (
+                                    <li class="ac-ms" data-cats={r.cats.join(' ')} hidden={!showRow(r.cats)}>
+                                        <span></span>
+                                        <span class="ac-dot" style="--c: var(--stamp-amber-ink); --cb: var(--stamp-amber);" aria-hidden="true"><Icon name="lucide:trophy" /></span>
+                                        <p>{ms.join(' · ')} <small>con {msWith}</small></p>
+                                    </li>
+                                )}
                                 <li class:list={['ac-ev', { 'is-person': isPerson }]} data-cats={r.cats.join(' ')} hidden={!showRow(r.cats)}>
                                     <time class:list={{ rg: ranged }} datetime={isoOf(end)} data-ts={end} data-ts-start={ranged ? start : undefined}>
                                         {ranged ? <>{fmtHm(start)}<br />{fmtHm(end)}</> : fmtHm(end)}
@@ -787,11 +855,12 @@ const monthSep = [
                                                 </>
                                             )}
                                             {note && <p class="ac-note">«{note}»</p>}
+                                            {done && <span class="ac-fin"><Icon name="lucide:check-check" />Serie terminada</span>}
                                         </div>
                                         <a class="ac-go" href={href} aria-label={`Ficha de ${title}`}><Icon name="lucide:chevron-right" /></a>
                                     </div>
                                 </li>
-                            );
+                            </>);
                         })}
                     </ul>
                 </section>
@@ -911,6 +980,8 @@ const monthSep = [
             </details>
         </div>
     </section>
+    {/* 9.5e · En móvil, «Resumen de noviembre» abre el panel en una hoja inferior (copia del panel del mes en pantalla). */}
+    <BottomSheet id="act-resumen" title={`Resumen de ${monthName}`}><div class="ac-pnsheet"></div></BottomSheet>
 
     <script is:inline>
         (function () {
@@ -987,9 +1058,9 @@ const monthSep = [
                     var badge = fx.querySelector('.b'); badge.hidden = !!segId; badge.textContent = String(F.length);
                 }
                 var shown = 0;
-                $$('.act-timeline .ac-day').forEach(function (day) {
+                $$('.act-timeline .ac-day:not(.ac-today)').forEach(function (day) {
                     var v = 0;
-                    $$('.ac-ev, .ac-ln', day).forEach(function (r) { var ok = matches(r, F); r.hidden = !ok; if (ok) v++; });
+                    $$('.ac-ev, .ac-ln, .ac-ms', day).forEach(function (r) { var ok = matches(r, F); r.hidden = !ok; if (ok) v++; });
                     day.hidden = v === 0; shown += v;
                 });
                 var listCats = ' ' + ((document.querySelector('.ac-seg [data-seg="lists"]') || { dataset: {} }).dataset.cats || '') + ' ';
@@ -1040,7 +1111,10 @@ const monthSep = [
                 if (first && pns) summaries[first.dataset.mes] = pns.innerHTML;
                 var sync = function () { if (wide.matches) pnw.open = true; };
                 sync(); wide.addEventListener('change', sync);
-                pnw.addEventListener('click', function (e) {
+                pnw.addEventListener('click', function (e) { panelClick(e, pnw); });
+            }
+            // Lo que se toca dentro de un panel (el de la derecha o su copia en la hoja de móvil).
+            function panelClick(e, box) {
                     // Mes · 16 semanas
                     var b = e.target.closest('[data-cal]');
                     if (b) {
@@ -1055,11 +1129,26 @@ const monthSep = [
                     if (a) {
                         var day = document.getElementById(a.hash.slice(1));
                         if (day && day.hidden) applyFilter([]);   // si el filtro lo escondía, se quita
-                        $$('.ac-cal .sel', pnw).forEach(function (x) { x.classList.remove('sel'); });
+                        $$('.ac-cal .sel', box).forEach(function (x) { x.classList.remove('sel'); });
                         a.classList.add('sel');
-                        if (!wide.matches) pnw.open = false;
+                        if (box !== pnw) document.dispatchEvent(new CustomEvent('yf:sheet-close'));
+                        else if (!wide.matches) pnw.open = false;
                     }
+            }
+            // 9.5e · Por debajo de 1024 px, «Resumen de …» abre una hoja inferior con el panel del mes en pantalla.
+            var sheetBox = document.querySelector('.ac-pnsheet');
+            var narrow = matchMedia('(max-width: 1023px)');
+            if (pnw && sheetBox) {
+                pnw.querySelector('.ac-pns').addEventListener('click', function (e) {
+                    if (!narrow.matches) return;   // de 1024 a 1199 px, se despliega en su sitio
+                    e.preventDefault();
+                    var pn = pnw.querySelector('.ac-pn:not([hidden])'); if (!pn) return;
+                    sheetBox.innerHTML = pn.outerHTML;
+                    var t = pnw.querySelector('.ac-pns .t'), title = sheetBox.closest('.yf-sheet');
+                    if (t && title) { var tt = title.querySelector('.yf-sheet-title'); if (tt) tt.textContent = t.textContent; title.setAttribute('aria-label', t.textContent); }
+                    document.dispatchEvent(new CustomEvent('yf:sheet-open', { detail: { id: 'act-resumen' } }));
                 });
+                sheetBox.addEventListener('click', function (e) { panelClick(e, sheetBox); });
             }
             var shownMes = pnw && pnw.querySelector('.ac-pn') ? pnw.querySelector('.ac-pn').dataset.mes : null;
             var showPanel = function (mes) {
