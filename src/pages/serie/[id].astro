@@ -378,11 +378,12 @@ function episodeMark(ep: any): { label: string; title: string } | null {
 // Dirección y guion de un episodio (vienen en `crew` de cada episodio).
 const EPISODE_WRITER_JOBS = ['Writer', 'Teleplay', 'Screenplay'];
 // ---- 4.6 · Temporadas fundidas ----
-// Banda de color de un episodio por su nota de TMDB (README del handoff D3): ≥ 9 · 8–8,9 · 6,5–7,9 · < 6,5.
-function epBand(ep: any): 'high' | 'med' | 'low' | 'poor' | 'none' {
+// Banda de color de un episodio por su nota de TMDB (README del handoff D3): ≥ 9 · 8–8,9 · 7–7,9 ·
+// 6,5–6,9 · < 6,5. «fair» (6,5–6,9) se pinta como «low» salvo en la paleta «verde 9·8·7» (9.4).
+function epBand(ep: any): 'high' | 'med' | 'low' | 'fair' | 'poor' | 'none' {
     const v = typeof ep?.vote_average === 'number' && (ep.vote_count ?? 1) > 0 ? ep.vote_average : 0;
     if (!v) return 'none';
-    return v >= 9 ? 'high' : v >= 8 ? 'med' : v >= 6.5 ? 'low' : 'poor';
+    return v >= 9 ? 'high' : v >= 8 ? 'med' : v >= 7 ? 'low' : v >= 6.5 ? 'fair' : 'poor';
 }
 // Tope de casillas por fila (los Especiales de algunas series pasan de 300): el resto, «+N».
 const STRIP_MAX = 48;
@@ -882,8 +883,8 @@ const jsonLd = item ? {
                         <p class="sr-legend">
                             <span><i class="sr-c is-seen" data-b="high"></i>≥ 9</span>
                             <span><i class="sr-c is-seen" data-b="med"></i>8–8,9</span>
-                            <span><i class="sr-c is-seen" data-b="low"></i>6,5–7,9</span>
-                            <span><i class="sr-c is-seen" data-b="poor"></i>&lt; 6,5</span>
+                            <span><i class="sr-c is-seen" data-b="low"></i><span class="lg-a">6,5–7,9</span><span class="lg-b">7–7,9</span></span>
+                            <span><i class="sr-c is-seen" data-b="poor"></i><span class="lg-a">&lt; 6,5</span><span class="lg-b">&lt; 7</span></span>
                             <span><i class="sr-c is-seen" data-b="none"></i>sin nota</span>
                             <span class="sr-legend-k">color pleno = visto · apagado = sin ver</span>
                         </p>

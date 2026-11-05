@@ -23,7 +23,8 @@ import "../styles/components/chips.css";       // chips del sistema v2 (filtro, 
 import "../styles/components/social-ui.css";   // botones, filas y avisos sociales (F2+)
 import "../styles/components/recommend.css";   // recomendar a un amigo (F4)
 import "../styles/components/messages-row.css"; // filas de conversación (mensajes M1+, también en la cabecera)
-import "../styles/dark-mode.css";   // <- el ÚLTIMO: las reglas [data-theme="dark"] ganan en cascada
+import "../styles/dark-mode.css";   // <- las reglas [data-theme="dark"] ganan en cascada
+import "../styles/components/strip-palettes.css";   // paleta de la tira (9.4): después del oscuro, para ganarle
 
 interface Props {
     title: string;
@@ -60,7 +61,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     || /^\/mislistas\/amigos\/mensajes\/\d+\/?$/.test(_tbPath);
 ---
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-strip={Astro.locals.user?.stripPalette || undefined}>
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>

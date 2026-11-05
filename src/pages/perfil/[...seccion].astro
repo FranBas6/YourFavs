@@ -16,7 +16,7 @@
 import Layout from "../../layouts/Layout.astro";
 import "../../styles/pages/ajustes.css";
 
-import { getUserProfile, setUserProfile, type UserProfile } from "../../services/BD/profile/userProfile";
+import { getUserProfile, setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from "../../services/BD/profile/userProfile";
 import { getIcsToken, icsPath } from "../../services/BD/profile/icsToken";
 import { clearUserTaste } from "../../services/BD/profile/userTaste";
 import { sanitizePlatformIds } from "../../services/API/shared/watchProviders";
@@ -136,6 +136,9 @@ if (Astro.request.method === 'POST') {
             case 'apariencia': {
                 const theme = String(fd.get('theme') || '');
                 if (theme === 'light' || theme === 'dark' || theme === 'system') patch.theme = theme;
+                // 9.4 · paleta de la tira de episodios (solo si viene en el envío y es una de las conocidas)
+                const strip = String(fd.get('strip_palette') || '');
+                if ((STRIP_PALETTES as readonly string[]).includes(strip)) patch.stripPalette = strip as StripPalette;
                 break;
             }
 

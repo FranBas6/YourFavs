@@ -29,6 +29,8 @@ interface SessionUser {
         hideCalendarTitles: boolean;
     };
     homeLayout?: { key: string; hidden?: boolean }[];  // §4 home a tu medida (bloques ocultos)
+    /** Paleta de la tira de episodios (9.4): la pone el Layout en <html data-strip>. */
+    stripPalette?: string;
     /** Perfil público (F1 social): para el menú de cuenta y la hoja Perfil («Ver mi perfil»). */
     publicHandle?: string;
     publicVisibility?: 'off' | 'public' | 'friends';

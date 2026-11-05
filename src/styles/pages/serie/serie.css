@@ -74,13 +74,10 @@ details[open] .season-overview {
 .sr-t small { font-size: var(--fs-meta); color: var(--text-3); margin-top: 2px; }
 .sr-facts { margin: 0; font-size: var(--fs-meta); color: var(--text-2); line-height: 1.5; }
 .sr-strip { display: flex; flex-wrap: wrap; gap: 4px; }
-.sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--border-strong); opacity: .35; }
+.sr-c { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--c, var(--border-strong)); opacity: .35; }
 .sr-c.is-seen { opacity: 1; }
-/* Un solo tono (azul, elegido por Fran entre 5 muestras): cuanto más intenso, mejor nota. */
-.sr-c[data-b="high"] { background: var(--ep-q-high); }
-.sr-c[data-b="med"]  { background: var(--ep-q-med); }
-.sr-c[data-b="low"]  { background: var(--ep-q-low); }
-.sr-c[data-b="poor"] { background: var(--ep-q-poor); }
+/* Color por franja de nota (--c) y paleta (azul por defecto; se elige en Ajustes → Apariencia):
+   styles/components/strip-palettes.css, cargado en el Layout (9.4). */
 .sr-n { font: 600 var(--fs-ui) var(--font); color: var(--text-2); white-space: nowrap; flex-shrink: 0; padding-top: 2px; }
 /* Sinopsis: oculta hasta abrir la temporada (Fran), y entonces entera. */
 .sr-main .sr-ov { display: none; margin: 0; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.55; }
@@ -94,6 +91,10 @@ details[open] > summary .sr-chev { transform: rotate(180deg); }
 .sr-legend > span { display: inline-flex; align-items: center; gap: 5px; }
 .sr-legend .sr-c { width: 10px; height: 10px; }
 .sr-legend-k { margin-left: auto; }
+/* La leyenda sigue a la paleta (9.4): en «verde 9·8·7» el corte es 7, no 6,5. */
+.sr-legend .lg-b { display: none; }
+[data-strip="verde987"] .sr-legend .lg-a { display: none; }
+[data-strip="verde987"] .sr-legend .lg-b { display: inline; }
 
 /* Próximo / último episodio: una línea */
 .sr-eps { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }

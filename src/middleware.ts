@@ -153,6 +153,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
                 // saber que existió un formato anterior.
                 context.locals.user.spoilers = resolveSpoilerSettings(profile);
                 context.locals.user.homeLayout = profile?.homeLayout; // §4 home a tu medida (bloques ocultos)
+                context.locals.user.stripPalette = profile?.stripPalette; // 9.4 · paleta de la tira (Layout → <html data-strip>)
                 // Perfil público: el menú de cuenta y la hoja Perfil enlazan a /u/{handle} si está activo.
                 context.locals.user.publicHandle = profile?.publicHandle;
                 context.locals.user.publicVisibility = profile?.publicVisibility ?? 'off';
