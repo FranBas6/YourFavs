@@ -164,3 +164,124 @@
     .act-filters.is-mobile::-webkit-scrollbar { display: none; }
     .act-filters.is-mobile .chip { flex-shrink: 0; }
 }
+
+/* =====================================================================================
+   9.5a · Línea de tiempo v2 (docs/Rediseño/design_handoff_actividad, prefijo ac-). Solo tokens.
+   Días como secciones con cabecera fija; filas planas con la hora en el eje y el color solo en el
+   punto; lo que viste delante y los cambios de listas plegados al final de cada día.
+   ===================================================================================== */
+.ac-tl { position: relative; }
+/* La línea de tiempo vieja (.act-timeline) pintaba su propio eje y sangría: fuera, manda .ac-ax. */
+.act-timeline.ac-tl { padding-left: 0; margin-top: 8px; }
+.act-timeline.ac-tl::before { display: none; }
+.ac-tl .tl-day { margin-bottom: 0; }
+.ac-day { position: relative; }
+.ac-day[hidden], .ac-ev[hidden], .ac-ln[hidden] { display: none !important; }
+.ac-ax { position: absolute; left: 62px; top: 52px; bottom: 0; width: 1px; background: var(--border); }
+.ac-dh {
+    position: sticky; top: 0; z-index: 2; background: transparent;
+    display: flex; align-items: baseline; gap: 6px 10px; flex-wrap: wrap; padding: 18px 0 8px 74px;
+}
+.ac-dh h2 { margin: 0; font: 700 var(--fs-sub)/1.2 var(--font); color: var(--text); }
+.ac-dh .m { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.ac-dh.stuck { background: var(--bg); box-shadow: 0 1px 0 var(--border); }   /* fondo solo pegada: en oscuro el cuerpo no es exactamente --bg */
+.ac-list { list-style: none; margin: 0; padding: 0; }
+
+.ac-ev { position: relative; display: grid; grid-template-columns: 62px 18px minmax(0, 1fr); align-items: start; padding: 5px 0; }
+.ac-ev > time { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); text-align: right; padding-right: 18px; margin-top: 16px; white-space: nowrap; }
+.ac-ev > time.rg { font-size: var(--fs-micro); line-height: 1.3; margin-top: 12px; }
+.ac-dot {
+    position: relative; z-index: 1; width: 24px; height: 24px; border-radius: 50%; margin-top: 12px;
+    display: grid; place-items: center; background: var(--cb, var(--bg-tint)); color: var(--c, var(--text-3));
+    box-shadow: 0 0 0 3px var(--bg);
+    margin-left: -12px;   /* centrado sobre el eje (.ac-ax) */
+}
+.ac-dot svg { width: 13px; height: 13px; }
+/* Lo que viste, en tarjeta (Fran: se distingue cada cosa de un vistazo); los cambios de listas, no. */
+.ac-row {
+    display: flex; align-items: flex-start; gap: 12px; min-width: 0; margin-left: 4px;
+    padding: 10px 6px 10px 12px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.ac-p {
+    position: relative; flex-shrink: 0; width: 40px; aspect-ratio: 2 / 3; border-radius: 5px; overflow: hidden;
+    background: var(--bg-tint); border: 1px solid var(--border); display: grid; place-items: center; text-decoration: none;
+}
+.ac-p b { font: 700 10px var(--font-mono); color: var(--text-3); letter-spacing: .04em; }
+.ac-p img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.ac-p.pr { border-radius: 50%; aspect-ratio: 1; }
+.ac-b { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; padding-top: 1px; }
+.ac-tt { font: 600 var(--fs-body)/1.3 var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+.ac-tt:hover { text-decoration: underline; text-underline-offset: 2px; }
+.ac-a { display: flex; align-items: center; gap: 4px 8px; flex-wrap: wrap; font-size: var(--fs-ui); color: var(--text-2); line-height: 1.4; }
+.ac-st { display: inline-flex; align-items: center; gap: 6px; }
+.ac-stars { position: relative; display: inline-block; font-size: 13px; letter-spacing: 1px; line-height: 1; color: var(--border-strong); }
+.ac-stars span { position: absolute; inset: 0 auto 0 0; overflow: hidden; white-space: nowrap; color: var(--a-rating); }
+.ac-st b { font: 700 var(--fs-ui) var(--font-mono); color: var(--text); }
+.ac-st small { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+.ac-go { flex-shrink: 0; margin-left: auto; width: 32px; height: 32px; display: grid; place-items: center; color: var(--text-4); align-self: center; }
+.ac-go:hover { color: var(--text); }
+.ac-go svg { width: 16px; height: 16px; }
+
+/* Maratones (regla de siempre, bingeView): chips de episodio y temporada como enlaces */
+.ac-eps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ac-e {
+    height: 26px; min-width: 34px; padding: 0 8px; border-radius: 6px; background: var(--a-ep-bg); color: var(--a-ep);
+    font: 600 var(--fs-micro) var(--font-mono); display: inline-flex; align-items: center; justify-content: center; gap: 4px; text-decoration: none;
+}
+.ac-a .ac-e { height: 22px; }
+/* La acción, con el color de su tipo (los mismos de antes: verde vista, ámbar nota, amarillo favorita…), y «· Película». */
+.ac-lb { color: var(--c); font-weight: 500; }
+.ac-ty { color: var(--text-3); white-space: nowrap; }
+.ac-ty::before { content: '·'; margin-right: 8px; color: var(--text-4); }
+.ac-e:hover { box-shadow: inset 0 0 0 1px var(--a-ep); }
+.ac-e svg { width: 11px; height: 11px; }
+.ac-e.sc:not(.done) { background: var(--bg-tint); color: var(--text-2); }
+.ac-sn { height: 26px; padding: 0 8px; border-radius: 6px; border: 1px dashed var(--border-strong); font: 600 var(--fs-micro) var(--font-mono); color: var(--text-2); display: inline-flex; align-items: center; }
+.ac-hrs { align-self: flex-start; border: 0; background: none; padding: 0; cursor: pointer; margin-top: 4px; font: 600 var(--fs-micro) var(--font-mono); color: var(--text-2); display: inline-flex; align-items: center; gap: 4px; }
+.ac-hrs svg { width: 12px; height: 12px; transition: transform .15s ease; }
+.ac-hrs[aria-expanded="true"] svg { transform: rotate(180deg); }
+.ac-htab { display: grid; grid-template-columns: auto auto; gap: 3px 18px; justify-content: start; font: 500 var(--fs-meta) var(--font-mono); color: var(--text-2); margin-top: 4px; }
+.ac-htab[hidden], .ac-break[hidden] { display: none; }
+.ac-meta { font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); }
+.ac-bar { display: flex; align-items: center; gap: 10px; margin-top: 4px; max-width: 360px; }
+.ac-bar i { flex: 1; height: 6px; border-radius: 3px; background: var(--bg-tint); overflow: hidden; border: 1px solid var(--border); }
+.ac-bar i b { display: block; height: 100%; background: var(--a-visto); }
+.ac-bar span { font: 600 var(--fs-micro) var(--font-mono); color: var(--text-2); white-space: nowrap; }
+.ac-note { margin: 6px 0 0; padding: 8px 12px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); font-size: var(--fs-ui); color: var(--text-2); max-width: 520px; }
+
+/* Secuencia de acciones de una fila, en su orden («Dejaste de seguir ×2 → Quitada de Pendientes») */
+.ac-seq { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; }
+.ac-step { display: inline-flex; align-items: center; gap: 5px; }
+.ac-seq .ar { color: var(--text-4); font-size: var(--fs-meta); }
+.ac-seq .x { font: 600 var(--fs-micro) var(--font-mono); color: var(--text-3); }
+
+/* Fila fina: cambios de listas, en su hora (más apagada que lo que viste) */
+.ac-ln { position: relative; display: grid; grid-template-columns: 62px 18px minmax(0, 1fr); align-items: start; padding: 6px 0; }
+.ac-ln > time { font: 500 var(--fs-micro) var(--font-mono); color: var(--text-4); text-align: right; padding-right: 18px; margin-top: 5px; white-space: nowrap; }
+.ac-pip { width: 9px; height: 9px; border-radius: 50%; margin: 8px 0 0 -4.5px; background: var(--bg); border: 2px solid var(--c, var(--border-strong)); position: relative; z-index: 1; }
+.ac-ln-b { display: flex; align-items: flex-start; gap: 10px; min-width: 0; padding-left: 17px; }   /* alineada con el contenido de las tarjetas */
+.ac-p.is-xs { width: 22px; border-radius: 3px; }
+.ac-p.is-xs b { font-size: 8px; }
+.ac-p.is-xs.pr { border-radius: 50%; }
+.ac-ln p { margin: 2px 0 0; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: var(--fs-meta); color: var(--text-3); line-height: 1.45; }
+.ac-ln p > a { font-weight: 600; color: var(--text-2); text-decoration: none; }
+.ac-ln p > a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+.ac-ln .ac-step svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+@media (max-width: 639px) {
+    .ac-ax { left: 52px; }
+    .ac-dh { padding: 14px 0 8px 64px; }
+    .ac-dh h2 { font-size: var(--fs-body); }
+    .ac-ev { grid-template-columns: 52px 16px minmax(0, 1fr); }
+    .ac-row { padding: 9px 10px; gap: 10px; }
+    .ac-ln-b { padding-left: 15px; }
+    .ac-ev > time { font-size: var(--fs-micro); padding-right: 14px; }
+    .ac-ev > time.rg { font-size: 10px; }
+    .ac-go { display: none; }
+    .ac-p { width: 36px; }
+    .ac-tt { font-size: var(--fs-ui); }
+    .ac-a { font-size: var(--fs-meta); }
+    .ac-e, .ac-sn { height: 30px; }
+    .ac-ln { grid-template-columns: 52px 16px minmax(0, 1fr); }
+    .ac-ln > time { padding-right: 14px; }
+}

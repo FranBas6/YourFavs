@@ -91,7 +91,7 @@ for (const ev of windowEvents) {
 // de inserción: anclar al inicio puede crear el grupo de ayer antes que el de hoy.
 const groupEntries = Array.from(groups.entries())
     .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
-    .map(([, g]) => [g.label, g.events] as [string, ActivityEvent[]]);
+    .map(([k, g]) => [g.label, g.events, k] as [string, ActivityEvent[], string]);
 
 // Medianoche local del servidor — la usa el heatmap/racha de abajo (se conserva
 // su cálculo previo; el agrupado del feed ya no depende de esto).
@@ -131,15 +131,6 @@ const CAT_ICON: Record<Cat, string> = {
     remove: 'circle-minus', unfollow: 'user-minus', abandon: 'pause', resume: 'rotate-ccw', reorder: 'arrow-up-down',
 };
 
-// Badges-resumen de cada día (conteo por categoría, en orden de aparición)
-function daySummary(events: ActivityEvent[]): [Cat, number][] {
-    const counts = new Map<Cat, number>();
-    for (const ev of events) {
-        const c = catOf(ev);
-        counts.set(c, (counts.get(c) ?? 0) + 1);
-    }
-    return Array.from(counts.entries());
-}
 
 // Chips de la fila-binge: episodios agrupados por temporada (ya vienen ordenados).
 // Se conserva el `ts` de cada episodio para poder desplegar su hora exacta.
@@ -160,12 +151,6 @@ function seasonGroups(eps: { season: number; episode: number; ts?: number }[]): 
  */
 const RANGE_MIN_MS = 2 * 60 * 1000;
 const fmtHm = (ts: number) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: APP_TZ });
-function timeText(ev: ActivityEvent): string {
-    const end = fmtHm(ev.timestamp);
-    if (ev.startTs == null || ev.timestamp - ev.startTs < RANGE_MIN_MS) return end;
-    const start = fmtHm(ev.startTs);
-    return start === end ? end : `${start}–${end}`;
-}
 
 // Regla por volumen de los binges (§6 del handoff): el render depende de CUÁNTO
 // se marcó ese día — texto / chips de episodio / chips de temporada / resumen+barra.
@@ -221,6 +206,119 @@ function bingeView(ev: ActivityEvent, detail?: Detail): BingeView {
     });
     return { mode: 'summary', verb, meta, pct, breakdown };
 }
+
+// =====================================================================================
+// 9.5a · Actividad v2 (docs/Rediseño/design_handoff_actividad) con el ajuste de Fran: TODO en su
+// orden (la gracia es ver qué hiciste y cuándo). Lo que viste (vistas, episodios, valoraciones,
+// re-visionados, favoritas, me gusta y personas) en filas grandes; los cambios de listas en filas
+// finas de una línea, en su hora, sin plegar. Varias acciones SEGUIDAS del mismo título en ≤ 30 min y
+// del mismo peso van en una fila, en su orden con flechas («Dejaste de seguir ×2 → Quitada de
+// Pendientes»). Dos tandas seguidas de episodios de la misma serie se juntan antes de bingeView.
+// =====================================================================================
+const LIST_CATS = new Set<Cat>(['pend', 'pronto', 'seguir', 'remove', 'unfollow', 'abandon', 'resume', 'reorder']);
+const GROUP_MS = 30 * 60 * 1000;
+// La acción que da el icono y el color del punto de una fila (la primera de esta lista que tenga).
+const PRIMARY_ORDER: Cat[] = ['ep', 'rating', 'rewatch', 'visto', 'fav', 'like', 'person'];
+// Texto de cada acción en la fila: el completo de siempre («Marcada como vista», «Añadida a Favoritos»…; Fran, 5-11).
+const SHORT_ACTION: Record<string, string> = { 'Vuelto a ver': 'Volviste a verla' };
+const shortAction = (ev: ActivityEvent) => SHORT_ACTION[ev.action] ?? ev.action.replace(/ · ★ .*$/, '');
+const KIND_LABEL = { movie: 'Película', serie: 'Serie', person: 'Persona' } as const;
+const isBingeEv = (ev: ActivityEvent) => ev.collection === 'WatchedEpisodes' && (ev.episodes?.length ?? 0) > 0;
+const ratingOf = (ev: ActivityEvent) => {
+    const m = /★\s*([\d.,]+)/.exec(ev.action);
+    return m ? Number(m[1].replace(',', '.')) : null;
+};
+const fmtScore = (n: number) => (Math.round(n * 10) / 10).toString().replace('.', ',');
+
+// Re-visionados: «3.ª vez» = la primera vez + los re-visionados hasta ese (de toda la historia).
+const rewatchNth = new Map<ActivityEvent, number>();
+{
+    const byTitle = new Map<string, ActivityEvent[]>();
+    for (const ev of allEvents) if (ev.collection === 'Rewatch') {
+        const k = `${ev.type}:${ev.id}`;
+        (byTitle.get(k) ?? byTitle.set(k, []).get(k)!).push(ev);
+    }
+    for (const list of byTitle.values()) list.sort((a, b) => a.timestamp - b.timestamp).forEach((ev, i) => rewatchNth.set(ev, i + 2));
+}
+
+/** Un paso de la secuencia de una fila: una acción (o la misma repetida seguida, «×2»). */
+interface TlStep { ev: ActivityEvent; cat: Cat; label: string; n: number }
+interface TlRow {
+    key: string;
+    type: ActivityEvent['type'];
+    id: string;
+    list: boolean;                // fila fina de cambios de listas
+    events: ActivityEvent[];      // del más nuevo al más antiguo
+    primary: ActivityEvent;       // da el punto (icono y color) y, si es un maratón, la regla bingeView
+    cats: Cat[];                  // para el filtro
+    steps: TlStep[];              // en su orden, del más antiguo al más nuevo
+}
+function buildRow(events: ActivityEvent[], list: boolean): TlRow {
+    const cats = [...new Set(events.map(catOf))];
+    const primary = list ? events[0] : (PRIMARY_ORDER.map((c) => events.find((e) => catOf(e) === c)).find(Boolean) ?? events[0]);
+    const steps: TlStep[] = [];
+    for (const ev of [...events].reverse()) {
+        const label = shortAction(ev);
+        const last = steps[steps.length - 1];
+        // La misma acción repetida seguida (salvo valoraciones, cada una con su nota) → «×2».
+        if (last && last.label === label && catOf(ev) !== 'rating') last.n++;
+        else steps.push({ ev, cat: catOf(ev), label, n: 1 });
+    }
+    return { key: `${primary.type}:${primary.id}`, type: primary.type, id: primary.id, list, events, primary, cats, steps };
+}
+/** Junta dos tandas seguidas de episodios de la misma serie (≤ 30 min): «Death Note · 4 episodios». */
+function mergeBinges(events: ActivityEvent[]): ActivityEvent[] {
+    const out: ActivityEvent[] = [];
+    for (const ev of events) {
+        const prev = out[out.length - 1];
+        if (prev && isBingeEv(prev) && isBingeEv(ev) && prev.id === ev.id && (prev.startTs ?? prev.timestamp) - ev.timestamp <= GROUP_MS) {
+            const eps = [...(ev.episodes ?? []), ...(prev.episodes ?? [])]
+                .sort((a, b) => a.season - b.season || a.episode - b.episode);
+            out[out.length - 1] = { ...prev, startTs: Math.min(ev.startTs ?? ev.timestamp, prev.startTs ?? prev.timestamp), episodes: eps };
+        } else out.push(ev);
+    }
+    return out;
+}
+/** Un día, en su orden: filas grandes (lo que viste) y finas (cambios de listas). */
+function buildDay(rawEvents: ActivityEvent[]) {
+    const events = mergeBinges(rawEvents);
+    const rows: TlRow[] = [];
+    let cur: { key: string; list: boolean; binge: boolean; events: ActivityEvent[] } | null = null;
+    for (const ev of events) {
+        const key = `${ev.type}:${ev.id}`;
+        const list = LIST_CATS.has(catOf(ev));
+        const binge = isBingeEv(ev);
+        if (cur && !binge && !cur.binge && cur.key === key && cur.list === list && cur.events[cur.events.length - 1].timestamp - ev.timestamp <= GROUP_MS) {
+            cur.events.push(ev);
+        } else {
+            if (cur) rows.push(buildRow(cur.events, cur.list));
+            cur = { key, list, binge, events: [ev] };
+        }
+    }
+    if (cur) rows.push(buildRow(cur.events, cur.list));
+    // Cabecera del día: lo que viste (películas, episodios, valoraciones, re-visionados) y personas.
+    let pelis = 0, eps = 0, vals = 0, revs = 0, changes = 0;
+    const people = new Set<string>();
+    for (const ev of events) {
+        const c = catOf(ev);
+        if (c === 'visto' && ev.type === 'movie') pelis++;
+        else if (c === 'ep') eps += ev.episodes?.length ?? 1;
+        else if (c === 'rating') vals++;
+        else if (c === 'rewatch') revs++;
+        else if (c === 'person') people.add(ev.id);
+        else if (LIST_CATS.has(c)) changes++;
+    }
+    const plural = (n: number, a: string, b: string) => `${n} ${n === 1 ? a : b}`;
+    const seen = [
+        pelis ? plural(pelis, 'película', 'películas') : '', eps ? plural(eps, 'episodio', 'episodios') : '',
+        vals ? plural(vals, 'valoración', 'valoraciones') : '', revs ? plural(revs, 're-visionado', 're-visionados') : '',
+    ].filter(Boolean);
+    const meta = seen.length ? seen : ['Nada visto'];
+    if (people.size) meta.push(plural(people.size, 'persona', 'personas'));
+    if (changes) meta.push(plural(changes, 'cambio en tus listas', 'cambios en tus listas'));
+    return { rows, meta };
+}
+const isoOf = (ts: number) => new Date(ts).toISOString();
 
 // Heatmap de racha — SIEMPRE actual (de allEvents, independiente de la ventana)
 const HEAT_WEEKS = 16;
@@ -355,177 +453,139 @@ const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.ic
             </EmptyState>
         )}
 
-        <div class="act-timeline">
-            {groupEntries.map(([label, events]) => (
-                <div class="tl-day">
-                    <div class="tl-day-head">
-                        <span class="d">{label}</span>
-                        <span class="c">({events.length})</span>
-                        <span class="sum">
-                            {daySummary(events).map(([c, n]) => (
-                                <span class="b" style={`background: var(--a-${c}-bg); color: var(--a-${c});`}>
-                                    <Icon name={`lucide:${CAT_ICON[c]}`} /> {n}
-                                </span>
-                            ))}
-                        </span>
-                    </div>
-                    {events.map(ev => {
-                        const d = detailsMap.get(`${ev.type}:${ev.id}`);
-                        const title = d?.title || 'Título desconocido';
-                        const poster = d?.poster;
-                        const href = ev.type === 'movie' ? `/movie/${ev.id}` : `/serie/${ev.id}`;
-                        const time = timeText(ev);
-                        const cat = catOf(ev);
-                        const isBinge = ev.collection === 'WatchedEpisodes' && (ev.episodes?.length ?? 0) > 0;
-                        const binge = isBinge ? bingeView(ev, d) : null;
-                        return binge ? (
-                            binge.mode === 'single' ? (
-                                <a href={href} class="ev" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="meta">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                            <span class="sep"></span>
-                                            <span>Serie</span>
+        {/* 9.5a · Línea de tiempo v2: días como secciones, filas planas con la hora en el eje, lo que
+            viste delante y los cambios de listas plegados al final de cada día. */}
+        <div class="act-timeline ac-tl">
+            {groupEntries.map(([label, events, dkey]) => {
+                const day = buildDay(events);
+                const anchorTs = events[events.length - 1].startTs ?? events[events.length - 1].timestamp;
+                return (
+                <section class="ac-day tl-day" id={`d-${dkey}`} aria-labelledby={`d-${dkey}-h`}>
+                    <div class="ac-ax" aria-hidden="true"></div>
+                    <header class="ac-dh">
+                        <h2 id={`d-${dkey}-h`} class="d" data-day-ts={anchorTs}>{label}</h2>
+                        <span class="m">{day.meta.map((m, i) => <span>{i > 0 && '· '}{m}</span>)}</span>
+                    </header>
+                    <ul class="ac-list">
+                        {day.rows.map((r) => {
+                            const ev = r.primary;
+                            const cat = catOf(ev);
+                            const d = detailsMap.get(r.key);
+                            const isPerson = r.type === 'person';
+                            const title = isPerson ? (ev.name || 'Persona') : (d?.title || 'Título desconocido');
+                            const img = isPerson ? ev.profile_path : d?.poster;
+                            const href = isPerson ? `/actor/${r.id}` : r.type === 'movie' ? `/movie/${r.id}` : `/serie/${r.id}`;
+                            const end = r.events[0].timestamp;
+                            const start = Math.min(...r.events.map((e) => e.startTs ?? e.timestamp));
+                            const ranged = end - start >= RANGE_MIN_MS && fmtHm(start) !== fmtHm(end);
+                            const abbr = title.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+                            // Fila fina: un cambio de listas (o varios seguidos del mismo título, en su orden).
+                            if (r.list) return (
+                                <li class="ac-ln" data-cats={r.cats.join(' ')}>
+                                    <time datetime={isoOf(end)} data-ts={end} data-ts-start={ranged ? start : undefined}>{ranged ? `${fmtHm(start)}–${fmtHm(end)}` : fmtHm(end)}</time>
+                                    <span class="ac-pip" style={`--c: var(--a-${cat});`} aria-hidden="true"></span>
+                                    <div class="ac-ln-b">
+                                        <a href={href} class:list={['ac-p', 'is-xs', { pr: isPerson }]} tabindex="-1" aria-hidden="true"><b>{abbr}</b>{img && <img src={posterUrl(img, 'w92')} alt="" loading="lazy" />}</a>
+                                        <p>
+                                            <a href={href}>{title}</a>
+                                            <span class="ac-seq">
+                                                {r.steps.map((st, i) => (
+                                                    <span class="ac-step">{i > 0 && <span class="ar" aria-label="y luego">→</span>}<Icon name={`lucide:${CAT_ICON[st.cat]}`} style={`color: var(--a-${st.cat})`} />{st.label}{st.n > 1 && <span class="x">×{st.n}</span>}</span>
+                                                ))}
+                                            </span>
+                                        </p>
+                                    </div>
+                                </li>
+                            );
+                            const binge = isBingeEv(ev) ? bingeView(ev, d) : null;
+                            const epHref = (sn: number, en: number) => `/serie/${r.id}/t${sn}/e${en}`;
+                            // Un paso de la secuencia de lo que viste (la valoración, con sus estrellas).
+                            const stepView = (st: TlStep) => {
+                                if (st.cat === 'rating') {
+                                    const score = ratingOf(st.ev);
+                                    return score == null ? <span class="ac-lb" style="--c: var(--a-rating)">{st.label}</span> : (
+                                        <span class="ac-step">
+                                            <span class="ac-lb" style="--c: var(--a-rating)">{st.ev.action.startsWith('Nota actualizada') ? 'Cambiaste tu nota' : 'Has valorado'}</span>
+                                            <span class="ac-st" aria-label={`Tu nota: ${fmtScore(score)} de 10`}>
+                                                <span class="ac-stars" aria-hidden="true">★★★★★<span style={`width: ${Math.max(0, Math.min(100, score * 10))}%`}>★★★★★</span></span>
+                                                <b>{fmtScore(score)}</b><small>/10</small>
+                                            </span>
                                         </span>
-                                    </span>
-                                    <span class="time">{time}</span>
-                                    <Icon name="lucide:chevron-right" class="chev" />
-                                </a>
-                            ) : binge.mode === 'episodes' ? (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="body">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                        </span>
-                                        <span class="ep-chips">
-                                            {binge.groups.map(([season, eps]) => (
+                                    );
+                                }
+                                if (st.cat === 'rewatch') return <span class="ac-step"><span class="ac-lb" style="--c: var(--a-rewatch)">Volviste a verla</span>{rewatchNth.get(st.ev) ? ` · ${rewatchNth.get(st.ev)}.ª vez` : ''}</span>;
+                                return <span class="ac-step"><span class="ac-lb" style={`--c: var(--a-${st.cat})`}>{st.label}</span>{st.n > 1 && <span class="x">×{st.n}</span>}</span>;
+                            };
+                            const note = r.steps.find((st) => st.cat === 'rewatch' && st.ev.note)?.ev.note;
+                            return (
+                                <li class:list={['ac-ev', { 'is-person': isPerson }]} data-cats={r.cats.join(' ')}>
+                                    <time class:list={{ rg: ranged }} datetime={isoOf(end)} data-ts={end} data-ts-start={ranged ? start : undefined}>
+                                        {ranged ? <>{fmtHm(start)}<br />{fmtHm(end)}</> : fmtHm(end)}
+                                    </time>
+                                    <span class="ac-dot" style={`--c: var(--a-${cat}); --cb: var(--a-${cat}-bg);`} aria-hidden="true"><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
+                                    <div class="ac-row">
+                                        <a href={href} class:list={['ac-p', { pr: isPerson }]} tabindex="-1" aria-hidden="true">
+                                            <b>{abbr}</b>
+                                            {img && <img src={posterUrl(img, 'w92')} alt="" loading="lazy" />}
+                                        </a>
+                                        <div class="ac-b">
+                                            <a class="ac-tt" href={href}>{title}</a>
+                                            <div class="ac-a">
+                                                {binge ? (
+                                                    binge.mode === 'single'
+                                                        ? <><span class="ac-lb" style="--c: var(--a-ep)">Episodio visto</span> <a class="ac-e" href={epHref(ev.episodes![0].season, ev.episodes![0].episode)}>T{ev.episodes![0].season} · E{ev.episodes![0].episode}</a></>
+                                                        : <span class="ac-lb" style="--c: var(--a-ep)">{binge.verb}</span>
+                                                ) : (
+                                                    <span class="ac-seq">
+                                                        {r.steps.map((st, i) => <>{i > 0 && <span class="ar" aria-label="y luego">→</span>}{stepView(st)}</>)}
+                                                    </span>
+                                                )}
+                                                <span class="ac-ty">{KIND_LABEL[r.type]}</span>
+                                            </div>
+                                            {binge && binge.mode === 'episodes' && (
                                                 <>
-                                                    <span class="ep-chip season">T{season}</span>
-                                                    {eps.map(e => <span class="ep-chip">E{e.episode}</span>)}
-                                                </>
-                                            ))}
-                                        </span>
-                                        {binge.times.length > 1 && (
-                                            <>
-                                                <button class="ev-disclose" type="button">Ver horas <Icon name="lucide:chevron-down" /></button>
-                                                <span class="ev-times">
-                                                    {binge.times.map(t => (
-                                                        <span class="ev-time-row"><b>{t.label}</b><i data-ts={t.ts}>{fmtHm(t.ts)}</i></span>
-                                                    ))}
-                                                </span>
-                                            </>
-                                        )}
-                                    </span>
-                                    <span class="time">{time}</span>
-                                </a>
-                            ) : binge.mode === 'season' ? (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="body">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                        </span>
-                                        <span class="ep-chips">
-                                            <span class="ep-chip season done">T{binge.season} ✓</span>
-                                        </span>
-                                    </span>
-                                    <span class="time">{time}</span>
-                                </a>
-                            ) : (
-                                <a href={href} class="ev binge" data-cat="ep" data-ts={ev.timestamp} data-ts-start={ev.startTs ?? ev.timestamp}>
-                                    <span class="act-ico" style={`background: var(--a-ep-bg); color: var(--a-ep);`}><Icon name="lucide:play" /></span>
-                                    {poster ? (
-                                        <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                    ) : (
-                                        <span class="poster"></span>
-                                    )}
-                                    <span class="body">
-                                        <span class="t">{title}</span>
-                                        <span class="sub">
-                                            <span class="verb" style="color: var(--a-ep);">{binge.verb}</span>
-                                        </span>
-                                        <span class="ev-roll">
-                                            <span class="roll-meta">{binge.meta}</span>
-                                            {binge.pct !== null && (
-                                                <>
-                                                    <span class="roll-bar"><i style={`width: ${binge.pct}%;`}></i></span>
-                                                    <span class="roll-pct">{binge.pct}%</span>
+                                                    <div class="ac-eps">
+                                                        {binge.groups.map(([sn, list]) => (
+                                                            <>
+                                                                <span class="ac-sn">T{sn}</span>
+                                                                {list.map((e) => <a class="ac-e" href={epHref(sn, e.episode)} aria-label={`Episodio T${sn}·E${e.episode}`}>E{e.episode}</a>)}
+                                                            </>
+                                                        ))}
+                                                    </div>
+                                                    {binge.times.length > 1 && (
+                                                        <>
+                                                            <button type="button" class="ac-hrs" aria-expanded="false">Ver horas <Icon name="lucide:chevron-down" /></button>
+                                                            <div class="ac-htab" hidden>
+                                                                {binge.times.map((t) => <><span>{t.label}</span><time data-ts={t.ts} datetime={isoOf(t.ts)}>{fmtHm(t.ts)}</time></>)}
+                                                            </div>
+                                                        </>
+                                                    )}
                                                 </>
                                             )}
-                                        </span>
-                                        <button class="ev-disclose" type="button">Ver desglose <Icon name="lucide:chevron-down" /></button>
-                                        <span class="ev-grid">
-                                            {binge.breakdown.map(ch => (
-                                                <span class:list={["ep-chip", "season", { done: ch.done }]}>{ch.label}</span>
-                                            ))}
-                                        </span>
-                                    </span>
-                                    <span class="time">{time}</span>
-                                </a>
-                            )
-                        ) : ev.type === 'person' ? (
-                            <a href={`/actor/${ev.id}`} class="ev" data-cat={cat} data-ts={ev.timestamp}>
-                                <span class="act-ico" style={`background: var(--a-${cat}-bg); color: var(--a-${cat});`}><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
-                                {ev.profile_path ? (
-                                    <img src={posterUrl(ev.profile_path, 'w92')} alt={ev.name} class="poster avatar" loading="lazy"/>
-                                ) : (
-                                    <span class="poster avatar"></span>
-                                )}
-                                <span class="meta">
-                                    <span class="t">{ev.name}</span>
-                                    <span class="sub">
-                                        <span class="verb" style={`color: var(--a-${cat});`}>{ev.action}</span>
-                                        <span class="sep"></span>
-                                        <span>Persona</span>
-                                    </span>
-                                </span>
-                                <span class="time">{time}</span>
-                                <Icon name="lucide:chevron-right" class="chev" />
-                            </a>
-                        ) : (
-                            <a href={href} class="ev" data-cat={cat} data-ts={ev.timestamp}>
-                                <span class="act-ico" style={`background: var(--a-${cat}-bg); color: var(--a-${cat});`}><Icon name={`lucide:${CAT_ICON[cat]}`} /></span>
-                                {poster ? (
-                                    <img src={posterUrl(poster, 'w92')} alt={title} class="poster" loading="lazy"/>
-                                ) : (
-                                    <span class="poster"></span>
-                                )}
-                                <span class="meta">
-                                    <span class="t">{title}</span>
-                                    <span class="sub">
-                                        <span class="verb" style={`color: var(--a-${cat});`}>{ev.action}</span>
-                                        <span class="sep"></span>
-                                        <span>{ev.type === 'serie' ? 'Serie' : 'Película'}</span>
-                                    </span>
-                                    {ev.note && <span class="ev-note" title={ev.note}>“{ev.note}”</span>}
-                                </span>
-                                <span class="time">{time}</span>
-                                <Icon name="lucide:chevron-right" class="chev" />
-                            </a>
-                        );
-                    })}
-                </div>
-            ))}
+                                            {binge && binge.mode === 'season' && (
+                                                <div class="ac-eps"><a class="ac-e sc done" href={`/serie/${r.id}#season-${binge.season}`}>T{binge.season} <Icon name="lucide:check" /></a></div>
+                                            )}
+                                            {binge && binge.mode === 'summary' && (
+                                                <>
+                                                    <span class="ac-meta">{binge.meta}</span>
+                                                    {binge.pct !== null && <div class="ac-bar"><i><b style={`width: ${binge.pct}%`}></b></i><span>{binge.pct} %</span></div>}
+                                                    <button type="button" class="ac-hrs" aria-expanded="false">Ver desglose <Icon name="lucide:chevron-down" /></button>
+                                                    <div class="ac-eps ac-break" hidden>
+                                                        {binge.breakdown.map((ch) => <a class:list={['ac-e', 'sc', { done: ch.done }]} href={`/serie/${r.id}#season-${ch.label.match(/T(\d+)/)?.[1] ?? ''}`}>{ch.label}</a>)}
+                                                    </div>
+                                                </>
+                                            )}
+                                            {note && <p class="ac-note">«{note}»</p>}
+                                        </div>
+                                        <a class="ac-go" href={href} aria-label={`Ficha de ${title}`}><Icon name="lucide:chevron-right" /></a>
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </section>
+                );
+            })}
         </div>
 
                 <div class="act-more">
@@ -547,88 +607,69 @@ const KPI_ITEMS = KPI_TILES.map((t) => ({ value: t.n, label: t.label, icon: t.ic
     </section>
 
     <script is:inline>
-        // Filtros por acción: oculta filas que no coinciden y días que quedan vacíos.
-        // Soporta varios bloques .act-filters (rail desktop + móvil) con estado sincronizado.
         (function () {
-            // Zona horaria del NAVEGADOR: el servidor renderiza en UTC, así que la
-            // hora y la etiqueta de día (Hoy/Ayer/fecha) se recalculan aquí con la
-            // zona del visitante. El valor del servidor queda como fallback sin-JS.
-            const dayKey = (d) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD, zona local
-            const todayKey = dayKey(new Date());
-            const yKey = (() => { const y = new Date(); y.setDate(y.getDate() - 1); return dayKey(y); })();
-            const fmtTime = (ts) => new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
-            const fmtDay = (d) => {
-                const k = dayKey(d);
+            // Zona horaria del NAVEGADOR: el servidor pinta en hora de Madrid; aquí se repintan horas y
+            // etiquetas de día con la del visitante (sin JS se queda lo del servidor).
+            var dayKey = function (d) { return d.toLocaleDateString('en-CA'); };
+            var todayKey = dayKey(new Date());
+            var yKey = (function () { var y = new Date(); y.setDate(y.getDate() - 1); return dayKey(y); })();
+            var fmtTime = function (ts) { return new Date(ts).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }); };
+            var fmtDay = function (d) {
+                var k = dayKey(d);
                 if (k === todayKey) return 'Hoy';
                 if (k === yKey) return 'Ayer';
-                return d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+                var s = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
+                return s.charAt(0).toUpperCase() + s.slice(1);
             };
-            // Una sesión de episodios se pinta como RANGO ("00:47–00:53"): data-ts es el
-            // último episodio y data-ts-start el primero. Umbral igual al del servidor.
-            const RANGE_MIN_MS = 2 * 60 * 1000;
-            document.querySelectorAll('.act-timeline .ev[data-ts]').forEach((ev) => {
-                const ts = Number(ev.dataset.ts);
-                if (!ts) return;
-                const t = ev.querySelector('.time');
-                if (!t) return;
-                const start = Number(ev.dataset.tsStart || 0);
-                const end = fmtTime(ts);
-                if (start && ts - start >= RANGE_MIN_MS) {
-                    const from = fmtTime(start);
-                    t.textContent = from === end ? end : from + '–' + end;
-                } else {
-                    t.textContent = end;
-                }
+            document.querySelectorAll('.act-timeline time[data-ts]').forEach(function (t) {
+                var end = Number(t.dataset.ts); if (!end) return;
+                var start = Number(t.dataset.tsStart || 0);
+                if (start && fmtTime(start) !== fmtTime(end)) {
+                    if (t.classList.contains('rg')) t.innerHTML = fmtTime(start) + '<br>' + fmtTime(end);
+                    else t.textContent = fmtTime(start) + '–' + fmtTime(end);
+                } else t.textContent = fmtTime(end);
             });
-            // Hora de cada episodio dentro del desplegable "Ver horas".
-            document.querySelectorAll('.act-timeline .ev-times i[data-ts]').forEach((el) => {
-                const ts = Number(el.dataset.ts);
-                if (ts) el.textContent = fmtTime(ts);
-            });
-            document.querySelectorAll('.act-timeline .tl-day').forEach((day) => {
-                // ts representativo del grupo = el INICIO más temprano de sus filas: una
-                // sesión que cruza medianoche se archiva en la noche en que empezó, y el
-                // servidor ya la agrupó así.
-                let minTs = Infinity;
-                day.querySelectorAll('.ev[data-ts]').forEach((ev) => {
-                    const ts = Number(ev.dataset.tsStart || ev.dataset.ts);
-                    if (ts && ts < minTs) minTs = ts;
-                });
-                const label = day.querySelector('.tl-day-head .d');
-                if (minTs !== Infinity && label) label.textContent = fmtDay(new Date(minTs));
+            document.querySelectorAll('.act-timeline .ac-dh .d[data-day-ts]').forEach(function (h) {
+                var ts = Number(h.dataset.dayTs); if (ts) h.textContent = fmtDay(new Date(ts));
             });
 
-            const groups = document.querySelectorAll('.act-filters');
-            if (!groups.length) return;
-            groups.forEach((group) => {
-                group.addEventListener('click', (e) => {
-                    const chip = e.target.closest('.chip');
-                    if (!chip) return;
-                    const filter = chip.dataset.filter;
-                    document.querySelectorAll('.act-filters .chip').forEach((c) => {
-                        c.classList.toggle('active', c.dataset.filter === filter);
-                    });
-                    document.querySelectorAll('.act-timeline .tl-day').forEach((day) => {
-                        let visible = 0;
-                        day.querySelectorAll('.ev').forEach((ev) => {
-                            const show = filter === 'all' || ev.dataset.cat === filter;
-                            ev.style.display = show ? '' : 'none';
-                            if (show) visible++;
-                        });
-                        day.style.display = visible ? '' : 'none';
+            // «Ver horas» / «Ver desglose»: abre lo que tiene justo debajo.
+            document.querySelectorAll('.act-timeline .ac-hrs').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var box = btn.nextElementSibling; if (!box) return;
+                    var open = box.hidden;
+                    box.hidden = !open;
+                    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+                });
+            });
+
+            // Filtros (los de siempre, hasta el panel nuevo de 9.5b): filas grandes y finas por categoría.
+            var has = function (el, f) { return (' ' + (el.dataset.cats || '') + ' ').indexOf(' ' + f + ' ') >= 0; };
+            document.querySelectorAll('.act-filters').forEach(function (group) {
+                group.addEventListener('click', function (e) {
+                    var chip = e.target.closest('.chip'); if (!chip) return;
+                    var f = chip.dataset.filter;
+                    document.querySelectorAll('.act-filters .chip').forEach(function (c) { c.classList.toggle('active', c.dataset.filter === f); });
+                    document.querySelectorAll('.act-timeline .ac-day').forEach(function (day) {
+                        var visible = 0;
+                        day.querySelectorAll('.ac-ev, .ac-ln').forEach(function (r) { var ok = f === 'all' || has(r, f); r.hidden = !ok; if (ok) visible++; });
+                        day.hidden = visible === 0;
                     });
                 });
             });
 
-            // "Ver desglose" de los binges-resumen: el botón vive dentro del <a>
-            // de la fila, así que hay que frenar la navegación.
-            document.querySelectorAll('.ev-disclose').forEach((btn) => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    btn.closest('.ev').classList.toggle('open');
+            // Cabecera de día fija: línea inferior cuando se queda pegada arriba.
+            var heads = Array.prototype.slice.call(document.querySelectorAll('.act-timeline .ac-dh'));
+            var tick = false;
+            var paint = function () {
+                tick = false;
+                heads.forEach(function (h) {
+                    var top = h.getBoundingClientRect().top, sec = h.parentElement.getBoundingClientRect();
+                    h.classList.toggle('stuck', top <= 1 && sec.bottom > h.offsetHeight + 8);
                 });
-            });
+            };
+            addEventListener('scroll', function () { if (!tick) { tick = true; requestAnimationFrame(paint); } }, { passive: true });
+            paint();
         })();
     </script>
 </Layout>
