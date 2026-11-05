@@ -7,6 +7,7 @@ import { fetchMovieDetails } from "../../services/API/Movies/tmdbMovies";
 import { fetchSerieDetails } from "../../services/API/Series/tmdbSeries";
 import { processBatch } from "../../utils/processBatch";
 import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { getSeasonRuntimes, seasonKey } from "../../services/API/Series/seasonRuntimes";
 import Stamp from "../../components/Stamp.astro";
 import { Icon } from "astro-icon/components";
 import { appDateParts, APP_TZ } from "../../utils/appTime";
@@ -38,13 +39,14 @@ for (const ev of windowEvents) {
     if (!uniqueItems.has(key)) uniqueItems.set(key, { id: ev.id, type: ev.type as 'movie' | 'serie' });
 }
 
-interface Detail { key: string; title: string; poster: string | null; seasons?: Record<number, number> }
+// runtime: película → su duración; serie → la media de un episodio (para estimar lo que TMDB no da por episodio).
+interface Detail { key: string; title: string; poster: string | null; seasons?: Record<number, number>; runtime?: number | null }
 const fetchers = Array.from(uniqueItems.values());
 const loadDetail = async (item: { id: string; type: 'movie' | 'serie' }): Promise<Detail> => {
         try {
             if (item.type === 'movie') {
                 const d = await fetchMovieDetails(item.id);
-                return { key: `movie:${item.id}`, title: d?.title || 'Sin título', poster: d?.poster_path || null };
+                return { key: `movie:${item.id}`, title: d?.title || 'Sin título', poster: d?.poster_path || null, runtime: Number(d?.runtime) > 0 ? Number(d.runtime) : null };
             }
             const d = await fetchSerieDetails(item.id);
             // Total de episodios por temporada (para la regla por volumen de los binges)
@@ -52,7 +54,8 @@ const loadDetail = async (item: { id: string; type: 'movie' | 'serie' }): Promis
             for (const s of d?.seasons ?? []) {
                 if (s.season_number > 0 && s.episode_count > 0) seasons[s.season_number] = s.episode_count;
             }
-            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null, seasons };
+            const avg = Number(d?.episode_run_time?.[0]) || Number(d?.last_episode_to_air?.runtime) || null;
+            return { key: `serie:${item.id}`, title: d?.name || 'Sin título', poster: d?.poster_path || null, seasons, runtime: avg };
         } catch {
             return { key: `${item.type}:${item.id}`, title: 'Sin título', poster: null };
         }
@@ -303,12 +306,47 @@ function buildDay(rawEvents: ActivityEvent[]) {
         pelis ? plural(pelis, 'película', 'películas') : '', eps ? plural(eps, 'episodio', 'episodios') : '',
         vals ? plural(vals, 'valoración', 'valoraciones') : '', revs ? plural(revs, 're-visionado', 're-visionados') : '',
     ].filter(Boolean);
-    const meta = seen.length ? seen : ['Nada visto'];
+    const dur = fmtDur(screenTime(events));
+    const meta = seen.length ? (dur ? [dur, ...seen] : seen) : ['Nada visto'];
     if (people.size) meta.push(plural(people.size, 'persona', 'personas'));
     if (changes) meta.push(plural(changes, 'cambio en tus listas', 'cambios en tus listas'));
     return { rows, meta };
 }
 const isoOf = (ts: number) => new Date(ts).toISOString();
+
+// =====================================================================================
+// 9.5d · Tiempo en pantalla: duración de las películas vistas (y re-vistas) y de cada episodio visto.
+// Los episodios salen de `/tv/{id}/season/{n}` (una llamada por temporada distinta del mes, con caché);
+// si falta alguno, se usa la media de la serie y la cifra lleva «≈». Los marcados en bloque cuentan.
+// =====================================================================================
+const seasonRt = await getSeasonRuntimes(
+    windowEvents.filter((e) => catOf(e) === 'ep' && e.episodes?.length).flatMap((e) => e.episodes!.map((x) => ({ id: e.id, season: x.season }))),
+);
+function screenTime(events: ActivityEvent[]) {
+    let min = 0, approx = false;
+    for (const ev of events) {
+        const c = catOf(ev);
+        if (c === 'ep') {
+            const avg = detailsMap.get(`serie:${ev.id}`)?.runtime ?? 0;
+            if (!ev.episodes?.length) { min += avg; approx = true; continue; }
+            for (const e of ev.episodes) {
+                const exact = seasonRt.get(seasonKey(ev.id, e.season))?.[e.episode];
+                if (exact) min += exact; else { min += avg; approx = true; }
+            }
+        } else if ((c === 'visto' || c === 'rewatch') && ev.type === 'movie') {
+            const r = detailsMap.get(`movie:${ev.id}`)?.runtime;
+            if (r) min += r; else approx = true;
+        }
+    }
+    return { min, approx };
+}
+/** «2 h 16 min», «45 min», «31 h»; con «≈» si hay algo estimado. Vacío si no hay nada. */
+function fmtDur({ min, approx }: { min: number; approx: boolean }, short = false) {
+    if (!min) return '';
+    const h = Math.floor(min / 60), m = Math.round(min % 60);
+    const txt = short ? (h ? `${h} h` : `${m} min`) : [h ? `${h} h` : '', m || !h ? `${m} min` : ''].filter(Boolean).join(' ');
+    return `${approx ? '≈ ' : ''}${txt}`;
+}
 
 // =====================================================================================
 // 9.5b · Panel del periodo (derecha) y filtros. Todo sale de allEvents (ya cargados): racha con la
@@ -523,7 +561,10 @@ const firstYear = Math.min(vy, ...[...activeMonths].map((m) => Number(m.slice(0,
 const pickerYears = Array.from({ length: thisYear - firstYear + 1 }, (_, i) => firstYear + i);
 const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 // Separador al seguir con este mes debajo del siguiente: «Octubre 2026 · 64 episodios · 6 películas».
+const mTime = screenTime(windowEvents);
+const mTimeTxt = fmtDur(mTime);
 const monthSep = [
+    mTimeTxt,
     mStats.eps ? plural(mStats.eps, 'episodio', 'episodios') : '', mStats.pelis ? plural(mStats.pelis, 'película', 'películas') : '',
     mStats.vals ? plural(mStats.vals, 'valoración', 'valoraciones') : '', mStats.revs ? plural(mStats.revs, 're-visionado', 're-visionados') : '',
 ].filter(Boolean);
@@ -777,7 +818,8 @@ const monthSep = [
                     <span class="t">Resumen de {monthName}</span>
                     <span class="q">
                         <span><Icon name="lucide:flame" />{plural(streak, 'día', 'días')}</span>
-                        {MONTH_NUMS.slice(0, 2).map((x) => <span><Icon name={`lucide:${x.icon}`} style={`color: var(--a-${x.cat})`} />{x.n}</span>)}
+                        {mTimeTxt && <span><Icon name="lucide:clock" />{fmtDur(mTime, true)}</span>}
+                        {MONTH_NUMS.slice(0, mTimeTxt ? 1 : 2).map((x) => <span><Icon name={`lucide:${x.icon}`} style={`color: var(--a-${x.cat})`} />{x.n}</span>)}
                     </span>
                     <Icon name="lucide:chevron-down" class="car" />
                 </summary>
@@ -818,6 +860,11 @@ const monthSep = [
 
                     <div class="ac-blk">
                         <span class="ac-k">{isThisMonth ? 'Este mes, de momento' : monthName}</span>
+                        {mTimeTxt && (
+                            <div class="ac-big" title={mTime.approx ? 'Aproximado: de algún episodio o película no hay duración y se usa la media de la serie' : undefined}>
+                                {mTimeTxt}<small>{isThisMonth ? `en pantalla · del 1 al ${todayDay} de ${monthName}` : `en pantalla en ${monthName}`}</small>
+                            </div>
+                        )}
                         {MONTH_NUMS.length ? (
                             <div class="ac-nums">
                                 {MONTH_NUMS.map((x) => <div><b style={`--c: var(--a-${x.cat})`}><Icon name={`lucide:${x.icon}`} />{x.n}</b><span>{x.label}</span></div>)}
