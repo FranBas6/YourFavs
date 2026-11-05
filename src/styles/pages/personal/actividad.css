@@ -56,7 +56,9 @@
 .tl-day-head .d { display: inline-block; font-size: 15px; font-weight: 700; color: var(--text); }
 .tl-day-head .d::first-letter { text-transform: uppercase; }
 .tl-day-head .c { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); }
-.tl-day-head .sum { margin-left: auto; display: flex; gap: 5px; }
+/* Los contadores del día saltan de línea si no caben (a 1024 px, con la columna de Mis listas y el
+   panel lateral, se salían de la página; 9.2). En móvil ya lo hacía la cabecera entera. */
+.tl-day-head .sum { margin-left: auto; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; min-width: 0; }
 .tl-day-head .sum .b { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: var(--r-full); }
 .tl-day-head .sum .b svg { width: 11px; height: 11px; }
 
@@ -72,8 +74,12 @@
 .ev .meta, .ev .body { flex: 1; min-width: 0; }
 .ev .t { display: block; font-size: 14px; font-weight: 600; line-height: 1.25; margin: 0 0 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
 .ev .sub { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: 12px; color: var(--text-3); }
-.ev .sub .verb { font-weight: 500; }
-.ev .sub .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
+.ev .sub .verb { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* El punto va pegado a lo que le sigue («· Serie»): si la línea salta, baja con ello en vez de quedarse
+   colgando al final de la primera (9.2). */
+.ev .sub .sep { display: none; }
+.ev .sub .sep + span { white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }
+.ev .sub .sep + span::before { content: ''; width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
 .ev .ev-note { display: block; margin-top: 4px; font-size: 12px; font-style: italic; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ev .time { font-family: var(--font-mono); font-size: 11px; color: var(--text-4); flex-shrink: 0; letter-spacing: .02em; }
 .ev .chev { color: var(--text-4); flex-shrink: 0; width: 16px; height: 16px; }
