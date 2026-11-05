@@ -13,20 +13,23 @@ import { appDateParts, APP_TZ } from "../../utils/appTime";
 import "../../styles/pages/personal/actividad.css";
 
 const url = new URL(Astro.request.url);
-const page = Math.max(1, Number(url.searchParams.get('page')) || 1);
-const DAYS_PER_PAGE = 30;
 const DAY_MS = 24 * 3600 * 1000;
-
 const now = Date.now();
-const windowEnd = now - (page - 1) * DAYS_PER_PAGE * DAY_MS;
-const windowStart = now - page * DAYS_PER_PAGE * DAY_MS;
+
+// 9.5c · El periodo es el MES NATURAL (?mes=2026-10; sin él, el mes en curso), en hora de Madrid.
+// Un evento cae en el mes del día en que se archiva (el de inicio de su sesión), como en el feed.
+const curMonth = appDateParts(now).key.slice(0, 7);
+const mesParam = url.searchParams.get('mes') ?? '';
+const mes = /^\d{4}-(0[1-9]|1[0-2])$/.test(mesParam) && mesParam <= curMonth ? mesParam : curMonth;
 
 const allEvents = await fetchAllActivityEvents();
+const anchorKeyOf = (e: ActivityEvent) => appDateParts(e.startTs ?? e.timestamp).key;
 const windowEvents = allEvents
-    .filter(e => e.timestamp >= windowStart && e.timestamp < windowEnd)
+    .filter((e) => anchorKeyOf(e).startsWith(mes))
     .sort((a, b) => b.timestamp - a.timestamp);
-
-const hasOlder = allEvents.some(e => e.timestamp < windowStart);
+// Meses con actividad: el selector les pone un punto y al acabar el mes se sigue con el anterior que tenga.
+const activeMonths = new Set(allEvents.map((e) => anchorKeyOf(e).slice(0, 7)));
+const prevActive = [...activeMonths].filter((m) => m < mes).sort().pop() ?? null;
 
 const uniqueItems = new Map<string, { id: string; type: 'movie' | 'serie' }>();
 for (const ev of windowEvents) {
@@ -88,10 +91,6 @@ for (const ev of windowEvents) {
 const groupEntries = Array.from(groups.entries())
     .sort((a, b) => (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0))
     .map(([k, g]) => [g.label, g.events, k] as [string, ActivityEvent[], string]);
-
-const windowLabel = page === 1
-    ? `Últimos ${DAYS_PER_PAGE} días`
-    : `Entre hace ${(page - 1) * DAYS_PER_PAGE} y ${page * DAYS_PER_PAGE} días`;
 
 // Categoría de acción por colección (rediseño "timeline con momentum")
 type Cat = 'visto' | 'fav' | 'like' | 'ep' | 'pend' | 'pronto' | 'seguir' | 'rewatch' | 'rating' | 'person'
@@ -365,9 +364,8 @@ const bestText = !bestRun || runLen(bestRun) < 2 ? null
     : bestRun === curRun ? { pre: 'Es tu mejor racha', b: '', post: ' hasta ahora' }
     : { pre: 'Tu mejor: ', b: plural(runLen(bestRun), 'día', 'días'), post: `, en ${fmtN(bestRun.end, { month: 'long', year: 'numeric' })}` };
 
-// El mes del panel: el del periodo que tienes en pantalla (en la 9.5c, los meses naturales).
-const viewKey = appDateParts(Math.min(windowEnd, now) - 1).key;
-const monthKey = viewKey.slice(0, 7);
+// El mes del panel: el de la página (al bajar a otro mes, el navegador cambia al panel de ese mes).
+const monthKey = mes;
 const [vy, vm] = monthKey.split('-').map(Number);
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 const monthName = MONTHS[vm - 1];
@@ -451,7 +449,7 @@ const showTop = topMap.size >= 2;
 
 // Hace un año (solo en la página de hoy): ese día o, si no hubo nada, el más cercano en ±3 días.
 const agoView = (() => {
-    if (page !== 1) return null;
+    if (!isThisMonth) return null;
     const target = dayNum(`${thisYear - 1}${todayKey.slice(4)}`);
     for (const off of [0, -1, 1, -2, 2, -3, 3]) {
         const n = target + off;
@@ -510,13 +508,25 @@ const activeSeg = activeF.length === 0 ? 'all'
 const onlyLists = activeF.length > 0 && activeF.every((c) => LIST_CATS.has(c));
 const showRow = (cats: Cat[]) => activeF.length === 0 || cats.some((c) => activeF.includes(c));
 const visibleRows = allRows.filter((r) => showRow(r.cats)).length;
-const pageHref = (pg: number) => {
-    const q = new URLSearchParams();
-    if (pg > 1) q.set('page', String(pg));
-    if (activeF.length) q.set('f', activeF.join(','));
-    const qs = q.toString();
-    return `/mislistas/actividad${qs ? `?${qs}` : ''}`;
+// ---- 9.5c · Moverse por meses ----
+const monthHref = (mk: string | null, hash = '') => {
+    const q: string[] = [];
+    if (mk && mk !== curMonth) q.push(`mes=${mk}`);
+    if (activeF.length) q.push(`f=${activeF.join(',')}`);
+    return `/mislistas/actividad${q.length ? `?${q.join('&')}` : ''}${hash}`;
 };
+const shiftMonth = (mk: string, d: number) => { const [y, m] = mk.split('-').map(Number); const t = new Date(Date.UTC(y, m - 1 + d, 1)); return t.toISOString().slice(0, 7); };
+const monthTitle = (mk: string) => { const [y, m] = mk.split('-').map(Number); return `${MONTHS[m - 1].charAt(0).toUpperCase()}${MONTHS[m - 1].slice(1)} ${y}`; };
+const prevMonth = shiftMonth(mes, -1), nextMonth = mes < curMonth ? shiftMonth(mes, 1) : null;
+// Selector: de el primer año con actividad a este; cada mes con punto si tuvo algo, los futuros fuera.
+const firstYear = Math.min(vy, ...[...activeMonths].map((m) => Number(m.slice(0, 4))));
+const pickerYears = Array.from({ length: thisYear - firstYear + 1 }, (_, i) => firstYear + i);
+const MONTH_SHORT = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+// Separador al seguir con este mes debajo del siguiente: «Octubre 2026 · 64 episodios · 6 películas».
+const monthSep = [
+    mStats.eps ? plural(mStats.eps, 'episodio', 'episodios') : '', mStats.pelis ? plural(mStats.pelis, 'película', 'películas') : '',
+    mStats.vals ? plural(mStats.vals, 'valoración', 'valoraciones') : '', mStats.revs ? plural(mStats.revs, 're-visionado', 're-visionados') : '',
+].filter(Boolean);
 ---
 <Layout title="Actividad">
     <ListsNav slot="aside" />
@@ -526,16 +536,49 @@ const pageHref = (pg: number) => {
                 <h1>Actividad</h1>
                 <p>Tu historial en pantalla, día a día</p>
             </div>
-            <span class="act-live">
-                {page === 1 && <span class="pulse"></span>}
-                {page === 1 ? `EN VIVO · ${windowLabel.toUpperCase()}` : windowLabel.toUpperCase()}
-            </span>
+            {/* 9.5c · ‹ Noviembre 2026 › — el del medio abre el selector de mes. */}
+            <nav class="ac-per" aria-label="Elegir mes">
+                <a class="ar" href={monthHref(prevMonth)} aria-label={`Mes anterior: ${monthTitle(prevMonth)}`}><Icon name="lucide:chevron-left" /></a>
+                <details class="ac-mpk">
+                    <summary class="mo" aria-label={`${monthTitle(mes)}. Elegir otro mes`}><Icon name="lucide:calendar" />{monthTitle(mes)}<Icon name="lucide:chevron-down" class="car" /></summary>
+                    <div class="ac-pop ac-mp" role="dialog" aria-label="Elegir mes">
+                        {pickerYears.map((y) => (
+                            <div class="yr" data-y={y} hidden={y !== vy}>
+                                <div class="hd">
+                                    <button type="button" data-go={y - 1} disabled={y === firstYear} aria-label={`Año ${y - 1}`}><Icon name="lucide:chevron-left" /></button>
+                                    <b>{y}</b>
+                                    <button type="button" data-go={y + 1} disabled={y === thisYear} aria-label={`Año ${y + 1}`}><Icon name="lucide:chevron-right" /></button>
+                                </div>
+                                <div class="g">
+                                    {MONTH_SHORT.map((m, i) => {
+                                        const mk = `${y}-${String(i + 1).padStart(2, '0')}`;
+                                        const label = `${MONTHS[i]} de ${y}${activeMonths.has(mk) ? '' : ', sin actividad'}`;
+                                        return mk > curMonth
+                                            ? <span class="fut" aria-hidden="true">{m}<i></i></span>
+                                            : <a href={monthHref(mk)} class:list={{ on: mk === mes, nil: !activeMonths.has(mk) }} aria-current={mk === mes ? 'date' : undefined} aria-label={label}>{m}<i></i></a>;
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                        <div class="ft">
+                            <a href={monthHref(curMonth)}>Este mes</a>
+                            <a href={monthHref(shiftMonth(curMonth, -1))}>El mes pasado</a>
+                            <label class="go">Ir a un día… <input type="date" min={`${firstYear}-01-01`} max={todayKey} /></label>
+                        </div>
+                    </div>
+                </details>
+                {nextMonth
+                    ? <a class="ar" href={monthHref(nextMonth)} aria-label={`Mes siguiente: ${monthTitle(nextMonth)}`}><Icon name="lucide:chevron-right" /></a>
+                    : <span class="ar off" aria-disabled="true" aria-label="No hay mes siguiente"><Icon name="lucide:chevron-right" /></span>}
+                {mes !== curMonth && <a class="q" href={monthHref(curMonth)}>Volver a hoy</a>}
+            </nav>
         </header>
 
 
         <div class="act-grid">
             <div class="act-main">
                 {/* 9.5b · Filtros: segmentado + «Más filtros» con una casilla por tipo (los 15). Van en la URL. */}
+                {windowEvents.length > 0 && (
                 <div class="ac-fl" role="toolbar" aria-label="Filtrar la actividad">
                     <div class="ac-seg" role="radiogroup" aria-label="Qué enseñar">
                         {SEGMENTS.map((sg) => (
@@ -564,23 +607,26 @@ const pageHref = (pg: number) => {
                     </details>
                     <button type="button" class="clr" hidden={!!activeSeg}>Quitar filtro</button>
                 </div>
+                )}
 
-        {windowEvents.length === 0 && (
-            <EmptyState
-                size="lg"
-                title="Sin actividad en este periodo"
-                description={page === 1 ? 'Añade algo a tus colecciones para empezar tu historial.' : 'Retrocede más en el tiempo o vuelve al principio.'}
-            >
-                {page === 1
-                    ? <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] text-sm font-medium transition-colors">Explorar tendencias</a>
-                    : <a slot="cta" href="/mislistas/actividad" class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors">Volver al inicio</a>
-                }
+        {windowEvents.length === 0 && (allEvents.length === 0 ? (
+            <EmptyState size="lg" title="Aún no hay actividad" description="Añade algo a tus colecciones para empezar tu historial.">
+                <a slot="cta" href="/catalogo/tendencias" class="inline-flex items-center gap-2 px-4 py-2 bg-[#E63946] text-white rounded-lg hover:bg-[#C7283A] text-sm font-medium transition-colors">Explorar tendencias</a>
             </EmptyState>
-        )}
+        ) : (
+            <EmptyState size="lg" title={`Nada en ${monthName} de ${vy}`} description={isThisMonth ? 'Este mes aún no has hecho nada. Lo que veas o guardes saldrá aquí.' : 'Ese mes no hiciste nada en tus listas.'}>
+                <a slot="cta" href={prevActive ? monthHref(prevActive) : monthHref(curMonth)} class="inline-flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 text-sm font-medium transition-colors">
+                    {prevActive ? `Ir a ${monthTitle(prevActive).toLowerCase()}` : 'Volver a hoy'}
+                </a>
+            </EmptyState>
+        ))}
 
         {/* 9.5a · Línea de tiempo v2: días como secciones, filas planas con la hora en el eje, lo que
             viste delante y los cambios de listas plegados al final de cada día. */}
         <div class:list={['act-timeline', 'ac-tl', { 'only-lists': onlyLists }]}>
+          {/* Un bloque por mes: al bajar se añaden los anteriores (con su separador) sin cambiar de página. */}
+          <div class="ac-mblock" data-mes={mes}>
+            <div class="ac-mo"><h2>{monthTitle(mes)}</h2>{monthSep.length > 0 && <span>{monthSep.join(' · ')}</span>}</div>
             {days.map(({ label, events, dkey, day }) => {
                 const anchorTs = events[events.length - 1].startTs ?? events[events.length - 1].timestamp;
                 return (
@@ -710,26 +756,18 @@ const pageHref = (pg: number) => {
                 </section>
                 );
             })}
+          </div>
         </div>
 
                 {allRows.length > 0 && (
                     <p class="ac-none" hidden={visibleRows > 0}>Nada de esto en estos días. <button type="button" class="clr">Quitar filtro</button></p>
                 )}
 
-                <div class="act-more">
-                    {page > 1 && (
-                        <a href={pageHref(page - 1)}>
-                            <Icon name="lucide:chevron-left" />
-                            Más reciente
-                        </a>
-                    )}
-                    {hasOlder && (
-                        <a href={pageHref(page + 1)}>
-                            Más antiguo
-                            <Icon name="lucide:chevron-right" />
-                        </a>
-                    )}
-                </div>
+                {prevActive && windowEvents.length > 0 && (
+                    <div class="ac-loadw">
+                        <a class="ac-load" href={monthHref(prevActive)} data-mes={prevActive}><Icon name="lucide:chevrons-down" />Seguir con {monthTitle(prevActive).toLowerCase()}</a>
+                    </div>
+                )}
             </div>
 
             {/* 9.5b · Panel del periodo: a la derecha y fijo en escritorio ancho; por debajo, plegado en
@@ -743,7 +781,7 @@ const pageHref = (pg: number) => {
                     </span>
                     <Icon name="lucide:chevron-down" class="car" />
                 </summary>
-                <aside class="ac-pn" aria-label={`Resumen de ${monthName}`}>
+                <aside class="ac-pn" data-mes={mes} aria-label={`Resumen de ${monthName} de ${vy}`}>
                     <div class="ac-blk">
                         <span class="ac-k">Racha</span>
                         <div class="ac-rc">
@@ -829,6 +867,12 @@ const pageHref = (pg: number) => {
 
     <script is:inline>
         (function () {
+            var $$ = function (sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); };
+            var tl = document.querySelector('.act-timeline');
+            var pnw = document.querySelector('.ac-pnw');
+            var wide = matchMedia('(min-width: 1200px)');
+
+            // ---- Lo que hay que preparar en cada mes que entra en la página (el primero y los que se cargan) ----
             // Zona horaria del NAVEGADOR: el servidor pinta en hora de Madrid; aquí se repintan horas y
             // etiquetas de día con la del visitante (sin JS se queda lo del servidor).
             var dayKey = function (d) { return d.toLocaleDateString('en-CA'); };
@@ -842,33 +886,48 @@ const pageHref = (pg: number) => {
                 var s = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
                 return s.charAt(0).toUpperCase() + s.slice(1);
             };
-            document.querySelectorAll('.act-timeline time[data-ts]').forEach(function (t) {
-                var end = Number(t.dataset.ts); if (!end) return;
-                var start = Number(t.dataset.tsStart || 0);
-                if (start && fmtTime(start) !== fmtTime(end)) {
-                    if (t.classList.contains('rg')) t.innerHTML = fmtTime(start) + '<br>' + fmtTime(end);
-                    else t.textContent = fmtTime(start) + '–' + fmtTime(end);
-                } else t.textContent = fmtTime(end);
-            });
-            document.querySelectorAll('.act-timeline .ac-dh .d[data-day-ts]').forEach(function (h) {
-                var ts = Number(h.dataset.dayTs); if (ts) h.textContent = fmtDay(new Date(ts));
-            });
-
-            // «Ver horas» / «Ver desglose»: abre lo que tiene justo debajo.
-            document.querySelectorAll('.act-timeline .ac-hrs').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    var box = btn.nextElementSibling; if (!box) return;
-                    var open = box.hidden;
-                    box.hidden = !open;
-                    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+            var initBlock = function (root) {
+                $$('time[data-ts]', root).forEach(function (t) {
+                    var end = Number(t.dataset.ts); if (!end) return;
+                    var start = Number(t.dataset.tsStart || 0);
+                    if (start && fmtTime(start) !== fmtTime(end)) {
+                        if (t.classList.contains('rg')) t.innerHTML = fmtTime(start) + '<br>' + fmtTime(end);
+                        else t.textContent = fmtTime(start) + '–' + fmtTime(end);
+                    } else t.textContent = fmtTime(end);
                 });
+                $$('.ac-dh .d[data-day-ts]', root).forEach(function (h) {
+                    var ts = Number(h.dataset.dayTs); if (ts) h.textContent = fmtDay(new Date(ts));
+                });
+            };
+            if (tl) initBlock(tl);
+            // «Ver horas» / «Ver desglose»: abre lo que tiene justo debajo (delegado: vale para los meses cargados).
+            if (tl) tl.addEventListener('click', function (e) {
+                var btn = e.target.closest('.ac-hrs'); if (!btn) return;
+                var box = btn.nextElementSibling; if (!box) return;
+                var open = box.hidden;
+                box.hidden = !open;
+                btn.setAttribute('aria-expanded', open ? 'true' : 'false');
             });
 
-            // 9.5b · Filtros: el segmentado y las casillas son lo mismo (un conjunto de tipos). Sin casillas = Todo.
-            var boxes = Array.prototype.slice.call(document.querySelectorAll('.ac-fx input[type=checkbox]'));
-            var segs = Array.prototype.slice.call(document.querySelectorAll('.ac-seg [data-seg]'));
+            // ---- 9.5b · Filtros: el segmentado y las casillas son lo mismo (un conjunto de tipos). Sin casillas = Todo ----
+            var boxes = $$('.ac-fx input[type=checkbox]');
+            var segs = $$('.ac-seg [data-seg]');
             var fx = document.querySelector('.ac-fx');
+            var curF = (new URL(location.href).searchParams.get('f') || '').split(',').filter(Boolean);
+            var matches = function (r, F) { var cats = (r.dataset.cats || '').split(' '); return F.length === 0 || cats.some(function (c) { return F.indexOf(c) >= 0; }); };
+            var withF = function (href) {
+                var u = new URL(href, location.href);
+                if (curF.length) u.searchParams.set('f', curF.join(',')); else u.searchParams.delete('f');
+                return u.pathname + u.search.replace(/%2C/gi, ',') + u.hash;   // ?f=visto,ep,rating, legible
+            };
+            // Contadores del segmentado y de las casillas: de todos los meses que haya en pantalla.
+            var recount = function () {
+                var rows = $$('.act-timeline .ac-ev, .act-timeline .ac-ln');
+                segs.forEach(function (sg) { var n = sg.querySelector('.n'); if (n) n.textContent = rows.filter(function (r) { return matches(r, sg.dataset.cats ? sg.dataset.cats.split(' ') : []); }).length; });
+                boxes.forEach(function (b) { var n = b.parentElement.querySelector('.n'); if (n) n.textContent = rows.filter(function (r) { return matches(r, [b.value]); }).length; });
+            };
             var applyFilter = function (F) {
+                curF = F;
                 boxes.forEach(function (b) { b.checked = F.indexOf(b.value) >= 0; });
                 var segId = F.length === 0 ? 'all' : null;
                 segs.forEach(function (sg) {
@@ -881,73 +940,133 @@ const pageHref = (pg: number) => {
                     var badge = fx.querySelector('.b'); badge.hidden = !!segId; badge.textContent = String(F.length);
                 }
                 var shown = 0;
-                document.querySelectorAll('.act-timeline .ac-day').forEach(function (day) {
+                $$('.act-timeline .ac-day').forEach(function (day) {
                     var v = 0;
-                    day.querySelectorAll('.ac-ev, .ac-ln').forEach(function (r) {
-                        var cats = (r.dataset.cats || '').split(' ');
-                        var ok = F.length === 0 || cats.some(function (c) { return F.indexOf(c) >= 0; });
-                        r.hidden = !ok; if (ok) v++;
-                    });
+                    $$('.ac-ev, .ac-ln', day).forEach(function (r) { var ok = matches(r, F); r.hidden = !ok; if (ok) v++; });
                     day.hidden = v === 0; shown += v;
                 });
-                var listCats = (document.querySelector('.ac-seg [data-seg="lists"]') || { dataset: {} }).dataset.cats || '';
-                var tlEl = document.querySelector('.act-timeline');
-                if (tlEl) tlEl.classList.toggle('only-lists', F.length > 0 && F.every(function (c) { return (' ' + listCats + ' ').indexOf(' ' + c + ' ') >= 0; }));
-                document.querySelectorAll('.ac-fl .clr').forEach(function (b) { b.hidden = !!segId; });
+                var listCats = ' ' + ((document.querySelector('.ac-seg [data-seg="lists"]') || { dataset: {} }).dataset.cats || '') + ' ';
+                if (tl) tl.classList.toggle('only-lists', F.length > 0 && F.every(function (c) { return listCats.indexOf(' ' + c + ' ') >= 0; }));
+                $$('.ac-fl .clr').forEach(function (b) { b.hidden = !!segId; });
                 var none = document.querySelector('.ac-none'); if (none) none.hidden = shown > 0;
-                // En la URL (y en «Más antiguo / Más reciente»), para volver con el mismo filtro.
-                var withF = function (href) {
-                    var u = new URL(href, location.href);
-                    if (F.length) u.searchParams.set('f', F.join(',')); else u.searchParams.delete('f');
-                    return u.pathname + u.search.replace(/%2C/gi, ',') + u.hash;   // ?f=visto,ep,rating, legible
-                };
+                // En la URL y en los enlaces de mes, para volver con el mismo filtro.
                 history.replaceState(history.state, '', withF(location.href));
-                document.querySelectorAll('.act-more a').forEach(function (a) { a.setAttribute('href', withF(a.getAttribute('href'))); });
+                $$('.ac-load, .ac-per a, .ac-mp a').forEach(function (a) { a.setAttribute('href', withF(a.getAttribute('href'))); });
             };
             segs.forEach(function (sg) { sg.addEventListener('click', function () { applyFilter(sg.dataset.cats ? sg.dataset.cats.split(' ') : []); }); });
             boxes.forEach(function (b) { b.addEventListener('change', function () { applyFilter(boxes.filter(function (x) { return x.checked; }).map(function (x) { return x.value; })); }); });
-            document.querySelectorAll('.clr').forEach(function (b) { b.addEventListener('click', function () { applyFilter([]); }); });
-            // «Más filtros» se cierra al tocar fuera o con Escape.
-            if (fx) {
-                document.addEventListener('click', function (e) { if (fx.open && !fx.contains(e.target)) fx.open = false; });
-                fx.addEventListener('keydown', function (e) { if (e.key === 'Escape') { fx.open = false; fx.querySelector('summary').focus(); } });
+            $$('.clr').forEach(function (b) { b.addEventListener('click', function () { applyFilter([]); }); });
+
+            // ---- Ventanas emergentes («Más filtros» y el selector de mes): se cierran al tocar fuera o con Escape ----
+            $$('.ac-fx, .ac-mpk').forEach(function (d) {
+                document.addEventListener('click', function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
+                d.addEventListener('keydown', function (e) { if (e.key === 'Escape') { d.open = false; d.querySelector('summary').focus(); } });
+            });
+
+            // ---- 9.5c · Selector de mes: año con flechas e «Ir a un día…» ----
+            var mpk = document.querySelector('.ac-mpk');
+            if (mpk) {
+                mpk.addEventListener('click', function (e) {
+                    var b = e.target.closest('[data-go]'); if (!b || b.disabled) return;
+                    $$('.yr', mpk).forEach(function (y) { y.hidden = y.dataset.y !== b.dataset.go; });
+                });
+                var dateIn = mpk.querySelector('input[type=date]');
+                if (dateIn) dateIn.addEventListener('change', function () {
+                    var v = dateIn.value; if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return;
+                    var u = new URL('/mislistas/actividad', location.href);
+                    u.searchParams.set('mes', v.slice(0, 7));
+                    if (curF.length) u.searchParams.set('f', curF.join(','));
+                    location.href = u.pathname + u.search.replace(/%2C/gi, ',') + '#d-' + v;
+                });
+            }
+            // Llegar a un día (#d-2026-10-27) sin actividad: baja al anterior que tenga.
+            if (/^#d-\d{4}-\d{2}-\d{2}$/.test(location.hash) && !document.getElementById(location.hash.slice(1))) {
+                var target = location.hash.slice(3);
+                var near = $$('.act-timeline .ac-day').filter(function (d) { return d.id.slice(2) < target; })[0];
+                if (near) near.scrollIntoView();
             }
 
-            // Panel: en escritorio ancho, siempre abierto (su «Ver resumen» solo existe por debajo).
-            var pnw = document.querySelector('.ac-pnw');
+            // ---- Panel del periodo: abierto en escritorio ancho; uno por mes cargado, se ve el del mes en pantalla ----
+            var summaries = {};
             if (pnw) {
-                var wide = matchMedia('(min-width: 1200px)');
+                var first = pnw.querySelector('.ac-pn'), pns = pnw.querySelector('.ac-pns');
+                if (first && pns) summaries[first.dataset.mes] = pns.innerHTML;
                 var sync = function () { if (wide.matches) pnw.open = true; };
                 sync(); wide.addEventListener('change', sync);
-                // Mes · 16 semanas
-                pnw.querySelectorAll('[data-cal]').forEach(function (b) {
-                    b.addEventListener('click', function () {
-                        pnw.querySelectorAll('[data-cal]').forEach(function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on ? 'true' : 'false'); });
-                        pnw.querySelectorAll('[data-view]').forEach(function (v) { v.hidden = v.dataset.view !== b.dataset.cal; });
-                        var h = pnw.querySelector('.ac-calh h3'); if (h) h.textContent = h.dataset[b.dataset.cal] || h.textContent;
-                    });
-                });
-                // Tocar un día del calendario: baja a él y lo marca.
-                pnw.querySelectorAll('.ac-cal a.d').forEach(function (a) {
-                    a.addEventListener('click', function () {
+                pnw.addEventListener('click', function (e) {
+                    // Mes · 16 semanas
+                    var b = e.target.closest('[data-cal]');
+                    if (b) {
+                        var pn = b.closest('.ac-pn');
+                        $$('[data-cal]', pn).forEach(function (x) { var on = x === b; x.classList.toggle('on', on); x.setAttribute('aria-checked', on ? 'true' : 'false'); });
+                        $$('[data-view]', pn).forEach(function (v) { v.hidden = v.dataset.view !== b.dataset.cal; });
+                        var h = pn.querySelector('.ac-calh h3'); if (h) h.textContent = h.dataset[b.dataset.cal] || h.textContent;
+                        return;
+                    }
+                    // Tocar un día del calendario: baja a él y lo marca.
+                    var a = e.target.closest('.ac-cal a.d');
+                    if (a) {
                         var day = document.getElementById(a.hash.slice(1));
                         if (day && day.hidden) applyFilter([]);   // si el filtro lo escondía, se quita
-                        pnw.querySelectorAll('.ac-cal .sel').forEach(function (x) { x.classList.remove('sel'); });
+                        $$('.ac-cal .sel', pnw).forEach(function (x) { x.classList.remove('sel'); });
                         a.classList.add('sel');
                         if (!wide.matches) pnw.open = false;
-                    });
+                    }
                 });
             }
+            var shownMes = pnw && pnw.querySelector('.ac-pn') ? pnw.querySelector('.ac-pn').dataset.mes : null;
+            var showPanel = function (mes) {
+                if (!pnw || mes === shownMes || !pnw.querySelector('.ac-pn[data-mes="' + mes + '"]')) return;
+                shownMes = mes;
+                $$('.ac-pn', pnw).forEach(function (p) { p.hidden = p.dataset.mes !== mes; });
+                var pns = pnw.querySelector('.ac-pns'); if (pns && summaries[mes]) pns.innerHTML = summaries[mes];
+            };
 
-            // Cabecera de día fija: línea inferior cuando se queda pegada arriba.
-            var heads = Array.prototype.slice.call(document.querySelectorAll('.act-timeline .ac-dh'));
+            // ---- 9.5c · Al acabar el mes, sigue el anterior con actividad (se trae su página y se añade debajo) ----
+            var loading = false;
+            var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (es) {
+                es.forEach(function (en) { if (en.isIntersecting) loadPrev(en.target); });
+            }, { rootMargin: '0px 0px 500px 0px' }) : null;
+            var loadPrev = function (a) {
+                if (loading || !a.isConnected) return;
+                loading = true;
+                a.classList.add('is-loading'); a.setAttribute('aria-busy', 'true');
+                fetch(a.getAttribute('href'), { credentials: 'same-origin' })
+                    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+                    .then(function (html) {
+                        var doc = new DOMParser().parseFromString(html, 'text/html');
+                        var blk = doc.querySelector('.ac-mblock');
+                        if (blk && tl) { var node = document.importNode(blk, true); tl.appendChild(node); initBlock(node); }
+                        var pn = doc.querySelector('.ac-pn'), pns = doc.querySelector('.ac-pns');
+                        if (pn && pnw) { var p2 = document.importNode(pn, true); p2.hidden = true; pnw.appendChild(p2); if (pns) summaries[pn.dataset.mes] = pns.innerHTML; }
+                        var nxt = doc.querySelector('.ac-load');
+                        if (nxt) {
+                            a.setAttribute('href', nxt.getAttribute('href')); a.dataset.mes = nxt.dataset.mes; a.innerHTML = nxt.innerHTML;
+                            a.classList.remove('is-loading'); a.removeAttribute('aria-busy');
+                        } else a.parentElement.remove();
+                        recount(); applyFilter(curF);
+                        loading = false;
+                        if (io && a.isConnected) { io.unobserve(a); io.observe(a); }   // si aún se ve, a por el siguiente
+                    })
+                    .catch(function () { location.href = a.getAttribute('href'); });   // sin suerte: a la página de ese mes
+            };
+            var loadA = document.querySelector('.ac-load');
+            if (loadA) {
+                loadA.addEventListener('click', function (e) { e.preventDefault(); loadPrev(loadA); });
+                if (io) io.observe(loadA);
+            }
+
+            // ---- Al bajar: cabecera de día fija con su línea y el panel del mes que tienes en pantalla ----
             var tick = false;
             var paint = function () {
                 tick = false;
-                heads.forEach(function (h) {
+                $$('.act-timeline .ac-dh').forEach(function (h) {
                     var top = h.getBoundingClientRect().top, sec = h.parentElement.getBoundingClientRect();
                     h.classList.toggle('stuck', top <= 1 && sec.bottom > h.offsetHeight + 8);
                 });
+                var blocks = $$('.act-timeline .ac-mblock'), cur = blocks[0];
+                blocks.forEach(function (b) { if (b.getBoundingClientRect().top <= 140) cur = b; });
+                if (cur) showPanel(cur.dataset.mes);
             };
             addEventListener('scroll', function () { if (!tick) { tick = true; requestAnimationFrame(paint); } }, { passive: true });
             paint();
