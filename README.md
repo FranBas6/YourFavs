@@ -31,7 +31,7 @@
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/movil-serie-oscuro.jpg" />
-    <img src=".github/readme/movil-serie-claro.jpg" alt="A series page: logo, rating, seasons and your lists" width="250" />
+    <img src=".github/readme/movil-serie-claro.jpg" alt="A series page: seasons with your progress and the episode strip coloured by rating" width="250" />
   </picture>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/movil-episodio-oscuro.jpg" />
@@ -58,6 +58,13 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/readme/escritorio-pelicula-oscuro.jpg" />
     <img src=".github/readme/escritorio-pelicula-claro.jpg" alt="Desktop: a film page with its hero, the title logo and the action bar" width="860" />
+  </picture>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/readme/escritorio-actividad-oscuro.jpg" />
+    <img src=".github/readme/escritorio-actividad-claro.jpg" alt="Desktop: Activity, a month of everything you did in order, with your streak, the month calendar and screen time" width="860" />
   </picture>
 </p>
 
@@ -102,8 +109,9 @@ Spanish; it is the one I use every day.
 
 - 📺 **Episode by episode.** Mark episodes as watched from the series page, from each episode's
   own page or from «You're watching» on the home page, which always shows the next one, with an
-  undo. Progress per season and per series, finales and mid-season breaks flagged, and a
-  spoiler-free mode that hides stills and synopses of what you have not seen.
+  undo. Progress per season and per series, a strip of episodes coloured by their rating (six
+  palettes to choose from in Settings), finales and mid-season breaks flagged, and a spoiler-free
+  mode that hides stills and synopses of what you have not seen.
 - 🗂️ **Lists that mean something.** Favourites (with your own ranking), Liked, Watched, Watchlist,
   Watch soon and Following, as levels that never contradict each other, plus your own
   collections. Ratings from 0.5 to 10, notes and a diary with every rewatch.
@@ -122,6 +130,10 @@ Spanish; it is the one I use every day.
 - 📥 **Bring your library.** Import from IMDb (CSV), Letterboxd (ZIP: watched, ratings,
   watchlist, diary and lists) or a TMDB account, with a review step for doubtful matches and a
   one-click undo.
+- 🕒 **Your activity.** A timeline of everything you do, in order and by months that follow one
+  another as you scroll: what you watched as cards, list changes as single lines, screen time for
+  each day, your streak (only days on which you watched something count), a month calendar,
+  milestones («Your 2,100th episode») and filters kept in the URL.
 - 📊 **Your year.** Films, series, episodes and hours per year, month by month, your busiest day
   and an all-time view.
 
@@ -142,6 +154,12 @@ Spanish; it is the one I use every day.
   development). Details are cached in Postgres for exactly as long as TMDB's CDN says they are
   fresh (`Cache-Control: max-age`), never longer, so the data shown is always TMDB's latest.
   Requests authenticate with a Bearer token and fall back to the API key on their own.
+- **A design system, not a theme.** A full redesign in nine phases built on tokens (type, colour,
+  radii, shadows) and shared components (title card, rows, section headers, chips, figures), light
+  and dark. Each phase was designed in Claude Design, checked against an inventory of what already
+  existed so no data or feature was lost, and verified with an automated audit before and after:
+  the twelve longest pages went from 267,405 to 84,354 px tall on mobile (−68 %), and hard-coded
+  Tailwind colour classes from 2,289 to 988.
 - **A careful service worker.** It installs as an app, but HTML is never cached, because every page
   carries the user's session. Only hashed assets, icons and posters are, each with its own
   strategy.
@@ -169,7 +187,7 @@ Spanish; it is the one I use every day.
 
 | Commits | Pages | API routes | Migrations | Database tests |
 | :-----: | :---: | :--------: | :--------: | :------------: |
-|   327   |  48   |    113     |     23     |      344       |
+|   422   |  48   |    118     |     27     |      344       |
 
 ## Tech stack
 
