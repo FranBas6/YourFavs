@@ -53,6 +53,9 @@ interface Props {
     releaseLabel?: string;
     /** Aviso de estreno (película) o de nuevas temporadas (serie) activo. */
     notif?: boolean;
+    /** Serie finalizada o cancelada: no tendrá temporadas nuevas, así que no se ofrece el aviso
+     *  (salvo que ya estuviera puesto, para poder quitarlo). */
+    seriesOver?: boolean;
     /** Serie en Favoritos: posición y total. */
     favPos?: number | null;
     favTotal?: number;
@@ -69,7 +72,7 @@ interface Props {
 
 const {
     mediaType, id, title, poster = null, state: s, watched, times, lastPretty = '', efemeride = '',
-    unreleased = false, releaseLabel = '', notif = false, favPos = null, favTotal = 0, progress = null,
+    unreleased = false, releaseLabel = '', notif = false, seriesOver = false, favPos = null, favTotal = 0, progress = null,
     imdbId = null, providersByCountry = {}, linkByCountry = {}, myPlatformIds = [], homepage = null, trailerUrl = null,
 } = Astro.props;
 
@@ -203,7 +206,7 @@ const mid = `fa-${mediaType}-${id}`;
                     </form>
                 </>
             )}
-            {!isMovie && (
+            {!isMovie && (!seriesOver || notif) && (
                 <form method="POST" class="fa-sec" data-reload>
                     <input type="hidden" name="actionType" value="notification" /><input type="hidden" name="media_type" value="tv" />
                     <input type="hidden" name="tmdb_id" value={id} /><input type="hidden" name="action" value={notif ? 'remove' : 'add'} />
