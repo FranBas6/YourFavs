@@ -26,6 +26,8 @@ export const EXPLORE_ITEMS: NavItem[] = [
     { href: "/catalogo/cartelera",           color: "blue",   icon: "clapperboard",  title: "Cartelera",            desc: "En cines ahora" },
     { href: "/catalogo/ultimoslanzamientos", color: "green",  icon: "sparkles",      title: "Últimos lanzamientos", desc: "Estrenos en streaming" },
     { href: "/catalogo/maspopulares",        color: "pink",   icon: "flame",         title: "Más populares",        desc: "Lo que todo el mundo ve" },
+    // Mismo orden que el desplegable «Descubrir» del header (escritorio): faltaba en móvil.
+    { href: "/catalogo/plataformas",         color: "slate",  icon: "layout-grid",   title: "Plataformas",          desc: "Por dónde se ve" },
     { href: "/catalogo/topmovies",           color: "amber",  icon: "star",          title: "Top películas",        desc: "Las mejores de siempre" },
     { href: "/catalogo/topseries",           color: "blue",   icon: "trophy",        title: "Top series",           desc: "Imprescindibles TV" },
     { href: "/catalogo/categorias",          color: "slate",  icon: "layers",        title: "Categorías",           desc: "Por género" },
