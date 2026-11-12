@@ -88,6 +88,7 @@ export function serieCard(it: NextEpisodeItem, o: SerieCardOptions = {}): string
     const when = airLabel(it.air_date);
     const meta = [
         when ? `<span>${icon('calendar')}${when}</span>` : '',
+        it.runtime ? `<span>${icon('clock')}${runtimeLabel(it.runtime)}</span>` : '',
         it.vote_average != null && it.vote_average > 0 ? `<span class="nv-rt">${icon('star')}<b>${decimal(it.vote_average)}</b>&nbsp;TMDB</span>` : '',
     ].join('');
     const just = o.just
@@ -98,7 +99,7 @@ export function serieCard(it: NextEpisodeItem, o: SerieCardOptions = {}): string
         + just + media
         + `<div class="nv-b">`
         + poster(it.poster_path, 'nv-po', serieHref, `Ficha de ${it.name}`, true)
-        + `<div class="nv-sr"><a href="${serieHref}" aria-label="Ficha de ${esc(it.name)}">${esc(it.name)}</a></div>`
+        + `<div class="nv-sr"><a href="${serieHref}" aria-label="Ficha de ${esc(it.name)}" title="Ir a la serie"><span>${esc(it.name)}</span>${icon('chevron-right')}</a></div>`
         + `<a class="nv-t" href="${epHref}" aria-label="${esc(epLabel)}">${esc(title)}</a>`
         + (meta ? `<div class="nv-mt">${meta}</div>` : '')
         + progress
