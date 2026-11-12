@@ -27,6 +27,8 @@ export interface NextEpisodeItem {
     episode_type?: string | null;
     /** Nota TMDB del episodio (1 decimal) o null si no tiene votos. */
     vote_average: number | null;
+    /** Duración del episodio en minutos (la del episodio; si TMDB no la da, la media de la serie). */
+    runtime?: number | null;
     overview: string;
     /** Progreso de la serie (episodios regulares) para la barra. */
     watched_count: number;
@@ -95,6 +97,7 @@ export async function computeNextEpisode(
             ? Math.round(next.vote_average * 10) / 10
             : null,
         overview: next.overview || '',
+        runtime: Number(next.runtime) > 0 ? Number(next.runtime) : (Number(detail?.episode_run_time?.[0]) || null),
         watched_count: watched.length,
         total_count: totalCount,
         watched_at: progress.last_watched?.watched_at || '',

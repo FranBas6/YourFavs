@@ -61,8 +61,13 @@
 .nv-ph { width: 100%; height: 100%; display: grid; place-items: center; color: var(--card-text-3); }
 .nv-ph svg { width: 18px; height: 18px; }
 .nv-sr { display: flex; align-items: center; padding-left: 58px; min-height: 26px; margin-bottom: 6px; }
-.nv-sr a { min-width: 0; font: 600 13px var(--font); color: var(--card-text-2); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.nv-sr a:hover { color: var(--card-text); text-decoration: underline; text-underline-offset: 2px; }
+.nv-sr a { min-width: 0; display: inline-flex; align-items: center; gap: 2px; min-height: 26px; font: 600 13px var(--font); color: var(--card-text-2); text-decoration: none; }
+.nv-sr a > span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* La flecha dice que el nombre lleva a la ficha de la serie (antes enlazaba igual, pero no se notaba). */
+.nv-sr a > svg { flex-shrink: 0; width: 15px; height: 15px; color: var(--card-text-3); transition: transform .15s ease, color .15s ease; }
+.nv-sr a:hover { color: var(--card-text); }
+.nv-sr a:hover > span { text-decoration: underline; text-underline-offset: 2px; }
+.nv-sr a:hover > svg { color: var(--card-text); transform: translateX(2px); }
 .nv-t {
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 2.6em;
     font: 600 15px/1.3 var(--font); color: var(--card-text); text-decoration: none;
