@@ -227,3 +227,8 @@ export function seasonCardStatus(o: { logged: boolean; seen: number; count: numb
     if (o.seen > 0) return { text: o.firstUnseen ? `Vas por el E${o.firstUnseen}` : `${o.seen} de ${o.count}`, done: false };
     return { text: `Sin empezar · ${plural(o.count, 'episodio', 'episodios')}`, done: false };
 }
+
+/** «Visto lun 2 nov» (o con el año si no es este), en la fila de un episodio visto. '' si no hay hora. */
+export function seenLabel(iso: string, today: string): string {
+    return iso ? `Visto ${brief(dayOf(iso), today)}` : 'Visto';
+}

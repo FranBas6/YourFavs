@@ -14,7 +14,8 @@
  *   · `action: 'unmark'` con `episodes: […]` → desmarcar varios; devuelve `removed` (con su fecha) para
  *     poder deshacer. `unlog: true` los quita también del diario (deshacer un «Marcar» recién hecho);
  *     sin él, el diario se queda, como al vaciar una temporada en el acordeón;
- *   · `restore: [{ episode, watched_at }]` → «Deshacer» de lo anterior: los vuelve a marcar con su fecha.
+ *   · `restore: [{ episode, watched_at }]` → «Deshacer» de lo anterior: los vuelve a marcar con su fecha
+ *     (`relog: true` los devuelve también al diario, si al desmarcar salieron de él).
  * Sin `action` hace lo de siempre. Devuelve `watchedAt` (el instante guardado) al marcar uno.
  */
 import type { APIRoute } from 'astro';
@@ -49,7 +50,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 return { episode: ep, watched_at: Number.isFinite(t) && t <= now ? new Date(t).toISOString() : null };
             }).filter((r) => Number.isInteger(r.episode) && r.episode >= 1);
             if (!rows.length) return json({ ok: false, error: 'Parámetros inválidos' }, 400);
-            const restored = await restoreWatchedEpisodes(serieId, season, rows);
+            const restored = await restoreWatchedEpisodes(serieId, season, rows, { relog: body?.relog === true });
             return json({ ok: true, restored }, 200);
         }
 

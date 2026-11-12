@@ -118,9 +118,95 @@
 .tnv-one { display: flex; align-items: center; gap: 8px; margin: 0; font: 500 13px var(--font); color: var(--text-2); }
 .tnv-one svg { width: 16px; height: 16px; color: var(--text-3); }
 
-/* Provisional hasta el paso 3 (lista de episodios). */
-.tp-tmp { margin: 24px 48px; display: grid; gap: 6px; font: 500 14px var(--font); }
-.tp-tmp a { color: var(--text); }
+/* ---- Episodios (paso 3) ---------------------------------------------------------------------- */
+/* El cuerpo de la ficha de episodio (`.eb`): lista a la izquierda; el lateral llega en el paso 4. */
+.tl-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 14px; }
+.tl-h .sp { flex: 1; }
+.tl-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); }
+.tl-seg[hidden] { display: none; }
+.tl-seg button {
+    height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px var(--font); color: var(--text-2); white-space: nowrap;
+}
+.tl-seg button svg { width: 15px; height: 15px; }
+.tl-seg button[aria-checked="true"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm); outline: 1px solid var(--border-strong); }
+.tl-seg button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tl-seg.ic button { padding: 0 9px; }
+
+.tl { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.tr {
+    display: grid; grid-template-columns: 176px minmax(0, 1fr) auto; gap: 18px; align-items: start;
+    padding: 16px 0; border-bottom: 1px solid var(--border); position: relative; scroll-margin-top: 90px;
+}
+.tr[hidden], .tl.folded .tr.xtra { display: none; }
+.tr .th { display: block; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; position: relative; background: var(--bg-tint); }
+.tr .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tr .th.none { display: grid; place-items: center; color: var(--text-4); }
+.tr .th.none svg { width: 20px; height: 20px; }
+.tr .th.no {
+    background: none; border: 1.5px dashed var(--border-strong);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center;
+}
+.tr .th.no b { font: 700 13px var(--font-mono); color: var(--text-2); }
+.tr .th.no span { font: 500 11px var(--font); color: var(--text-3); }
+.tr .th.yf-spoil .yf-spoil-btn { height: 30px; padding: 0 12px; font-size: 12px; }
+.tr .tx { min-width: 0; }
+.tr .l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tr .c { font: 700 11.5px var(--font-mono); letter-spacing: .06em; color: var(--text-3); }
+.tr .t { font: 600 15px var(--font); color: var(--text); text-decoration: none; }
+.tr a.t:hover { color: var(--primary); }
+.tr.u .t { color: var(--text-2); }
+.tr .ttoca {
+    display: none; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--r-sm);
+    background: var(--text); color: var(--bg-elev); font: 700 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+}
+.tr .ttoca svg { width: 11px; height: 11px; }
+.tr.nx .ttoca { display: inline-flex; }
+.tr .l2 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font: 500 12.5px var(--font); color: var(--text-2); }
+.tr .l2 > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tr .l2 > span[hidden] { display: none; }
+.tr .l2 svg { width: 13px; height: 13px; color: var(--text-3); }
+.tr .l2 .r { font-weight: 600; color: var(--text); }
+/* La estrella, rellena (el SVG de Lucide trae `fill="none"` en el trazo). */
+.tr .l2 .r svg * { fill: var(--text); stroke: none; }
+.tr .l2 .ok, .tr .l2 .ok svg { color: var(--ok-ink); }
+.tr .l2 .mu { color: var(--text-3); }
+/* La sinopsis, solo en «Te toca» (en el resto, el detalle está en la ficha del episodio). */
+.tr .syn2 { display: none; margin: 8px 0 0; font: 400 13.5px/1.55 var(--font); color: var(--text-2); max-width: 64ch; }
+.tr.nx .syn2 { display: block; }
+.tr.nx p.syn2, .tr.nx .syn2 p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
+.tr.nx p.syn2 { margin-top: 8px; }
+.tr .syn2.yf-spoil { min-height: 44px; border-radius: 8px; overflow: hidden; }
+.tr .syn2.yf-spoil .yf-spoil-btn { height: 28px; padding: 0 12px; font-size: 12px; }
+.tr .crew { margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
+.tr .act { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.tr .act a { font: 600 12px var(--font); color: var(--primary); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; text-decoration: none; }
+.tr .act a:hover { text-decoration: underline; }
+.tr .act a svg { width: 13px; height: 13px; }
+.tvb .on { display: none; }
+.tvb[aria-pressed="true"] .on { display: inline; }
+.tvb[aria-pressed="true"] .off { display: none; }
+.tvb.dis { border-style: dashed; color: var(--text-3); background: none; cursor: default; }
+/* «Te toca»: borde de 2 px y fondo de tarjeta, que sobresale un poco de la lista. */
+.tr.nx { margin: 0 -14px; padding: 16px 14px; border: 2px solid var(--text); border-radius: var(--r-lg); background: var(--bg-elev); }
+.tr.nx + .tr { border-top: 0; }
+.tl-more { margin-top: 14px; }
+.tl-empty { margin: 16px 0 0; font: 500 14px var(--font); color: var(--text-3); }
+.tl-empty[hidden] { display: none; }
+
+/* Compacta: una línea por episodio (código · título · fecha · duración · nota · Visto). */
+.tl.cmp .tr { grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 9px 0; }
+.tl.cmp .tr .th, .tl.cmp .tr .syn2, .tl.cmp .tr .crew, .tl.cmp .tr .act a { display: none; }
+.tl.cmp .tr .tx { display: flex; align-items: center; gap: 14px; }
+.tl.cmp .tr .l1 { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; }
+.tl.cmp .tr .c { flex: 0 0 34px; font-size: 12px; color: var(--text-2); }
+.tl.cmp .tr .t { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tl.cmp .tr .l2 { flex: 0 0 auto; margin: 0; flex-wrap: nowrap; }
+.tl.cmp .tr .act { flex-direction: row; }
+.tl.cmp .tr .tvb { width: 36px; padding: 0; }
+.tl.cmp .tr .tvb span { display: none; }
+.tl.cmp .tr.nx { margin: 0 -10px; padding: 9px 10px; }
+.tl.cmp .tr .etag { flex-shrink: 0; }
 
 /* ================= Móvil ================= */
 @media (max-width: 767.98px) {
@@ -144,7 +230,6 @@
     .tph .eh-m { font-size: 12.5px; gap: 4px 12px; margin-top: 10px; }
     .tph .tsyn { font-size: 14px; }
     .tph .tcd { display: flex; width: 100%; }
-    .tp-tmp { margin: 16px; }
 
     /* Barra: todo a lo ancho; «Te toca» con su «Visto» cuadrado de 44 px. */
     .tea .est, .tea .tnx { flex: none; min-width: 0; width: 100%; }
@@ -162,4 +247,21 @@
     .tnv .enc .th { width: 36px; }
     .tnv .etr li { flex-basis: auto; height: 44px; }
     .tnv .etr li a { min-width: 52px; }
+
+    /* Episodios: fotograma de 112 px, título a dos líneas y «Visto» cuadrado de 44 px; sin equipo ni «Ficha». */
+    .tl-seg.ic { display: none; }
+    .tr { grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 12px; padding: 12px 0; align-items: center; }
+    .tr .t { font-size: 14px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .tr .l2 { font-size: 12px; gap: 2px 10px; }
+    .tr .crew, .tr .act a { display: none; }
+    .tr .tvb { width: 44px; height: 44px; padding: 0; }
+    .tr .tvb span { display: none; }
+    .tr .th.yf-spoil .yf-spoil-btn { height: 26px; padding: 0 8px; font-size: 11px; }
+    .tr.nx { margin: 0 -10px; padding: 12px 10px; }
+    /* En móvil la compacta no hace falta: la de fotogramas ya es de una línea por episodio. */
+    .tl.cmp .tr { grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 12px; padding: 12px 0; }
+    .tl.cmp .tr .th { display: block; }
+    .tl.cmp .tr .tx { display: block; }
+    .tl.cmp .tr .l2 { margin-top: 4px; flex-wrap: wrap; }
+    .tl.cmp .tr .tvb { width: 44px; }
 }

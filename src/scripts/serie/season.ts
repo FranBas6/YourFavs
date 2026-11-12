@@ -9,7 +9,8 @@
  *   · «Visto» de «Te toca» → marca ese episodio; «Deshacer» lo desmarca.
  *   · Aviso de estreno (`POST /api/notifications/subscribe`) y «Entrar» sin sesión.
  * Tras cada cambio se repinta con `utils/seasonView.ts::seasonBar`, el mismo código que usa el servidor.
- * Otras partes de la página (la lista de episodios, en el paso 3) escuchan `yf:season-watched`.
+ * La lista de episodios (`seasonList.ts`) pide marcar con `yf:season-mark` y se repinta con
+ * `yf:season-watched`; si algo falla, `yf:season-error`.
  */
 import { showToast } from '../social/toast';
 import { seasonBar, seasonChip, type TpState } from '../../utils/seasonView';
@@ -74,8 +75,9 @@ function init(s: TpState) {
 
     /** Envuelve una acción: bloquea, enseña «Guardando…» en el botón y, si falla, el error. */
     async function run(btn: HTMLElement | null, fn: () => Promise<void>) {
-        if (busy) return;
-        if (!s.logged) return requireAuth();
+        const fail = () => document.dispatchEvent(new CustomEvent('yf:season-error'));
+        if (busy) return fail();
+        if (!s.logged) { fail(); return requireAuth(); }
         busy = true;
         err.hidden = true;
         btn?.classList.add('busy');
@@ -86,6 +88,7 @@ function init(s: TpState) {
             err.hidden = false;
             btn?.classList.remove('busy');
             btn?.removeAttribute('aria-busy');
+            fail();
         } finally {
             busy = false;
         }
@@ -111,15 +114,17 @@ function init(s: TpState) {
             const removed: { episode: number; watched_at: string | null }[] = r.removed ?? [];
             apply({}, eps);
             render(!!btn?.matches('[data-tp-all]'));
-            const msg = o.unlog ? 'Deshecho' : `${s.season === 0 ? 'Especiales desmarcados' : 'Temporada desmarcada'}`;
+            const msg = !o.undoable ? 'Deshecho'
+                : eps.length === 1 ? `E${eps[0]} desmarcado`
+                : s.season === 0 ? 'Especiales desmarcados' : 'Temporada desmarcada';
             announce(msg);
-            if (o.undoable && removed.length) showToast(msg, 'success', () => { void restore(removed); });
+            if (o.undoable && removed.length) showToast(msg, 'success', () => { void restore(removed, o.unlog); });
         });
     }
 
-    function restore(rows: { episode: number; watched_at: string | null }[]) {
+    function restore(rows: { episode: number; watched_at: string | null }[], relog: boolean) {
         return run(null, async () => {
-            await post({ restore: rows });
+            await post({ restore: rows, relog });
             apply(Object.fromEntries(rows.map((r) => [r.episode, r.watched_at ?? new Date().toISOString()])), []);
             render();
             announce('Deshecho');
@@ -176,7 +181,7 @@ function init(s: TpState) {
         }
     }
 
-    // Otras partes de la página que marcan (la lista, paso 3) avisan con `yf:season-mark`.
+    // La lista de episodios pide marcar o desmarcar una fila con `yf:season-mark`.
     document.addEventListener('yf:season-mark', ((ev: CustomEvent<{ episode: number; on: boolean; btn?: HTMLElement }>) => {
         const { episode, on, btn } = ev.detail;
         if (on) void markMany([episode], btn ?? null);

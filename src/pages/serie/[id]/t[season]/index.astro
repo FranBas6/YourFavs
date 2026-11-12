@@ -12,6 +12,9 @@
  *     navegador (`scripts/serie/season.ts`) al marcar sin recargar. Recomendar, Enviar a… y la plataforma.
  *   · Navegación (`.en`): temporada anterior y siguiente, la tira de temporadas con tu progreso
  *     (especiales aparte) y el selector.
+ *   · Episodios (`.tl`, paso 3): con fotograma o compacta (desde 16 episodios, y se recuerda), filtro
+ *     «Sin ver», «Visto» en cada fila y «Te toca» destacado. No se despliegan: el detalle está en la
+ *     ficha del episodio. `scripts/serie/seasonList.ts` las mantiene al día al marcar.
  */
 import Layout from '../../../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
@@ -27,12 +30,13 @@ import { getCurrentRegion } from '../../../../services/BD/shared/userScope';
 import { getSeasonWatchProviders } from '../../../../services/API/Series/InfoSeries';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/shared/tmdbClient';
-import { seasonBar, seasonCardStatus, seasonChip, type TpState } from '../../../../utils/seasonView';
+import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seenLabel, type TpState } from '../../../../utils/seasonView';
+import SectionHeader from '../../../../components/SectionHeader.astro';
 import { safeFetch } from '../../../../utils/safeFetch';
 import { distinctOriginalTitle } from '../../../../utils/constants/helpers/media-helpers';
 import {
-    airState, countdown, dateRange, decimal, episodeHref, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
-    relativeAgo, runtimeLabel, seasonHref, seasonLabel, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
+    airState, countdown, dateRange, decimal, episodeCrew, episodeHref, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
+    relativeAgo, runtimeLabel, seasonHref, seasonLabel, shortDate, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
 } from '../../../../utils/episodeView';
 
 // Mismos topes que la ficha de episodio: ids de serie de hasta 9 cifras, temporadas de hasta 4.
@@ -204,6 +208,44 @@ const picker = [...regular].reverse().concat(specials ? [specials] : []).map((x)
     cur: x.season_number === season,
 }));
 const seasonsCaption = `${regular.length} ${regular.length === 1 ? 'temporada' : 'temporadas'}${specials ? ' y especiales' : ''}`;
+
+// --- Episodios (paso 3) ------------------------------------------------------------------------
+const counts = tp ? seasonCounts(tp) : null;
+// «Te toca» solo con la temporada empezada: sin empezar, la barra ya dice «Empezar por el E1».
+const nextE = tp?.logged && counts?.seenCount ? counts.next?.e ?? null : null;
+const lastEp = Math.max(0, ...episodes.map((e) => Number(e.episode_number)));
+const rows = tp ? tp.eps.map((x, i) => {
+    const e = episodes[i];
+    const seen = x.e in tp.watched;
+    const crew = episodeCrew(e.crew);
+    // «FINAL», «FINAL DE SERIE» y «PARÓN» (no son spoilers: dicen dónde acaba la temporada).
+    const tag = e.episode_type === 'finale'
+        ? (seriesEnded && season === d!.series.last_season && x.e === lastEp ? TAG_STYLE.seriesEnd : TAG_STYLE.final)
+        : e.episode_type === 'mid_season' ? TAG_STYLE.mid : null;
+    const votes = Number(e.vote_count) || 0;
+    const rating = x.aired && votes > 0 && Number(e.vote_average) > 0 ? decimal(Number(e.vote_average)) : null;
+    const cd = !x.aired && x.air ? countdown(x.air, today) : null;
+    return {
+        ...x, seen, tag,
+        href: episodeHref(id!, season!, x.e),
+        date: x.air ? shortDate(x.air).replace(/^\S+ /, '') : 'Sin fecha',
+        runtime: runtimeLabel(x.runtime),
+        rating,
+        // Sin spoilers: de lo no visto, ni fotograma, ni sinopsis, ni nota (como en el acordeón).
+        hideStill: hideStills && !seen,
+        hideSyn: hideSynopsis && !seen,
+        hideRating: spoilerFree && !seen,
+        overview: String(e.overview ?? '').trim(),
+        crewLine: [crew.directors.length ? `Dirección: ${crew.directors.join(', ')}` : '', crew.writers.length ? `Guion: ${crew.writers.join(', ')}` : ''].filter(Boolean).join(' · '),
+        seenText: seen ? seenLabel(tp.watched[x.e], today) : '',
+        soon: cd ? (cd.unit ? `en ${cd.label}` : cd.n) : x.air ? 'Se estrena' : 'Anunciado',
+    };
+}) : [];
+// Desde 16 episodios, compacta por defecto (el navegador recuerda la que elijas).
+const compact = rows.length >= 16;
+const unseenCount = counts?.remaining.length ?? 0;
+// Anunciada y larga: los 5 primeros y «Mostrar los N».
+const foldAt = counts && !counts.aired.length && rows.length > 5 ? 5 : 0;
 
 const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
 ---
@@ -385,10 +427,98 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                     <span class="enc nx off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Siguiente</span><b>Es la última</b></span></span>
                 ))}
             </div>
-            {/* Paso 3: la lista de episodios de verdad. */}
-            <ol class="tp-tmp">
-                {episodes.map((e) => <li><a href={episodeHref(id!, season!, e.episode_number)}>E{e.episode_number} · {e.name}</a></li>)}
-            </ol>
+            <!-- Cuerpo: episodios (y, en el paso 4, notas, reparto, vídeos y el lateral) -->
+            {rows.length > 0 && (
+                <div class="eb tpb">
+                    <div class="eb-m">
+                        <section aria-labelledby="tp-eps" data-tp-list>
+                            <SectionHeader title="Episodios" icon="list" color="blue" headingId="tp-eps"
+                                cap={counts!.aired.length < rows.length ? `${rows.length} ${counts!.aired.length ? 'episodios' : 'anunciados'}${counts!.aired.length ? ` · ${counts!.aired.length} emitidos` : ''}` : `${rows.length} episodios`} />
+                            <div class="tl-h">
+                                {tp!.logged && (
+                                    <div class="tl-seg" role="radiogroup" aria-label="Qué episodios" data-tp-filter hidden={!unseenCount || unseenCount === counts!.aired.length}>
+                                        <button type="button" role="radio" aria-checked="true" data-f="all">Todos</button>
+                                        <button type="button" role="radio" aria-checked="false" data-f="unseen">Sin ver · <span data-tp-unseen>{unseenCount}</span></button>
+                                    </div>
+                                )}
+                                <span class="sp"></span>
+                                <div class="tl-seg ic" role="radiogroup" aria-label="Vista de la lista" data-tp-density>
+                                    <button type="button" role="radio" aria-checked={compact ? 'false' : 'true'} data-d="img" aria-label="Con fotogramas" title="Con fotogramas"><Icon name="lucide:layout-grid" aria-hidden="true" /></button>
+                                    <button type="button" role="radio" aria-checked={compact ? 'true' : 'false'} data-d="cmp" aria-label="Compacta" title="Compacta"><Icon name="lucide:list" aria-hidden="true" /></button>
+                                </div>
+                            </div>
+                            <div class:list={['tl', { cmp: compact, folded: foldAt > 0 }]} role="list" data-tp-rows data-default={compact ? 'cmp' : 'img'}>
+                                {rows.map((r, i) => (
+                                    <div class:list={['tr', { w: r.seen, u: !r.aired, nx: r.e === nextE, xtra: foldAt > 0 && i >= foldAt }]} role="listitem" data-tp-row={r.e}
+                                        aria-label={`E${r.e}, ${r.name}${r.tag ? `, ${r.tag.label.toLowerCase()}` : ''}`}>
+                                        {!r.aired ? (
+                                            <span class="th no" aria-hidden="true"><b>{r.air ? r.date.replace(/ \d{4}$/, '') : 'Sin fecha'}</b><span>{r.soon}</span></span>
+                                        ) : r.still ? (r.hideStill ? (
+                                            <div class="th yf-spoil">
+                                                <img class="yf-blur" src={r.still} alt="" loading="lazy" aria-hidden="true" inert />
+                                                <button type="button" class="yf-spoil-btn" aria-label={`Mostrar el fotograma del E${r.e}`}><Icon name="lucide:eye" aria-hidden="true" />Mostrar</button>
+                                            </div>
+                                        ) : (
+                                            <a class="th" href={r.href} tabindex="-1" aria-hidden="true"><img src={r.still} alt="" loading="lazy" /></a>
+                                        )) : (
+                                            <span class="th none" aria-hidden="true"><Icon name="lucide:image-off" /></span>
+                                        )}
+                                        <div class="tx">
+                                            <div class="l1">
+                                                <span class="c">E{r.e}</span>
+                                                <a class="t" href={r.href}>{r.name}</a>
+                                                <span class="ttoca"><Icon name="lucide:play" aria-hidden="true" />Te toca</span>
+                                                {r.tag && (
+                                                    <span class="etag" style={`--sb:var(--stamp-${r.tag.color});--si:var(--stamp-${r.tag.color}-ink)`}>
+                                                        <Icon name={`lucide:${r.tag.icon}`} aria-hidden="true" />{r.tag.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div class="l2">
+                                                <span>{r.date}</span>
+                                                {r.runtime && <span><Icon name="lucide:clock" aria-hidden="true" />{r.runtime}</span>}
+                                                {r.rating && (r.hideRating ? (
+                                                    <>
+                                                        <span class="mu" data-tp-rh><Icon name="lucide:eye-off" aria-hidden="true" />Nota oculta</span>
+                                                        <span class="r" data-tp-r hidden><Icon name="lucide:star" aria-hidden="true" />{r.rating}</span>
+                                                    </>
+                                                ) : (
+                                                    <span class="r"><Icon name="lucide:star" aria-hidden="true" />{r.rating}</span>
+                                                ))}
+                                                <span class="ok" data-tp-seen hidden={!r.seen}><Icon name="lucide:check" aria-hidden="true" /><span>{r.seenText}</span></span>
+                                            </div>
+                                            {r.overview && (r.hideSyn ? (
+                                                <div class="syn2 yf-spoil txt-sm">
+                                                    <p class="yf-blur" aria-hidden="true" inert>{r.overview}</p>
+                                                    <button type="button" class="yf-spoil-btn" aria-label={`Mostrar la sinopsis del E${r.e}`}><Icon name="lucide:eye" aria-hidden="true" />Mostrar</button>
+                                                </div>
+                                            ) : (
+                                                <p class="syn2">{r.overview}</p>
+                                            ))}
+                                            {r.crewLine && <p class="crew">{r.crewLine}</p>}
+                                        </div>
+                                        <div class="act">
+                                            {r.aired ? (
+                                                <button type="button" class="tvb" aria-pressed={r.seen ? 'true' : 'false'} data-tp-row-btn
+                                                    aria-label={r.seen ? `E${r.e} visto. Pulsa para desmarcar` : `Marcar el E${r.e} como visto`}>
+                                                    <Icon class="on" name="lucide:check-check" aria-hidden="true" /><Icon class="off" name="lucide:eye" aria-hidden="true" /><span>Visto</span>
+                                                </button>
+                                            ) : (
+                                                <button type="button" class="tvb dis" disabled aria-label={`E${r.e}: aún no se ha emitido`}><Icon name="lucide:calendar-clock" aria-hidden="true" /><span>Sin emitir</span></button>
+                                            )}
+                                            <a href={r.href} aria-label={`Ficha del E${r.e}`}>Ficha<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {foldAt > 0 && (
+                                <div class="tl-more"><button type="button" class="pf-btn sm" data-tp-more aria-expanded="false"><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar los {rows.length} episodios</button></div>
+                            )}
+                            <p class="tl-empty" data-tp-empty hidden>Ya has visto todos los episodios emitidos.</p>
+                        </section>
+                    </div>
+                </div>
+            )}
         </article>
     )}
 </Layout>
@@ -396,6 +526,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
 <script>
     import '../../../../scripts/shared/spoil';
     import '../../../../scripts/serie/season';
+    import '../../../../scripts/serie/seasonList';
 
     // La tira de temporadas, centrada en la actual y con el borde difuminado por donde quedan más.
     const strip = document.querySelector<HTMLElement>('[data-tp-strip]');
