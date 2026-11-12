@@ -25,6 +25,8 @@
 .eh-sr svg { width: 14px; height: 14px; }
 .eh-k { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 10px; }
 .eh-k .se { white-space: nowrap; font: 700 12px var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--card-text-2); }
+.eh-k .se a { color: inherit; text-decoration: underline; text-decoration-color: var(--card-text-3); text-underline-offset: 3px; }
+.eh-k .se a:hover { color: var(--card-text); text-decoration-color: currentColor; }
 .eh h1 { font: 700 44px/1.05 var(--font); letter-spacing: -.025em; color: var(--card-text); text-wrap: balance; margin: 0; }
 .eh h1 small { display: block; font: 500 15px var(--font); letter-spacing: 0; color: var(--card-text-3); margin-top: 8px; }
 .eh-m { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; margin-top: 16px; font: 500 14px var(--font); color: var(--card-text-2); }
@@ -117,6 +119,7 @@
     display: inline-flex; align-items: center; height: 32px; padding: 0 10px; border-radius: 8px;
     background: var(--stamp-amber); color: var(--stamp-amber-ink); font: 800 12px var(--font); text-decoration: none;
 }
+.prv-note { margin: 10px 0 0; font: 400 12px/1.45 var(--font); color: var(--text-3); }
 .ea-err { flex-basis: 100%; display: flex; align-items: center; gap: 6px; margin: 0; font: 500 12.5px var(--font); color: var(--stamp-red-ink); }
 .ea-err[hidden] { display: none; }
 .ea-err svg { width: 14px; height: 14px; }
@@ -149,6 +152,8 @@ a.enc:hover { border-color: var(--border-strong); }
 .etr-h > span, .etr-h > a { white-space: nowrap; }
 .etr-h > a { margin-left: auto; font: 600 12px var(--font); color: var(--primary); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
 .etr-h > a svg { width: 13px; height: 13px; }
+/* «Ver temporada» empuja a la derecha; «Ver la serie» va pegado a su lado. */
+.etr-h > a.etr-sr { margin-left: 0; }
 /* Selector de temporada: un <details> con su lista (sin JS). */
 .ssel { position: relative; }
 .ssel > summary {
@@ -335,6 +340,9 @@ a.enc:hover { border-color: var(--border-strong); }
     .m-only { display: block; }
     .d-only { display: none; }
     .en .etr { grid-column: 1 / -1; grid-row: 1; }
+    /* Con «Ver temporada» y «Ver la serie» no cabe también «15 episodios» (ya se ve en la tira). */
+    .en:not(.tnv) .etr-h > span { display: none; }
+    .en:not(.tnv) .etr-h > a:not(.etr-sr) { margin-left: auto; }
     .enc { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; }
     .enc.nx { flex-direction: column; text-align: right; }
     .enc .th { width: 100%; }

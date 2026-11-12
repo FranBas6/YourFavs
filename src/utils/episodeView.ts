@@ -208,3 +208,135 @@ export function episodeKind(season: number, episodeType: string | null | undefin
 export const PROVIDER_KIND: Record<string, string> = {
     flatrate: 'Suscripción', free: 'Gratis', ads: 'Gratis con anuncios', rent: 'Alquiler', buy: 'Compra',
 };
+
+// --- Ficha de temporada (`/serie/{id}/t{n}`) ------------------------------------------------------
+
+/** URL de la ficha de una temporada. */
+export const seasonHref = (seriesId: number | string, season: number) => `/serie/${seriesId}/t${season}`;
+
+/** «Temporada 2» o «Especiales». */
+export const seasonLabel = (season: number) => (season === 0 ? 'Especiales' : `Temporada ${season}`);
+
+/**
+ * ¿El nombre de TMDB es el genérico («Temporada 2», «Season 2», «Especiales»)? Si no lo es
+ * (*Murder House*, «Libro primero»), la cabecera lo usa de título.
+ */
+export function isPlaceholderSeasonName(name: string | null | undefined, season: number, seriesName = ''): boolean {
+    const n = (name ?? '').trim();
+    if (!n) return true;
+    // «Stranger Things 4»: el nombre de la serie y el número no son un nombre propio.
+    if (seriesName && n.toLowerCase() === `${seriesName.trim().toLowerCase()} ${season}`) return true;
+    if (season === 0) return /^(especiales|specials|spéciaux|extras)$/i.test(n);
+    // Miniseries: TMDB llama «Miniserie» o «Limited Series» a su única temporada.
+    if (/^(miniserie|miniseries|mini-series|limited series|serie limitada|temporada única)$/i.test(n)) return true;
+    return new RegExp(`^(temporada|season|saison|staffel|stagione|temporada n\\.?º?)\\s*${season}$`, 'i').test(n);
+}
+
+export type SeasonStatus = 'airing' | 'announced' | 'last';
+
+/**
+ * Estado de la temporada para la etiqueta de la cabecera:
+ *   · `announced` — ningún episodio emitido (o TMDB aún no lista ninguno);
+ *   · `airing` — unos emitidos y otros no, o TMDB dice que el próximo episodio de la serie es de esta;
+ *   · `last` — la serie terminó y esta es su última temporada;
+ *   · `null` — una temporada cerrada cualquiera (y los especiales, siempre).
+ */
+export function seasonStatus(o: {
+    season: number;
+    airStates: AirState[];
+    seriesEnded: boolean;
+    isLastSeason: boolean;
+    nextAirSeason: number | null;
+}): SeasonStatus | null {
+    if (o.season === 0) return null;
+    const aired = o.airStates.filter((a) => a !== 'soon').length;
+    if (aired === 0) return 'announced';
+    if (aired < o.airStates.length || o.nextAirSeason === o.season) return 'airing';
+    if (o.seriesEnded && o.isLastSeason) return 'last';
+    return null;
+}
+
+export const SEASON_STATUS_STYLE: Record<SeasonStatus, { color: string; icon: string; label: string }> = {
+    airing: { color: 'green', icon: 'radio', label: 'En emisión' },
+    announced: { color: 'blue', icon: 'calendar-clock', label: 'Anunciada' },
+    last: { color: 'amber', icon: 'flag', label: 'Última temporada' },
+};
+
+const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+const weekdayOf = (key: string) => at(key).getUTCDay();
+
+/** «viernes 21 jun 2019» (en minúscula, para ir dentro de una frase); sin el año si es el de `today`. */
+export function phraseDate(key: string, today?: string): string {
+    const s = shortDate(key).replace(/^\S+/, WEEKDAYS[weekdayOf(key)]);
+    return today && key.slice(0, 4) === today.slice(0, 4) ? s.replace(/ \d{4}$/, '') : s;
+}
+
+/** «6 semanas» · «4 meses» · «2 años» (la duración de un parón). */
+function spanLabel(days: number): string {
+    if (days < 63) return `${Math.round(days / 7)} semanas`;
+    if (days < 730) return `${Math.round(days / 30.44)} meses`;
+    return `${Math.round(days / 365.25)} años`;
+}
+
+/** «17 ene – 21 mar 2025» · «28 sept 2025 – 17 may 2026» · «21 jun 2019» (un solo día). */
+export function dateRange(first: string, last: string): string {
+    const d = (k: string, year: boolean) => {
+        const s = shortDate(k).replace(/^\S+ /, '');
+        return year ? s : s.replace(/ \d{4}$/, '');
+    };
+    if (first === last) return d(first, true);
+    return `${d(first, first.slice(0, 4) !== last.slice(0, 4))} – ${d(last, true)}`;
+}
+
+/** Más de tres semanas sin episodio cuenta como parón (handoff, punto 1). */
+const BREAK_DAYS = 21;
+
+/**
+ * Cómo se emitió la temporada, a partir de las fechas de sus episodios. Es la línea que sustituye a la
+ * sinopsis cuando TMDB no la tiene (lo normal), así que nunca sale «No hay descripción»:
+ *   «Los 8 episodios se estrenaron a la vez el viernes 21 jun 2019»
+ *   «Uno cada viernes, del 17 ene al 21 mar 2025» · «Estreno con 3 episodios y luego uno cada jueves…»
+ *   «… con un parón de 6 semanas» · «Uno al día, del 1 al 5 dic 2024» · «Del 3 mar al 12 jun 2008»
+ * Con `regular = false` (los especiales) solo se dice el rango de fechas.
+ * `null` si no hay fechas emitidas (la temporada anunciada lleva la cuenta atrás en su lugar).
+ */
+export function seasonSchedule(airDates: (string | null)[], today = todayKey(), regular = true): string | null {
+    const dates = airDates.filter((x): x is string => !!x && x <= today).sort();
+    if (!dates.length) return null;
+    const n = dates.length;
+    const first = dates[0], last = dates[n - 1];
+    const allAired = dates.length === airDates.length;
+    if (n === 1) return `Se estrenó el ${phraseDate(first)}`;
+    if (first === last) return allAired ? `Los ${n} episodios se estrenaron a la vez el ${phraseDate(first)}` : `Los ${n} primeros se estrenaron a la vez el ${phraseDate(first)}`;
+
+    const days = [...new Set(dates)];
+    const gaps = days.slice(1).map((k, i) => daysBetween(days[i], k));
+    const breaks = gaps.filter((g) => g > BREAK_DAYS);
+    const usual = gaps.filter((g) => g <= BREAK_DAYS);
+    const share = (ok: (g: number) => boolean) => (usual.length ? usual.filter(ok).length / usual.length : 0);
+    const batch = dates.filter((k) => k === first).length;
+    const range = dateRange(first, last).replace(/^/, 'del ').replace(' – ', ' al ');
+
+    let rhythm: string;
+    // Con tantos parones como pausas normales (los especiales, casi siempre) no hay ritmo que contar.
+    // `regular = false` en los especiales: se emiten sueltos, aunque dos caigan seguidos.
+    if (!regular || breaks.length >= usual.length) {
+        rhythm = '';
+    } else if (share((g) => g >= 6 && g <= 8) >= 0.7) {
+        // Días de la semana de los episodios fuera del estreno: si casi todos caen el mismo, se nombra.
+        const wd = days.slice(batch > 1 ? 1 : 0).map(weekdayOf);
+        const counts = wd.reduce<Record<number, number>>((m, x) => ((m[x] = (m[x] ?? 0) + 1), m), {});
+        const [top, c] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] ?? ['0', 0];
+        rhythm = c / wd.length >= 0.7 ? `uno cada ${WEEKDAYS[Number(top)]}` : 'uno a la semana';
+    } else if (share((g) => g === 1) >= 0.7) {
+        rhythm = 'uno al día';
+    } else {
+        rhythm = '';
+    }
+
+    if (!rhythm) return capital(range);
+    let text = batch > 1 ? `Estreno con ${batch} episodios y luego ${rhythm}, ${range}` : `${capital(rhythm)}, ${range}`;
+    if (breaks.length === 1) text += `, con un parón de ${spanLabel(breaks[0])}`;
+    else if (breaks.length > 1) text += `, con ${breaks.length} parones`;
+    return text;
+}

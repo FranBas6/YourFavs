@@ -1,0 +1,367 @@
+/* Ficha de temporada — handoff `docs/Temporada/design_handoff_temporada` (`tp.css` es la fuente de las
+   medidas). Se carga DESPUÉS de `episodio.css` y solo cambia lo que la temporada hace distinto (prefijo
+   `.tp` / `.tph`). Solo tokens: sin reglas de modo oscuro propias. Móvil (< 768 px) al final. */
+
+/* El título original de la serie junto a su nombre («Separación  Severance  Ver la serie ›»). */
+.tph .eh-sr-o { font: 500 13px var(--font); font-style: normal; color: var(--card-text-3); }
+
+/* ---- Cabecera: el póster de la temporada a la izquierda, en vez del fotograma a la derecha -------- */
+.tph .eh-in { grid-template-columns: 200px minmax(0, 1fr); gap: 36px; align-items: end; }
+.tph .eh-cr { grid-column: 1 / -1; }
+.tpo {
+    position: relative; width: 200px; aspect-ratio: 2 / 3; border-radius: 12px; overflow: hidden;
+    box-shadow: var(--sh-lg); border: 1px solid var(--card-text-3); background: var(--card);
+}
+.tpo > img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpo .cnt {
+    position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 5px;
+    height: 24px; padding: 0 9px; border-radius: var(--r-full); background: var(--card); color: var(--card-text);
+    font: 600 11px var(--font-mono); text-decoration: none;
+}
+.tpo .cnt svg { width: 12px; height: 12px; }
+.tpo.none {
+    border: 1.5px dashed var(--card-text-3); box-shadow: none; background: none;
+    display: grid; place-items: center; text-align: center; padding: 16px;
+    color: var(--card-text-3); font: 500 12.5px/1.4 var(--font);
+}
+
+.tph .tsyn {
+    margin: 16px 0 0; max-width: 64ch; font: 400 15px/1.6 var(--font); color: var(--card-text-2); text-wrap: pretty;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.tph .tsyn.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+.tph .tmore {
+    display: inline-flex; margin-top: 6px; padding: 0; border: 0; background: none; cursor: pointer;
+    font: 600 13px var(--font); color: var(--card-text);
+    text-decoration: underline; text-decoration-color: var(--card-text-3); text-underline-offset: 3px;
+}
+.tph .tmore[hidden] { display: none; }
+.tph .tmore:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+.tph .tsp-box { margin-top: 16px; max-width: 64ch; border-radius: var(--r-lg); overflow: hidden; min-height: 72px; }
+.tph .tsp-box .tsyn { margin: 0; }
+.tph .tfact { margin: 14px 0 0; display: flex; align-items: flex-start; gap: 8px; font: 500 13.5px/1.45 var(--font); color: var(--card-text-2); }
+.tph .tfact svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; color: var(--card-text-3); }
+.tph .tcd {
+    margin-top: 18px; display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px;
+    border-radius: var(--r-lg); background: var(--card); border: 1px solid var(--card-text-3);
+}
+.tph .tcd .k { font: 700 10.5px var(--font-mono); letter-spacing: .14em; color: var(--card-text-3); }
+.tph .tcd .n { font: 700 36px/1 var(--font-mono); color: var(--card-text); }
+.tph .tcd .n small { font-size: 15px; color: var(--card-text-2); margin-left: 5px; }
+.tph .tcd .d { font: 500 13px var(--font); color: var(--card-text-2); }
+
+/* ---- Barra «Tu temporada» (paso 2): la `.ea` de la ficha de episodio ------------------------------ */
+/* Los huecos que repinta el script no ocupan sitio: sus hijos son los de la barra. */
+.tea .tea-slot { display: contents; }
+.tea .est { flex: 1 1 320px; min-width: 260px; }
+.tea .ea-r { flex: 1 1 100%; margin-left: 0; flex-wrap: wrap; justify-content: flex-start; }
+.tea .ea-r .m { display: none; }
+.evb.guest { gap: 8px; background: var(--bg-elev); border-color: var(--border-strong); color: var(--text); }
+/* El botón de la temporada lleva un espacio entre icono y texto como el de «Visto». */
+.tea .evb > span { gap: 8px; }
+/* El aviso de estreno lleva su texto en un <span> sin clase (el de «Visto» los esconde). */
+.tea .evb.bell > span { display: inline; }
+
+/* Segmentos: uno por episodio (visto, te toca, sin emitir). */
+.tseg { display: flex; gap: 3px; width: 220px; max-width: 100%; }
+.tseg i { flex: 1; height: 6px; border-radius: 2px; background: var(--border); }
+.tseg i.w { background: var(--ok-ink); }
+.tseg i.nx { background: var(--bg-elev); box-shadow: inset 0 0 0 1.5px var(--text); }
+.tseg i.u { background: none; box-shadow: inset 0 0 0 1px var(--border-strong); }
+
+/* «Te toca · E6 Attila». */
+.tnx {
+    display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; border-radius: var(--r-lg);
+    border: 2px solid var(--text); background: var(--bg-elev); min-width: 0; flex: 0 1 380px;
+}
+.tnx .th { width: 104px; flex-shrink: 0; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden; background: var(--bg-tint); display: grid; place-items: center; color: var(--text-3); }
+.tnx .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tnx .th svg { width: 18px; height: 18px; }
+.tnx .tx { min-width: 0; flex: 1; color: var(--text); text-decoration: none; }
+.tnx .tx:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.tnx .k { display: flex; align-items: center; gap: 6px; font: 700 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.tnx .k svg { width: 12px; height: 12px; }
+.tnx b { display: block; font: 600 14.5px var(--font); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.tnx small { font-size: 12px; color: var(--text-3); }
+.tvb {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 12px;
+    border-radius: var(--r-md); border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text);
+    font: 600 12.5px var(--font); white-space: nowrap; flex-shrink: 0; cursor: pointer;
+}
+.tvb svg { width: 15px; height: 15px; }
+.tvb[aria-pressed="true"] { background: var(--ok-soft); border-color: var(--ok-ink); color: var(--ok-ink); }
+.tvb:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.tvb.busy { opacity: .7; cursor: progress; }
+
+/* ---- Navegación (paso 2): la `.en` de la ficha de episodio con pósters ---------------------------- */
+.tnv.solo { grid-template-columns: minmax(0, 1fr); }
+.tnv .enc .th { width: 40px; aspect-ratio: 2 / 3; border-radius: 5px; }
+.tnv .etr li { flex: 0 0 auto; height: 40px; }
+.tnv .etr li a {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+    min-width: 48px; padding: 0 8px; font: 700 12px var(--font-mono);
+}
+.tnv .etr li a small { font: 500 9.5px var(--font-mono); color: var(--text-3); letter-spacing: 0; }
+.tnv .etr li.w a small { color: var(--ok-ink); }
+.tnv .etr li.w a::after { display: none; }
+.tnv .etr li.u a small { color: var(--text-4); }
+.tnv .etr li.esp a { font-family: var(--font); font-weight: 600; }
+.tnv .etr li.sp { flex: 0 0 auto; display: flex; align-items: center; padding: 0 2px; color: var(--text-4); }
+.tnv .etr li .pb { position: absolute; left: 6px; right: 6px; bottom: 3px; height: 2px; border-radius: 1px; background: var(--border); }
+.tnv .etr li .pb i { display: block; height: 100%; background: var(--ok-ink); border-radius: 1px; }
+.tnv .etr-h > span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tnv .ssel ul { min-width: 240px; }
+.tnv .ssel li a { align-items: center; }
+.tnv .ssel li a .y { color: var(--text-3); font-weight: 500; }
+.tnv .ssel li a small.ok { display: inline-flex; align-items: center; gap: 4px; color: var(--ok-ink); }
+.tnv .ssel li a small svg { width: 12px; height: 12px; }
+.tnv-one { display: flex; align-items: center; gap: 8px; margin: 0; font: 500 13px var(--font); color: var(--text-2); }
+.tnv-one svg { width: 16px; height: 16px; color: var(--text-3); }
+
+/* ---- Episodios (paso 3) ---------------------------------------------------------------------- */
+/* El cuerpo de la ficha de episodio (`.eb`): lista a la izquierda; el lateral llega en el paso 4. */
+.tl-h { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -4px 0 14px; }
+.tl-h .sp { flex: 1; }
+.tl-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: var(--r-md); background: var(--bg-tint); border: 1px solid var(--border); }
+.tl-seg[hidden] { display: none; }
+.tl-seg button {
+    height: 30px; padding: 0 12px; border: 0; border-radius: 7px; background: none; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px var(--font); color: var(--text-2); white-space: nowrap;
+}
+.tl-seg button svg { width: 15px; height: 15px; }
+.tl-seg button[aria-checked="true"] { background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-sm); outline: 1px solid var(--border-strong); }
+.tl-seg button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tl-seg.ic button { padding: 0 9px; }
+
+.tl { display: flex; flex-direction: column; border-top: 1px solid var(--border); }
+.tr {
+    display: grid; grid-template-columns: 176px minmax(0, 1fr) auto; gap: 18px; align-items: start;
+    padding: 16px 0; border-bottom: 1px solid var(--border); position: relative; scroll-margin-top: 90px;
+}
+.tr[hidden], .tl.folded .tr.xtra { display: none; }
+.tr .th { display: block; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; position: relative; background: var(--bg-tint); }
+.tr .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tr .th.none { display: grid; place-items: center; color: var(--text-4); }
+.tr .th.none svg { width: 20px; height: 20px; }
+.tr .th.no {
+    background: none; border: 1.5px dashed var(--border-strong);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center;
+}
+.tr .th.no b { font: 700 13px var(--font-mono); color: var(--text-2); }
+.tr .th.no span { font: 500 11px var(--font); color: var(--text-3); }
+.tr .th.yf-spoil .yf-spoil-btn { height: 30px; padding: 0 12px; font-size: 12px; }
+.tr .tx { min-width: 0; }
+.tr .l1 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.tr .c { font: 700 11.5px var(--font-mono); letter-spacing: .06em; color: var(--text-3); }
+.tr .t { font: 600 15px var(--font); color: var(--text); text-decoration: none; }
+.tr a.t:hover { color: var(--primary); }
+.tr.u .t { color: var(--text-2); }
+.tr .ttoca {
+    display: none; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: var(--r-sm);
+    background: var(--text); color: var(--bg-elev); font: 700 10.5px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; white-space: nowrap;
+}
+.tr .ttoca svg { width: 11px; height: 11px; }
+.tr.nx .ttoca { display: inline-flex; }
+.tr .l2 { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font: 500 12.5px var(--font); color: var(--text-2); }
+.tr .l2 > span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.tr .l2 > span[hidden] { display: none; }
+.tr .l2 svg { width: 13px; height: 13px; color: var(--text-3); }
+.tr .l2 .r { font-weight: 600; color: var(--text); }
+/* La estrella, rellena (el SVG de Lucide trae `fill="none"` en el trazo). */
+.tr .l2 .r svg * { fill: var(--text); stroke: none; }
+.tr .l2 .ok, .tr .l2 .ok svg { color: var(--ok-ink); }
+.tr .l2 .mu { color: var(--text-3); }
+/* La sinopsis, solo en «Te toca» (en el resto, el detalle está en la ficha del episodio). */
+.tr .syn2 { display: none; margin: 8px 0 0; font: 400 13.5px/1.55 var(--font); color: var(--text-2); max-width: 64ch; }
+.tr.nx .syn2 { display: block; }
+.tr.nx p.syn2, .tr.nx .syn2 p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
+.tr.nx p.syn2 { margin-top: 8px; }
+.tr .syn2.yf-spoil { min-height: 44px; border-radius: 8px; overflow: hidden; }
+.tr .syn2.yf-spoil .yf-spoil-btn { height: 28px; padding: 0 12px; font-size: 12px; }
+.tr .crew { margin: 6px 0 0; font-size: 12px; color: var(--text-3); }
+.tr .act { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.tr .act a { font: 600 12px var(--font); color: var(--primary); display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; text-decoration: none; }
+.tr .act a:hover { text-decoration: underline; }
+.tr .act a svg { width: 13px; height: 13px; }
+.tvb .on { display: none; }
+.tvb[aria-pressed="true"] .on { display: inline; }
+.tvb[aria-pressed="true"] .off { display: none; }
+.tvb.dis { border-style: dashed; color: var(--text-3); background: none; cursor: default; }
+/* «Te toca»: borde de 2 px y fondo de tarjeta, que sobresale un poco de la lista. */
+.tr.nx { margin: 0 -14px; padding: 16px 14px; border: 2px solid var(--text); border-radius: var(--r-lg); background: var(--bg-elev); }
+.tr.nx + .tr { border-top: 0; }
+.tl-more { margin-top: 14px; }
+.tl-empty { margin: 16px 0 0; font: 500 14px var(--font); color: var(--text-3); }
+.tl-empty[hidden] { display: none; }
+
+/* Compacta: una línea por episodio (código · título · fecha · duración · nota · Visto). */
+.tl.cmp .tr { grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 9px 0; }
+.tl.cmp .tr .th, .tl.cmp .tr .syn2, .tl.cmp .tr .crew, .tl.cmp .tr .act a { display: none; }
+.tl.cmp .tr .tx { display: flex; align-items: center; gap: 14px; }
+.tl.cmp .tr .l1 { flex: 1 1 auto; flex-wrap: nowrap; min-width: 0; }
+.tl.cmp .tr .c { flex: 0 0 34px; font-size: 12px; color: var(--text-2); }
+.tl.cmp .tr .t { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tl.cmp .tr .l2 { flex: 0 0 auto; margin: 0; flex-wrap: nowrap; }
+.tl.cmp .tr .act { flex-direction: row; }
+.tl.cmp .tr .tvb { width: 36px; padding: 0; }
+.tl.cmp .tr .tvb span { display: none; }
+.tl.cmp .tr.nx { margin: 0 -10px; padding: 9px 10px; }
+.tl.cmp .tr .etag { flex-shrink: 0; }
+
+/* ---- Notas por episodio (paso 4) ------------------------------------------------------------- */
+/* Colores: la paleta de la tira elegida en Ajustes (--ep-q-*, strip-palettes.css). Pleno = visto. */
+.tch { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 28px; align-items: end; }
+.tch-main { min-width: 0; padding-left: 26px; }
+.tch-g { position: relative; height: 200px; display: flex; align-items: flex-end; gap: 6px; padding: 0 0 26px; border-bottom: 1px solid var(--border); }
+.tch-g .gl { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); font: 500 10px var(--font-mono); color: var(--text-4); }
+.tch-g .gl span { position: absolute; left: -24px; top: -7px; }
+.tch-b { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; position: relative; }
+.tch-b .v { font: 700 11px var(--font-mono); color: var(--text); margin-bottom: 4px; white-space: nowrap; }
+.tch-b .bar { width: 100%; max-width: 40px; border-radius: 5px 5px 2px 2px; background: var(--c); }
+.tch-b.nw .bar { opacity: .35; }
+.tch-b.hid .bar { background: none; border: 1.5px dashed var(--border-strong); height: 40px; opacity: 1; }
+.tch-b.hid .v { color: var(--text-3); }
+.tch-b.u .bar, .tch-b.nr .bar { background: none; border: 1.5px dashed var(--border); height: 16px; opacity: 1; }
+.tch-b .e { position: absolute; bottom: -22px; font: 600 10.5px var(--font-mono); color: var(--text-3); }
+.tch-b.best .e, .tch-b.worst .e { color: var(--text); }
+/* «Mejor» y «Peor», encima de su barra (en la columna, no arriba del todo). */
+.tch-b .tg {
+    margin-bottom: 4px; padding: 2px 6px; border-radius: 5px; white-space: nowrap;
+    font: 700 9.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase;
+}
+.tch-b.best .tg { background: var(--stamp-green); color: var(--stamp-green-ink); }
+.tch-b.worst .tg { background: var(--stamp-slate); color: var(--stamp-slate-ink); }
+.tch-b .dot { position: absolute; bottom: -12px; width: 5px; height: 5px; border-radius: 50%; background: var(--ok-ink); }
+.tch-b.cur .bar { outline: 2px solid var(--text); outline-offset: 2px; }
+.tch-s { display: flex; flex-direction: column; gap: 12px; }
+.tch-s div { display: flex; flex-direction: column; gap: 2px; }
+.tch-s span { font: 700 10.5px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.tch-s b { font: 600 14px var(--font); color: var(--text); }
+.tch-s b a { color: inherit; text-decoration: none; }
+.tch-s b a:hover { color: var(--primary); text-decoration: underline; }
+.tch-s b small { font-weight: 500; color: var(--text-2); }
+.tch-lg { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--text-3); }
+.tch-lg span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.tch-lg i { width: 11px; height: 11px; border-radius: 3px; background: var(--c); }
+.tch-lg i.o { opacity: .35; }
+.tch-lg i.h { background: none; border: 1.5px dashed var(--border-strong); }
+/* Paleta «Contorno» (Ajustes): lo no visto, con borde en vez de apagado, como en la tira. */
+[data-strip="contorno"] .tch-b.nw:not(.hid):not(.u):not(.nr) .bar { opacity: 1; background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+[data-strip="contorno"] .tch-lg i.o { opacity: 1; background: transparent; box-shadow: inset 0 0 0 1.5px var(--c); }
+.tch-lg a { margin-left: auto; font-weight: 600; color: var(--primary); text-decoration: none; }
+.tch-lg a:hover { text-decoration: underline; }
+
+/* Sin spoilers (paso 5): la gráfica entera oculta y el aviso de la lista. */
+.tch[hidden] { display: none; }
+.tch[tabindex], .tch:focus { outline: none; }
+.tch-hide {
+    display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: var(--r-lg);
+    border: 1.5px dashed var(--border-strong); background: var(--bg-elev); color: var(--text-3);
+}
+.tch-hide > svg { width: 20px; height: 20px; flex-shrink: 0; }
+.tch-hide span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tch-hide b { font: 600 14px var(--font); color: var(--text); }
+.tch-hide small { font-size: 12.5px; color: var(--text-3); }
+.tl-hid { display: inline-flex; align-items: center; gap: 6px; font: 500 12.5px var(--font); color: var(--text-2); }
+.tl-hid svg { width: 14px; height: 14px; color: var(--text-3); }
+.tl-hid button { padding: 0; border: 0; background: none; cursor: pointer; font: 600 12.5px var(--font); color: var(--primary); }
+.tl-hid button:hover { text-decoration: underline; }
+
+/* ---- Reparto, equipo y pósters (paso 4) ------------------------------------------------------ */
+.tpb .pc em { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; font: 600 11px var(--font-mono); font-style: normal; color: var(--text-2); }
+.tpb .pc em svg { width: 12px; height: 12px; }
+.tcw { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 28px; }
+.tcw div { display: flex; align-items: baseline; gap: 10px; font-size: 13px; color: var(--text); padding: 10px 0; border-bottom: 1px solid var(--border); min-width: 0; }
+.tcw dt { width: 84px; flex-shrink: 0; color: var(--text-3); }
+.tcw dd { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tcw dd a { color: inherit; text-decoration: none; }
+.tcw dd a:hover { color: var(--primary); text-decoration: underline; }
+.tcw small { margin-left: auto; font: 600 11px var(--font-mono); color: var(--text-3); white-space: nowrap; }
+.tpg { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
+.tpg a { display: block; aspect-ratio: 2 / 3; border-radius: 8px; overflow: hidden; background: var(--bg-tint); }
+.tpg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tpg a:hover img { opacity: .88; }
+/* La tarjeta «Tu temporada» la pinta el script: su hueco no ocupa sitio en el lateral. */
+.eb-s .tea-slot { display: contents; }
+.esc dd .ep-rt small { display: inline; margin-left: 6px; }
+
+/* ================= Móvil ================= */
+@media (max-width: 767.98px) {
+    /* Aquí sí va el fondo de la serie (en el episodio se quita porque el fotograma va encima). */
+    .tph .eh-bg { display: block; }
+    .tph .eh-bg::after { background: linear-gradient(0deg, var(--card) 45%, transparent 100%); }
+    /* La serie arriba; póster de 104 px con el título al lado; la sinopsis o el dato, debajo. */
+    .tph .eh-in { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 0 14px; align-items: end; padding: 16px 16px 22px; }
+    .tph .eh-tx { display: contents; }
+    .tph .eh-sr { grid-row: 1; grid-column: 1 / -1; margin-bottom: 14px; }
+    .tph .eh-sr span { white-space: nowrap; }
+    /* En móvil no cabe junto al nombre («Ataque a los Titanes 進撃の巨人 Ver la serie»); está en la ficha de serie. */
+    .tph .eh-sr-o { display: none; }
+    .tph .tpo { grid-row: 2; grid-column: 1; width: 104px; border-radius: 8px; }
+    .tph .tpo .cnt { right: 5px; bottom: 5px; height: 20px; padding: 0 6px; font-size: 10px; }
+    .tph .tpo.none { padding: 8px; font-size: 11px; }
+    .tph .tph-hd { grid-row: 2; grid-column: 2; min-width: 0; }
+    .tph .tph-bd { grid-row: 3; grid-column: 1 / -1; }
+    .tph h1 { font-size: 26px; }
+    .tph h1 small { font-size: 13px; }
+    .tph .eh-m { font-size: 12.5px; gap: 4px 12px; margin-top: 10px; }
+    .tph .tsyn { font-size: 14px; }
+    .tph .tcd { display: flex; width: 100%; }
+
+    /* Barra: todo a lo ancho; «Te toca» con su «Visto» cuadrado de 44 px. */
+    .tea .est, .tea .tnx { flex: none; min-width: 0; width: 100%; }
+    .tseg { width: 100%; }
+    .tnx .tvb { width: 44px; height: 44px; padding: 0; }
+    .tnx .tvb span { display: none; }
+    .tea .ea-r .d { display: none; }
+    .tea .ea-r .m { display: inline; }
+    /* «Marcar todo» en su fila; debajo Recomendar · Enviar a… y la plataforma (rejilla de episodio.css). */
+    .tea .ea-r .tea-slot .pf-btn { grid-column: 1 / -1; height: 40px; justify-content: center; font-size: 13px; }
+
+    /* Navegación: tarjetas en fila con su póster pequeño (en el episodio van en columna con el fotograma). */
+    .tnv .enc { flex-direction: row; align-items: center; }
+    .tnv .enc.nx { flex-direction: row-reverse; }
+    .tnv .enc .th { width: 36px; }
+    .tnv .etr li { flex-basis: auto; height: 44px; }
+    .tnv .etr li a { min-width: 52px; }
+
+    /* Episodios: fotograma de 112 px, título a dos líneas y «Visto» cuadrado de 44 px; sin equipo ni «Ficha». */
+    .tl-seg.ic { display: none; }
+    .tr { grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 12px; padding: 12px 0; align-items: center; }
+    /* Código, título y etiquetas en el mismo párrafo: un título largo sigue al lado de «E3», no debajo. */
+    .tr .l1 { display: block; line-height: 1.35; }
+    .tr .c { margin-right: 6px; }
+    .tr .t { font-size: 14px; }
+    .tr .l1 .etag, .tr.nx .l1 .ttoca { margin-left: 6px; vertical-align: 1px; }
+    .tr .l2 { font-size: 12px; gap: 2px 10px; }
+    .tr .crew, .tr .act a { display: none; }
+    .tr .tvb { width: 44px; height: 44px; padding: 0; }
+    .tr .tvb span { display: none; }
+    .tr .th.yf-spoil .yf-spoil-btn { height: 26px; padding: 0 8px; font-size: 11px; }
+    .tr.nx { margin: 0 -10px; padding: 12px 10px; }
+    /* En móvil la compacta no hace falta: la de fotogramas ya es de una línea por episodio. */
+    .tl.cmp .tr { grid-template-columns: 112px minmax(0, 1fr) 44px; gap: 12px; padding: 12px 0; }
+    .tl.cmp .tr .th { display: block; }
+    .tl.cmp .tr .tx { display: block; }
+    .tl.cmp .tr .l2 { margin-top: 4px; flex-wrap: wrap; }
+    .tl.cmp .tr .tvb { width: 44px; }
+
+    /* Notas: barras más estrechas, mejor y peor debajo. */
+    .tch { display: block; }
+    .tch-main { padding-left: 22px; }
+    .tch-g { height: 170px; gap: 3px; }
+    .tch-b .v { font-size: 9.5px; }
+    .tch-b .tg { font-size: 8.5px; padding: 1px 4px; }
+    .tch-s { flex-direction: row; flex-wrap: wrap; gap: 12px 22px; margin-top: 20px; }
+    .tcw { grid-template-columns: 1fr; }
+    .tpg { display: flex; overflow-x: auto; gap: 10px; scrollbar-width: none; margin-right: calc((100% - 100vw) / 2); padding-right: 12px; }
+    .tpg::-webkit-scrollbar { display: none; }
+    .tpg a { flex: 0 0 108px; }
+    /* Reparto en carril (episodio.css): «10 episodios» centrado y sin icono. */
+    .tpb .pc em { justify-content: center; }
+    .tpb .pc em svg { display: none; }
+    /* Vídeos en carril, como los pósters: cuatro tráileres en columna eran media página. */
+    .tpb .vids { display: flex; overflow-x: auto; gap: 12px; scrollbar-width: none; margin-right: calc((100% - 100vw) / 2); padding-right: 12px; scroll-snap-type: x proximity; }
+    .tpb .vids::-webkit-scrollbar { display: none; }
+    .tpb .vid { flex: 0 0 80%; scroll-snap-align: start; }
+}

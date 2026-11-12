@@ -21,7 +21,7 @@ import { tmdbFetch } from '../shared/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts } from '../../../utils/appTime';
 import { episodeTypeLabel } from '../../../utils/episodeType';
-import { episodeHref } from '../../../utils/episodeView';
+import { episodeHref, seasonHref } from '../../../utils/episodeView';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
 import { getCurrentRegion } from '../../BD/shared/userScope';
@@ -126,7 +126,7 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
             items.push({
                 id: `season:tv:${id}:S${n}`, type: 'new_season', title: d.name,
                 subtitle: `Temporada ${n} · ${diff > 0 ? `se estrena ${whenLabel(ep.air_date)}` : sinceLabel(ep.air_date)}`,
-                href: episodeHref(id, n, 1), poster_path: d.poster_path ?? null, always,
+                href: seasonHref(id, n), poster_path: d.poster_path ?? null, always, // a la ficha de la temporada
             });
         }
     }

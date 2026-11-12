@@ -12,6 +12,7 @@
  */
 import { tmdbFetch } from '../shared/tmdbClient';
 import { getCurrentLanguage } from '../../BD/shared/userScope';
+import { buildProviderLinksByCountry, buildProvidersByCountry } from '../shared/tmdbInfoService';
 
 /** Lo mínimo de un episodio para la tira y para anterior / siguiente. */
 export interface EpisodeRef {
@@ -36,6 +37,8 @@ export interface EpisodeDetail {
         /** Temporadas con episodios (sin las vacías que TMDB anuncia), para el selector. */
         seasons: { season_number: number; name: string; episode_count: number }[];
         last_season: number;
+        /** Dónde ver la serie entera: respaldo cuando TMDB no tiene el dato de la temporada (muchas series). */
+        providers: { providersByCountry: Record<string, any[]>; linkByCountry: Record<string, string> };
     };
     /** La respuesta de TMDB del episodio (con credits, images, videos, external_ids). */
     episode: any;
@@ -92,7 +95,7 @@ export async function getEpisodeDetail(seriesId: number, season: number, episode
     const lang = getCurrentLanguage().split('-')[0];
 
     const [series, ep] = await Promise.all([
-        tmdbFetch<any>(`/tv/${seriesId}`, { append_to_response: seasonsWanted.map((n) => `season/${n}`).join(',') }).catch(() => null),
+        tmdbFetch<any>(`/tv/${seriesId}`, { append_to_response: [...seasonsWanted.map((n) => `season/${n}`), 'watch/providers'].join(',') }).catch(() => null),
         tmdbFetch<any>(`/tv/${seriesId}/season/${season}/episode/${episode}`, {
             append_to_response: 'images,videos,credits,external_ids',
             include_image_language: `${lang},en,null`,
@@ -129,6 +132,10 @@ export async function getEpisodeDetail(seriesId: number, season: number, episode
             number_of_episodes: Number(series.number_of_episodes) || 0,
             seasons,
             last_season: Math.max(0, ...seasons.map((s: { season_number: number }) => s.season_number)),
+            providers: {
+                providersByCountry: buildProvidersByCountry(series['watch/providers']?.results ?? {}),
+                linkByCountry: buildProviderLinksByCountry(series['watch/providers']?.results ?? {}),
+            },
         },
         episode: ep,
         seasonEpisodes: current,

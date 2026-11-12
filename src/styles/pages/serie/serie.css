@@ -71,6 +71,19 @@ details[open] .season-overview {
 .sr-head { display: flex; align-items: flex-start; gap: 12px; }
 .sr-t { display: flex; flex-direction: column; flex: 1 1 auto; min-width: 0; }
 .sr-t b { font: 600 var(--fs-sub) var(--font); color: var(--text); line-height: 1.25; }
+/* El título enlaza a la ficha de la temporada (subrayado y flecha al pasar el ratón). */
+.sr-tl { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; color: inherit; text-decoration: none; }
+.sr-tl svg { width: 16px; height: 16px; color: var(--text-3); flex-shrink: 0; transition: transform .15s ease; }
+.sr-tl:hover b { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
+.sr-tl:hover svg { color: var(--text); transform: translateX(2px); }
+.sr-tl:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+/* Dentro: «Marcar / Desmarcar temporada completa» y, al lado, «Ficha de la temporada ›». */
+.sr-acts { display: flex; gap: 10px; align-items: flex-start; margin-bottom: 12px; }
+.sr-acts form { flex: 1 1 auto; min-width: 0; }
+.sr-acts .sr-markall { margin-bottom: 0; }
+.sr-ficha { flex-shrink: 0; gap: 6px; white-space: nowrap; }
+.sr-ficha svg { width: 15px; height: 15px; }
+@media (prefers-reduced-motion: reduce) { .sr-tl svg { transition: none; } }
 .sr-t small { font-size: var(--fs-meta); color: var(--text-3); margin-top: 2px; }
 .sr-facts { margin: 0; font-size: var(--fs-meta); color: var(--text-2); line-height: 1.5; }
 .sr-strip { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -128,6 +141,10 @@ details[open] > summary .sr-chev { transform: rotate(180deg); }
     .sr-stats b { font-size: var(--fs-body); }
     .sr-facts, .sr-main > .sr-strip, .sr-main .sr-ov { grid-column: 1 / -1; margin-top: 0; }
     .sr-t b { font-size: var(--fs-body); }
+    /* Móvil: el título con 44 px de alto para tocarlo bien; la ficha, debajo del botón y a todo el ancho. */
+    .sr-tl { min-height: 44px; }
+    .sr-acts { flex-direction: column; align-items: stretch; gap: 8px; }
+    .sr-ficha { justify-content: center; }
     .sr-strip { gap: 3px; }
     .sr-strip .sr-c { width: 10px; height: 10px; border-radius: 2px; }
     .sr-el-body { flex-direction: column; }

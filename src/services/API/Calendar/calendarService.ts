@@ -6,7 +6,7 @@ import { fetchSerieDetails } from '../Series/tmdbSeries';
 import { getCurrentRegion } from '../../BD/shared/userScope';
 import { processBatch } from '../../../utils/processBatch';
 import { episodeTypeLabel } from '../../../utils/episodeType';
-import { episodeHref } from '../../../utils/episodeView';
+import { episodeHref, seasonHref } from '../../../utils/episodeView';
 
 export interface CalendarEvent {
     tmdb_id: string;
@@ -318,7 +318,7 @@ export async function getCalendarData(
                             poster_path: posterUrl(serie.poster_path),
                             event_type: 'season_premiere',
                             label: `Temporada ${currentSeasonNum} completa (${episodes.length} eps)`,
-                            href: `/serie/${serieIdStr}#season-${currentSeasonNum}`,
+                            href: seasonHref(serieIdStr, currentSeasonNum),
                             is_subscribed: isSub,
                             is_following: isFollowing,
                         });

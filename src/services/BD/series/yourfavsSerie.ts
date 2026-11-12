@@ -432,6 +432,56 @@ export async function markWatchedEpisodes(serieId: string, season: number, episo
     return inserted.length;
 }
 
+/**
+ * Desmarca varios episodios de una temporada (ficha de temporada) y devuelve los que estaban, con su
+ * fecha, para que «Deshacer» los pueda devolver tal cual (`restoreWatchedEpisodes`).
+ *   · `unlog: false` («Desmarcar temporada»): como el vaciado en bloque del acordeón, el diario se queda.
+ *   · `unlog: true` (deshacer un «Marcar» de hace un momento): era un error, así que también sale del
+ *     diario, como al desmarcar uno suelto.
+ */
+export async function unmarkWatchedEpisodes(
+    serieId: string, season: number, episodes: number[], opts: { unlog?: boolean } = {},
+): Promise<{ episode: number; watched_at: string | null }[]> {
+    if (!episodes.length) return [];
+    const userId = requireAuthId();
+    const { data, error } = await db().from('watched_episodes').delete()
+        .eq('user_id', userId).eq('serie_id', Number(serieId)).eq('season', season).in('episode', episodes)
+        .select('episode, watched_at');
+    if (error) throw new Error(error.message);
+    const removed = ((data ?? []) as { episode: number; watched_at: string | null }[]).sort((a, b) => a.episode - b.episode);
+    if (opts.unlog) for (const r of removed) await unlogEpisode(serieId, season, r.episode);
+    if (removed.length) await bustYearStats();
+    return removed;
+}
+
+/**
+ * Vuelve a marcar episodios con la fecha que tenían («Deshacer» de un desmarcado en la ficha de temporada).
+ *   · Sin `relog` («Desmarcar temporada»): el diario no se tocó al desmarcar en bloque, así que tampoco ahora.
+ *   · Con `relog` (desmarcar uno de la lista, que sí lo sacó del diario): vuelve al diario con su día.
+ */
+export async function restoreWatchedEpisodes(
+    serieId: string, season: number, rows: { episode: number; watched_at: string | null }[], opts: { relog?: boolean } = {},
+): Promise<number> {
+    if (!rows.length) return 0;
+    const userId = requireAuthId();
+    const now = new Date().toISOString();
+    const { data, error } = await db().from('watched_episodes')
+        .upsert(rows.map((r) => ({ user_id: userId, serie_id: Number(serieId), season, episode: r.episode, watched_at: r.watched_at ?? now })),
+            { onConflict: 'user_id,serie_id,season,episode', ignoreDuplicates: true })
+        .select('episode');
+    if (error) throw new Error(error.message);
+    if (opts.relog) {
+        const back = new Set(((data ?? []) as { episode: number }[]).map((r) => r.episode));
+        for (const r of rows) {
+            if (!back.has(r.episode)) continue;
+            const watched_on = r.watched_at ? appDateParts(new Date(r.watched_at).getTime()).key : undefined;
+            try { await appendWatchLog({ media_type: 'tv', tmdb_id: serieId, season, episode: r.episode, watched_on, logged_at: r.watched_at ?? undefined }); } catch { /* diario opcional */ }
+        }
+    }
+    await bustYearStats();
+    return (data ?? []).length;
+}
+
 export async function markSeasonWatched(serieId: string, season: number, episodeNumbers: number[]): Promise<void> {
     // Quitar los episodios de esta temporada que ya estén y reemplazar con todos (misma hora).
     await deleteEpisodes(serieId, { season });

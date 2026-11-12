@@ -1,0 +1,862 @@
+---
+/**
+ * Ficha de temporada — handoff `docs/Temporada/design_handoff_temporada` (README) y plan
+ * `docs/Temporada/PLAN_TEMPORADA.md`.
+ *
+ * `/serie/{id}/t{n}`, también la temporada 0 (especiales). Una temporada que no existe da 404.
+ * Datos: `getSeasonDetail` (2 llamadas a TMDB) + el progreso del usuario y su modo sin spoilers.
+ *
+ *   · Cabecera (`.eh.tph`): la de la ficha de episodio con el póster de la temporada a la izquierda;
+ *     sinopsis o, si TMDB no la tiene (lo normal), cómo se emitió; cuenta atrás si está anunciada.
+ *   · Barra «Tu temporada» (`.ea.tea`, paso 2): la pinta `utils/seasonView.ts::seasonBar`, aquí y en el
+ *     navegador (`scripts/serie/season.ts`) al marcar sin recargar. Recomendar, Enviar a… y la plataforma.
+ *   · Navegación (`.en`): temporada anterior y siguiente, la tira de temporadas con tu progreso
+ *     (especiales aparte) y el selector.
+ *   · Episodios (`.tl`, paso 3): con fotograma o compacta (desde 16 episodios, y se recuerda), filtro
+ *     «Sin ver», «Visto» en cada fila y «Te toca» destacado. No se despliegan: el detalle está en la
+ *     ficha del episodio. `scripts/serie/seasonList.ts` las mantiene al día al marcar.
+ *   · Cuerpo (paso 4): notas por episodio (barras con la paleta de la tira, mejor y peor), reparto y
+ *     equipo de la temporada con su nº de episodios (`aggregate_credits`), vídeos y pósters. Lateral: Tu
+ *     temporada (`seasonSide`), Esta temporada, dónde verla y amigos (de la serie).
+ */
+import Layout from '../../../../layouts/Layout.astro';
+import { Icon } from 'astro-icon/components';
+import '../../../../styles/shared/spoil.css';
+import '../../../../styles/shared/detail-common.css';
+import '../../../../styles/pages/serie/episodio.css';
+import '../../../../styles/pages/serie/temporada.css';
+import { getSeasonDetail } from '../../../../services/API/Series/seasonDetail';
+import { getWatchedProgress } from '../../../../services/BD/series/yourfavsSerie';
+import { getSpoilerPref } from '../../../../services/BD/shared/spoilerPrefs';
+import { getNotificationSub } from '../../../../services/BD/notifications/yourfavsNotifications';
+import { getCurrentRegion } from '../../../../services/BD/shared/userScope';
+import { getSeasonWatchProviders } from '../../../../services/API/Series/InfoSeries';
+import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/shared/tmdbClient';
+import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seasonSide, seenLabel, type TpState } from '../../../../utils/seasonView';
+import FriendsSeen from '../../../../components/detail/FriendsSeen.astro';
+import { SUPPORTED_COUNTRIES } from '../../../../services/API/shared/tmdbInfoService';
+import SectionHeader from '../../../../components/SectionHeader.astro';
+import { safeFetch } from '../../../../utils/safeFetch';
+import { distinctOriginalTitle } from '../../../../utils/constants/helpers/media-helpers';
+import {
+    airState, countdown, dateRange, decimal, episodeCrew, episodeHref, mediumDate, PROVIDER_KIND, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
+    relativeAgo, runtimeLabel, seasonHref, seasonLabel, shortDate, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
+} from '../../../../utils/episodeView';
+
+// Mismos topes que la ficha de episodio: ids de serie de hasta 9 cifras, temporadas de hasta 4.
+const posInt = (v: string | undefined, min: number, digits: number) =>
+    (v && new RegExp(`^\\d{1,${digits}}$`).test(v) && Number(v) >= min ? Number(v) : null);
+const id = posInt(Astro.params.id, 1, 9);
+const season = posInt(Astro.params.season, 0, 4);
+
+const user = Astro.locals.user;
+const result = id != null && season != null
+    ? await safeFetch(getSeasonDetail(id, season), `temporada/${id}/${season}`, { missing: true as const, series: null })
+    : { missing: true as const, series: null };
+const missing = 'missing' in result ? result : null;
+const d = 'missing' in result ? null : result;
+if (missing) Astro.response.status = 404;
+
+// --- Lo del usuario: qué ha visto, su modo sin spoilers y su aviso; y dónde verla ---------------
+const [progress, spoilerPref, notifSub, seasonProviders] = d
+    ? await Promise.all([
+        user ? safeFetch(getWatchedProgress(String(id)), `temporada/${id}/progreso`, null) : null,
+        user ? safeFetch(getSpoilerPref(id!), `temporada/${id}/spoilerpref`, null as boolean | null) : null,
+        user ? safeFetch(getNotificationSub('tv', String(id)), `temporada/${id}/aviso`, null) : null,
+        safeFetch(getSeasonWatchProviders(id!, season!), `temporada/${id}/t${season}/providers`, { providersByCountry: {}, linkByCountry: {} }),
+    ])
+    : [null, null, null, null];
+/** Episodio de esta temporada → instante en que lo marcaste (o '' si no hay hora). */
+const watched = new Map<number, string>();
+for (const w of progress?.watched_episodes ?? []) if (w.season === season) watched.set(w.episode, (w as any).watched_at ?? '');
+
+// Igual que la ficha de serie y la de episodio: la serie manda sobre el ajuste general, y solo con sesión.
+const spoilerFree = !!user && (spoilerPref !== null ? spoilerPref : user.spoilers?.enabled === true);
+const hideSynopsis = spoilerFree && user?.spoilers?.hideSynopsis !== false;
+const hideStills = spoilerFree && user?.spoilers?.hideStills !== false;
+
+// --- La temporada --------------------------------------------------------------------------------
+const today = todayKey();
+const s = d?.season;
+const seriesName = d?.series.name ?? '';
+// El título original de la serie junto a su nombre, si es otro («Severance»), como en su ficha.
+const seriesOriginal = d ? distinctOriginalTitle(seriesName, d.series.original_name) : null;
+const episodes: any[] = s?.episodes ?? [];
+const airStates = episodes.map((e) => airState(e.air_date, today));
+const seriesEnded = ['Ended', 'Canceled'].includes(d?.series.status ?? '');
+const status = d ? seasonStatus({
+    season: season!, airStates, seriesEnded,
+    // «Última temporada» solo si hubo más de una: en una miniserie no dice nada.
+    isLastSeason: season === d.series.last_season && d.series.seasons.filter((x) => x.season_number > 0).length > 1,
+    nextAirSeason: d.series.next_air_season,
+}) : null;
+
+const ref = d?.series.seasons.find((x) => x.season_number === season);
+const premiere: string | null = s?.air_date || episodes.find((e) => e.air_date)?.air_date || ref?.air_date || null;
+const year = premiere?.slice(0, 4) ?? '';
+
+// Título: el nombre propio si TMDB lo tiene («Murder House»); si no, «Temporada 2».
+const ownName = d && !isPlaceholderSeasonName(s.name, season!, seriesName) ? String(s.name) : '';
+const title = ownName || seasonLabel(season ?? 0);
+const titleSub = ownName ? `${seasonLabel(season!)} de ${seriesName}` : '';
+const kicker = [season === 0 ? 'Especiales' : `Temporada ${season}`, year].filter(Boolean).join(' · ');
+
+// Meta: episodios · duración total · nota media · fechas.
+const epCount = episodes.length;
+const totalMin = episodes.reduce((n, e) => n + (Number(e.runtime) > 0 ? Number(e.runtime) : 0), 0);
+const totalRuntime = runtimeLabel(totalMin);
+const voted = episodes.filter((e, i) => airStates[i] !== 'soon' && Number(e.vote_count) > 0 && Number(e.vote_average) > 0);
+const avg = Number(s?.vote_average) > 0
+    ? Number(s.vote_average)
+    : voted.length ? voted.reduce((n, e) => n + Number(e.vote_average), 0) / voted.length : 0;
+const score = status !== 'announced' && avg > 0 ? decimal(avg) : null;
+const dated = episodes.map((e) => e.air_date).filter(Boolean).sort() as string[];
+const range = dated.length > 1 && dated[0] !== dated.at(-1) ? dateRange(dated[0], dated.at(-1)!) : null;
+
+// Póster: el de la temporada; si no tiene, el de la serie (un hueco parecería un error), salvo en una
+// anunciada, donde el hueco dice que aún no hay (decisión de Fran, 2026-11-12).
+const posters: string[] = (s?.images?.posters ?? []).map((p: any) => p.file_path).filter(Boolean);
+const poster: string | null = s?.poster_path ?? (status === 'announced' ? null : d?.series.poster_path ?? null);
+
+// Debajo del título: la sinopsis o, si no hay, cómo se emitió. En emisión, además, el próximo episodio.
+const overview = String(s?.overview ?? '').trim();
+const seenAny = watched.size > 0;
+const hideOverview = !!overview && hideSynopsis && !seenAny;
+const nextUp = status === 'airing' ? episodes.find((e, i) => airStates[i] === 'soon' && e.air_date) : null;
+const nextLine = nextUp
+    ? `Próximo: E${nextUp.episode_number}, el ${phraseDate(nextUp.air_date, today)} (${relativeAgo(nextUp.air_date, today)})`
+    : null;
+const schedule = !overview && status !== 'announced' && status !== 'airing' ? seasonSchedule(episodes.map((e) => e.air_date), today, season! > 0) : null;
+const cd = status === 'announced' && premiere && premiere > today ? countdown(premiere, today) : null;
+// (Fuera del JSX: el compilador de Astro rompe un `${}` dentro de un ternario anidado en la plantilla.)
+const noCountdown = premiere && premiere <= today ? `Se estrenó el ${phraseDate(premiere)}` : 'Fecha de estreno por anunciar';
+const cdLabel = cd ? `Se estrena ${cd.n === 'hoy' || cd.n === 'mañana' ? cd.n : `en ${cd.label}`}, ${longDate(premiere!, today)}` : '';
+
+// --- Barra «Tu temporada» (paso 2) ---------------------------------------------------------------
+const regular = (d?.series.seasons ?? []).filter((x) => x.season_number > 0);
+const specials = d?.series.seasons.find((x) => x.season_number === 0) ?? null;
+const regIdx = regular.findIndex((x) => x.season_number === season);
+const tp: TpState | null = d ? {
+    seriesId: id!, season: season!, logged: !!user, status,
+    eps: episodes.map((e, i) => ({
+        e: Number(e.episode_number),
+        name: isPlaceholderTitle(e.name, Number(e.episode_number)) ? `Episodio ${e.episode_number}` : String(e.name),
+        aired: airStates[i] !== 'soon',
+        air: e.air_date || null,
+        runtime: Number(e.runtime) > 0 ? Number(e.runtime) : null,
+        still: e.still_path ? stillUrl(e.still_path, 'w300') : null,
+    })),
+    watched: Object.fromEntries(watched),
+    seriesWatched: (progress?.watched_episodes ?? []).filter((w) => w.season > 0).length,
+    seriesTotal: d.series.number_of_episodes,
+    nextSeason: season! > 0 && regIdx >= 0 ? regular[regIdx + 1]?.season_number ?? null : null,
+    notif: !!notifSub, hideStills, today,
+} : null;
+const bar = tp ? seasonBar(tp) : null;
+
+// Dónde verla: lo de esta temporada en tu país; si TMDB no lo tiene (muchas series), lo de la serie,
+// y se dice así. Una anunciada no hereda nada: aún no está en ninguna parte.
+const region = getCurrentRegion();
+const seasonHas = (seasonProviders?.providersByCountry?.[region] ?? []).length > 0;
+const providersFromSeries = !seasonHas && status !== 'announced' && (d?.series.providers.providersByCountry[region] ?? []).length > 0;
+const where = providersFromSeries ? d!.series.providers : seasonProviders;
+// «Ver en {plataforma}»: la suscripción en tu país, mejor si es una de las tuyas.
+const myPlatforms = new Set<number>(((user as any)?.platforms ?? []).map(Number));
+const regionProviders: any[] = (where?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
+const provider = regionProviders.find((p) => myPlatforms.has(Number(p.provider_id))) ?? regionProviders[0] ?? null;
+const providerLink = where?.linkByCountry?.[region] ?? null;
+// «T2 · Separación», el comentario con que llega «Enviar a…».
+const sendMsg = d ? `${season === 0 ? 'Especiales' : `Temporada ${season}`} · ${seriesName}` : '';
+
+// --- Navegación --------------------------------------------------------------------------------
+/** Temporada → episodios vistos y el más alto visto (para «Vas por el E6»). */
+const seenBySeason = new Map<number, { n: number; max: number }>();
+for (const w of progress?.watched_episodes ?? []) {
+    const cur = seenBySeason.get(w.season) ?? { n: 0, max: 0 };
+    seenBySeason.set(w.season, { n: cur.n + 1, max: Math.max(cur.max, w.episode) });
+}
+const seenIn = (n: number) => (n === season ? watched.size : seenBySeason.get(n)?.n ?? 0);
+const countOf = (x: { season_number: number; episode_count: number }) => (x.season_number === season ? episodes.length : x.episode_count);
+function navCard(x: (typeof regular)[number] | undefined) {
+    if (!x) return null;
+    const seen = seenIn(x.season_number);
+    const count = countOf(x);
+    const max = seenBySeason.get(x.season_number)?.max ?? 0;
+    const st = seasonCardStatus({ logged: !!user, seen, count, air: x.air_date, today, firstUnseen: max && max < count ? max + 1 : null });
+    return {
+        href: seasonHref(id!, x.season_number),
+        title: isPlaceholderSeasonName(x.name, x.season_number, seriesName) ? seasonLabel(x.season_number) : x.name,
+        thumb: x.poster_path ?? d?.series.poster_path ?? null,
+        ...st,
+    };
+}
+// Los especiales no entran en anterior y siguiente (sí en la tira y en el selector).
+const showCards = season! > 0 && regular.length > 1;
+const prevCard = showCards ? navCard(regular[regIdx - 1]) : null;
+const nextCard = showCards ? navCard(regular[regIdx + 1]) : null;
+const onlyOne = regular.length <= 1 && !specials;
+const chips = [...regular, ...(specials ? [specials] : [])].map((x) => {
+    const c = seasonChip({ logged: !!user, seen: seenIn(x.season_number), count: countOf(x), air: x.air_date, today });
+    const label = x.season_number === 0 ? 'Esp.' : `T${x.season_number}`;
+    const state = c.announced ? 'anunciada' : c.done ? 'vista' : user ? `${Math.min(seenIn(x.season_number), countOf(x))} de ${countOf(x)} vistos` : `${countOf(x)} episodios`;
+    return {
+        n: x.season_number, label, ...c,
+        href: seasonHref(id!, x.season_number),
+        cur: x.season_number === season,
+        sp: x.season_number === 0 && regular.length > 0,
+        aria: `${seasonLabel(x.season_number)}, ${state}${x.season_number === season ? ', estás aquí' : ''}`,
+    };
+});
+// Selector: de la más reciente a la primera, y los especiales al final.
+const picker = [...regular].reverse().concat(specials ? [specials] : []).map((x) => ({
+    href: seasonHref(id!, x.season_number),
+    label: seasonLabel(x.season_number),
+    year: x.air_date?.slice(0, 4) ?? '',
+    prog: user && countOf(x) ? `${Math.min(seenIn(x.season_number), countOf(x))}/${countOf(x)}` : `${countOf(x)} ep.`,
+    done: !!user && countOf(x) > 0 && seenIn(x.season_number) >= countOf(x),
+    cur: x.season_number === season,
+}));
+const seasonsCaption = `${regular.length} ${regular.length === 1 ? 'temporada' : 'temporadas'}${specials ? ' y especiales' : ''}`;
+
+// --- Episodios (paso 3) ------------------------------------------------------------------------
+const counts = tp ? seasonCounts(tp) : null;
+// «Te toca» solo con la temporada empezada: sin empezar, la barra ya dice «Empezar por el E1».
+const nextE = tp?.logged && counts?.seenCount ? counts.next?.e ?? null : null;
+const lastEp = Math.max(0, ...episodes.map((e) => Number(e.episode_number)));
+const rows = tp ? tp.eps.map((x, i) => {
+    const e = episodes[i];
+    const seen = x.e in tp.watched;
+    const crew = episodeCrew(e.crew);
+    // «FINAL», «FINAL DE SERIE» y «PARÓN» (no son spoilers: dicen dónde acaba la temporada).
+    const tag = e.episode_type === 'finale'
+        ? (seriesEnded && season === d!.series.last_season && x.e === lastEp ? TAG_STYLE.seriesEnd : TAG_STYLE.final)
+        : e.episode_type === 'mid_season' ? TAG_STYLE.mid : null;
+    const votes = Number(e.vote_count) || 0;
+    const rating = x.aired && votes > 0 && Number(e.vote_average) > 0 ? decimal(Number(e.vote_average)) : null;
+    const cd = !x.aired && x.air ? countdown(x.air, today) : null;
+    return {
+        ...x, seen, tag,
+        href: episodeHref(id!, season!, x.e),
+        date: x.air ? shortDate(x.air).replace(/^\S+ /, '') : 'Sin fecha',
+        runtime: runtimeLabel(x.runtime),
+        rating,
+        // Sin spoilers: de lo no visto, ni fotograma, ni sinopsis, ni nota (como en el acordeón).
+        hideStill: hideStills && !seen,
+        hideSyn: hideSynopsis && !seen,
+        hideRating: spoilerFree && !seen,
+        overview: String(e.overview ?? '').trim(),
+        crewLine: [crew.directors.length ? `Dirección: ${crew.directors.join(', ')}` : '', crew.writers.length ? `Guion: ${crew.writers.join(', ')}` : ''].filter(Boolean).join(' · '),
+        seenText: seen ? seenLabel(tp.watched[x.e], today) : '',
+        soon: cd ? (cd.unit ? `en ${cd.label}` : cd.n) : x.air ? 'Se estrena' : 'Anunciado',
+    };
+}) : [];
+// Sin spoilers: cuántos episodios tienen algo oculto (para «N con spoilers ocultos · Mostrar todo»).
+const hiddenRows = rows.filter((r) => (r.hideStill && r.still) || (r.hideSyn && r.overview) || (r.hideRating && r.rating)).length;
+// Desde 16 episodios, compacta por defecto (el navegador recuerda la que elijas).
+const compact = rows.length >= 16;
+const unseenCount = counts?.remaining.length ?? 0;
+// Anunciada y larga: los 5 primeros y «Mostrar los N».
+const foldAt = counts && !counts.aired.length && rows.length > 5 ? 5 : 0;
+
+// --- Notas por episodio (paso 4) ----------------------------------------------------------------
+// Banda de color como la tira del acordeón (≥ 9 · 8 · 7 · 6,5); la paleta es la que elegiste en Ajustes.
+const band = (v: number) => (v >= 9 ? 'high' : v >= 8 ? 'med' : v >= 7 ? 'low' : v >= 6.5 ? 'fair' : 'poor');
+const rated = rows.filter((r) => r.rating);
+const chartLo = Math.min(6, Math.floor(Math.min(...rated.map((r) => Number(r.rating!.replace(',', '.'))), 6)));
+const CH_H = 150; // alto de la barra de 10
+const shown = rated.filter((r) => !r.hideRating);
+const valueOf = (r: (typeof rows)[number]) => Number(r.rating!.replace(',', '.'));
+const best = shown.length > 1 ? shown.reduce((a, r) => (valueOf(r) > valueOf(a) ? r : a)) : null;
+const worst = shown.length > 1 ? shown.reduce((a, r) => (valueOf(r) < valueOf(a) ? r : a)) : null;
+const bars = rows.map((r) => {
+    const v = r.rating ? valueOf(r) : 0;
+    return {
+        e: r.e, seen: r.seen, aired: r.aired, rating: r.rating, hidden: !!r.rating && r.hideRating,
+        h: v ? Math.max(6, Math.round(((v - chartLo) / (10 - chartLo)) * CH_H)) : 0,
+        band: v ? band(v) : 'poor',
+        best: !!best && r.e === best.e && valueOf(best) !== valueOf(worst!),
+        worst: !!worst && r.e === worst.e && valueOf(best!) !== valueOf(worst),
+    };
+});
+const hiddenRatings = rated.length - shown.length;
+const avgShown = shown.length ? decimal(shown.reduce((n, r) => n + valueOf(r), 0) / shown.length) : null;
+const bandsUsed = new Set(bars.filter((b) => b.rating && !b.hidden).map((b) => b.band));
+const legend = [
+    ['high', '9 o más'], ['med', '8–8,9'], ['low', '7–7,9'], ['fair', '6,5–6,9'], ['poor', 'menos de 6,5'],
+].filter(([k]) => bandsUsed.has(k as string));
+const chartAlt = `Notas de TMDB por episodio: ${bars.map((b) => !b.aired ? `E${b.e} sin emitir` : b.hidden ? `E${b.e} oculta` : b.rating ? `E${b.e} ${b.rating}` : `E${b.e} sin nota`).join(', ')}.`;
+
+// --- Reparto y equipo de la temporada (aggregate_credits) -----------------------------------------
+const epWord = (n: number) => `${n} ${n === 1 ? 'episodio' : 'episodios'}`;
+const cast = ((s?.aggregate_credits?.cast ?? []) as any[])
+    .slice().sort((a, b) => (Number(b.total_episode_count) || 0) - (Number(a.total_episode_count) || 0))
+    .slice(0, 24)
+    .map((p) => {
+        // En animación llega «Homer Simpson / Abe Simpson / Barney… (voice)»: el primero y «y N más».
+        const roles: string[] = (p.roles ?? []).flatMap((r: any) => String(r.character ?? '').split(' / ')).map((x: string) => x.replace(/\s*\(voice\)$/i, '').trim()).filter(Boolean);
+        const character = roles.length > 1 ? `${roles[0]} y ${roles.length - 1} más` : roles[0] ?? '';
+        return { id: p.id, name: p.name ?? '', character, profile_path: p.profile_path ?? null, eps: Number(p.total_episode_count) || 0 };
+    });
+const CAST_CAP = 8;
+const CREW_JOBS: [string, string[], number][] = [
+    ['Dirección', ['Director'], 6], ['Guion', ['Writer', 'Teleplay', 'Screenplay'], 6], ['Música', ['Original Music Composer', 'Composer', 'Music'], 2],
+];
+const crewRows = CREW_JOBS.flatMap(([label, jobs, cap]) => ((s?.aggregate_credits?.crew ?? []) as any[])
+    .map((p) => ({ name: String(p.name ?? ''), eps: (p.jobs ?? []).filter((j: any) => jobs.includes(j.job)).reduce((n: number, j: any) => Math.max(n, Number(j.episode_count) || 0), 0) }))
+    .filter((p) => p.name && p.eps > 0)
+    .sort((a, b) => b.eps - a.eps)
+    .slice(0, cap)
+    .map((p) => ({ label, ...p })));
+
+// --- Vídeos y pósters -------------------------------------------------------------------------------
+const VIDEO_TYPE: Record<string, string> = {
+    Trailer: 'Tráiler', Teaser: 'Avance', Featurette: 'Reportaje', 'Behind the Scenes': 'Detrás de las cámaras',
+    Clip: 'Clip', 'Opening Credits': 'Cabecera', Recap: 'Resumen', Bloopers: 'Tomas falsas',
+};
+const VIDEO_ORDER = ['Trailer', 'Teaser', 'Clip', 'Featurette', 'Behind the Scenes', 'Opening Credits', 'Recap', 'Bloopers'];
+const videos = ((s?.videos?.results ?? []) as any[])
+    .filter((v) => v.site === 'YouTube' && v.key)
+    .sort((a, b) => (VIDEO_ORDER.indexOf(a.type) + 1 || 99) - (VIDEO_ORDER.indexOf(b.type) + 1 || 99))
+    .slice(0, 4)
+    .map((v) => ({ key: String(v.key), name: String(v.name ?? ''), type: VIDEO_TYPE[v.type] ?? String(v.type ?? '') }));
+const posterList = posters.slice(0, 24);
+
+// --- Lateral --------------------------------------------------------------------------------------
+const regionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === region)?.label ?? region;
+const allProviders: any[] = where?.providersByCountry?.[region] ?? [];
+const lastAir = dated.at(-1) ?? null;
+const airedRuntimes = (tp?.eps ?? []).filter((x) => x.runtime);
+const avgRuntime = airedRuntimes.length ? runtimeLabel(Math.round(airedRuntimes.reduce((n, x) => n + x.runtime!, 0) / airedRuntimes.length)) : null;
+const topDirectors = crewRows.filter((r) => r.label === 'Dirección');
+const sideInfo = {
+    premiere: premiere ? mediumDate(premiere) : null,
+    premiereSmall: premiere ? relativeAgo(premiere, today) : '',
+    last: lastAir && lastAir !== premiere ? mediumDate(lastAir) : null,
+    lastSmall: lastAir && lastAir > today ? 'previsto' : '',
+    episodes: epCount ? `${epCount}` : null,
+    episodesSmall: counts && counts.aired.length < epCount ? (counts.aired.length ? `${counts.aired.length} emitidos` : 'títulos sin anunciar') : '',
+    runtime: totalRuntime && status !== 'announced' ? totalRuntime : null,
+    runtimeSmall: avgRuntime ? `${avgRuntime} de media` : '',
+    score: score,
+    scoreSmall: voted.length ? `media de ${epWord(voted.length)}` : '',
+    // Mejor episodio: sin spoilers, solo si has visto toda la temporada (si no, delata notas).
+    best: best && (!spoilerFree || !counts?.remaining.length) ? `E${best.e} · ${best.name}` : null,
+    bestHref: best ? best.href : '',
+    bestSmall: best ? best.rating! : '',
+    director: topDirectors[0] ? topDirectors[0].name : null,
+    directorMore: topDirectors.length > 1 ? `y ${topDirectors.length - 1} más` : '',
+    createdBy: d?.series.created_by.map((c) => c.name).filter(Boolean) ?? [],
+};
+const side = tp ? seasonSide(tp) : '';
+
+const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
+---
+<Layout title={pageTitle} description={overview && !hideOverview ? overview : undefined} ogImage={s?.poster_path || d?.series.backdrop_path || undefined}>
+    {missing ? (
+        <section class="ep-404">
+            <p class="ep-404-k">Error 404 · Temporada</p>
+            <h1>Esta temporada no existe</h1>
+            <p>{missing.series ? `${missing.series.name} no tiene ${season === 0 ? 'especiales' : `una temporada ${season ?? ''}`}.` : 'No encontramos esta serie ni esta temporada.'}</p>
+            <div class="ep-404-b">
+                {missing.series ? <a class="pf-btn pri" href={`/serie/${missing.series.id}`}>Ver la serie</a> : <a class="pf-btn pri" href="/">Volver al inicio</a>}
+            </div>
+        </section>
+    ) : d && (
+        <article class="ep tp">
+            <!-- Cabecera -->
+            <header class="eh tph">
+                {d.series.backdrop_path && <div class="eh-bg" style={`background-image:url(${backdropUrl(d.series.backdrop_path, 'w1280')})`}></div>}
+                <div class="eh-in">
+                    <nav class="eh-cr" aria-label="Migas">
+                        <a href="/">Inicio</a><i>/</i>
+                        <a href="/catalogo/topseries">Series</a><i>/</i>
+                        <a href={`/serie/${id}`}>{seriesName}</a><i>/</i>
+                        <b>{seasonLabel(season!)}</b>
+                    </nav>
+                    {poster ? (
+                        <div class="tpo">
+                            <img src={posterUrl(poster, 'w342')} alt={`Póster de ${title}`} width="200" height="300" />
+                            {posters.length > 1 && <a class="cnt" href="#posters" aria-label={`Ver los ${posters.length} pósters de la temporada`}><Icon name="lucide:image" aria-hidden="true" />{posters.length}</a>}
+                        </div>
+                    ) : (
+                        <div class="tpo none"><span>Esta temporada aún no tiene póster</span></div>
+                    )}
+                    <div class="eh-tx">
+                        <a class="eh-sr" href={`/serie/${id}`}>
+                            {d.series.poster_path && <img src={posterUrl(d.series.poster_path, 'w92')} alt="" width="30" height="45" />}
+                            <b>{seriesName}</b>
+                            {seriesOriginal && <i class="eh-sr-o" lang={d.series.original_language || undefined}>{seriesOriginal}</i>}
+                            <span>Ver la serie<Icon name="lucide:chevron-right" /></span>
+                        </a>
+                        <div class="tph-hd">
+                            <div class="eh-k">
+                                <span class="se">{kicker}</span>
+                                {season === 0 && (
+                                    <span class="etag" style={`--sb:var(--stamp-${TAG_STYLE.special.color});--si:var(--stamp-${TAG_STYLE.special.color}-ink)`}>
+                                        <Icon name={`lucide:${TAG_STYLE.special.icon}`} aria-hidden="true" />{TAG_STYLE.special.label}
+                                    </span>
+                                )}
+                                {status && (
+                                    <span class="etag" style={`--sb:var(--stamp-${SEASON_STATUS_STYLE[status].color});--si:var(--stamp-${SEASON_STATUS_STYLE[status].color}-ink)`}>
+                                        <Icon name={`lucide:${SEASON_STATUS_STYLE[status].icon}`} aria-hidden="true" />{SEASON_STATUS_STYLE[status].label}
+                                    </span>
+                                )}
+                            </div>
+                            <h1>{title}{titleSub && <small>{titleSub}</small>}</h1>
+                            <div class="eh-m">
+                                <span><Icon name="lucide:list" aria-hidden="true" />{epCount ? `${epCount} ${epCount === 1 ? 'episodio' : 'episodios'}` : 'Sin episodios anunciados'}</span>
+                                {totalRuntime && status !== 'announced' && <span><Icon name="lucide:clock" aria-hidden="true" />{totalRuntime}</span>}
+                                {score && <span class="sc"><Icon name="lucide:star" aria-hidden="true" />{score}<small>&nbsp;media TMDB</small></span>}
+                                {range && <span><Icon name="lucide:calendar" aria-hidden="true" />{range}</span>}
+                            </div>
+                        </div>
+                        <div class="tph-bd">
+                            {overview && (hideOverview ? (
+                                <div class="yf-spoil tsp-box">
+                                    <p class="tsyn yf-blur" aria-hidden="true" inert>{overview}</p>
+                                    <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar sinopsis</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <p class="tsyn" data-tsyn>{overview}</p>
+                                    <button type="button" class="tmore" data-tmore aria-expanded="false" hidden>Leer más</button>
+                                </>
+                            ))}
+                            {nextLine && <p class="tfact"><Icon name="lucide:calendar-clock" aria-hidden="true" />{nextLine}</p>}
+                            {schedule && <p class="tfact"><Icon name="lucide:calendar" aria-hidden="true" />{schedule}</p>}
+                            {status === 'announced' && (cd ? (
+                                <div class="tcd" role="img" aria-label={cdLabel}>
+                                    <span class="k">SE ESTRENA EN</span>
+                                    <span class="n">{cd.n}{cd.unit && <small>{cd.unit}</small>}</span>
+                                    <span class="d">{longDate(premiere!, today)}</span>
+                                </div>
+                            ) : (
+                                <p class="tfact"><Icon name="lucide:calendar-clock" aria-hidden="true" />{noCountdown}</p>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <!-- Barra «Tu temporada»: la acción principal, lo que llevas y compartir / ver -->
+            {bar && (
+                <div class="ea tea" role="region" aria-label="Tu temporada" data-tp-bar>
+                    <div class="tea-slot" data-tp-main set:html={bar.main}></div>
+                    <div class="tea-slot" data-tp-state set:html={bar.state}></div>
+                    <div class="ea-r">
+                        <div class="tea-slot" data-tp-rest set:html={bar.rest}></div>
+                        {SOCIAL_PHASE.recommend && user && (
+                            <button type="button" class="pf-btn sm" data-recommend data-target-type="tv" data-target-id={id} data-title={seriesName} data-image={d.series.poster_path} aria-haspopup="dialog" aria-expanded="false">
+                                <Icon name="lucide:send" aria-hidden="true" />Recomendar
+                            </button>
+                        )}
+                        {SOCIAL_PHASE.messages && user && (
+                            <button type="button" class="pf-btn sm" data-send-to data-media-type="tv" data-tmdb-id={id} data-title={seriesName} data-image={d.series.poster_path}
+                                data-msg={sendMsg} aria-haspopup="dialog" aria-expanded="false">
+                                <Icon name="lucide:forward" aria-hidden="true" />Enviar a…
+                            </button>
+                        )}
+                        {provider && providerLink && (
+                            <a class="pf-btn sm ea-pv" href={providerLink} target="_blank" rel="noopener">
+                                <Icon name="lucide:tv" aria-hidden="true" /><span>Ver en {provider.provider_name}</span>
+                            </a>
+                        )}
+                    </div>
+                    <p class="ea-err" role="alert" data-tp-err hidden><Icon name="lucide:circle-alert" aria-hidden="true" />No se ha podido guardar. Vuelve a intentarlo.</p>
+                    <p class="sr-only" aria-live="polite" data-tp-live></p>
+                </div>
+            )}
+            {tp && <script type="application/json" id="tp-data" set:html={JSON.stringify(tp).replace(/</g, '\\u003c')} />}
+
+            <!-- Navegación: temporada anterior · tira de temporadas · siguiente -->
+            <div class:list={['en', 'tnv', { solo: !showCards }]}>
+                {showCards && (prevCard ? (
+                    <a class="enc" href={prevCard.href} aria-label={`Temporada anterior: ${prevCard.title}`}>
+                        <span class:list={['th', { ph: !prevCard.thumb }]}>{prevCard.thumb && <img src={posterUrl(prevCard.thumb, 'w92')} alt="" loading="lazy" />}</span>
+                        <span class="tx">
+                            <span class="k"><Icon name="lucide:chevron-left" aria-hidden="true" />Anterior</span>
+                            <b>{prevCard.title}</b>
+                            <span class="s">{prevCard.done && <Icon name="lucide:check" aria-hidden="true" />}{prevCard.text}</span>
+                        </span>
+                    </a>
+                ) : (
+                    <span class="enc off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Anterior</span><b>Es la primera</b></span></span>
+                ))}
+
+                <nav class="etr" aria-label="Temporadas">
+                    <div class="etr-h">
+                        {picker.length > 1 && (
+                            <details class="ssel">
+                                <summary aria-label={`Temporada: ${seasonLabel(season!)}. Cambiar de temporada`}>{season === 0 ? 'Esp.' : `T${season}`}<Icon name="lucide:chevron-down" aria-hidden="true" /></summary>
+                                <ul>
+                                    {picker.map((x) => (
+                                        <li><a href={x.href} aria-current={x.cur ? 'true' : undefined}>
+                                            <span>{x.label}{x.year && <small class="y"> · {x.year}</small>}</span>
+                                            <small class:list={{ ok: x.done }}>{x.done && <Icon name="lucide:check" aria-hidden="true" />}{x.prog}</small>
+                                        </a></li>
+                                    ))}
+                                </ul>
+                            </details>
+                        )}
+                        <span>{onlyOne ? 'Es su única temporada' : seasonsCaption}</span>
+                        <a href={`/serie/${id}`}>Ver la serie<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                    </div>
+                    {onlyOne ? (
+                        <p class="tnv-one"><Icon name="lucide:layers" aria-hidden="true" />No hay temporada anterior ni siguiente.</p>
+                    ) : (
+                        <ol data-tp-strip>
+                            {chips.map((c) => (
+                                <>
+                                    {c.sp && <li class="sp" aria-hidden="true">·</li>}
+                                    <li class:list={[{ w: c.done, u: c.announced, cur: c.cur, esp: c.n === 0 }]} aria-current={c.cur ? 'page' : undefined} data-tp-chip={c.cur ? '' : undefined}>
+                                        <a href={c.href} aria-label={c.aria}>{c.label}<small>{c.small}</small>{c.pct != null && <span class="pb"><i style={`width:${c.pct}%`}></i></span>}</a>
+                                    </li>
+                                </>
+                            ))}
+                        </ol>
+                    )}
+                </nav>
+
+                {showCards && (nextCard ? (
+                    <a class="enc nx" href={nextCard.href} aria-label={`Temporada siguiente: ${nextCard.title}`}>
+                        <span class:list={['th', { ph: !nextCard.thumb }]}>{nextCard.thumb && <img src={posterUrl(nextCard.thumb, 'w92')} alt="" loading="lazy" />}</span>
+                        <span class="tx">
+                            <span class="k">Siguiente<Icon name="lucide:chevron-right" aria-hidden="true" /></span>
+                            <b>{nextCard.title}</b>
+                            <span class="s">{nextCard.done && <Icon name="lucide:check" aria-hidden="true" />}{nextCard.text}</span>
+                        </span>
+                    </a>
+                ) : (
+                    <span class="enc nx off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Siguiente</span><b>Es la última</b></span></span>
+                ))}
+            </div>
+            <!-- Cuerpo: episodios (y, en el paso 4, notas, reparto, vídeos y el lateral) -->
+            {d && (
+                <div class="eb tpb">
+                    <div class="eb-m">
+                        {/* Anunciada: el tráiler es lo más interesante que hay, así que sube arriba. */}
+                        {status === 'announced' && videos.length > 0 && (
+                            <section aria-labelledby="tp-vids-top">
+                                <SectionHeader title="Vídeos de la temporada" icon="play" color="red" cap={`${videos.length} ${videos.length === 1 ? 'vídeo' : 'vídeos'}`} headingId="tp-vids-top" />
+                                <div class="vids">
+                                    {videos.map((v) => (
+                                        <figure class="vid">
+                                            <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                            <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                        {rows.length === 0 && (
+                            <section aria-labelledby="tp-eps">
+                                <SectionHeader title="Episodios" icon="list" color="blue" headingId="tp-eps" />
+                                <p class="syn-e"><Icon name="lucide:clock" aria-hidden="true" />Aún no hay episodios anunciados. TMDB suele publicarlos unas semanas antes del estreno.</p>
+                            </section>
+                        )}
+                        {rows.length > 0 && (
+                        <section aria-labelledby="tp-eps" data-tp-list>
+                            <SectionHeader title="Episodios" icon="list" color="blue" headingId="tp-eps"
+                                cap={counts!.aired.length < rows.length ? `${rows.length} ${counts!.aired.length ? 'episodios' : 'anunciados'}${counts!.aired.length ? ` · ${counts!.aired.length} emitidos` : ''}` : `${rows.length} episodios`} />
+                            <div class="tl-h">
+                                {tp!.logged && (
+                                    <div class="tl-seg" role="radiogroup" aria-label="Qué episodios" data-tp-filter hidden={!unseenCount || unseenCount === counts!.aired.length}>
+                                        <button type="button" role="radio" aria-checked="true" data-f="all">Todos</button>
+                                        <button type="button" role="radio" aria-checked="false" data-f="unseen">Sin ver · <span data-tp-unseen>{unseenCount}</span></button>
+                                    </div>
+                                )}
+                                <span class="sp"></span>
+                                {hiddenRows > 0 && (
+                                    <span class="tl-hid" data-tp-hidden>
+                                        <Icon name="lucide:eye-off" aria-hidden="true" />{hiddenRows} sin ver con spoilers ocultos
+                                        <button type="button" data-tp-reveal-all>Mostrar todo</button>
+                                    </span>
+                                )}
+                                <div class="tl-seg ic" role="radiogroup" aria-label="Vista de la lista" data-tp-density>
+                                    <button type="button" role="radio" aria-checked={compact ? 'false' : 'true'} data-d="img" aria-label="Con fotogramas" title="Con fotogramas"><Icon name="lucide:layout-grid" aria-hidden="true" /></button>
+                                    <button type="button" role="radio" aria-checked={compact ? 'true' : 'false'} data-d="cmp" aria-label="Compacta" title="Compacta"><Icon name="lucide:list" aria-hidden="true" /></button>
+                                </div>
+                            </div>
+                            <div class:list={['tl', { cmp: compact, folded: foldAt > 0 }]} role="list" data-tp-rows data-default={compact ? 'cmp' : 'img'}>
+                                {rows.map((r, i) => (
+                                    <div class:list={['tr', { w: r.seen, u: !r.aired, nx: r.e === nextE, xtra: foldAt > 0 && i >= foldAt }]} role="listitem" data-tp-row={r.e} id={`e${r.e}`}
+                                        aria-label={`E${r.e}, ${r.name}${r.tag ? `, ${r.tag.label.toLowerCase()}` : ''}`}>
+                                        {!r.aired ? (
+                                            <span class="th no" aria-hidden="true"><b>{r.air ? r.date.replace(/ \d{4}$/, '') : 'Sin fecha'}</b><span>{r.soon}</span></span>
+                                        ) : r.still ? (r.hideStill ? (
+                                            <div class="th yf-spoil">
+                                                <img class="yf-blur" src={r.still} alt="" loading="lazy" aria-hidden="true" inert />
+                                                <button type="button" class="yf-spoil-btn" aria-label={`Mostrar el fotograma del E${r.e}`}><Icon name="lucide:eye" aria-hidden="true" />Mostrar</button>
+                                            </div>
+                                        ) : (
+                                            <a class="th" href={r.href} tabindex="-1" aria-hidden="true"><img src={r.still} alt="" loading="lazy" /></a>
+                                        )) : (
+                                            <span class="th none" aria-hidden="true"><Icon name="lucide:image-off" /></span>
+                                        )}
+                                        <div class="tx">
+                                            <div class="l1">
+                                                <span class="c">E{r.e}</span>
+                                                <a class="t" href={r.href}>{r.name}</a>
+                                                <span class="ttoca"><Icon name="lucide:play" aria-hidden="true" />Te toca</span>
+                                                {r.tag && (
+                                                    <span class="etag" style={`--sb:var(--stamp-${r.tag.color});--si:var(--stamp-${r.tag.color}-ink)`}>
+                                                        <Icon name={`lucide:${r.tag.icon}`} aria-hidden="true" />{r.tag.label}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div class="l2">
+                                                <span>{r.date}</span>
+                                                {r.runtime && <span><Icon name="lucide:clock" aria-hidden="true" />{r.runtime}</span>}
+                                                {r.rating && (r.hideRating ? (
+                                                    <>
+                                                        <span class="mu" data-tp-rh><Icon name="lucide:eye-off" aria-hidden="true" />Nota oculta</span>
+                                                        <span class="r" data-tp-r hidden><Icon name="lucide:star" aria-hidden="true" />{r.rating}</span>
+                                                    </>
+                                                ) : (
+                                                    <span class="r"><Icon name="lucide:star" aria-hidden="true" />{r.rating}</span>
+                                                ))}
+                                                <span class="ok" data-tp-seen hidden={!r.seen}><Icon name="lucide:check" aria-hidden="true" /><span>{r.seenText}</span></span>
+                                            </div>
+                                            {r.overview && (r.hideSyn ? (
+                                                <div class="syn2 yf-spoil txt-sm">
+                                                    <p class="yf-blur" aria-hidden="true" inert>{r.overview}</p>
+                                                    <button type="button" class="yf-spoil-btn" aria-label={`Mostrar la sinopsis del E${r.e}`}><Icon name="lucide:eye" aria-hidden="true" />Mostrar</button>
+                                                </div>
+                                            ) : (
+                                                <p class="syn2">{r.overview}</p>
+                                            ))}
+                                            {r.crewLine && <p class="crew">{r.crewLine}</p>}
+                                        </div>
+                                        <div class="act">
+                                            {r.aired ? (
+                                                <button type="button" class="tvb" aria-pressed={r.seen ? 'true' : 'false'} data-tp-row-btn
+                                                    aria-label={r.seen ? `E${r.e} visto. Pulsa para desmarcar` : `Marcar el E${r.e} como visto`}>
+                                                    <Icon class="on" name="lucide:check-check" aria-hidden="true" /><Icon class="off" name="lucide:eye" aria-hidden="true" /><span>Visto</span>
+                                                </button>
+                                            ) : (
+                                                <button type="button" class="tvb dis" disabled aria-label={`E${r.e}: aún no se ha emitido`}><Icon name="lucide:calendar-clock" aria-hidden="true" /><span>Sin emitir</span></button>
+                                            )}
+                                            <a href={r.href} aria-label={`Ficha del E${r.e}`}>Ficha<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            {foldAt > 0 && (
+                                <div class="tl-more"><button type="button" class="pf-btn sm" data-tp-more aria-expanded="false"><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar los {rows.length} episodios</button></div>
+                            )}
+                            <p class="tl-empty" data-tp-empty hidden>Ya has visto todos los episodios emitidos.</p>
+                        </section>
+                        )}
+
+                        {rated.length > 0 && (
+                            <section aria-labelledby="tp-notes">
+                                <SectionHeader title="Notas por episodio" icon="chart-column" color="purple" cap="TMDB" headingId="tp-notes" />
+                                {/* Todas ocultas: diez barras de «?» no dicen nada, así que una tarjeta con «Mostrar». */}
+                                {shown.length === 0 && (
+                                    <div class="tch-hide" data-tp-chart-hide>
+                                        <Icon name="lucide:eye-off" aria-hidden="true" />
+                                        <span><b>Ocultas hasta que los veas</b><small>Las notas de los {hiddenRatings} episodios sin ver, por el modo sin spoilers.</small></span>
+                                        <button type="button" class="pf-btn sm" data-tp-chart-show><Icon name="lucide:eye" aria-hidden="true" />Mostrar</button>
+                                    </div>
+                                )}
+                                <figure class="tch" data-tp-chart hidden={shown.length === 0} tabindex="-1">
+                                    <div class="tch-main">
+                                        <div class="tch-g" aria-hidden="true" style={`--n:${bars.length}`}>
+                                            {[10, 9, 8, 7, 6, 5, 4].filter((v) => v > chartLo).map((v) => (
+                                                <span class="gl" style={`bottom:${26 + Math.round(((v - chartLo) / (10 - chartLo)) * CH_H)}px`}><span>{v}</span></span>
+                                            ))}
+                                            {bars.map((b) => (
+                                                <div class:list={['tch-b', { u: !b.aired, nr: b.aired && !b.rating, hid: b.hidden, nw: tp!.logged && !b.seen, best: b.best, worst: b.worst, cur: b.e === nextE }]}
+                                                    style={`--c:var(--ep-q-${b.band})`} data-tp-bar={b.e} data-v={b.hidden ? b.rating : undefined} data-h={b.hidden ? b.h : undefined}>
+                                                    {b.best && <span class="tg">Mejor</span>}
+                                                    {b.worst && <span class="tg">Peor</span>}
+                                                    <span class="v">{!b.aired || !b.rating ? '' : b.hidden ? '?' : b.rating}</span>
+                                                    <span class="bar" style={b.rating && !b.hidden ? `height:${b.h}px` : undefined}></span>
+                                                    {tp!.logged && b.seen && <span class="dot"></span>}
+                                                    <span class="e">{bars.length > 14 ? b.e : `E${b.e}`}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <figcaption class="sr-only">{chartAlt}</figcaption>
+                                        <div class="tch-lg">
+                                            {legend.map(([k, l]) => <span><i style={`--c:var(--ep-q-${k})`}></i>{l}</span>)}
+                                            {tp!.logged && <span><i class="o" style="--c:var(--ep-q-med)"></i>sin ver</span>}
+                                            {hiddenRatings > 0 && <span><i class="h"></i>oculta (sin spoilers)</span>}
+                                            {tp!.logged && <a href="/perfil/apariencia">Cambiar colores</a>}
+                                        </div>
+                                    </div>
+                                    <div class="tch-s">
+                                        {best && <div><span>Mejor</span><b><a href={best.href}>E{best.e} · {best.name}</a> <small>{best.rating}</small></b></div>}
+                                        {worst && <div><span>Peor</span><b><a href={worst.href}>E{worst.e} · {worst.name}</a> <small>{worst.rating}</small></b></div>}
+                                        {avgShown && <div><span>Media</span><b>{avgShown}<small> · {epWord(shown.length)}</small></b></div>}
+                                        {hiddenRatings > 0 && <div data-tp-hidden-n><span>Ocultas</span><b>{hiddenRatings}<small> hasta que las veas</small></b></div>}
+                                    </div>
+                                </figure>
+                            </section>
+                        )}
+
+                        {cast.length > 0 && (
+                            <section aria-labelledby="tp-cast">
+                                <SectionHeader title="Reparto de la temporada" icon="users" color="blue" cap={`${(s.aggregate_credits?.cast ?? []).length} personas`} headingId="tp-cast" />
+                                <div class="cast-b" data-cast>
+                                    <div class="pcg">
+                                        {cast.map((p, i) => (
+                                            <a class:list={['pc', { xtra: i >= CAST_CAP }]} href={`/actor/${p.id}`}>
+                                                {p.profile_path ? <img src={posterUrl(p.profile_path, 'w185')} alt="" loading="lazy" /> : <span class="pc-ph" aria-hidden="true">{p.name.charAt(0)}</span>}
+                                                <span class="pc-t"><b>{p.name}</b><span>{p.character}</span>{p.eps > 0 && <em><Icon name="lucide:list" aria-hidden="true" />{epWord(p.eps)}</em>}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                    {cast.length > CAST_CAP && <button type="button" class="more" aria-expanded="false" data-more><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar {cast.length === (s.aggregate_credits?.cast ?? []).length ? `las ${cast.length}` : `las ${cast.length} principales`}</button>}
+                                </div>
+                            </section>
+                        )}
+
+                        {crewRows.length > 0 && (
+                            <section aria-labelledby="tp-crew">
+                                <SectionHeader title="Dirección y guion" icon="clapperboard" color="slate" headingId="tp-crew" />
+                                <dl class="tcw">
+                                    {crewRows.map((r) => (
+                                        <div><dt>{r.label}</dt><dd><a href={`/team/${encodeURIComponent(r.name)}`}>{r.name}</a></dd><small>{epWord(r.eps)}</small></div>
+                                    ))}
+                                </dl>
+                            </section>
+                        )}
+
+                        {status !== 'announced' && videos.length > 0 && (
+                            <section aria-labelledby="tp-vids">
+                                <SectionHeader title="Vídeos de la temporada" icon="play" color="red" cap={`${videos.length} ${videos.length === 1 ? 'vídeo' : 'vídeos'}`} headingId="tp-vids" />
+                                <div class="vids">
+                                    {videos.map((v) => (
+                                        <figure class="vid">
+                                            <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                            <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
+                        {posterList.length > 1 && (
+                            <section aria-labelledby="tp-posters" id="posters">
+                                <SectionHeader title="Pósters de la temporada" icon="image" color="purple" cap={`${posters.length} pósters`} headingId="tp-posters" />
+                                <div class="tpg">
+                                    {posterList.map((p, i) => (
+                                        <a href={`#poster-${i}`} aria-label={`Póster ${i + 1} de ${posterList.length}`}><img src={posterUrl(p, 'w185')} alt="" loading="lazy" /></a>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                    </div>
+
+                    <aside class="eb-s">
+                        <div class="tea-slot" data-tp-side set:html={side}></div>
+
+                        <section class="esc" aria-labelledby="tp-info">
+                            <h3 id="tp-info">{season === 0 ? 'Los especiales' : 'Esta temporada'}</h3>
+                            <dl>
+                                <dt>Estreno</dt>
+                                <dd>{sideInfo.premiere ? <>{sideInfo.premiere}{sideInfo.premiereSmall && <small>{sideInfo.premiereSmall}</small>}</> : <span class="mu">Por anunciar</span>}</dd>
+                                {sideInfo.last && <><dt>Final</dt><dd>{sideInfo.last}{sideInfo.lastSmall && <small>{sideInfo.lastSmall}</small>}</dd></>}
+                                <dt>Episodios</dt>
+                                <dd>{sideInfo.episodes ?? <span class="mu">Sin anunciar</span>}{sideInfo.episodesSmall && <small>{sideInfo.episodesSmall}</small>}</dd>
+                                <dt>Duración</dt>
+                                <dd>{sideInfo.runtime ? <>{sideInfo.runtime}{sideInfo.runtimeSmall && <small>{sideInfo.runtimeSmall}</small>}</> : <span class="mu">Sin confirmar</span>}</dd>
+                                <dt>Nota TMDB</dt>
+                                <dd>{sideInfo.score ? <span class="ep-rt"><Icon name="lucide:star" aria-hidden="true" />{sideInfo.score}{sideInfo.scoreSmall && <small>{sideInfo.scoreSmall}</small>}</span> : <span class="mu">{status === 'announced' ? 'Sin nota hasta que se emita' : 'Sin votos todavía'}</span>}</dd>
+                                {sideInfo.best && <><dt>Mejor</dt><dd><a href={sideInfo.bestHref}>{sideInfo.best}</a><small>★ {sideInfo.bestSmall}</small></dd></>}
+                                {(sideInfo.director || sideInfo.createdBy.length > 0) && <hr />}
+                                {sideInfo.director && <><dt>Dirección</dt><dd><a href={`/team/${encodeURIComponent(sideInfo.director)}`}>{sideInfo.director}</a>{sideInfo.directorMore && ` ${sideInfo.directorMore}`}</dd></>}
+                                {sideInfo.createdBy.length > 0 && <><dt>Creada por</dt><dd>{sideInfo.createdBy.map((n, i) => <>{i > 0 && (i === sideInfo.createdBy.length - 1 ? ' y ' : ', ')}<a href={`/team/${encodeURIComponent(n)}`}>{n}</a></>)}</dd></>}
+                            </dl>
+                        </section>
+
+                        <section class="esc" aria-labelledby="tp-where">
+                            <h3 id="tp-where">{providersFromSeries ? 'Dónde ver la serie' : `Dónde ver ${season === 0 ? 'los especiales' : `la T${season}`}`}<small>{regionLabel}</small></h3>
+                            {allProviders.length > 0 ? (
+                                <ul class="prv">
+                                    {allProviders.slice(0, 6).map((p) => (
+                                        <li class="prv-r">
+                                            {p.logo_path ? <img src={posterUrl(p.logo_path, 'w92')} alt="" loading="lazy" /> : <span class="lg" aria-hidden="true">{p.provider_name.slice(0, 2)}</span>}
+                                            <span>{p.provider_name}<small>{PROVIDER_KIND[p.type] ?? ''}</small></span>
+                                            {providerLink && <a class="pf-btn sm" href={providerLink} target="_blank" rel="noopener" aria-label={`Ver en ${p.provider_name}`}>Ver</a>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p class="prv-e">{status === 'announced' ? 'Aún no está en ninguna plataforma.' : `No está en plataformas de ${regionLabel} ahora mismo.`}</p>
+                            )}
+                            {providersFromSeries && <p class="prv-note">No hay datos de {season === 0 ? 'los especiales' : 'esta temporada'} en concreto: es lo de la serie entera, así que puede que {season === 0 ? 'no estén' : 'aún no esté'} {season === 0 ? 'todos' : 'incluida'}.</p>}
+                            <p class="prv-jw">Disponibilidad por <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a></p>
+                        </section>
+
+                        <FriendsSeen mediaType="tv" tmdbId={id!} note="de la serie" />
+                    </aside>
+                </div>
+            )}
+
+            <!-- Visor de pósters (CSS :target de detail-common.css, como el de fotogramas del episodio) -->
+            {posterList.length > 1 && posterList.map((p, i) => (
+                <div id={`poster-${i}`} class="lightbox ep-lb" role="dialog" aria-label={`Póster ${i + 1} de ${posterList.length}`}>
+                    <a href="#posters" class="ep-lb-x" aria-label="Cerrar"></a>
+                    <img src={posterUrl(p, 'w780')} alt={`Póster ${i + 1} de ${title}`} loading="lazy" />
+                    <a href="#posters" class="ep-lb-c" aria-label="Cerrar">&times;</a>
+                    {i > 0 && <a href={`#poster-${i - 1}`} class="ep-lb-p" aria-label="Anterior"><Icon name="lucide:chevron-left" /></a>}
+                    {i < posterList.length - 1 && <a href={`#poster-${i + 1}`} class="ep-lb-n" aria-label="Siguiente"><Icon name="lucide:chevron-right" /></a>}
+                </div>
+            ))}
+        </article>
+    )}
+</Layout>
+
+<script>
+    import '../../../../scripts/shared/spoil';
+    import '../../../../scripts/serie/season';
+    import '../../../../scripts/serie/seasonList';
+
+    // La tira de temporadas, centrada en la actual y con el borde difuminado por donde quedan más.
+    const strip = document.querySelector<HTMLElement>('[data-tp-strip]');
+    const cur = strip?.querySelector<HTMLElement>('li[aria-current="page"]');
+    if (strip && cur && strip.scrollWidth > strip.clientWidth) {
+        const delta = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left;
+        strip.scrollLeft += delta - (strip.clientWidth - cur.clientWidth) / 2;
+    }
+    if (strip) {
+        const fades = () => {
+            const max = strip.scrollWidth - strip.clientWidth;
+            strip.classList.toggle('fade-l', strip.scrollLeft > 2);
+            strip.classList.toggle('fade-r', strip.scrollLeft < max - 2);
+        };
+        fades();
+        strip.addEventListener('scroll', fades, { passive: true });
+        window.addEventListener('resize', fades);
+    }
+
+    // «Mostrar las N» del reparto: despliega en el sitio.
+    document.querySelectorAll<HTMLButtonElement>('[data-more]').forEach((b) => {
+        b.addEventListener('click', () => {
+            const box = b.closest<HTMLElement>('[data-cast]');
+            const open = !box?.classList.contains('is-open');
+            box?.classList.toggle('is-open', open);
+            b.setAttribute('aria-expanded', String(open));
+            b.hidden = open;
+        });
+    });
+
+    // El selector de temporada se cierra al pulsar fuera o con Escape.
+    const sel = document.querySelector<HTMLDetailsElement>('.ssel');
+    document.addEventListener('click', (e) => { if (sel?.open && !sel.contains(e.target as Node)) sel.open = false; });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel?.open) { sel.open = false; sel.querySelector('summary')?.focus(); } });
+
+    // «Leer más» solo si la sinopsis no cabe en sus tres líneas; despliega en el sitio.
+    const syn = document.querySelector<HTMLElement>('[data-tsyn]');
+    const more = document.querySelector<HTMLButtonElement>('[data-tmore]');
+    if (syn && more && syn.scrollHeight > syn.clientHeight + 2) {
+        more.hidden = false;
+        more.addEventListener('click', () => {
+            const open = syn.classList.toggle('open');
+            more.setAttribute('aria-expanded', String(open));
+            more.textContent = open ? 'Leer menos' : 'Leer más';
+        });
+    }
+</script>

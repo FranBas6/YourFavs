@@ -6,6 +6,7 @@ import {fetchSerieDetails} from "../../services/API/Series/tmdbSeries";
 import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
+import {seasonHref} from "../../utils/episodeView";
 import {processBatch} from "../../utils/processBatch";
 import ListsNav from "../../components/personal/ListsNav.astro";
 import ListTitle from "../../components/personal/ListTitle.astro";
@@ -219,7 +220,7 @@ const pageUrl = Astro.url;
                             </a>
                         ))}
                         {almostDoneSeason.map(({ serie, seasonNumber, watched, total, remaining }) => (
-                            <a href={`/serie/${serie.id}#season-${seasonNumber}`} class="snap-start group flex items-center gap-3 bg-white rounded-xl p-3 border border-violet-200 hover:border-violet-400 hover:shadow-md transition w-72 flex-shrink-0">
+                            <a href={seasonHref(serie.id, seasonNumber)} class="snap-start group flex items-center gap-3 bg-white rounded-xl p-3 border border-violet-200 hover:border-violet-400 hover:shadow-md transition w-72 flex-shrink-0">
                                 {serie.poster_path ? (
                                     <img src={posterUrl(serie.poster_path, 'w154')} alt={serie.name} class="w-12 h-16 object-cover rounded flex-shrink-0" loading="lazy"/>
                                 ) : (
@@ -255,7 +256,7 @@ const pageUrl = Astro.url;
                     </summary>
                     <div class="px-4 pb-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                         {abandonadas.map(({ serie, lastWatchedAt, watched, lastSeason }) => (
-                            <a href={`/serie/${serie.id}#season-${lastSeason}`} class="group/item flex items-center gap-3 bg-white rounded-xl p-3 border border-amber-200 hover:border-amber-400 hover:shadow-md transition">
+                            <a href={seasonHref(serie.id, lastSeason)} class="group/item flex items-center gap-3 bg-white rounded-xl p-3 border border-amber-200 hover:border-amber-400 hover:shadow-md transition">
                                 {serie.poster_path ? (
                                     <img src={posterUrl(serie.poster_path, 'w154')} alt={serie.name} class="w-12 h-16 object-cover rounded flex-shrink-0" loading="lazy"/>
                                 ) : (
