@@ -226,3 +226,15 @@ export function toTimestamp(dateValue: any): number {
     const ms = new Date(dateValue).getTime();
     return Number.isNaN(ms) ? 0 : ms;
 }
+
+/**
+ * El título original, solo si dice algo distinto del traducido («Severance» bajo «Separación»).
+ * Mayúsculas, acentos y signos no cuentan: «La Casa de Papel» y «La casa de papel» son el mismo. Y si el
+ * traducido ya lo lleva dentro («Del revés 2 (Inside Out 2)»), repetirlo debajo no aporta nada.
+ */
+export function distinctOriginalTitle(title: string | null | undefined, original: string | null | undefined): string | null {
+    const o = (original ?? '').trim();
+    if (!o) return null;
+    const norm = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    return norm(title ?? '').includes(norm(o)) ? null : o;
+}
