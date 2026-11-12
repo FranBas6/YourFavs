@@ -10,10 +10,17 @@
  *   · `action: 'unmark'` → desmarcar (también idempotente);
  *   · `episodes: [1, 2…]` → marcar varios de la temporada a la vez («Marcarlos»);
  *   · la temporada 0 (especiales).
+ * La ficha de temporada, además:
+ *   · `action: 'unmark'` con `episodes: […]` → desmarcar varios; devuelve `removed` (con su fecha) para
+ *     poder deshacer. `unlog: true` los quita también del diario (deshacer un «Marcar» recién hecho);
+ *     sin él, el diario se queda, como al vaciar una temporada en el acordeón;
+ *   · `restore: [{ episode, watched_at }]` → «Deshacer» de lo anterior: los vuelve a marcar con su fecha.
  * Sin `action` hace lo de siempre. Devuelve `watchedAt` (el instante guardado) al marcar uno.
  */
 import type { APIRoute } from 'astro';
-import { markWatchedEpisode, markWatchedEpisodes, unmarkWatchedEpisode, getWatchedProgress } from '../../../services/BD/series/yourfavsSerie';
+import {
+    markWatchedEpisode, markWatchedEpisodes, unmarkWatchedEpisode, unmarkWatchedEpisodes, restoreWatchedEpisodes, getWatchedProgress,
+} from '../../../services/BD/series/yourfavsSerie';
 
 export const prerender = false;
 
@@ -33,9 +40,26 @@ export const POST: APIRoute = async ({ request, locals }) => {
             return json({ ok: false, error: 'Parámetros inválidos' }, 400);
         }
 
+        if (Array.isArray(body?.restore)) {
+            // Solo fechas válidas y no futuras; lo demás, como si no la tuviera (se marca con la de ahora).
+            const now = Date.now();
+            const rows = (body.restore as any[]).slice(0, MAX_EPISODES).map((r) => {
+                const ep = Number(r?.episode);
+                const t = typeof r?.watched_at === 'string' ? Date.parse(r.watched_at) : NaN;
+                return { episode: ep, watched_at: Number.isFinite(t) && t <= now ? new Date(t).toISOString() : null };
+            }).filter((r) => Number.isInteger(r.episode) && r.episode >= 1);
+            if (!rows.length) return json({ ok: false, error: 'Parámetros inválidos' }, 400);
+            const restored = await restoreWatchedEpisodes(serieId, season, rows);
+            return json({ ok: true, restored }, 200);
+        }
+
         if (Array.isArray(body?.episodes)) {
             const eps = [...new Set<number>(body.episodes.map(Number))].filter((n) => Number.isInteger(n) && n >= 1).slice(0, MAX_EPISODES);
             if (!eps.length) return json({ ok: false, error: 'Parámetros inválidos' }, 400);
+            if (action === 'unmark') {
+                const removed = await unmarkWatchedEpisodes(serieId, season, eps, { unlog: body?.unlog === true });
+                return json({ ok: true, removed }, 200);
+            }
             const marked = await markWatchedEpisodes(serieId, season, eps);
             return json({ ok: true, marked }, 200);
         }

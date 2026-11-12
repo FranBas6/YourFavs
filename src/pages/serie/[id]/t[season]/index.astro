@@ -8,6 +8,10 @@
  *
  *   · Cabecera (`.eh.tph`): la de la ficha de episodio con el póster de la temporada a la izquierda;
  *     sinopsis o, si TMDB no la tiene (lo normal), cómo se emitió; cuenta atrás si está anunciada.
+ *   · Barra «Tu temporada» (`.ea.tea`, paso 2): la pinta `utils/seasonView.ts::seasonBar`, aquí y en el
+ *     navegador (`scripts/serie/season.ts`) al marcar sin recargar. Recomendar, Enviar a… y la plataforma.
+ *   · Navegación (`.en`): temporada anterior y siguiente, la tira de temporadas con tu progreso
+ *     (especiales aparte) y el selector.
  */
 import Layout from '../../../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
@@ -18,12 +22,17 @@ import '../../../../styles/pages/serie/temporada.css';
 import { getSeasonDetail } from '../../../../services/API/Series/seasonDetail';
 import { getWatchedProgress } from '../../../../services/BD/series/yourfavsSerie';
 import { getSpoilerPref } from '../../../../services/BD/shared/spoilerPrefs';
-import { backdropUrl, posterUrl } from '../../../../services/API/shared/tmdbClient';
+import { getNotificationSub } from '../../../../services/BD/notifications/yourfavsNotifications';
+import { getCurrentRegion } from '../../../../services/BD/shared/userScope';
+import { getSeasonWatchProviders } from '../../../../services/API/Series/InfoSeries';
+import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/shared/tmdbClient';
+import { seasonBar, seasonCardStatus, seasonChip, type TpState } from '../../../../utils/seasonView';
 import { safeFetch } from '../../../../utils/safeFetch';
 import { distinctOriginalTitle } from '../../../../utils/constants/helpers/media-helpers';
 import {
-    airState, countdown, dateRange, decimal, episodeHref, isPlaceholderSeasonName, longDate, phraseDate, relativeAgo,
-    runtimeLabel, seasonLabel, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
+    airState, countdown, dateRange, decimal, episodeHref, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
+    relativeAgo, runtimeLabel, seasonHref, seasonLabel, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
 } from '../../../../utils/episodeView';
 
 // Mismos topes que la ficha de episodio: ids de serie de hasta 9 cifras, temporadas de hasta 4.
@@ -40,13 +49,15 @@ const missing = 'missing' in result ? result : null;
 const d = 'missing' in result ? null : result;
 if (missing) Astro.response.status = 404;
 
-// --- Lo del usuario: qué ha visto y su modo sin spoilers --------------------------------------
-const [progress, spoilerPref] = d && user
+// --- Lo del usuario: qué ha visto, su modo sin spoilers y su aviso; y dónde verla ---------------
+const [progress, spoilerPref, notifSub, seasonProviders] = d
     ? await Promise.all([
-        safeFetch(getWatchedProgress(String(id)), `temporada/${id}/progreso`, null),
-        safeFetch(getSpoilerPref(id!), `temporada/${id}/spoilerpref`, null as boolean | null),
+        user ? safeFetch(getWatchedProgress(String(id)), `temporada/${id}/progreso`, null) : null,
+        user ? safeFetch(getSpoilerPref(id!), `temporada/${id}/spoilerpref`, null as boolean | null) : null,
+        user ? safeFetch(getNotificationSub('tv', String(id)), `temporada/${id}/aviso`, null) : null,
+        safeFetch(getSeasonWatchProviders(id!, season!), `temporada/${id}/t${season}/providers`, { providersByCountry: {}, linkByCountry: {} }),
     ])
-    : [null, null];
+    : [null, null, null, null];
 /** Episodio de esta temporada → instante en que lo marcaste (o '' si no hay hora). */
 const watched = new Map<number, string>();
 for (const w of progress?.watched_episodes ?? []) if (w.season === season) watched.set(w.episode, (w as any).watched_at ?? '');
@@ -54,6 +65,7 @@ for (const w of progress?.watched_episodes ?? []) if (w.season === season) watch
 // Igual que la ficha de serie y la de episodio: la serie manda sobre el ajuste general, y solo con sesión.
 const spoilerFree = !!user && (spoilerPref !== null ? spoilerPref : user.spoilers?.enabled === true);
 const hideSynopsis = spoilerFree && user?.spoilers?.hideSynopsis !== false;
+const hideStills = spoilerFree && user?.spoilers?.hideStills !== false;
 
 // --- La temporada --------------------------------------------------------------------------------
 const today = todayKey();
@@ -111,6 +123,87 @@ const cd = status === 'announced' && premiere && premiere > today ? countdown(pr
 // (Fuera del JSX: el compilador de Astro rompe un `${}` dentro de un ternario anidado en la plantilla.)
 const noCountdown = premiere && premiere <= today ? `Se estrenó el ${phraseDate(premiere)}` : 'Fecha de estreno por anunciar';
 const cdLabel = cd ? `Se estrena ${cd.n === 'hoy' || cd.n === 'mañana' ? cd.n : `en ${cd.label}`}, ${longDate(premiere!, today)}` : '';
+
+// --- Barra «Tu temporada» (paso 2) ---------------------------------------------------------------
+const regular = (d?.series.seasons ?? []).filter((x) => x.season_number > 0);
+const specials = d?.series.seasons.find((x) => x.season_number === 0) ?? null;
+const regIdx = regular.findIndex((x) => x.season_number === season);
+const tp: TpState | null = d ? {
+    seriesId: id!, season: season!, logged: !!user, status,
+    eps: episodes.map((e, i) => ({
+        e: Number(e.episode_number),
+        name: isPlaceholderTitle(e.name, Number(e.episode_number)) ? `Episodio ${e.episode_number}` : String(e.name),
+        aired: airStates[i] !== 'soon',
+        air: e.air_date || null,
+        runtime: Number(e.runtime) > 0 ? Number(e.runtime) : null,
+        still: e.still_path ? stillUrl(e.still_path, 'w300') : null,
+    })),
+    watched: Object.fromEntries(watched),
+    seriesWatched: (progress?.watched_episodes ?? []).filter((w) => w.season > 0).length,
+    seriesTotal: d.series.number_of_episodes,
+    nextSeason: season! > 0 && regIdx >= 0 ? regular[regIdx + 1]?.season_number ?? null : null,
+    notif: !!notifSub, hideStills, today,
+} : null;
+const bar = tp ? seasonBar(tp) : null;
+
+// «Ver en {plataforma}»: la suscripción de esta temporada en tu país, mejor si es una de las tuyas.
+const region = getCurrentRegion();
+const myPlatforms = new Set<number>(((user as any)?.platforms ?? []).map(Number));
+const regionProviders: any[] = (seasonProviders?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
+const provider = regionProviders.find((p) => myPlatforms.has(Number(p.provider_id))) ?? regionProviders[0] ?? null;
+const providerLink = seasonProviders?.linkByCountry?.[region] ?? null;
+// «T2 · Separación», el comentario con que llega «Enviar a…».
+const sendMsg = d ? `${season === 0 ? 'Especiales' : `Temporada ${season}`} · ${seriesName}` : '';
+
+// --- Navegación --------------------------------------------------------------------------------
+/** Temporada → episodios vistos y el más alto visto (para «Vas por el E6»). */
+const seenBySeason = new Map<number, { n: number; max: number }>();
+for (const w of progress?.watched_episodes ?? []) {
+    const cur = seenBySeason.get(w.season) ?? { n: 0, max: 0 };
+    seenBySeason.set(w.season, { n: cur.n + 1, max: Math.max(cur.max, w.episode) });
+}
+const seenIn = (n: number) => (n === season ? watched.size : seenBySeason.get(n)?.n ?? 0);
+const countOf = (x: { season_number: number; episode_count: number }) => (x.season_number === season ? episodes.length : x.episode_count);
+function navCard(x: (typeof regular)[number] | undefined) {
+    if (!x) return null;
+    const seen = seenIn(x.season_number);
+    const count = countOf(x);
+    const max = seenBySeason.get(x.season_number)?.max ?? 0;
+    const st = seasonCardStatus({ logged: !!user, seen, count, air: x.air_date, today, firstUnseen: max && max < count ? max + 1 : null });
+    return {
+        href: seasonHref(id!, x.season_number),
+        title: isPlaceholderSeasonName(x.name, x.season_number, seriesName) ? seasonLabel(x.season_number) : x.name,
+        thumb: x.poster_path ?? d?.series.poster_path ?? null,
+        ...st,
+    };
+}
+// Los especiales no entran en anterior y siguiente (sí en la tira y en el selector).
+const showCards = season! > 0 && regular.length > 1;
+const prevCard = showCards ? navCard(regular[regIdx - 1]) : null;
+const nextCard = showCards ? navCard(regular[regIdx + 1]) : null;
+const onlyOne = regular.length <= 1 && !specials;
+const chips = [...regular, ...(specials ? [specials] : [])].map((x) => {
+    const c = seasonChip({ logged: !!user, seen: seenIn(x.season_number), count: countOf(x), air: x.air_date, today });
+    const label = x.season_number === 0 ? 'Esp.' : `T${x.season_number}`;
+    const state = c.announced ? 'anunciada' : c.done ? 'vista' : user ? `${Math.min(seenIn(x.season_number), countOf(x))} de ${countOf(x)} vistos` : `${countOf(x)} episodios`;
+    return {
+        n: x.season_number, label, ...c,
+        href: seasonHref(id!, x.season_number),
+        cur: x.season_number === season,
+        sp: x.season_number === 0 && regular.length > 0,
+        aria: `${seasonLabel(x.season_number)}, ${state}${x.season_number === season ? ', estás aquí' : ''}`,
+    };
+});
+// Selector: de la más reciente a la primera, y los especiales al final.
+const picker = [...regular].reverse().concat(specials ? [specials] : []).map((x) => ({
+    href: seasonHref(id!, x.season_number),
+    label: seasonLabel(x.season_number),
+    year: x.air_date?.slice(0, 4) ?? '',
+    prog: user && countOf(x) ? `${Math.min(seenIn(x.season_number), countOf(x))}/${countOf(x)}` : `${countOf(x)} ep.`,
+    done: !!user && countOf(x) > 0 && seenIn(x.season_number) >= countOf(x),
+    cur: x.season_number === season,
+}));
+const seasonsCaption = `${regular.length} ${regular.length === 1 ? 'temporada' : 'temporadas'}${specials ? ' y especiales' : ''}`;
 
 const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
 ---
@@ -200,7 +293,99 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                     </div>
                 </div>
             </header>
-            {/* Pasos siguientes del plan: barra «Tu temporada», navegación, episodios, notas, cuerpo y lateral. */}
+            <!-- Barra «Tu temporada»: la acción principal, lo que llevas y compartir / ver -->
+            {bar && (
+                <div class="ea tea" role="region" aria-label="Tu temporada" data-tp-bar>
+                    <div class="tea-slot" data-tp-main set:html={bar.main}></div>
+                    <div class="tea-slot" data-tp-state set:html={bar.state}></div>
+                    <div class="ea-r">
+                        <div class="tea-slot" data-tp-rest set:html={bar.rest}></div>
+                        {SOCIAL_PHASE.recommend && user && (
+                            <button type="button" class="pf-btn sm" data-recommend data-target-type="tv" data-target-id={id} data-title={seriesName} data-image={d.series.poster_path} aria-haspopup="dialog" aria-expanded="false">
+                                <Icon name="lucide:send" aria-hidden="true" />Recomendar
+                            </button>
+                        )}
+                        {SOCIAL_PHASE.messages && user && (
+                            <button type="button" class="pf-btn sm" data-send-to data-media-type="tv" data-tmdb-id={id} data-title={seriesName} data-image={d.series.poster_path}
+                                data-msg={sendMsg} aria-haspopup="dialog" aria-expanded="false">
+                                <Icon name="lucide:forward" aria-hidden="true" />Enviar a…
+                            </button>
+                        )}
+                        {provider && providerLink && (
+                            <a class="pf-btn sm ea-pv" href={providerLink} target="_blank" rel="noopener">
+                                <Icon name="lucide:tv" aria-hidden="true" /><span>Ver en {provider.provider_name}</span>
+                            </a>
+                        )}
+                    </div>
+                    <p class="ea-err" role="alert" data-tp-err hidden><Icon name="lucide:circle-alert" aria-hidden="true" />No se ha podido guardar. Vuelve a intentarlo.</p>
+                    <p class="sr-only" aria-live="polite" data-tp-live></p>
+                </div>
+            )}
+            {tp && <script type="application/json" id="tp-data" set:html={JSON.stringify(tp).replace(/</g, '\\u003c')} />}
+
+            <!-- Navegación: temporada anterior · tira de temporadas · siguiente -->
+            <div class:list={['en', 'tnv', { solo: !showCards }]}>
+                {showCards && (prevCard ? (
+                    <a class="enc" href={prevCard.href} aria-label={`Temporada anterior: ${prevCard.title}`}>
+                        <span class:list={['th', { ph: !prevCard.thumb }]}>{prevCard.thumb && <img src={posterUrl(prevCard.thumb, 'w92')} alt="" loading="lazy" />}</span>
+                        <span class="tx">
+                            <span class="k"><Icon name="lucide:chevron-left" aria-hidden="true" />Anterior</span>
+                            <b>{prevCard.title}</b>
+                            <span class="s">{prevCard.done && <Icon name="lucide:check" aria-hidden="true" />}{prevCard.text}</span>
+                        </span>
+                    </a>
+                ) : (
+                    <span class="enc off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Anterior</span><b>Es la primera</b></span></span>
+                ))}
+
+                <nav class="etr" aria-label="Temporadas">
+                    <div class="etr-h">
+                        {picker.length > 1 && (
+                            <details class="ssel">
+                                <summary aria-label={`Temporada: ${seasonLabel(season!)}. Cambiar de temporada`}>{season === 0 ? 'Esp.' : `T${season}`}<Icon name="lucide:chevron-down" aria-hidden="true" /></summary>
+                                <ul>
+                                    {picker.map((x) => (
+                                        <li><a href={x.href} aria-current={x.cur ? 'true' : undefined}>
+                                            <span>{x.label}{x.year && <small class="y"> · {x.year}</small>}</span>
+                                            <small class:list={{ ok: x.done }}>{x.done && <Icon name="lucide:check" aria-hidden="true" />}{x.prog}</small>
+                                        </a></li>
+                                    ))}
+                                </ul>
+                            </details>
+                        )}
+                        <span>{onlyOne ? 'Es su única temporada' : seasonsCaption}</span>
+                        <a href={`/serie/${id}`}>Ver la serie<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                    </div>
+                    {onlyOne ? (
+                        <p class="tnv-one"><Icon name="lucide:layers" aria-hidden="true" />No hay temporada anterior ni siguiente.</p>
+                    ) : (
+                        <ol data-tp-strip>
+                            {chips.map((c) => (
+                                <>
+                                    {c.sp && <li class="sp" aria-hidden="true">·</li>}
+                                    <li class:list={[{ w: c.done, u: c.announced, cur: c.cur, esp: c.n === 0 }]} aria-current={c.cur ? 'page' : undefined} data-tp-chip={c.cur ? '' : undefined}>
+                                        <a href={c.href} aria-label={c.aria}>{c.label}<small>{c.small}</small>{c.pct != null && <span class="pb"><i style={`width:${c.pct}%`}></i></span>}</a>
+                                    </li>
+                                </>
+                            ))}
+                        </ol>
+                    )}
+                </nav>
+
+                {showCards && (nextCard ? (
+                    <a class="enc nx" href={nextCard.href} aria-label={`Temporada siguiente: ${nextCard.title}`}>
+                        <span class:list={['th', { ph: !nextCard.thumb }]}>{nextCard.thumb && <img src={posterUrl(nextCard.thumb, 'w92')} alt="" loading="lazy" />}</span>
+                        <span class="tx">
+                            <span class="k">Siguiente<Icon name="lucide:chevron-right" aria-hidden="true" /></span>
+                            <b>{nextCard.title}</b>
+                            <span class="s">{nextCard.done && <Icon name="lucide:check" aria-hidden="true" />}{nextCard.text}</span>
+                        </span>
+                    </a>
+                ) : (
+                    <span class="enc nx off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Siguiente</span><b>Es la última</b></span></span>
+                ))}
+            </div>
+            {/* Paso 3: la lista de episodios de verdad. */}
             <ol class="tp-tmp">
                 {episodes.map((e) => <li><a href={episodeHref(id!, season!, e.episode_number)}>E{e.episode_number} · {e.name}</a></li>)}
             </ol>
@@ -210,6 +395,30 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
 
 <script>
     import '../../../../scripts/shared/spoil';
+    import '../../../../scripts/serie/season';
+
+    // La tira de temporadas, centrada en la actual y con el borde difuminado por donde quedan más.
+    const strip = document.querySelector<HTMLElement>('[data-tp-strip]');
+    const cur = strip?.querySelector<HTMLElement>('li[aria-current="page"]');
+    if (strip && cur && strip.scrollWidth > strip.clientWidth) {
+        const delta = cur.getBoundingClientRect().left - strip.getBoundingClientRect().left;
+        strip.scrollLeft += delta - (strip.clientWidth - cur.clientWidth) / 2;
+    }
+    if (strip) {
+        const fades = () => {
+            const max = strip.scrollWidth - strip.clientWidth;
+            strip.classList.toggle('fade-l', strip.scrollLeft > 2);
+            strip.classList.toggle('fade-r', strip.scrollLeft < max - 2);
+        };
+        fades();
+        strip.addEventListener('scroll', fades, { passive: true });
+        window.addEventListener('resize', fades);
+    }
+
+    // El selector de temporada se cierra al pulsar fuera o con Escape.
+    const sel = document.querySelector<HTMLDetailsElement>('.ssel');
+    document.addEventListener('click', (e) => { if (sel?.open && !sel.contains(e.target as Node)) sel.open = false; });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && sel?.open) { sel.open = false; sel.querySelector('summary')?.focus(); } });
 
     // «Leer más» solo si la sinopsis no cabe en sus tres líneas; despliega en el sitio.
     const syn = document.querySelector<HTMLElement>('[data-tsyn]');
