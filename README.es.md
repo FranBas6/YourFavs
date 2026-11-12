@@ -205,6 +205,10 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 
 ---
 
+Más sobre este proyecto y el resto de mi trabajo en mi portfolio: [franbasguil.netlify.app](https://franbasguil.netlify.app/es/proyectos/yourfavs/)
+
+---
+
 <p align="center">
   <sub>Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB. Disponibilidad en plataformas por JustWatch.</sub>
 </p>
