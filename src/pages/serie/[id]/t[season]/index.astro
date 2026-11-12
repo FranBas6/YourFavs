@@ -1,0 +1,225 @@
+---
+/**
+ * Ficha de temporada — handoff `docs/Temporada/design_handoff_temporada` (README) y plan
+ * `docs/Temporada/PLAN_TEMPORADA.md`.
+ *
+ * `/serie/{id}/t{n}`, también la temporada 0 (especiales). Una temporada que no existe da 404.
+ * Datos: `getSeasonDetail` (2 llamadas a TMDB) + el progreso del usuario y su modo sin spoilers.
+ *
+ *   · Cabecera (`.eh.tph`): la de la ficha de episodio con el póster de la temporada a la izquierda;
+ *     sinopsis o, si TMDB no la tiene (lo normal), cómo se emitió; cuenta atrás si está anunciada.
+ */
+import Layout from '../../../../layouts/Layout.astro';
+import { Icon } from 'astro-icon/components';
+import '../../../../styles/shared/spoil.css';
+import '../../../../styles/shared/detail-common.css';
+import '../../../../styles/pages/serie/episodio.css';
+import '../../../../styles/pages/serie/temporada.css';
+import { getSeasonDetail } from '../../../../services/API/Series/seasonDetail';
+import { getWatchedProgress } from '../../../../services/BD/series/yourfavsSerie';
+import { getSpoilerPref } from '../../../../services/BD/shared/spoilerPrefs';
+import { backdropUrl, posterUrl } from '../../../../services/API/shared/tmdbClient';
+import { safeFetch } from '../../../../utils/safeFetch';
+import { distinctOriginalTitle } from '../../../../utils/constants/helpers/media-helpers';
+import {
+    airState, countdown, dateRange, decimal, episodeHref, isPlaceholderSeasonName, longDate, phraseDate, relativeAgo,
+    runtimeLabel, seasonLabel, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
+} from '../../../../utils/episodeView';
+
+// Mismos topes que la ficha de episodio: ids de serie de hasta 9 cifras, temporadas de hasta 4.
+const posInt = (v: string | undefined, min: number, digits: number) =>
+    (v && new RegExp(`^\\d{1,${digits}}$`).test(v) && Number(v) >= min ? Number(v) : null);
+const id = posInt(Astro.params.id, 1, 9);
+const season = posInt(Astro.params.season, 0, 4);
+
+const user = Astro.locals.user;
+const result = id != null && season != null
+    ? await safeFetch(getSeasonDetail(id, season), `temporada/${id}/${season}`, { missing: true as const, series: null })
+    : { missing: true as const, series: null };
+const missing = 'missing' in result ? result : null;
+const d = 'missing' in result ? null : result;
+if (missing) Astro.response.status = 404;
+
+// --- Lo del usuario: qué ha visto y su modo sin spoilers --------------------------------------
+const [progress, spoilerPref] = d && user
+    ? await Promise.all([
+        safeFetch(getWatchedProgress(String(id)), `temporada/${id}/progreso`, null),
+        safeFetch(getSpoilerPref(id!), `temporada/${id}/spoilerpref`, null as boolean | null),
+    ])
+    : [null, null];
+/** Episodio de esta temporada → instante en que lo marcaste (o '' si no hay hora). */
+const watched = new Map<number, string>();
+for (const w of progress?.watched_episodes ?? []) if (w.season === season) watched.set(w.episode, (w as any).watched_at ?? '');
+
+// Igual que la ficha de serie y la de episodio: la serie manda sobre el ajuste general, y solo con sesión.
+const spoilerFree = !!user && (spoilerPref !== null ? spoilerPref : user.spoilers?.enabled === true);
+const hideSynopsis = spoilerFree && user?.spoilers?.hideSynopsis !== false;
+
+// --- La temporada --------------------------------------------------------------------------------
+const today = todayKey();
+const s = d?.season;
+const seriesName = d?.series.name ?? '';
+// El título original de la serie junto a su nombre, si es otro («Severance»), como en su ficha.
+const seriesOriginal = d ? distinctOriginalTitle(seriesName, d.series.original_name) : null;
+const episodes: any[] = s?.episodes ?? [];
+const airStates = episodes.map((e) => airState(e.air_date, today));
+const seriesEnded = ['Ended', 'Canceled'].includes(d?.series.status ?? '');
+const status = d ? seasonStatus({
+    season: season!, airStates, seriesEnded,
+    // «Última temporada» solo si hubo más de una: en una miniserie no dice nada.
+    isLastSeason: season === d.series.last_season && d.series.seasons.filter((x) => x.season_number > 0).length > 1,
+    nextAirSeason: d.series.next_air_season,
+}) : null;
+
+const ref = d?.series.seasons.find((x) => x.season_number === season);
+const premiere: string | null = s?.air_date || episodes.find((e) => e.air_date)?.air_date || ref?.air_date || null;
+const year = premiere?.slice(0, 4) ?? '';
+
+// Título: el nombre propio si TMDB lo tiene («Murder House»); si no, «Temporada 2».
+const ownName = d && !isPlaceholderSeasonName(s.name, season!, seriesName) ? String(s.name) : '';
+const title = ownName || seasonLabel(season ?? 0);
+const titleSub = ownName ? `${seasonLabel(season!)} de ${seriesName}` : '';
+const kicker = [season === 0 ? 'Especiales' : `Temporada ${season}`, year].filter(Boolean).join(' · ');
+
+// Meta: episodios · duración total · nota media · fechas.
+const epCount = episodes.length;
+const totalMin = episodes.reduce((n, e) => n + (Number(e.runtime) > 0 ? Number(e.runtime) : 0), 0);
+const totalRuntime = runtimeLabel(totalMin);
+const voted = episodes.filter((e, i) => airStates[i] !== 'soon' && Number(e.vote_count) > 0 && Number(e.vote_average) > 0);
+const avg = Number(s?.vote_average) > 0
+    ? Number(s.vote_average)
+    : voted.length ? voted.reduce((n, e) => n + Number(e.vote_average), 0) / voted.length : 0;
+const score = status !== 'announced' && avg > 0 ? decimal(avg) : null;
+const dated = episodes.map((e) => e.air_date).filter(Boolean).sort() as string[];
+const range = dated.length > 1 && dated[0] !== dated.at(-1) ? dateRange(dated[0], dated.at(-1)!) : null;
+
+// Póster: el de la temporada; si no tiene, el de la serie (un hueco parecería un error), salvo en una
+// anunciada, donde el hueco dice que aún no hay (decisión de Fran, 2026-11-12).
+const posters: string[] = (s?.images?.posters ?? []).map((p: any) => p.file_path).filter(Boolean);
+const poster: string | null = s?.poster_path ?? (status === 'announced' ? null : d?.series.poster_path ?? null);
+
+// Debajo del título: la sinopsis o, si no hay, cómo se emitió. En emisión, además, el próximo episodio.
+const overview = String(s?.overview ?? '').trim();
+const seenAny = watched.size > 0;
+const hideOverview = !!overview && hideSynopsis && !seenAny;
+const nextUp = status === 'airing' ? episodes.find((e, i) => airStates[i] === 'soon' && e.air_date) : null;
+const nextLine = nextUp
+    ? `Próximo: E${nextUp.episode_number}, el ${phraseDate(nextUp.air_date, today)} (${relativeAgo(nextUp.air_date, today)})`
+    : null;
+const schedule = !overview && status !== 'announced' && status !== 'airing' ? seasonSchedule(episodes.map((e) => e.air_date), today, season! > 0) : null;
+const cd = status === 'announced' && premiere && premiere > today ? countdown(premiere, today) : null;
+// (Fuera del JSX: el compilador de Astro rompe un `${}` dentro de un ternario anidado en la plantilla.)
+const noCountdown = premiere && premiere <= today ? `Se estrenó el ${phraseDate(premiere)}` : 'Fecha de estreno por anunciar';
+const cdLabel = cd ? `Se estrena ${cd.n === 'hoy' || cd.n === 'mañana' ? cd.n : `en ${cd.label}`}, ${longDate(premiere!, today)}` : '';
+
+const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
+---
+<Layout title={pageTitle} description={overview && !hideOverview ? overview : undefined} ogImage={s?.poster_path || d?.series.backdrop_path || undefined}>
+    {missing ? (
+        <section class="ep-404">
+            <p class="ep-404-k">Error 404 · Temporada</p>
+            <h1>Esta temporada no existe</h1>
+            <p>{missing.series ? `${missing.series.name} no tiene ${season === 0 ? 'especiales' : `una temporada ${season ?? ''}`}.` : 'No encontramos esta serie ni esta temporada.'}</p>
+            <div class="ep-404-b">
+                {missing.series ? <a class="pf-btn pri" href={`/serie/${missing.series.id}`}>Ver la serie</a> : <a class="pf-btn pri" href="/">Volver al inicio</a>}
+            </div>
+        </section>
+    ) : d && (
+        <article class="ep tp">
+            <!-- Cabecera -->
+            <header class="eh tph">
+                {d.series.backdrop_path && <div class="eh-bg" style={`background-image:url(${backdropUrl(d.series.backdrop_path, 'w1280')})`}></div>}
+                <div class="eh-in">
+                    <nav class="eh-cr" aria-label="Migas">
+                        <a href="/">Inicio</a><i>/</i>
+                        <a href="/catalogo/topseries">Series</a><i>/</i>
+                        <a href={`/serie/${id}`}>{seriesName}</a><i>/</i>
+                        <b>{seasonLabel(season!)}</b>
+                    </nav>
+                    {poster ? (
+                        <div class="tpo">
+                            <img src={posterUrl(poster, 'w342')} alt={`Póster de ${title}`} width="200" height="300" />
+                            {posters.length > 1 && <a class="cnt" href="#posters" aria-label={`Ver los ${posters.length} pósters de la temporada`}><Icon name="lucide:image" aria-hidden="true" />{posters.length}</a>}
+                        </div>
+                    ) : (
+                        <div class="tpo none"><span>Esta temporada aún no tiene póster</span></div>
+                    )}
+                    <div class="eh-tx">
+                        <a class="eh-sr" href={`/serie/${id}`}>
+                            {d.series.poster_path && <img src={posterUrl(d.series.poster_path, 'w92')} alt="" width="30" height="45" />}
+                            <b>{seriesName}</b>
+                            {seriesOriginal && <i class="eh-sr-o" lang={d.series.original_language || undefined}>{seriesOriginal}</i>}
+                            <span>Ver la serie<Icon name="lucide:chevron-right" /></span>
+                        </a>
+                        <div class="tph-hd">
+                            <div class="eh-k">
+                                <span class="se">{kicker}</span>
+                                {season === 0 && (
+                                    <span class="etag" style={`--sb:var(--stamp-${TAG_STYLE.special.color});--si:var(--stamp-${TAG_STYLE.special.color}-ink)`}>
+                                        <Icon name={`lucide:${TAG_STYLE.special.icon}`} aria-hidden="true" />{TAG_STYLE.special.label}
+                                    </span>
+                                )}
+                                {status && (
+                                    <span class="etag" style={`--sb:var(--stamp-${SEASON_STATUS_STYLE[status].color});--si:var(--stamp-${SEASON_STATUS_STYLE[status].color}-ink)`}>
+                                        <Icon name={`lucide:${SEASON_STATUS_STYLE[status].icon}`} aria-hidden="true" />{SEASON_STATUS_STYLE[status].label}
+                                    </span>
+                                )}
+                            </div>
+                            <h1>{title}{titleSub && <small>{titleSub}</small>}</h1>
+                            <div class="eh-m">
+                                <span><Icon name="lucide:list" aria-hidden="true" />{epCount ? `${epCount} ${epCount === 1 ? 'episodio' : 'episodios'}` : 'Sin episodios anunciados'}</span>
+                                {totalRuntime && status !== 'announced' && <span><Icon name="lucide:clock" aria-hidden="true" />{totalRuntime}</span>}
+                                {score && <span class="sc"><Icon name="lucide:star" aria-hidden="true" />{score}<small>&nbsp;media TMDB</small></span>}
+                                {range && <span><Icon name="lucide:calendar" aria-hidden="true" />{range}</span>}
+                            </div>
+                        </div>
+                        <div class="tph-bd">
+                            {overview && (hideOverview ? (
+                                <div class="yf-spoil tsp-box">
+                                    <p class="tsyn yf-blur" aria-hidden="true" inert>{overview}</p>
+                                    <button type="button" class="yf-spoil-btn"><Icon name="lucide:eye" aria-hidden="true" />Mostrar sinopsis</button>
+                                </div>
+                            ) : (
+                                <>
+                                    <p class="tsyn" data-tsyn>{overview}</p>
+                                    <button type="button" class="tmore" data-tmore aria-expanded="false" hidden>Leer más</button>
+                                </>
+                            ))}
+                            {nextLine && <p class="tfact"><Icon name="lucide:calendar-clock" aria-hidden="true" />{nextLine}</p>}
+                            {schedule && <p class="tfact"><Icon name="lucide:calendar" aria-hidden="true" />{schedule}</p>}
+                            {status === 'announced' && (cd ? (
+                                <div class="tcd" role="img" aria-label={cdLabel}>
+                                    <span class="k">SE ESTRENA EN</span>
+                                    <span class="n">{cd.n}{cd.unit && <small>{cd.unit}</small>}</span>
+                                    <span class="d">{longDate(premiere!, today)}</span>
+                                </div>
+                            ) : (
+                                <p class="tfact"><Icon name="lucide:calendar-clock" aria-hidden="true" />{noCountdown}</p>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </header>
+            {/* Pasos siguientes del plan: barra «Tu temporada», navegación, episodios, notas, cuerpo y lateral. */}
+            <ol class="tp-tmp">
+                {episodes.map((e) => <li><a href={episodeHref(id!, season!, e.episode_number)}>E{e.episode_number} · {e.name}</a></li>)}
+            </ol>
+        </article>
+    )}
+</Layout>
+
+<script>
+    import '../../../../scripts/shared/spoil';
+
+    // «Leer más» solo si la sinopsis no cabe en sus tres líneas; despliega en el sitio.
+    const syn = document.querySelector<HTMLElement>('[data-tsyn]');
+    const more = document.querySelector<HTMLButtonElement>('[data-tmore]');
+    if (syn && more && syn.scrollHeight > syn.clientHeight + 2) {
+        more.hidden = false;
+        more.addEventListener('click', () => {
+            const open = syn.classList.toggle('open');
+            more.setAttribute('aria-expanded', String(open));
+            more.textContent = open ? 'Leer menos' : 'Leer más';
+        });
+    }
+</script>
