@@ -407,6 +407,11 @@ const epLines = ([['Próximo', item?.next_episode_to_air], ['Último', item?.las
         seen: watchedSet.has(`${ep.season_number}-${ep.episode_number}`),
     }));
 
+/** Fecha corta de la fila de episodio en móvil («20 ago 2026»); la larga va en escritorio. */
+function shortAirDate(iso: string | null | undefined): string {
+    if (!iso) return formatDate(iso as string);
+    return new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)).replace('.', '');
+}
 function episodeCredits(ep: any): { directors: string[]; writers: string[] } {
     const crew: any[] = ep?.crew || [];
     const names = (jobs: string[]) => [...new Set(crew.filter((c) => jobs.includes(c.job)).map((c) => c.name as string))];
@@ -978,7 +983,7 @@ const jsonLd = item ? {
                                                     <input type="hidden" name="episodes" value={seasonEpisodes.map((ep) => ep.episode_number).join(',')} />
                                                     <input type="hidden" name="action" value={isSeasonComplete ? 'unmark' : 'mark'} />
                                                     <button type="submit" class="btn btn--sm sr-markall" data-tone="visto" aria-pressed={isSeasonComplete ? 'true' : 'false'}>
-                                                        {isSeasonComplete ? 'Desmarcar temporada completa' : `Marcar toda la temporada como vista (${seasonTotal} episodios)`}
+                                                        {isSeasonComplete ? 'Desmarcar temporada completa' : <><span class="ep-dsk">{`Marcar toda la temporada como vista (${seasonTotal} episodios)`}</span><span class="ep-mob">{`Marcar temporada vista (${seasonTotal})`}</span></>}
                                                     </button>
                                                 </form>
                                             )}
@@ -994,18 +999,23 @@ const jsonLd = item ? {
                                                                 {season.season_number === 0 ? `E${episode.episode_number}` : episode.episode_number}
                                                             </span>
                                                             {mark && (
-                                                                <span class="chip-state ep-mark" title={mark.title}>{mark.label}</span>
+                                                                <span class="chip-state ep-mark ep-dsk-f" title={mark.title}>{mark.label}</span>
                                                             )}
                                                             <div class="flex-1 min-w-0">
+                                                                {/* En móvil, la etiqueta (FINAL, PARÓN…) va encima del título: al lado se lo comía. */}
+                                                                {mark && <span class="chip-state ep-mark ep-mob-b" title={mark.title}>{mark.label}</span>}
                                                                 {/* TMDB D4: el título lleva a la ficha del episodio; «Visto» sigue marcando sin salir. */}
-                                                                <p class="ep-t truncate group-open:whitespace-normal group-open:overflow-visible"><a href={episodeHref(id, season.season_number, episode.episode_number)} class="ep-link">{episode.name}</a></p>
+                                                                {/* El título despliega como el resto de la fila (antes llevaba a la ficha y en móvil
+                                                                    se tocaba sin querer); a la ficha se va con «Ficha» o desde el desplegable. */}
+                                                                <p class="ep-t truncate group-open:whitespace-normal group-open:overflow-visible">{episode.name}</p>
                                                                 <p class="ep-m truncate">
-                                                                    {formatDate(episode.air_date)}{episode.runtime ? `  ·  ${formatRuntime(episode.runtime)}` : ''}
+                                                                    <span class="ep-dsk">{formatDate(episode.air_date)}</span><span class="ep-mob">{shortAirDate(episode.air_date)}</span>{episode.runtime ? <><span class="ep-dsk">{`  ·  ${formatRuntime(episode.runtime)}`}</span><span class="ep-mob">{`  ·  ${episode.runtime} min`}</span></> : ''}
                                                                     {episode.vote_average > 0 && <span class="ep-r">  ·  ★ {episode.vote_average.toFixed(1).replace('.', ',')}</span>}
                                                                 </p>
                                                             </div>
-                                                            {/* TMDB D4: a la ficha del episodio, al lado de «Visto» y con su misma forma. */}
-                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class="btn btn--sm btn--ghost ep-btn" aria-label={`Abrir la ficha de «${episode.name}»`} onclick="event.stopPropagation()">
+                                                            <svg class="ep-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                                                            {/* TMDB D4: a la ficha del episodio, al lado de «Visto» (solo escritorio; en móvil, desde el desplegable). */}
+                                                            <a href={episodeHref(id, season.season_number, episode.episode_number)} class="btn btn--sm btn--ghost ep-btn ep-ficha" aria-label={`Abrir la ficha de «${episode.name}»`} onclick="event.stopPropagation()">
                                                                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="2.18"/><path d="M7 2v20M17 2v20M2 12h20M2 7h5M2 17h5M17 17h5M17 7h5"/></svg>
                                                                 <span class="hidden sm:inline">Ficha</span>
                                                             </a>
@@ -1028,6 +1038,16 @@ const jsonLd = item ? {
                                                                     Mostrar (spoilers)
                                                                 </button>
                                                             )}
+                                                            {/* Imagen */}
+                                                            {episode.still_path && (
+                                                                <div class={`flex justify-center mb-3 ${hideStills && !isWatched ? 'yf-blur' : ''}`}>
+                                                                    <img src={posterUrl(episode.still_path, 'w500')} alt={episode.name} loading="lazy" class="rounded-lg shadow-md w-full max-w-md" />
+                                                                </div>
+                                                            )}
+
+                                                            {/* Sinopsis */}
+                                                            <p class={`text-sm text-gray-700 leading-relaxed mb-3 ${hideSynopsis && !isWatched ? 'yf-blur' : ''}`}>{episode.overview || "No hay descripción disponible."}</p>
+
                                                             {/* Dirección y guion (B2a): no es spoiler, va sin difuminar */}
                                                             {(credits.directors.length > 0 || credits.writers.length > 0) && (
                                                                 <p class="ep-cr">
@@ -1040,22 +1060,12 @@ const jsonLd = item ? {
                                                                     )}
                                                                 </p>
                                                             )}
-                                                            {/* Imagen */}
-                                                            {episode.still_path && (
-                                                                <div class={`flex justify-center mb-3 ${hideStills && !isWatched ? 'yf-blur' : ''}`}>
-                                                                    <img src={posterUrl(episode.still_path, 'w500')} alt={episode.name} loading="lazy" class="rounded-lg shadow-md w-full max-w-md" />
-                                                                </div>
-                                                            )}
-
-                                                            {/* Sinopsis */}
-                                                            <p class={`text-sm text-gray-700 leading-relaxed mb-3 ${hideSynopsis && !isWatched ? 'yf-blur' : ''}`}>{episode.overview || "No hay descripción disponible."}</p>
-
                                                             {/* Estrellas invitadas — van con la sinopsis: un nombre en el reparto
                                                                 de un episodio cuenta tanto como el texto (o más). */}
                                                             {episode.guest_stars && episode.guest_stars.length > 0 && (
                                                                 <div class={hideSynopsis && !isWatched ? 'yf-blur' : ''}>
                                                                     <p class="ep-gh">Estrellas invitadas</p>
-                                                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 ep-gs">
                                                                         {episode.guest_stars.map((star: GuestStar) => (
                                                                             <a href={`/actor/${star.id}`} class="flex items-center gap-3 text-sm">
                                                                                 {star.profile_path && <img src={posterUrl(star.profile_path, 'w185')} alt={star.name} class="w-11 h-11 rounded-full object-cover flex-shrink-0" loading="lazy" />}
@@ -1066,6 +1076,9 @@ const jsonLd = item ? {
                                                                             </a>
                                                                         ))}
                                                                     </div>
+                                                                    {episode.guest_stars.length > 6 && (
+                                                                        <button type="button" class="btn btn--sm btn--ghost ep-gs-more" onclick="this.previousElementSibling.classList.add('is-all'); this.remove()">Ver los {episode.guest_stars.length}</button>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                             <a href={episodeHref(id, season.season_number, episode.episode_number)} class="btn btn--sm ep-open">

@@ -265,6 +265,30 @@ section:not(:has(> details.cg-more[open])) .cg-x { display: none; }
 .ep-gh { margin: 4px 0 8px !important; font: 600 var(--fs-ui) var(--font); color: var(--text); }
 .ep-open { width: 100%; margin-top: 12px; }
 .sr-markall { width: 100%; margin-bottom: 6px; }
+/* Fila de episodio: toda la fila despliega (la flecha lo dice); a la ficha se va con «Ficha» (escritorio)
+   o con «Abrir la ficha del episodio» dentro del desplegable. Textos largos/cortos según el ancho. */
+.ep-chev { flex-shrink: 0; width: 16px; height: 16px; color: var(--text-3); transition: transform .2s ease; }
+.ep[open] > .ep-row .ep-chev { transform: rotate(180deg); }
+.ep-mob { display: none; }
+.ep-mob-b { display: none; }
+.ep-gs-more { display: none; }
+@media (max-width: 639px) {
+    .ep-dsk { display: none; }
+    .ep-mob { display: inline; }
+    .ep-dsk-f { display: none !important; }
+    .ep-mob-b { display: inline-flex; margin-bottom: 3px; }
+    .ep-row { min-height: 60px; gap: 12px; padding: 8px 4px; }
+    .ep-m.truncate { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.35; }   /* fecha · min · nota: sin cortar, en dos líneas si no cabe */
+    .ep-ficha { display: none !important; }
+    .ep-chev { margin-right: 2px; }
+    .ep-body { margin: 2px 0 16px; padding: 14px 12px; }
+    .ep-body img { max-width: 100%; }
+    .ep-gs > a:nth-child(n+7) { display: none; }
+    .ep-gs.is-all > a { display: flex; }
+    .ep-gs-more { display: inline-flex; width: 100%; margin-top: 10px; }
+    .ep-open { margin-top: 16px; min-height: 44px; }
+    .sr-markall { white-space: normal; }
+}
 section + .fvid-more, .fvid-more { margin-top: 12px; }
 .cdet > summary { white-space: nowrap; }
 .cdet > summary .n { flex: 0 1 auto; }
