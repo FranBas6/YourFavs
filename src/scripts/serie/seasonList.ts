@@ -7,6 +7,8 @@
  *   · Con fotogramas o compacta: por defecto compacta desde 16 episodios; la que elijas se recuerda en
  *     este navegador (`localStorage`, sin pasar nada si no se puede).
  *   · «Mostrar los N episodios» de una temporada anunciada larga.
+ *   · Sin spoilers: «Mostrar todo» destapa lo oculto de la lista y de la gráfica, solo en esta visita
+ *     (no cambia el ajuste); la tarjeta de la gráfica con todo oculto, solo la gráfica.
  */
 import { revealSpoiler } from '../shared/spoil';
 import { seasonCounts, seenLabel, type TpState } from '../../utils/seasonView';
@@ -66,6 +68,36 @@ function init(s: TpState, list: HTMLElement) {
         more.closest('.tl-more')?.remove();
     });
 
+    // --- Sin spoilers: «Mostrar todo» y «Mostrar» de la gráfica ---------------------------------------
+    /** Destapa la nota de una barra (la guarda en `data-v` / `data-h`, fuera del texto accesible). */
+    const revealBar = (bar: HTMLElement) => {
+        if (!bar.classList.contains('hid') || !bar.dataset.v) return;
+        bar.classList.remove('hid');
+        bar.querySelector<HTMLElement>('.v')!.textContent = bar.dataset.v;
+        bar.querySelector<HTMLElement>('.bar')!.style.height = `${bar.dataset.h}px`;
+    };
+    function revealChart() {
+        document.querySelectorAll<HTMLElement>('[data-tp-bar].hid').forEach(revealBar);
+        document.querySelector('[data-tp-chart-hide]')?.remove();
+        document.querySelector('[data-tp-chart]')?.removeAttribute('hidden');
+        document.querySelector('[data-tp-hidden-n]')?.remove();
+    }
+    function revealRow(r: HTMLElement) {
+        r.querySelectorAll<HTMLElement>('.yf-spoil:not(.revealed)').forEach(revealSpoiler);
+        r.querySelector<HTMLElement>('[data-tp-r]')?.removeAttribute('hidden');
+        r.querySelector<HTMLElement>('[data-tp-rh]')?.setAttribute('hidden', '');
+    }
+    list.querySelector('[data-tp-reveal-all]')?.addEventListener('click', () => {
+        rows.forEach(revealRow);
+        revealChart();
+        list.querySelector('[data-tp-hidden]')?.remove();
+        rowsBox.querySelector<HTMLElement>('.tr .t')?.focus();
+    });
+    document.querySelector('[data-tp-chart-show]')?.addEventListener('click', () => {
+        revealChart();
+        document.querySelector<HTMLElement>('[data-tp-chart]')?.focus();
+    });
+
     // --- «Visto» de cada fila ----------------------------------------------------------------------
     rowsBox.addEventListener('click', (e) => {
         const b = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-tp-row-btn]');
@@ -99,11 +131,7 @@ function init(s: TpState, list: HTMLElement) {
                 if (t) t.textContent = seen ? seenLabel(s.watched[e], s.today) : '';
             }
             // Visto: lo oculto por spoilers ya no lo es (fotograma, sinopsis y nota).
-            if (seen) {
-                r.querySelectorAll<HTMLElement>('.yf-spoil:not(.revealed)').forEach(revealSpoiler);
-                r.querySelector<HTMLElement>('[data-tp-r]')?.removeAttribute('hidden');
-                r.querySelector<HTMLElement>('[data-tp-rh]')?.setAttribute('hidden', '');
-            }
+            if (seen) revealRow(r);
         }
         // La gráfica de notas: pleno = visto, apagado = sin ver; la de «Te toca», con contorno.
         document.querySelectorAll<HTMLElement>('[data-tp-bar]').forEach((bar) => {
@@ -114,11 +142,7 @@ function init(s: TpState, list: HTMLElement) {
             if (seen && !bar.querySelector('.dot')) bar.querySelector('.bar')?.insertAdjacentHTML('afterend', '<span class="dot"></span>');
             if (!seen) bar.querySelector('.dot')?.remove();
             // Sin spoilers: al verlo, su nota se destapa.
-            if (seen && bar.classList.contains('hid') && bar.dataset.v) {
-                bar.classList.remove('hid');
-                bar.querySelector<HTMLElement>('.v')!.textContent = bar.dataset.v;
-                bar.querySelector<HTMLElement>('.bar')!.style.height = `${bar.dataset.h}px`;
-            }
+            if (seen) revealBar(bar);
         });
         const unseen = list.querySelector<HTMLElement>('[data-tp-unseen]');
         if (unseen) unseen.textContent = String(c.remaining.length);

@@ -124,10 +124,13 @@ export function seasonBar(s: TpState): { main: string; state: string; rest: stri
     const totalTime = runtimeLabel(sumMin(s.eps));
 
     if (!s.logged) {
+        // Anunciada: lo que se puede hacer con sesión es el aviso de estreno, no marcar.
+        const announced = !c.aired.length;
+        const line = c.total ? [plural(c.total, 'episodio', 'episodios'), totalTime].filter(Boolean).join(' · ') : 'Aún no hay episodios anunciados';
         return {
             main: `<button type="button" class="evb guest" data-tp-auth>${I.login}&nbsp;Entrar</button>`,
-            state: `<div class="est"><b class="mu">${I.eyeOff}Entra para marcar lo que ves</b>`
-                + `<div class="eprog"><span>${esc([plural(c.total, 'episodio', 'episodios'), totalTime].filter(Boolean).join(' · '))}</span></div></div>`,
+            state: `<div class="est"><b class="mu">${announced ? I.bell : I.eyeOff}${announced ? 'Entra y te avisaremos del estreno' : 'Entra para marcar lo que ves'}</b>`
+                + `<div class="eprog"><span>${esc(line)}</span></div></div>`,
             rest: '',
         };
     }

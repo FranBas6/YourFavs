@@ -251,6 +251,8 @@ const rows = tp ? tp.eps.map((x, i) => {
         soon: cd ? (cd.unit ? `en ${cd.label}` : cd.n) : x.air ? 'Se estrena' : 'Anunciado',
     };
 }) : [];
+// Sin spoilers: cuántos episodios tienen algo oculto (para «N con spoilers ocultos · Mostrar todo»).
+const hiddenRows = rows.filter((r) => (r.hideStill && r.still) || (r.hideSyn && r.overview) || (r.hideRating && r.rating)).length;
 // Desde 16 episodios, compacta por defecto (el navegador recuerda la que elijas).
 const compact = rows.length >= 16;
 const unseenCount = counts?.remaining.length ?? 0;
@@ -564,6 +566,12 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                                     </div>
                                 )}
                                 <span class="sp"></span>
+                                {hiddenRows > 0 && (
+                                    <span class="tl-hid" data-tp-hidden>
+                                        <Icon name="lucide:eye-off" aria-hidden="true" />{hiddenRows} sin ver con spoilers ocultos
+                                        <button type="button" data-tp-reveal-all>Mostrar todo</button>
+                                    </span>
+                                )}
                                 <div class="tl-seg ic" role="radiogroup" aria-label="Vista de la lista" data-tp-density>
                                     <button type="button" role="radio" aria-checked={compact ? 'false' : 'true'} data-d="img" aria-label="Con fotogramas" title="Con fotogramas"><Icon name="lucide:layout-grid" aria-hidden="true" /></button>
                                     <button type="button" role="radio" aria-checked={compact ? 'true' : 'false'} data-d="cmp" aria-label="Compacta" title="Compacta"><Icon name="lucide:list" aria-hidden="true" /></button>
@@ -643,7 +651,15 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                         {rated.length > 0 && (
                             <section aria-labelledby="tp-notes">
                                 <SectionHeader title="Notas por episodio" icon="chart-column" color="purple" cap="TMDB" headingId="tp-notes" />
-                                <figure class="tch" data-tp-chart>
+                                {/* Todas ocultas: diez barras de «?» no dicen nada, así que una tarjeta con «Mostrar». */}
+                                {shown.length === 0 && (
+                                    <div class="tch-hide" data-tp-chart-hide>
+                                        <Icon name="lucide:eye-off" aria-hidden="true" />
+                                        <span><b>Ocultas hasta que los veas</b><small>Las notas de los {hiddenRatings} episodios sin ver, por el modo sin spoilers.</small></span>
+                                        <button type="button" class="pf-btn sm" data-tp-chart-show><Icon name="lucide:eye" aria-hidden="true" />Mostrar</button>
+                                    </div>
+                                )}
+                                <figure class="tch" data-tp-chart hidden={shown.length === 0} tabindex="-1">
                                     <div class="tch-main">
                                         <div class="tch-g" aria-hidden="true" style={`--n:${bars.length}`}>
                                             {[10, 9, 8, 7, 6, 5, 4].filter((v) => v > chartLo).map((v) => (
@@ -673,7 +689,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                                         {best && <div><span>Mejor</span><b><a href={best.href}>E{best.e} · {best.name}</a> <small>{best.rating}</small></b></div>}
                                         {worst && <div><span>Peor</span><b><a href={worst.href}>E{worst.e} · {worst.name}</a> <small>{worst.rating}</small></b></div>}
                                         {avgShown && <div><span>Media</span><b>{avgShown}<small> · {epWord(shown.length)}</small></b></div>}
-                                        {hiddenRatings > 0 && <div><span>Ocultas</span><b>{hiddenRatings}<small> hasta que las veas</small></b></div>}
+                                        {hiddenRatings > 0 && <div data-tp-hidden-n><span>Ocultas</span><b>{hiddenRatings}<small> hasta que las veas</small></b></div>}
                                     </div>
                                 </figure>
                             </section>
