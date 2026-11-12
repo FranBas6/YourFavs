@@ -35,7 +35,7 @@ import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/share
 import { safeFetch } from '../../../../utils/safeFetch';
 import {
     airState, countdown, decimal, earlierUnseen, epCode, episodeCrew, episodeHref, episodeKind, episodeTags,
-    isPlaceholderTitle, longDate, mediumDate, progressLine, relativeAgo, runtimeLabel, shortDate, tinyDate,
+    isPlaceholderTitle, longDate, mediumDate, progressLine, relativeAgo, runtimeLabel, seasonHref, shortDate, tinyDate,
     todayKey, watchedLabel, PROVIDER_KIND, TAG_STYLE,
 } from '../../../../utils/episodeView';
 
@@ -87,7 +87,6 @@ const tags = d ? episodeTags({ season: season!, episodeType: ep.episode_type, is
 const placeholder = d ? isPlaceholderTitle(ep.name, episode!) : false;
 const title = d ? (placeholder ? `Episodio ${episode}` : ep.name) : '';
 const titleSub = placeholder && air !== 'aired' ? 'Título aún sin anunciar' : '';
-const kicker = season === 0 ? `Especiales · Episodio ${episode}` : `Temporada ${season} · Episodio ${episode}`;
 
 const stills: string[] = d ? (ep.images?.stills ?? []).map((s: any) => s.file_path).filter(Boolean) : [];
 const still = ep?.still_path ?? stills[0] ?? null;
@@ -192,7 +191,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
             <p>{missing.series ? `${missing.series.name} no tiene un episodio ${episode ?? ''} en ${season === 0 ? 'los especiales' : `la temporada ${season ?? ''}`}.` : 'No encontramos esta serie ni este episodio.'}</p>
             <div class="ep-404-b">
                 {missing.series && <a class="pf-btn pri" href={`/serie/${missing.series.id}`}>Ver la serie</a>}
-                {missing.series && missing.seasonExists && <a class="pf-btn" href={`/serie/${missing.series.id}#season-${season}`}>Ver la temporada {season}</a>}
+                {missing.series && missing.seasonExists && <a class="pf-btn" href={seasonHref(missing.series.id, season!)}>Ver la temporada {season}</a>}
                 {!missing.series && <a class="pf-btn pri" href="/">Volver al inicio</a>}
             </div>
         </section>
@@ -215,7 +214,8 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                             <span>Ver la serie<Icon name="lucide:chevron-right" /></span>
                         </a>
                         <div class="eh-k">
-                            <span class="se">{kicker}</span>
+                            {/* «Temporada 2» lleva a su ficha (la de temporada), como «Ver temporada» de la tira. */}
+                            <span class="se"><a href={seasonHref(id!, season!)}>{season === 0 ? 'Especiales' : `Temporada ${season}`}</a> · Episodio {episode}</span>
                             {tags.map((t) => (
                                 <span class="etag" style={`--sb:var(--stamp-${TAG_STYLE[t].color});--si:var(--stamp-${TAG_STYLE[t].color}-ink)`}>
                                     <Icon name={`lucide:${TAG_STYLE[t].icon}`} aria-hidden="true" />{TAG_STYLE[t].label}
@@ -358,7 +358,9 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                             </ul>
                         </details>
                         <span>{strip.length} {strip.length === 1 ? 'episodio' : 'episodios'}</span>
-                        <a href={`/serie/${id}#season-${season}`}>Ver temporada<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                        {/* Subir un nivel (la temporada) o dos (la serie entera). */}
+                        <a href={`${seasonHref(id!, season!)}#e${episode}`}>Ver temporada<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
+                        <a class="etr-sr" href={`/serie/${id}`}>Ver la serie<Icon name="lucide:chevron-right" aria-hidden="true" /></a>
                     </div>
                     <ol data-ep-strip>
                         {strip.map((s) => (

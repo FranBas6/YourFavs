@@ -61,6 +61,10 @@ function init(s: TpState, list: HTMLElement) {
         applyFilter();
     });
 
+    // Llegando con `#e5` (desde la ficha del episodio): si esa fila estaba plegada, se despliega.
+    const target = /^#e\d+$/.test(location.hash) ? rowsBox.querySelector<HTMLElement>(location.hash) : null;
+    if (target?.classList.contains('xtra')) { rowsBox.classList.remove('folded'); target.scrollIntoView(); }
+
     // --- «Mostrar los N episodios» -----------------------------------------------------------------
     const more = list.querySelector<HTMLButtonElement>('[data-tp-more]');
     more?.addEventListener('click', () => {

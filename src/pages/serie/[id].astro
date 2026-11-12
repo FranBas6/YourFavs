@@ -12,7 +12,7 @@ import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
 import '../../styles/shared/spoil.css'; // modo sin spoilers, compartido con la ficha de episodio (TMDB D4)
-import { episodeHref } from '../../utils/episodeView';
+import { episodeHref, seasonHref } from '../../utils/episodeView';
 import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
 } from "../../services/API/Series/InfoSeries";
@@ -942,7 +942,11 @@ const jsonLd = item ? {
                                             <div class="sr-main">
                                                 <div class="sr-head">
                                                     <span class="sr-t">
-                                                        <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
+                                                        {/* El título lleva a la ficha de la temporada; el resto de la fila abre y cierra. */}
+                                                        <a class="sr-tl" href={seasonHref(id, season.season_number)} onclick="event.stopPropagation()" aria-label={`Ficha de ${season.season_number === 0 ? 'los especiales' : `la temporada ${season.season_number}`}`}>
+                                                            <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
+                                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                                                        </a>
                                                         {season.air_date && <small>{season.air_date.slice(0, 4)}</small>}
                                                     </span>
                                                     {seasonTotal > 0 && <span class="sr-n" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>}
@@ -978,9 +982,10 @@ const jsonLd = item ? {
                                             </div>
                                         </summary>
                                         <div class="sr-body space-y-2">
-                                            {/* Botón marcar/desmarcar temporada */}
+                                            {/* Botón marcar/desmarcar temporada y, al lado, su ficha */}
+                                            <div class="sr-acts">
                                             {seasonTotal > 0 && (
-                                                <form method="POST" class="mb-3">
+                                                <form method="POST">
                                                     <input type="hidden" name="actionType" value="watched_season" />
                                                     <input type="hidden" name="season" value={season.season_number} />
                                                     <input type="hidden" name="episodes" value={seasonEpisodes.map((ep) => ep.episode_number).join(',')} />
@@ -990,6 +995,12 @@ const jsonLd = item ? {
                                                     </button>
                                                 </form>
                                             )}
+                                                <a class="btn btn--sm sr-ficha" href={seasonHref(id, season.season_number)}>
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></svg>
+                                                    <span class="ep-dsk">Ficha de la temporada</span><span class="ep-mob">Ver la ficha de la temporada</span>
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                                                </a>
+                                            </div>
                                             {seasonEpisodes.map((episode) => {
                                                 const isWatched = watchedSet.has(`${season.season_number}-${episode.episode_number}`);
                                                 const mark = episodeMark(episode);

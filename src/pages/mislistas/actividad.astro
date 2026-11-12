@@ -13,6 +13,7 @@ import { getSeasonRuntimes, seasonKey } from "../../services/API/Series/seasonRu
 import Stamp from "../../components/Stamp.astro";
 import { Icon } from "astro-icon/components";
 import { appDateParts, APP_TZ } from "../../utils/appTime";
+import { seasonHref } from "../../utils/episodeView";
 import "../../styles/pages/personal/actividad.css";
 
 const url = new URL(Astro.request.url);
@@ -842,7 +843,7 @@ const monthSep = [
                                                 </>
                                             )}
                                             {binge && binge.mode === 'season' && (
-                                                <div class="ac-eps"><a class="ac-e sc done" href={`/serie/${r.id}#season-${binge.season}`}>T{binge.season} <Icon name="lucide:check" /></a></div>
+                                                <div class="ac-eps"><a class="ac-e sc done" href={seasonHref(r.id, binge.season)}>T{binge.season} <Icon name="lucide:check" /></a></div>
                                             )}
                                             {binge && binge.mode === 'summary' && (
                                                 <>
@@ -850,7 +851,7 @@ const monthSep = [
                                                     {binge.pct !== null && <div class="ac-bar"><i><b style={`width: ${binge.pct}%`}></b></i><span>{binge.pct} %</span></div>}
                                                     <button type="button" class="ac-hrs" aria-expanded="false">Ver desglose <Icon name="lucide:chevron-down" /></button>
                                                     <div class="ac-eps ac-break" hidden>
-                                                        {binge.breakdown.map((ch) => <a class:list={['ac-e', 'sc', { done: ch.done }]} href={`/serie/${r.id}#season-${ch.label.match(/T(\d+)/)?.[1] ?? ''}`}>{ch.label}</a>)}
+                                                        {binge.breakdown.map((ch) => <a class:list={['ac-e', 'sc', { done: ch.done }]} href={(() => { const n = ch.label.match(/T(\d+)/)?.[1]; return n ? seasonHref(r.id, Number(n)) : `/serie/${r.id}`; })()}>{ch.label}</a>)}
                                                     </div>
                                                 </>
                                             )}
