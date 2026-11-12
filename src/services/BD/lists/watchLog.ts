@@ -96,6 +96,8 @@ interface AppendInput {
     season?: number;
     episode?: number;
     watched_on?: string;
+    /** Hora real del visionado (al deshacer un desmarcado: la que tenía). Sin ella, ahora. */
+    logged_at?: string;
     note?: string;
     /** Si ya hay una entrada del mismo item, NO añadir otra (evita duplicar al
      *  mover entre listas "visto" o curar algo ya visto). Para pelís vía listas. */
@@ -127,7 +129,7 @@ export async function appendWatchLog(e: AppendInput): Promise<{ rewatch: boolean
         tmdb_id: tmdbId,
         watched_on: e.watched_on || todayISO(),
         rewatch,
-        logged_at: new Date().toISOString(),
+        logged_at: e.logged_at || new Date().toISOString(),
         season: isEp ? e.season! : null,
         episode: isEp ? e.episode! : null,
         note: e.note ? String(e.note).slice(0, 500) : null,

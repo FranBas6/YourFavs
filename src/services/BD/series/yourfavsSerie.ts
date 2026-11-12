@@ -475,7 +475,7 @@ export async function restoreWatchedEpisodes(
         for (const r of rows) {
             if (!back.has(r.episode)) continue;
             const watched_on = r.watched_at ? appDateParts(new Date(r.watched_at).getTime()).key : undefined;
-            try { await appendWatchLog({ media_type: 'tv', tmdb_id: serieId, season, episode: r.episode, watched_on }); } catch { /* diario opcional */ }
+            try { await appendWatchLog({ media_type: 'tv', tmdb_id: serieId, season, episode: r.episode, watched_on, logged_at: r.watched_at ?? undefined }); } catch { /* diario opcional */ }
         }
     }
     await bustYearStats();
