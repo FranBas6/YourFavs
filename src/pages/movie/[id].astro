@@ -2,7 +2,7 @@
 import Layout from "../../layouts/Layout.astro";
 import type { CastMember, ProductionCompany } from "../../types/Media";
 import {
-    getLanguageDisplayName, getContentRating,
+    getLanguageDisplayName, getContentRating, distinctOriginalTitle,
     formatDate, formatTrailerUrl, providerLinks
 } from "../../utils/constants/helpers/media-helpers";
 import {formatCurrency} from "../../utils/constants/helpers/movie-helpers";
@@ -173,6 +173,8 @@ const additionalInfo: Record<string, any> = bundle?.additionalInfo ?? { keywords
 const allVideos: any[] = bundle?.videos ?? [];
 const reviewsData = bundle?.reviews ?? { results: [] };
 const movieLogo = bundle?.logo ?? null;
+// Bajo el título, el original si es otro («Eternal Sunshine of the Spotless Mind» bajo «¡Olvídate de mí!»).
+const originalTitle = distinctOriginalTitle(item?.title, item?.original_title);
 
 // La saga se pide una vez y sus ids sirven también para no recomendar la propia saga (C3).
 const collectionPromise = item?.belongs_to_collection ? getMovieCollectionInfo(item.belongs_to_collection.id).catch(() => null) : Promise.resolve(null);
@@ -323,6 +325,7 @@ const jsonLd = item ? {
                         {movieLogo
                             ? <h1 class="fh-logo"><img src={movieLogo} alt={item?.title} /></h1>
                             : <h1 class="fh-title">{item?.title}</h1>}
+                        {originalTitle && <p class="fh-orig" lang={item?.original_language || undefined}>{originalTitle}</p>}
                         {additionalInfo.tagline && <p class="fh-tag">“{additionalInfo.tagline}”</p>}
                         <div class="fh-facts">
                             {item?.vote_average > 0 && <span class="fh-rt"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>{item.vote_average.toFixed(1).replace('.', ',')}</span>}
