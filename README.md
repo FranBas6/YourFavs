@@ -202,6 +202,10 @@ Spanish; it is the one I use every day.
 
 ---
 
+More about this project and my other work on my portfolio: [franbasguil.netlify.app](https://franbasguil.netlify.app/en/projects/yourfavs/)
+
+---
+
 <p align="center">
   <sub>This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability by JustWatch.</sub>
 </p>
