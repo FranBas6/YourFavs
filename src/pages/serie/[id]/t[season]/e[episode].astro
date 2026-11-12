@@ -145,9 +145,12 @@ const canMark = air !== 'soon';
 // «Ver en {plataforma}»: la suscripción de esta temporada en tu país, mejor si es una de las tuyas.
 const region = getCurrentRegion();
 const myPlatforms = new Set<number>(((user as any)?.platforms ?? []).map(Number));
-const regionProviders: any[] = (seasonProviders?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
+// Si TMDB no tiene el dato de la temporada en tu país (muchas series), lo de la serie, y se dice así.
+const providersFromSeries = !(seasonProviders?.providersByCountry?.[region] ?? []).length && (d?.series.providers.providersByCountry[region] ?? []).length > 0;
+const where = providersFromSeries ? d!.series.providers : seasonProviders;
+const regionProviders: any[] = (where?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
 const provider = regionProviders.find((p) => myPlatforms.has(Number(p.provider_id))) ?? regionProviders[0] ?? null;
-const providerLink = seasonProviders?.linkByCountry?.[region] ?? null;
+const providerLink = where?.linkByCountry?.[region] ?? null;
 const imdbId: string | null = ep?.external_ids?.imdb_id ?? null;
 
 // Para el script: lo que necesita para recalcular sin recargar.
@@ -169,7 +172,7 @@ const unseenHidden = !seenThis;
 const blurSynopsis = hideSynopsis && unseenHidden;
 const blurGallery = hideStills && unseenHidden;
 const regionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === region)?.label ?? region;
-const allProviders: any[] = seasonProviders?.providersByCountry?.[region] ?? [];
+const allProviders: any[] = where?.providersByCountry?.[region] ?? [];
 const originNotSpain = !(d?.series.origin_country ?? []).includes('ES');
 // Filas del equipo: si falta un dato, en uno sin emitir sale «Sin confirmar»; si ya se emitió, la fila no sale.
 const crewRows = ([
@@ -482,7 +485,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                     </section>
 
                     <section class="esc" aria-labelledby="ep-where">
-                        <h3 id="ep-where">Dónde ver {season === 0 ? 'los especiales' : `la T${season}`}<small>{regionLabel}</small></h3>
+                        <h3 id="ep-where">{providersFromSeries ? 'Dónde ver la serie' : `Dónde ver ${season === 0 ? 'los especiales' : `la T${season}`}`}<small>{regionLabel}</small></h3>
                         {allProviders.length > 0 ? (
                             <ul class="prv">
                                 {allProviders.slice(0, 6).map((p) => (
@@ -496,6 +499,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                         ) : (
                             <p class="prv-e">No está en plataformas de {regionLabel} ahora mismo.</p>
                         )}
+                        {providersFromSeries && <p class="prv-note">No hay datos de esta temporada en concreto: es lo de la serie entera, así que puede que este episodio aún no esté.</p>}
                         <p class="prv-jw">Disponibilidad por <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a></p>
                     </section>
 

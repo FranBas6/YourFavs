@@ -13,7 +13,7 @@
  * `yf:season-watched`; si algo falla, `yf:season-error`.
  */
 import { showToast } from '../social/toast';
-import { seasonBar, seasonChip, type TpState } from '../../utils/seasonView';
+import { seasonBar, seasonChip, seasonSide, type TpState } from '../../utils/seasonView';
 
 const raw = document.getElementById('tp-data')?.textContent;
 if (raw) init(JSON.parse(raw) as TpState);
@@ -37,6 +37,8 @@ function init(s: TpState) {
         if (fresh) slot('main').querySelector('[data-tp-all]')?.classList.add('fresh');
         slot('state').innerHTML = b.state;
         slot('rest').innerHTML = b.rest;
+        const side = document.querySelector<HTMLElement>('[data-tp-side]');
+        if (side) side.innerHTML = seasonSide(s);
         // La pastilla de esta temporada en la tira de navegación.
         const chip = document.querySelector<HTMLElement>('[data-tp-chip]');
         if (chip) {

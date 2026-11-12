@@ -15,6 +15,9 @@
  *   · Episodios (`.tl`, paso 3): con fotograma o compacta (desde 16 episodios, y se recuerda), filtro
  *     «Sin ver», «Visto» en cada fila y «Te toca» destacado. No se despliegan: el detalle está en la
  *     ficha del episodio. `scripts/serie/seasonList.ts` las mantiene al día al marcar.
+ *   · Cuerpo (paso 4): notas por episodio (barras con la paleta de la tira, mejor y peor), reparto y
+ *     equipo de la temporada con su nº de episodios (`aggregate_credits`), vídeos y pósters. Lateral: Tu
+ *     temporada (`seasonSide`), Esta temporada, dónde verla y amigos (de la serie).
  */
 import Layout from '../../../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
@@ -30,12 +33,14 @@ import { getCurrentRegion } from '../../../../services/BD/shared/userScope';
 import { getSeasonWatchProviders } from '../../../../services/API/Series/InfoSeries';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 import { backdropUrl, posterUrl, stillUrl } from '../../../../services/API/shared/tmdbClient';
-import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seenLabel, type TpState } from '../../../../utils/seasonView';
+import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seasonSide, seenLabel, type TpState } from '../../../../utils/seasonView';
+import FriendsSeen from '../../../../components/detail/FriendsSeen.astro';
+import { SUPPORTED_COUNTRIES } from '../../../../services/API/shared/tmdbInfoService';
 import SectionHeader from '../../../../components/SectionHeader.astro';
 import { safeFetch } from '../../../../utils/safeFetch';
 import { distinctOriginalTitle } from '../../../../utils/constants/helpers/media-helpers';
 import {
-    airState, countdown, dateRange, decimal, episodeCrew, episodeHref, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
+    airState, countdown, dateRange, decimal, episodeCrew, episodeHref, mediumDate, PROVIDER_KIND, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
     relativeAgo, runtimeLabel, seasonHref, seasonLabel, shortDate, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
 } from '../../../../utils/episodeView';
 
@@ -150,12 +155,17 @@ const tp: TpState | null = d ? {
 } : null;
 const bar = tp ? seasonBar(tp) : null;
 
-// «Ver en {plataforma}»: la suscripción de esta temporada en tu país, mejor si es una de las tuyas.
+// Dónde verla: lo de esta temporada en tu país; si TMDB no lo tiene (muchas series), lo de la serie,
+// y se dice así. Una anunciada no hereda nada: aún no está en ninguna parte.
 const region = getCurrentRegion();
+const seasonHas = (seasonProviders?.providersByCountry?.[region] ?? []).length > 0;
+const providersFromSeries = !seasonHas && status !== 'announced' && (d?.series.providers.providersByCountry[region] ?? []).length > 0;
+const where = providersFromSeries ? d!.series.providers : seasonProviders;
+// «Ver en {plataforma}»: la suscripción en tu país, mejor si es una de las tuyas.
 const myPlatforms = new Set<number>(((user as any)?.platforms ?? []).map(Number));
-const regionProviders: any[] = (seasonProviders?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
+const regionProviders: any[] = (where?.providersByCountry?.[region] ?? []).filter((p: any) => p.type === 'flatrate');
 const provider = regionProviders.find((p) => myPlatforms.has(Number(p.provider_id))) ?? regionProviders[0] ?? null;
-const providerLink = seasonProviders?.linkByCountry?.[region] ?? null;
+const providerLink = where?.linkByCountry?.[region] ?? null;
 // «T2 · Separación», el comentario con que llega «Enviar a…».
 const sendMsg = d ? `${season === 0 ? 'Especiales' : `Temporada ${season}`} · ${seriesName}` : '';
 
@@ -246,6 +256,97 @@ const compact = rows.length >= 16;
 const unseenCount = counts?.remaining.length ?? 0;
 // Anunciada y larga: los 5 primeros y «Mostrar los N».
 const foldAt = counts && !counts.aired.length && rows.length > 5 ? 5 : 0;
+
+// --- Notas por episodio (paso 4) ----------------------------------------------------------------
+// Banda de color como la tira del acordeón (≥ 9 · 8 · 7 · 6,5); la paleta es la que elegiste en Ajustes.
+const band = (v: number) => (v >= 9 ? 'high' : v >= 8 ? 'med' : v >= 7 ? 'low' : v >= 6.5 ? 'fair' : 'poor');
+const rated = rows.filter((r) => r.rating);
+const chartLo = Math.min(6, Math.floor(Math.min(...rated.map((r) => Number(r.rating!.replace(',', '.'))), 6)));
+const CH_H = 150; // alto de la barra de 10
+const shown = rated.filter((r) => !r.hideRating);
+const valueOf = (r: (typeof rows)[number]) => Number(r.rating!.replace(',', '.'));
+const best = shown.length > 1 ? shown.reduce((a, r) => (valueOf(r) > valueOf(a) ? r : a)) : null;
+const worst = shown.length > 1 ? shown.reduce((a, r) => (valueOf(r) < valueOf(a) ? r : a)) : null;
+const bars = rows.map((r) => {
+    const v = r.rating ? valueOf(r) : 0;
+    return {
+        e: r.e, seen: r.seen, aired: r.aired, rating: r.rating, hidden: !!r.rating && r.hideRating,
+        h: v ? Math.max(6, Math.round(((v - chartLo) / (10 - chartLo)) * CH_H)) : 0,
+        band: v ? band(v) : 'poor',
+        best: !!best && r.e === best.e && valueOf(best) !== valueOf(worst!),
+        worst: !!worst && r.e === worst.e && valueOf(best!) !== valueOf(worst),
+    };
+});
+const hiddenRatings = rated.length - shown.length;
+const avgShown = shown.length ? decimal(shown.reduce((n, r) => n + valueOf(r), 0) / shown.length) : null;
+const bandsUsed = new Set(bars.filter((b) => b.rating && !b.hidden).map((b) => b.band));
+const legend = [
+    ['high', '9 o más'], ['med', '8–8,9'], ['low', '7–7,9'], ['fair', '6,5–6,9'], ['poor', 'menos de 6,5'],
+].filter(([k]) => bandsUsed.has(k as string));
+const chartAlt = `Notas de TMDB por episodio: ${bars.map((b) => !b.aired ? `E${b.e} sin emitir` : b.hidden ? `E${b.e} oculta` : b.rating ? `E${b.e} ${b.rating}` : `E${b.e} sin nota`).join(', ')}.`;
+
+// --- Reparto y equipo de la temporada (aggregate_credits) -----------------------------------------
+const epWord = (n: number) => `${n} ${n === 1 ? 'episodio' : 'episodios'}`;
+const cast = ((s?.aggregate_credits?.cast ?? []) as any[])
+    .slice().sort((a, b) => (Number(b.total_episode_count) || 0) - (Number(a.total_episode_count) || 0))
+    .slice(0, 24)
+    .map((p) => {
+        // En animación llega «Homer Simpson / Abe Simpson / Barney… (voice)»: el primero y «y N más».
+        const roles: string[] = (p.roles ?? []).flatMap((r: any) => String(r.character ?? '').split(' / ')).map((x: string) => x.replace(/\s*\(voice\)$/i, '').trim()).filter(Boolean);
+        const character = roles.length > 1 ? `${roles[0]} y ${roles.length - 1} más` : roles[0] ?? '';
+        return { id: p.id, name: p.name ?? '', character, profile_path: p.profile_path ?? null, eps: Number(p.total_episode_count) || 0 };
+    });
+const CAST_CAP = 8;
+const CREW_JOBS: [string, string[], number][] = [
+    ['Dirección', ['Director'], 6], ['Guion', ['Writer', 'Teleplay', 'Screenplay'], 6], ['Música', ['Original Music Composer', 'Composer', 'Music'], 2],
+];
+const crewRows = CREW_JOBS.flatMap(([label, jobs, cap]) => ((s?.aggregate_credits?.crew ?? []) as any[])
+    .map((p) => ({ name: String(p.name ?? ''), eps: (p.jobs ?? []).filter((j: any) => jobs.includes(j.job)).reduce((n: number, j: any) => Math.max(n, Number(j.episode_count) || 0), 0) }))
+    .filter((p) => p.name && p.eps > 0)
+    .sort((a, b) => b.eps - a.eps)
+    .slice(0, cap)
+    .map((p) => ({ label, ...p })));
+
+// --- Vídeos y pósters -------------------------------------------------------------------------------
+const VIDEO_TYPE: Record<string, string> = {
+    Trailer: 'Tráiler', Teaser: 'Avance', Featurette: 'Reportaje', 'Behind the Scenes': 'Detrás de las cámaras',
+    Clip: 'Clip', 'Opening Credits': 'Cabecera', Recap: 'Resumen', Bloopers: 'Tomas falsas',
+};
+const VIDEO_ORDER = ['Trailer', 'Teaser', 'Clip', 'Featurette', 'Behind the Scenes', 'Opening Credits', 'Recap', 'Bloopers'];
+const videos = ((s?.videos?.results ?? []) as any[])
+    .filter((v) => v.site === 'YouTube' && v.key)
+    .sort((a, b) => (VIDEO_ORDER.indexOf(a.type) + 1 || 99) - (VIDEO_ORDER.indexOf(b.type) + 1 || 99))
+    .slice(0, 4)
+    .map((v) => ({ key: String(v.key), name: String(v.name ?? ''), type: VIDEO_TYPE[v.type] ?? String(v.type ?? '') }));
+const posterList = posters.slice(0, 24);
+
+// --- Lateral --------------------------------------------------------------------------------------
+const regionLabel = SUPPORTED_COUNTRIES.find((c) => c.code === region)?.label ?? region;
+const allProviders: any[] = where?.providersByCountry?.[region] ?? [];
+const lastAir = dated.at(-1) ?? null;
+const airedRuntimes = (tp?.eps ?? []).filter((x) => x.runtime);
+const avgRuntime = airedRuntimes.length ? runtimeLabel(Math.round(airedRuntimes.reduce((n, x) => n + x.runtime!, 0) / airedRuntimes.length)) : null;
+const topDirectors = crewRows.filter((r) => r.label === 'Dirección');
+const sideInfo = {
+    premiere: premiere ? mediumDate(premiere) : null,
+    premiereSmall: premiere ? relativeAgo(premiere, today) : '',
+    last: lastAir && lastAir !== premiere ? mediumDate(lastAir) : null,
+    lastSmall: lastAir && lastAir > today ? 'previsto' : '',
+    episodes: epCount ? `${epCount}` : null,
+    episodesSmall: counts && counts.aired.length < epCount ? (counts.aired.length ? `${counts.aired.length} emitidos` : 'títulos sin anunciar') : '',
+    runtime: totalRuntime && status !== 'announced' ? totalRuntime : null,
+    runtimeSmall: avgRuntime ? `${avgRuntime} de media` : '',
+    score: score,
+    scoreSmall: voted.length ? `media de ${epWord(voted.length)}` : '',
+    // Mejor episodio: sin spoilers, solo si has visto toda la temporada (si no, delata notas).
+    best: best && (!spoilerFree || !counts?.remaining.length) ? `E${best.e} · ${best.name}` : null,
+    bestHref: best ? best.href : '',
+    bestSmall: best ? best.rating! : '',
+    director: topDirectors[0] ? topDirectors[0].name : null,
+    directorMore: topDirectors.length > 1 ? `y ${topDirectors.length - 1} más` : '',
+    createdBy: d?.series.created_by.map((c) => c.name).filter(Boolean) ?? [],
+};
+const side = tp ? seasonSide(tp) : '';
 
 const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
 ---
@@ -428,9 +529,30 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                 ))}
             </div>
             <!-- Cuerpo: episodios (y, en el paso 4, notas, reparto, vídeos y el lateral) -->
-            {rows.length > 0 && (
+            {d && (
                 <div class="eb tpb">
                     <div class="eb-m">
+                        {/* Anunciada: el tráiler es lo más interesante que hay, así que sube arriba. */}
+                        {status === 'announced' && videos.length > 0 && (
+                            <section aria-labelledby="tp-vids-top">
+                                <SectionHeader title="Vídeos de la temporada" icon="play" color="red" cap={`${videos.length} ${videos.length === 1 ? 'vídeo' : 'vídeos'}`} headingId="tp-vids-top" />
+                                <div class="vids">
+                                    {videos.map((v) => (
+                                        <figure class="vid">
+                                            <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                            <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+                        {rows.length === 0 && (
+                            <section aria-labelledby="tp-eps">
+                                <SectionHeader title="Episodios" icon="list" color="blue" headingId="tp-eps" />
+                                <p class="syn-e"><Icon name="lucide:clock" aria-hidden="true" />Aún no hay episodios anunciados. TMDB suele publicarlos unas semanas antes del estreno.</p>
+                            </section>
+                        )}
+                        {rows.length > 0 && (
                         <section aria-labelledby="tp-eps" data-tp-list>
                             <SectionHeader title="Episodios" icon="list" color="blue" headingId="tp-eps"
                                 cap={counts!.aired.length < rows.length ? `${rows.length} ${counts!.aired.length ? 'episodios' : 'anunciados'}${counts!.aired.length ? ` · ${counts!.aired.length} emitidos` : ''}` : `${rows.length} episodios`} />
@@ -516,9 +638,157 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                             )}
                             <p class="tl-empty" data-tp-empty hidden>Ya has visto todos los episodios emitidos.</p>
                         </section>
+                        )}
+
+                        {rated.length > 0 && (
+                            <section aria-labelledby="tp-notes">
+                                <SectionHeader title="Notas por episodio" icon="chart-column" color="purple" cap="TMDB" headingId="tp-notes" />
+                                <figure class="tch" data-tp-chart>
+                                    <div class="tch-main">
+                                        <div class="tch-g" aria-hidden="true" style={`--n:${bars.length}`}>
+                                            {[10, 9, 8, 7, 6, 5, 4].filter((v) => v > chartLo).map((v) => (
+                                                <span class="gl" style={`bottom:${26 + Math.round(((v - chartLo) / (10 - chartLo)) * CH_H)}px`}><span>{v}</span></span>
+                                            ))}
+                                            {bars.map((b) => (
+                                                <div class:list={['tch-b', { u: !b.aired, nr: b.aired && !b.rating, hid: b.hidden, nw: tp!.logged && !b.seen, best: b.best, worst: b.worst, cur: b.e === nextE }]}
+                                                    style={`--c:var(--ep-q-${b.band})`} data-tp-bar={b.e} data-v={b.hidden ? b.rating : undefined} data-h={b.hidden ? b.h : undefined}>
+                                                    {b.best && <span class="tg">Mejor</span>}
+                                                    {b.worst && <span class="tg">Peor</span>}
+                                                    <span class="v">{!b.aired || !b.rating ? '' : b.hidden ? '?' : b.rating}</span>
+                                                    <span class="bar" style={b.rating && !b.hidden ? `height:${b.h}px` : undefined}></span>
+                                                    {tp!.logged && b.seen && <span class="dot"></span>}
+                                                    <span class="e">{bars.length > 14 ? b.e : `E${b.e}`}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <figcaption class="sr-only">{chartAlt}</figcaption>
+                                        <div class="tch-lg">
+                                            {legend.map(([k, l]) => <span><i style={`--c:var(--ep-q-${k})`}></i>{l}</span>)}
+                                            {tp!.logged && <span><i class="o" style="--c:var(--ep-q-med)"></i>sin ver</span>}
+                                            {hiddenRatings > 0 && <span><i class="h"></i>oculta (sin spoilers)</span>}
+                                            {tp!.logged && <a href="/perfil/apariencia">Cambiar colores</a>}
+                                        </div>
+                                    </div>
+                                    <div class="tch-s">
+                                        {best && <div><span>Mejor</span><b><a href={best.href}>E{best.e} · {best.name}</a> <small>{best.rating}</small></b></div>}
+                                        {worst && <div><span>Peor</span><b><a href={worst.href}>E{worst.e} · {worst.name}</a> <small>{worst.rating}</small></b></div>}
+                                        {avgShown && <div><span>Media</span><b>{avgShown}<small> · {epWord(shown.length)}</small></b></div>}
+                                        {hiddenRatings > 0 && <div><span>Ocultas</span><b>{hiddenRatings}<small> hasta que las veas</small></b></div>}
+                                    </div>
+                                </figure>
+                            </section>
+                        )}
+
+                        {cast.length > 0 && (
+                            <section aria-labelledby="tp-cast">
+                                <SectionHeader title="Reparto de la temporada" icon="users" color="blue" cap={`${(s.aggregate_credits?.cast ?? []).length} personas`} headingId="tp-cast" />
+                                <div class="cast-b" data-cast>
+                                    <div class="pcg">
+                                        {cast.map((p, i) => (
+                                            <a class:list={['pc', { xtra: i >= CAST_CAP }]} href={`/actor/${p.id}`}>
+                                                {p.profile_path ? <img src={posterUrl(p.profile_path, 'w185')} alt="" loading="lazy" /> : <span class="pc-ph" aria-hidden="true">{p.name.charAt(0)}</span>}
+                                                <span class="pc-t"><b>{p.name}</b><span>{p.character}</span>{p.eps > 0 && <em><Icon name="lucide:list" aria-hidden="true" />{epWord(p.eps)}</em>}</span>
+                                            </a>
+                                        ))}
+                                    </div>
+                                    {cast.length > CAST_CAP && <button type="button" class="more" aria-expanded="false" data-more><Icon name="lucide:chevron-down" aria-hidden="true" />Mostrar {cast.length === (s.aggregate_credits?.cast ?? []).length ? `las ${cast.length}` : `las ${cast.length} principales`}</button>}
+                                </div>
+                            </section>
+                        )}
+
+                        {crewRows.length > 0 && (
+                            <section aria-labelledby="tp-crew">
+                                <SectionHeader title="Dirección y guion" icon="clapperboard" color="slate" headingId="tp-crew" />
+                                <dl class="tcw">
+                                    {crewRows.map((r) => (
+                                        <div><dt>{r.label}</dt><dd><a href={`/team/${encodeURIComponent(r.name)}`}>{r.name}</a></dd><small>{epWord(r.eps)}</small></div>
+                                    ))}
+                                </dl>
+                            </section>
+                        )}
+
+                        {status !== 'announced' && videos.length > 0 && (
+                            <section aria-labelledby="tp-vids">
+                                <SectionHeader title="Vídeos de la temporada" icon="play" color="red" cap={`${videos.length} ${videos.length === 1 ? 'vídeo' : 'vídeos'}`} headingId="tp-vids" />
+                                <div class="vids">
+                                    {videos.map((v) => (
+                                        <figure class="vid">
+                                            <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                            <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
+                                        </figure>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
+                        {posterList.length > 1 && (
+                            <section aria-labelledby="tp-posters" id="posters">
+                                <SectionHeader title="Pósters de la temporada" icon="image" color="purple" cap={`${posters.length} pósters`} headingId="tp-posters" />
+                                <div class="tpg">
+                                    {posterList.map((p, i) => (
+                                        <a href={`#poster-${i}`} aria-label={`Póster ${i + 1} de ${posterList.length}`}><img src={posterUrl(p, 'w185')} alt="" loading="lazy" /></a>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                     </div>
+
+                    <aside class="eb-s">
+                        <div class="tea-slot" data-tp-side set:html={side}></div>
+
+                        <section class="esc" aria-labelledby="tp-info">
+                            <h3 id="tp-info">{season === 0 ? 'Los especiales' : 'Esta temporada'}</h3>
+                            <dl>
+                                <dt>Estreno</dt>
+                                <dd>{sideInfo.premiere ? <>{sideInfo.premiere}{sideInfo.premiereSmall && <small>{sideInfo.premiereSmall}</small>}</> : <span class="mu">Por anunciar</span>}</dd>
+                                {sideInfo.last && <><dt>Final</dt><dd>{sideInfo.last}{sideInfo.lastSmall && <small>{sideInfo.lastSmall}</small>}</dd></>}
+                                <dt>Episodios</dt>
+                                <dd>{sideInfo.episodes ?? <span class="mu">Sin anunciar</span>}{sideInfo.episodesSmall && <small>{sideInfo.episodesSmall}</small>}</dd>
+                                <dt>Duración</dt>
+                                <dd>{sideInfo.runtime ? <>{sideInfo.runtime}{sideInfo.runtimeSmall && <small>{sideInfo.runtimeSmall}</small>}</> : <span class="mu">Sin confirmar</span>}</dd>
+                                <dt>Nota TMDB</dt>
+                                <dd>{sideInfo.score ? <span class="ep-rt"><Icon name="lucide:star" aria-hidden="true" />{sideInfo.score}{sideInfo.scoreSmall && <small>{sideInfo.scoreSmall}</small>}</span> : <span class="mu">{status === 'announced' ? 'Sin nota hasta que se emita' : 'Sin votos todavía'}</span>}</dd>
+                                {sideInfo.best && <><dt>Mejor</dt><dd><a href={sideInfo.bestHref}>{sideInfo.best}</a><small>★ {sideInfo.bestSmall}</small></dd></>}
+                                {(sideInfo.director || sideInfo.createdBy.length > 0) && <hr />}
+                                {sideInfo.director && <><dt>Dirección</dt><dd><a href={`/team/${encodeURIComponent(sideInfo.director)}`}>{sideInfo.director}</a>{sideInfo.directorMore && ` ${sideInfo.directorMore}`}</dd></>}
+                                {sideInfo.createdBy.length > 0 && <><dt>Creada por</dt><dd>{sideInfo.createdBy.map((n, i) => <>{i > 0 && (i === sideInfo.createdBy.length - 1 ? ' y ' : ', ')}<a href={`/team/${encodeURIComponent(n)}`}>{n}</a></>)}</dd></>}
+                            </dl>
+                        </section>
+
+                        <section class="esc" aria-labelledby="tp-where">
+                            <h3 id="tp-where">{providersFromSeries ? 'Dónde ver la serie' : `Dónde ver ${season === 0 ? 'los especiales' : `la T${season}`}`}<small>{regionLabel}</small></h3>
+                            {allProviders.length > 0 ? (
+                                <ul class="prv">
+                                    {allProviders.slice(0, 6).map((p) => (
+                                        <li class="prv-r">
+                                            {p.logo_path ? <img src={posterUrl(p.logo_path, 'w92')} alt="" loading="lazy" /> : <span class="lg" aria-hidden="true">{p.provider_name.slice(0, 2)}</span>}
+                                            <span>{p.provider_name}<small>{PROVIDER_KIND[p.type] ?? ''}</small></span>
+                                            {providerLink && <a class="pf-btn sm" href={providerLink} target="_blank" rel="noopener" aria-label={`Ver en ${p.provider_name}`}>Ver</a>}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <p class="prv-e">{status === 'announced' ? 'Aún no está en ninguna plataforma.' : `No está en plataformas de ${regionLabel} ahora mismo.`}</p>
+                            )}
+                            {providersFromSeries && <p class="prv-note">No hay datos de {season === 0 ? 'los especiales' : 'esta temporada'} en concreto: es lo de la serie entera, así que puede que {season === 0 ? 'no estén' : 'aún no esté'} {season === 0 ? 'todos' : 'incluida'}.</p>}
+                            <p class="prv-jw">Disponibilidad por <a href="https://www.justwatch.com" target="_blank" rel="noopener">JustWatch</a></p>
+                        </section>
+
+                        <FriendsSeen mediaType="tv" tmdbId={id!} note="de la serie" />
+                    </aside>
                 </div>
             )}
+
+            <!-- Visor de pósters (CSS :target de detail-common.css, como el de fotogramas del episodio) -->
+            {posterList.length > 1 && posterList.map((p, i) => (
+                <div id={`poster-${i}`} class="lightbox ep-lb" role="dialog" aria-label={`Póster ${i + 1} de ${posterList.length}`}>
+                    <a href="#posters" class="ep-lb-x" aria-label="Cerrar"></a>
+                    <img src={posterUrl(p, 'w780')} alt={`Póster ${i + 1} de ${title}`} loading="lazy" />
+                    <a href="#posters" class="ep-lb-c" aria-label="Cerrar">&times;</a>
+                    {i > 0 && <a href={`#poster-${i - 1}`} class="ep-lb-p" aria-label="Anterior"><Icon name="lucide:chevron-left" /></a>}
+                    {i < posterList.length - 1 && <a href={`#poster-${i + 1}`} class="ep-lb-n" aria-label="Siguiente"><Icon name="lucide:chevron-right" /></a>}
+                </div>
+            ))}
         </article>
     )}
 </Layout>
@@ -545,6 +815,17 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
         strip.addEventListener('scroll', fades, { passive: true });
         window.addEventListener('resize', fades);
     }
+
+    // «Mostrar las N» del reparto: despliega en el sitio.
+    document.querySelectorAll<HTMLButtonElement>('[data-more]').forEach((b) => {
+        b.addEventListener('click', () => {
+            const box = b.closest<HTMLElement>('[data-cast]');
+            const open = !box?.classList.contains('is-open');
+            box?.classList.toggle('is-open', open);
+            b.setAttribute('aria-expanded', String(open));
+            b.hidden = open;
+        });
+    });
 
     // El selector de temporada se cierra al pulsar fuera o con Escape.
     const sel = document.querySelector<HTMLDetailsElement>('.ssel');

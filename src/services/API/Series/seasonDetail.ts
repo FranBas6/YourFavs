@@ -9,10 +9,14 @@
  *     pósters y vídeos. Pósters y vídeos con `include_*_language` (si no, el idioma del perfil los
  *     filtra y casi nunca queda ninguno).
  *
- * Dónde verla va aparte (`getSeasonWatchProviders`, que ya tiene caché). Sin caché propia: los datos de
+ * Dónde verla va aparte (`getSeasonWatchProviders`, que ya tiene caché). TMDB solo tiene ese dato por
+ * temporada en algunas series y países (*Los Simpson* T38 en España: vacío, aunque la serie está en
+ * Disney+), así que `/tv/{id}` trae también el de la serie (`watch/providers`, sin llamada extra) para
+ * usarlo cuando el de la temporada falte. Sin caché propia: los datos de
  * TMDB se muestran como TMDB los da (regla de Fran, C4), igual que la ficha de episodio.
  */
 import { tmdbFetch } from '../shared/tmdbClient';
+import { buildProviderLinksByCountry, buildProvidersByCountry } from '../shared/tmdbInfoService';
 import { getCurrentLanguage } from '../../BD/shared/userScope';
 
 /** Una temporada de la serie, lo justo para la navegación. */
@@ -43,6 +47,8 @@ export interface SeasonDetail {
         last_season: number;
         /** Temporada del próximo episodio que TMDB anuncia (para «En emisión»), o null. */
         next_air_season: number | null;
+        /** Dónde ver la serie entera, por país (respaldo del de la temporada). */
+        providers: { providersByCountry: Record<string, any[]>; linkByCountry: Record<string, string> };
     };
     /** La respuesta de TMDB de la temporada (con aggregate_credits, images, videos). */
     season: any;
@@ -57,7 +63,7 @@ export interface SeasonMissing {
 export async function getSeasonDetail(seriesId: number, season: number): Promise<SeasonDetail | SeasonMissing> {
     const lang = getCurrentLanguage().split('-')[0];
     const [series, s] = await Promise.all([
-        tmdbFetch<any>(`/tv/${seriesId}`).catch(() => null),
+        tmdbFetch<any>(`/tv/${seriesId}`, { append_to_response: 'watch/providers' }).catch(() => null),
         tmdbFetch<any>(`/tv/${seriesId}/season/${season}`, {
             append_to_response: 'aggregate_credits,images,videos',
             include_image_language: `${lang},en,null`,
@@ -99,6 +105,10 @@ export async function getSeasonDetail(seriesId: number, season: number): Promise
             seasons,
             last_season: Math.max(0, ...seasons.map((x) => x.season_number)),
             next_air_season: series.next_episode_to_air ? Number(series.next_episode_to_air.season_number) : null,
+            providers: {
+                providersByCountry: buildProvidersByCountry(series['watch/providers']?.results ?? {}),
+                linkByCountry: buildProviderLinksByCountry(series['watch/providers']?.results ?? {}),
+            },
         },
         season: s,
     };

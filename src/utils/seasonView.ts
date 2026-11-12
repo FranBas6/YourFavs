@@ -232,3 +232,30 @@ export function seasonCardStatus(o: { logged: boolean; seen: number; count: numb
 export function seenLabel(iso: string, today: string): string {
     return iso ? `Visto ${brief(dayOf(iso), today)}` : 'Visto';
 }
+
+/**
+ * La tarjeta «Tu temporada» del lateral (paso 4): empezada, terminada o por dónde vas, cuánto has visto y
+ * cuánto te queda. '' sin sesión o sin nada visto. La repinta `season.ts` como la barra.
+ */
+export function seasonSide(s: TpState): string {
+    if (!s.logged) return '';
+    const c = seasonCounts(s);
+    if (!c.seenCount) return '';
+    const seenEps = s.eps.filter((x) => x.e in s.watched);
+    const row = (k: string, v: string, small = '') => `<dt>${k}</dt><dd>${v}${small ? `<small>${small}</small>` : ''}</dd>`;
+    let html = '';
+    if (c.firstDay) html += row('Empezada', esc(brief(c.firstDay, s.today)));
+    if (!c.remaining.length && c.aired.length === c.total) {
+        if (c.lastDay) html += row('Terminada', esc(brief(c.lastDay, s.today)));
+    } else if (c.next) {
+        html += row('Vas por', `<a href="${episodeHref(s.seriesId, s.season, c.next.e)}">E${c.next.e} · ${esc(c.next.name)}</a>`);
+    }
+    const seenTime = runtimeLabel(sumMin(seenEps));
+    const allTime = runtimeLabel(sumMin(s.eps));
+    if (seenTime) html += row('Visto', esc(seenTime), allTime && allTime !== seenTime ? `de ${esc(allTime)}` : '');
+    if (c.remaining.length) {
+        const left = runtimeLabel(sumMin(c.remaining));
+        html += row('Te quedan', esc([plural(c.remaining.length, 'episodio', 'episodios'), left].filter(Boolean).join(' · ')));
+    }
+    return `<section class="esc" aria-labelledby="tp-mine"><h3 id="tp-mine">Tu temporada</h3><dl>${html}</dl></section>`;
+}

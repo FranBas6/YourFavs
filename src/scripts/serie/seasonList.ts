@@ -105,6 +105,21 @@ function init(s: TpState, list: HTMLElement) {
                 r.querySelector<HTMLElement>('[data-tp-rh]')?.setAttribute('hidden', '');
             }
         }
+        // La gráfica de notas: pleno = visto, apagado = sin ver; la de «Te toca», con contorno.
+        document.querySelectorAll<HTMLElement>('[data-tp-bar]').forEach((bar) => {
+            const e = Number(bar.dataset.tpBar);
+            const seen = e in s.watched;
+            bar.classList.toggle('nw', !seen);
+            bar.classList.toggle('cur', e === nextE);
+            if (seen && !bar.querySelector('.dot')) bar.querySelector('.bar')?.insertAdjacentHTML('afterend', '<span class="dot"></span>');
+            if (!seen) bar.querySelector('.dot')?.remove();
+            // Sin spoilers: al verlo, su nota se destapa.
+            if (seen && bar.classList.contains('hid') && bar.dataset.v) {
+                bar.classList.remove('hid');
+                bar.querySelector<HTMLElement>('.v')!.textContent = bar.dataset.v;
+                bar.querySelector<HTMLElement>('.bar')!.style.height = `${bar.dataset.h}px`;
+            }
+        });
         const unseen = list.querySelector<HTMLElement>('[data-tp-unseen]');
         if (unseen) unseen.textContent = String(c.remaining.length);
         // El filtro solo tiene sentido si hay vistos y sin ver a la vez (o si está puesto).
