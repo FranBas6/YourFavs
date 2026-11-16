@@ -18,16 +18,16 @@ const { series } = Astro.props;
     <div class="resc-scroll">
         {series.map((s) => (
             <article class="resc-card" data-resc-card data-id={s.id}>
-                <a href={`/serie/${s.id}`} class="resc-poster" aria-label={s.name}>
+                <a href={s.resumeHref} class="resc-poster" aria-label={`${s.name}: seguir por la T${s.lastSeason}`}>
                     {s.poster_path
                         ? <img src={posterUrl(s.poster_path, 'w185')} alt={s.name} loading="lazy" />
                         : <span class="resc-noposter"></span>}
                 </a>
                 <div class="resc-body">
                     <h3 class="resc-title">{s.name}</h3>
-                    <p class="resc-meta">Lo dejaste en la T{s.lastSeason} · {s.watched} eps · {s.label}</p>
+                    <p class="resc-meta">Te toca la T{s.lastSeason} · {s.watched} eps vistos · {s.label.charAt(0).toLowerCase() + s.label.slice(1)}</p>
                     <div class="resc-actions">
-                        <a href={`/serie/${s.id}`} class="btn btn--sm btn--pri">Reanudar</a>
+                        <a href={s.resumeHref} class="btn btn--sm btn--pri">Reanudar</a>
                         <button type="button" class="btn btn--sm" data-resc-abandon={s.id}>Abandonar</button>
                         <button type="button" class="btn btn--sm btn--ghost" data-resc-snooze={s.id}>Recordar en un mes</button>
                     </div>

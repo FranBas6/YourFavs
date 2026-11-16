@@ -7,6 +7,7 @@ import {getGenreName} from "../../utils/constants/genres";
 import {buildUrl} from "../../utils/buildUrl";
 import {posterUrl} from "../../services/API/shared/tmdbClient";
 import {seasonHref} from "../../utils/episodeView";
+import {resumeReason} from "../../utils/resumeReason";
 import {processBatch} from "../../utils/processBatch";
 import ListsNav from "../../components/personal/ListsNav.astro";
 import ListTitle from "../../components/personal/ListTitle.astro";
@@ -124,36 +125,29 @@ const almostDoneSeason: AlmostDoneSeason[] = seriesSiguiendo
     .filter((x): x is AlmostDoneSeason => x !== null)
     .sort((a, b) => a.remaining - b.remaining);
 
-// C14 — Series abandonadas: en emisión, con progreso, último visto > 6 meses
-type Abandoned = { serie: Serie; lastWatchedAt: number; watched: number; lastSeason: number };
+// C14 — Series abandonadas: episodios emitidos sin ver que llevan más de 6 meses esperándote (misma regla
+// que «¿Retomamos alguna?» de la portada, `resumeReason`). Ir al día esperando episodios nuevos no es
+// abandonarla, y una temporada que salió ayer no lleva meses esperando. También las terminadas: dejar una
+// serie acabada a medias es el abandono más claro. El siguiente episodio ya está en `nextEpisodes`.
+type Abandoned = { serie: Serie; since: number; watched: number; lastSeason: number; label: string };
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const abandonedCutoff = Date.now() - SIX_MONTHS_MS;
 const almostDoneSeasonIds = new Set(almostDoneSeason.map(x => String(x.serie.id)));
+const nextById = new Map(nextEpisodes.map((n) => [String(n.id), n]));
 
 const abandonadas: Abandoned[] = seriesSiguiendo
-    .filter(s => {
+    .flatMap((s): Abandoned[] => {
         const id = String(s.id);
-        if (almostDoneIds.has(id) || almostDoneSeasonIds.has(id)) return false;
-        if (s.status === 'Ended' || s.status === 'Canceled') return false;
+        if (almostDoneIds.has(id) || almostDoneSeasonIds.has(id)) return [];
         const w = watchedMap[id];
-        if (!w || !w.lastWatchedAt) return false;
-        return w.watched > 0 && w.lastWatchedAt < abandonedCutoff;
+        const next = nextById.get(id);
+        if (!w || !w.lastWatchedAt || w.watched <= 0 || !next) return [];
+        const why = resumeReason(w.lastWatchedAt, next);
+        if (why.since >= abandonedCutoff) return [];
+        return [{ serie: s, since: why.since, watched: w.watched, lastSeason: next.next_season, label: why.label }];
     })
-    .map(s => {
-        const w = watchedMap[String(s.id)]!;
-        const seasonsWatched = Object.keys(w.bySeasons || {}).map(Number);
-        const lastSeason = seasonsWatched.length > 0 ? Math.max(...seasonsWatched) : 1;
-        return { serie: s, lastWatchedAt: w.lastWatchedAt!, watched: w.watched, lastSeason };
-    })
-    .sort((a, b) => a.lastWatchedAt - b.lastWatchedAt) // más antiguas primero
+    .sort((a, b) => a.since - b.since) // las que más llevan esperando, primero
     .slice(0, 5);
-
-function monthsAgo(timestamp: number): string {
-    const months = Math.floor((Date.now() - timestamp) / (30 * 24 * 60 * 60 * 1000));
-    if (months < 12) return `hace ${months} meses`;
-    const years = Math.floor(months / 12);
-    return years === 1 ? 'hace 1 año' : `hace ${years} años`;
-}
 
 const pageUrl = Astro.url;
 ---
@@ -255,7 +249,7 @@ const pageUrl = Astro.url;
                         </svg>
                     </summary>
                     <div class="px-4 pb-4 grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                        {abandonadas.map(({ serie, lastWatchedAt, watched, lastSeason }) => (
+                        {abandonadas.map(({ serie, label, watched, lastSeason }) => (
                             <a href={seasonHref(serie.id, lastSeason)} class="group/item flex items-center gap-3 bg-white rounded-xl p-3 border border-amber-200 hover:border-amber-400 hover:shadow-md transition">
                                 {serie.poster_path ? (
                                     <img src={posterUrl(serie.poster_path, 'w154')} alt={serie.name} class="w-12 h-16 object-cover rounded flex-shrink-0" loading="lazy"/>
@@ -268,8 +262,10 @@ const pageUrl = Astro.url;
                                         <span class="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-medium whitespace-nowrap">
                                             Retomar T{lastSeason}
                                         </span>
-                                        <span class="text-xs text-gray-500">{watched} eps · {monthsAgo(lastWatchedAt)}</span>
+                                        <span class="text-xs text-gray-500">{watched} eps vistos</span>
                                     </div>
+                                    {/* Por qué está aquí: «T3 disponible desde hace 8 meses» / «Sin ver nada desde hace 2 años» */}
+                                    <div class="mt-1 text-xs text-gray-500">{label}</div>
                                 </div>
                             </a>
                         ))}
