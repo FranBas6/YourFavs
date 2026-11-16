@@ -140,6 +140,8 @@ const isWatchedMovie = isInVistas || isInFavorites || isInLiked || moviePasses.p
 // Kicker del hero (4.3): «PELÍCULA · 1999 · DAVID FINCHER» (hasta dos en codirección).
 const kickerDirectors: string[] = [...new Set(directors.filter((d) => d.job === 'Director').map((d) => d.name))].slice(0, 2);
 const movieTimes = (isWatchedMovie ? 1 : 0) + moviePasses.passes;
+// Vista sin fecha: guardada en Favs / Me gusta sin terminarla aquí → ninguna fila en el diario.
+const movieUndated = isWatchedMovie && !moviePasses.first;
 const watchLastPretty = moviePasses.last ? new Date(moviePasses.last + 'T12:00:00').toLocaleDateString('es-ES', { month: 'short', year: 'numeric' }) : '';
 
 // Efeméride "tu historia con esta peli" (§6 detalles con alma): fecha del primer
@@ -366,6 +368,7 @@ const jsonLd = item ? {
             times={movieTimes}
             lastPretty={watchLastPretty}
             efemeride={movieEfemeride}
+            undated={movieUndated}
             unreleased={isUnreleased}
             releaseLabel={isUnreleased ? formatDate(item?.release_date) : ''}
             notif={isNotifSubscribed}

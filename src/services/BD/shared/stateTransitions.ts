@@ -11,7 +11,10 @@
  *   - Marcar CONSUMIDO (Visto/Fav/Like) limpia el progreso (Pendiente/Ver pronto/
  *     Viendo — en series, Siguiendo hace de "Viendo").
  *   - La opinión es de un solo nivel: Favorito y Me gusta se excluyen mutuamente.
- *   - Fav/Like añaden Visto (paraguas "consumido").
+ *   - Fav/Like añaden Visto (paraguas "consumido") pero NO registran pase: la FECHA del
+ *     visionado la pone terminarla (o «Vista»), no la opinión. Así una peli vista hace años
+ *     que guardas hoy en Favoritos queda «vista sin fecha» y no cuenta como vista hoy en las
+ *     estadísticas. Si la terminaste antes, conserva esa fecha.
  *   - Marcar PROGRESO (Pendiente/Ver pronto/Viendo/Siguiendo) NO borra opinión ni
  *     Visto (re-ver es libre). "Ver pronto" convive con "Pendiente".
  *
@@ -34,8 +37,8 @@ const MOVIE: Record<string, Transition> = {
     MoviesVerPronto: { remove: [], alsoAdd: [], logPase: false },
     MoviesViendo: { remove: ['MoviesPendientes', 'MoviesVerPronto'], alsoAdd: [], logPase: false },
     MoviesVistas: { remove: ['MoviesPendientes', 'MoviesVerPronto', 'MoviesViendo'], alsoAdd: [], logPase: true },
-    MovieFavs: { remove: ['MoviesPendientes', 'MoviesVerPronto', 'MoviesViendo', 'LikedMovies'], alsoAdd: ['MoviesVistas'], logPase: true },
-    LikedMovies: { remove: ['MoviesPendientes', 'MoviesVerPronto', 'MoviesViendo', 'MovieFavs'], alsoAdd: ['MoviesVistas'], logPase: true },
+    MovieFavs: { remove: ['MoviesPendientes', 'MoviesVerPronto', 'MoviesViendo', 'LikedMovies'], alsoAdd: ['MoviesVistas'], logPase: false },
+    LikedMovies: { remove: ['MoviesPendientes', 'MoviesVerPronto', 'MoviesViendo', 'MovieFavs'], alsoAdd: ['MoviesVistas'], logPase: false },
 };
 
 // En series, "Siguiendo" es el estado de progreso (equivalente al "Viendo" de pelis).
