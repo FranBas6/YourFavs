@@ -48,6 +48,9 @@ interface Props {
     times: number;
     lastPretty?: string;
     efemeride?: string;
+    /** Película vista sin fecha: está en Vistas / Me gusta / Favs pero no tiene ningún visionado
+     *  en el diario (la guardaste sin terminarla aquí). No cuenta en ningún mes. */
+    undated?: boolean;
     /** Película sin estrenar: el principal es «Avisarme del estreno». */
     unreleased?: boolean;
     releaseLabel?: string;
@@ -71,7 +74,7 @@ interface Props {
 }
 
 const {
-    mediaType, id, title, poster = null, state: s, watched, times, lastPretty = '', efemeride = '',
+    mediaType, id, title, poster = null, state: s, watched, times, lastPretty = '', efemeride = '', undated = false,
     unreleased = false, releaseLabel = '', notif = false, seriesOver = false, favPos = null, favTotal = 0, progress = null,
     imdbId = null, providersByCountry = {}, linkByCountry = {}, myPlatformIds = [], homepage = null, trailerUrl = null,
 } = Astro.props;
@@ -185,7 +188,7 @@ const mid = `fa-${mediaType}-${id}`;
             )}
 
             {showLevel && (
-                <LevelControl mediaType={mediaType} id={id} watched={watched} inVistas={s.vistas} liked={s.liked} fav={s.fav} viendo={!!s.viendo} favPos={favPos} refollow={canRefollow} />
+                <LevelControl mediaType={mediaType} id={id} watched={watched} inVistas={s.vistas} liked={s.liked} fav={s.fav} viendo={!!s.viendo} favPos={favPos} refollow={canRefollow} undated={undated} />
             )}
 
             {showQueue && (
@@ -310,10 +313,11 @@ const mid = `fa-${mediaType}-${id}`;
                     <span class="fa-grp">
                         <span class="fa-ind" style="--tone:var(--a-rewatch)">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.repeat} />
-                            {times > 0 ? `La has visto ${times} ${times === 1 ? 'vez' : 'veces'}` : 'La tienes como vista'}
+                            {undated ? 'La tienes como vista' : times > 0 ? `La has visto ${times} ${times === 1 ? 'vez' : 'veces'}` : 'La tienes como vista'}
                         </span>
+                        {undated && <span class="fa-dim">· sin fecha</span>}
                         {lastPretty && <span class="fa-dim">· última en {lastPretty}</span>}
-                        <button type="button" class="fa-link js-rewatch" data-mt={mediaType} data-id={id}>Apuntar otro visionado</button>
+                        <button type="button" class="fa-link js-rewatch" data-mt={mediaType} data-id={id} data-first={undated ? '' : undefined}>{undated ? 'Apuntar visionado' : 'Apuntar otro visionado'}</button>
                     </span>
                 )}
                 {!isMovie && s.fav && favPos && (

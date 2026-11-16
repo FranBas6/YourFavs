@@ -32,9 +32,11 @@ interface Props {
     favPos?: number | null;
     /** Serie vista y sin seguir: el menú ofrece «Volver a seguirla». */
     refollow?: boolean;
+    /** Película vista sin fecha (sin visionado en el diario): «Apuntar visionado» es el primero. */
+    undated?: boolean;
 }
 
-const { mediaType, id, watched, inVistas, liked, fav, viendo = false, favPos = null, refollow = false } = Astro.props;
+const { mediaType, id, watched, inVistas, liked, fav, viendo = false, favPos = null, refollow = false, undated = false } = Astro.props;
 const f = (l: Parameters<typeof fichaField>[1]) => fichaField(mediaType, l);
 const menuId = `fa-m-vista-${mediaType}-${id}`;
 ---
@@ -73,9 +75,11 @@ const menuId = `fa-m-vista-${mediaType}-${id}`;
                         </button>
                     </form>
                 )}
-                <button type="button" class="fa-mi js-rewatch" role="menuitem" data-mt={mediaType} data-id={id}>
+                <button type="button" class="fa-mi js-rewatch" role="menuitem" data-mt={mediaType} data-id={id} data-first={undated ? '' : undefined}>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.repeat} />
-                    <span>Apuntar otro visionado<small>Suma una vez más con la fecha de hoy</small></span>
+                    {undated
+                        ? <span>Apuntar visionado<small>La cuenta como vista hoy en tus estadísticas</small></span>
+                        : <span>Apuntar otro visionado<small>Suma una vez más con la fecha de hoy</small></span>}
                 </button>
                 {inVistas && (
                     <form method="POST">
