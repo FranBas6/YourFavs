@@ -10,7 +10,7 @@
  *   · Sin spoilers: «Mostrar todo» destapa lo oculto de la lista y de la gráfica, solo en esta visita
  *     (no cambia el ajuste); la tarjeta de la gráfica con todo oculto, solo la gráfica.
  */
-import { revealSpoiler } from '../shared/spoil';
+import { revealSpoiler } from '../ui/spoil';
 import { seasonCounts, seenLabel, type TpState } from '../../utils/titles/seasonView';
 
 const DENSITY_KEY = 'yf-season-density';

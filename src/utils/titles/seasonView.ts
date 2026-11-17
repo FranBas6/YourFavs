@@ -1,6 +1,6 @@
 /**
  * Ficha de temporada: la barra «Tu temporada» (handoff, punto 2). Pura y sin Astro: la pinta el servidor
- * (`set:html`) y la repinta el navegador (`scripts/serie/season.ts`) al marcar o desmarcar, con el MISMO
+ * (`set:html`) y la repinta el navegador (`scripts/series/season.ts`) al marcar o desmarcar, con el MISMO
  * código, para que nunca digan cosas distintas.
  *
  * Estados: sin sesión · anunciada · sin empezar · a medias («Te toca») · al día de una en emisión · vista.

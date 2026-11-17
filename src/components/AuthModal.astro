@@ -7,7 +7,7 @@
  * una tarjeta de 420 px; Crear cuenta, de 780 px con un lateral (pósters y tres razones) desde 860 px
  * de ancho. Google + email/contraseña + «¿La has olvidado?».
  *
- * Las acciones (../utils/authActions) son `fetch` a /api/auth/*: el login lo hace el servidor con
+ * Las acciones (`scripts/auth/authActions.ts`) son `fetch` a /api/auth/*: el login lo hace el servidor con
  * Supabase y deja la sesión en cookies httpOnly. Google va por redirección (no popup): al volver,
  * /auth/callback trae `?auth=ok|new|error|link|invite` y aquí se completa lo que toque (acción
  * pendiente del invitado u onboarding).
@@ -398,7 +398,7 @@ const I = {
 </style>
 
 <script>
-    import type * as AuthActions from '../utils/authActions';
+    import type * as AuthActions from '../scripts/auth/authActions';
     import { SOCIAL_PHASE } from '../utils/social/social';
 
     const overlay = document.getElementById('auth-modal') as HTMLElement | null;
@@ -523,7 +523,7 @@ const I = {
 
         // Carga las acciones de auth bajo demanda (una sola vez).
         async function getActions(): Promise<typeof AuthActions> {
-            if (!actions) actions = await import('../utils/authActions');
+            if (!actions) actions = await import('../scripts/auth/authActions');
             return actions;
         }
 

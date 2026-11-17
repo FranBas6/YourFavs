@@ -11,7 +11,7 @@
  * Los textos del progreso salen de `utils/titles/episodeView.ts::progressLine`, lo mismo que en el servidor.
  */
 import { showToast } from '../social/toast';
-import { revealSpoiler } from '../shared/spoil';
+import { revealSpoiler } from '../ui/spoil';
 import { earlierUnseen, progressLine, watchedLabel, type SeasonEp } from '../../utils/titles/episodeView';
 
 interface Data {
