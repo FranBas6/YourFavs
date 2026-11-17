@@ -1,7 +1,16 @@
 import { getCurrentUid } from "../db/userScope";
+import { onLibraryChange } from './libraryChanges';
 import type { LiveProgress, WatchLogRow } from "./episodeWatches";
 import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
-import { toTimestamp, formatScore } from "../../utils/titles/media-helpers";
+import { toTimestamp, formatScore } from "../../utils/titles/mediaHelpers";
+import { listRatings } from "./ratings";
+import { getAllFollowedPeople } from "../people/followedPeople";
+import { getActorsFav } from "../people/favoriteActors";
+import { tmdbFetch } from "../tmdb/tmdbClient";
+import { processBatch } from "../../utils/core/processBatch";
+import { listActivity } from "./activityLog";
+import { getAllWatchedProgress } from "../series/serieLibrary";
+import { getAllWatchLog } from "./watchLog";
 
 export interface ActivityEvent {
     type: 'movie' | 'serie' | 'person';
@@ -224,7 +233,6 @@ async function fetchRewatchEvents(
 // instante; si updated_at supera a created_at es una edición → "Nota actualizada".
 async function fetchRatingEvents(): Promise<ActivityEvent[]> {
     try {
-        const { listRatings } = await import('./ratings');
         const events: ActivityEvent[] = [];
         for (const x of await listRatings()) {
             if (!x.score) continue;
@@ -253,7 +261,6 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
 // FollowedPeople guarda name/profile_path/added_at → sin fetch extra a TMDB.
 async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
     try {
-        const { getAllFollowedPeople } = await import('../people/yourfavsPeople');
         const people = await getAllFollowedPeople();
         return people
             .map((p): ActivityEvent => ({
@@ -276,11 +283,8 @@ async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
 // ActorsFavs solo guarda { id, added_at, position } → resolvemos nombre/foto por TMDB.
 async function fetchActorFavEvents(): Promise<ActivityEvent[]> {
     try {
-        const { getActorsFav } = await import('../people/yourfavsActor');
         const favs = await getActorsFav();
         if (!favs.length) return [];
-        const { tmdbFetch } = await import('../tmdb/tmdbClient');
-        const { processBatch } = await import('../../utils/core/processBatch');
         const events = await processBatch(
             favs,
             async (f: any): Promise<ActivityEvent | null> => {
@@ -320,7 +324,6 @@ const REMOVE_LABEL: Record<string, string> = {
 
 async function fetchMutationEvents(): Promise<ActivityEvent[]> {
     try {
-        const { listActivity } = await import('./activityLog');
         const records = await listActivity();
         const out: ActivityEvent[] = [];
         for (const r of records) {
@@ -363,7 +366,9 @@ async function fetchMutationEvents(): Promise<ActivityEvent[]> {
 // historial desfasado justo tras una acción. El TTL es solo un backstop.
 const FEED_TTL_MS = 60 * 1000;
 const feedCache = new Map<string, { data: ActivityEvent[]; expires: number }>();
-export function invalidateActivityFeed(uid?: string): void {
+// Se vacía sola con cualquier cosa que salga en el feed (libraryChanges.ts).
+onLibraryChange(['lists', 'ratings', 'episodes', 'diary', 'activity', 'people'], () => invalidateActivityFeed(getCurrentUid() ?? undefined));
+function invalidateActivityFeed(uid?: string): void {
     if (uid) feedCache.delete(uid); else feedCache.clear();
 }
 
@@ -374,8 +379,6 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (cachedFeed && cachedFeed.expires > Date.now()) return cachedFeed.data;
     // WatchLog se lee UNA sola vez y se comparte entre episodios vistos y re-visionados
     // (antes se escaneaba dos veces → doble de lecturas en la colección más grande).
-    const { getAllWatchedProgress } = await import('../series/yourfavsSerie');
-    const { getAllWatchLog } = await import('./watchLog');
     const [snapshot, logRows, live] = await Promise.all([
         getLibrarySnapshot(),          // las listas (cacheado)
         getAllWatchLog(),

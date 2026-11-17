@@ -1,9 +1,10 @@
 import { tmdbFetch, tmdbFetchList } from "../tmdb/tmdbClient";
 import { processBatch } from "../../utils/core/processBatch";
-import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/InfoMovies";
+import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/movieDetail";
 import { getLibrarySnapshot } from "../library/librarySnapshot";
 import { getCurrentUid } from "../db/userScope";
-import { toTimestamp } from "../../utils/titles/media-helpers";
+import { onLibraryChange } from '../library/libraryChanges';
+import { toTimestamp } from "../../utils/titles/mediaHelpers";
 import { SEED_COLLECTION_IDS } from "../../utils/catalog/featuredCollections";
 
 interface CacheEntry<T> { data: T; expires: number }
@@ -15,6 +16,8 @@ let popularCache: CacheEntry<MovieCollectionInfo[]> | null = null;
 // Por uid: son las sagas de TU biblioteca. Con una única variable, la instancia caliente
 // le servía a cualquier usuario las del último que entró.
 const userCache = new Map<string, CacheEntry<MovieCollectionInfo[]>>();
+// Tus sagas se vacían solas cuando cambian tus listas (services/library/libraryChanges.ts).
+onLibraryChange(['lists'], () => invalidateUserCollectionsCache());
 
 async function extractCollectionIds(movieIds: string[]): Promise<number[]> {
     const results = await processBatch(
@@ -134,7 +137,7 @@ export function invalidateCollectionsCache(): void {
 }
 
 /** Solo las sagas del usuario de la petición; sin uid (fuera de una petición) se vacía todo. */
-export function invalidateUserCollectionsCache(): void {
+function invalidateUserCollectionsCache(): void {
     const uid = getCurrentUid();
     if (uid) userCache.delete(uid);
     else userCache.clear();

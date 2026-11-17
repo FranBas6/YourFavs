@@ -1,5 +1,5 @@
-import { clearAllSeriesVerPronto, deleteSerieVerProntoById } from "../series/yourfavsSerie";
-import { clearAllMoviesVerPronto, deleteMovieVerProntoById } from "../movies/yourfavsMovie";
+import { clearAllSeriesVerPronto, deleteSerieVerProntoById } from "../series/serieLibrary";
+import { clearAllMoviesVerPronto, deleteMovieVerProntoById } from "../movies/movieLibrary";
 
 export async function handleVerProntoAction(formData: FormData): Promise<string | null> {
     const clearAction = formData.get("clear");

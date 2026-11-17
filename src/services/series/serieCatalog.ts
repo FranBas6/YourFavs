@@ -1,12 +1,11 @@
 import { type Serie } from "../../types/ApiSerie.ts";
-import { tmdbFetchList } from '../tmdb/tmdbClient';
+import { tmdbFetchList, tmdbFetch } from '../tmdb/tmdbClient';
 import { getMostPopular, getTopRated, searchByTitle } from '../catalog/tmdbDiscoverService';
 
 // --- Fetch de detalles (específico de series por el endpoint) ---
 
 export const fetchSerieDetails = async (id: string | number) => {
     try {
-        const { tmdbFetch } = await import('../tmdb/tmdbClient');
         return await tmdbFetch<any>(`/tv/${id}`);
     } catch (error) {
         console.error(`❌ Error al obtener detalles de serie ID ${id}:`, error);

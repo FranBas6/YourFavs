@@ -18,15 +18,7 @@ function json(data: unknown, status = 200): Response {
 export const POST: APIRoute = async ({ locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
-        await clearUserTaste();
-        try {
-            const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../../services/recs/genrePreferences'),
-                import('../../../services/recs/personalRecommendations'),
-            ]);
-            invalidateGenrePreferencesCache();
-            invalidatePersonalRecsCache();
-        } catch { /* la caché caduca sola igualmente */ }
+        await clearUserTaste(); // avisa a las cachés de «Para ti» (libraryChanges.ts)
         return json({ ok: true });
     } catch (err) {
         console.error('[api/profile/taste-reset] error:', (err as Error).message);

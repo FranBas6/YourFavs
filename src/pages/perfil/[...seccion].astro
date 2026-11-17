@@ -69,16 +69,7 @@ if (Astro.request.method === 'POST') {
     }
 
     if (action === 'reset_taste') {
-        await clearUserTaste();
-        // Los gustos alimentan el motor de recomendaciones → invalidar sus cachés.
-        try {
-            const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../services/recs/genrePreferences'),
-                import('../../services/recs/personalRecommendations'),
-            ]);
-            invalidateGenrePreferencesCache();
-            invalidatePersonalRecsCache();
-        } catch { /* la caché caduca sola igualmente */ }
+        await clearUserTaste(); // avisa a las cachés de «Para ti» (libraryChanges.ts)
         return Astro.redirect('/perfil/gustos?saved=1');
     }
 

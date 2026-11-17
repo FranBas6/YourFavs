@@ -1,4 +1,4 @@
-import { getWatchedProgressBatch, getWatchStreak } from "../series/yourfavsSerie";
+import { getWatchedProgressBatch, getWatchStreak } from "../series/serieLibrary";
 import { tmdbFetch } from "../tmdb/tmdbClient";
 import { getTitleDetails } from "../tmdb/tmdbTitleCache";
 import { getCurrentRegion } from "../db/userScope";

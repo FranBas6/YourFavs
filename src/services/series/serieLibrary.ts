@@ -5,9 +5,12 @@ import {
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../library/watchLog";
-import { normalizeScore } from "../../utils/titles/media-helpers";
+import { libraryChanged } from "../library/libraryChanges";
+import { normalizeScore } from "../../utils/titles/mediaHelpers";
 import { appDateParts } from "../../utils/core/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../types/DbSerie";
+import { setRating, deleteRating } from "../library/ratings";
+import { appendActivity } from "../library/activityLog";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 
 // Diario (L5): registrar lo que se marca como visto, SIN acoplar al progreso y
@@ -23,26 +26,6 @@ async function logSeasonEpisodes(serieId: string, eps: { season: number; episode
 // vaciados en bloque conservan el diario (son "volver a ver"). Best-effort.
 async function unlogEpisode(serieId: string, season: number, episode: number): Promise<void> {
     try { await removeEpisodeFromLog(serieId, season, episode); } catch { /* diario opcional */ }
-}
-// Cualquier cambio de progreso cambia el resumen anual (episodios, heatmap, top series y
-// el mes a mes). Antes solo lo invalidaban las mutaciones de LISTAS, así que marcar un
-// episodio podía tardar hasta 1 h (el TTL) en verse en "Tu cine en números".
-/** Vacía las cachés de «Para ti» (semillas y resultado) de este usuario. */
-async function bustRecs(): Promise<void> {
-    try {
-        const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-            import('../recs/genrePreferences'), import('../recs/personalRecommendations'),
-        ]);
-        invalidateGenrePreferencesCache();
-        invalidatePersonalRecsCache();
-    } catch { /* la caché caduca sola */ }
-}
-
-async function bustYearStats(): Promise<void> {
-    try {
-        const { invalidateYearStatsCache } = await import('../stats/yearStats');
-        invalidateYearStatsCache();
-    } catch { /* la caché caduca sola */ }
 }
 
 const SERIE_COLLECTIONS = ['SeriesFavs', 'SeriesPendiente', 'SeriesVistas', 'SeriesSiguiendo', 'LikedSeries', 'SeriesVerPronto', 'SeriesAbandonadas'];
@@ -76,10 +59,8 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         await patchTitle('tv', serieId, { rating: ratingNum });
         // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
         try {
-            const { setRating } = await import('../library/ratings');
             await setRating('tv', serieId, ratingNum);
         } catch { /* la nota inline ya está guardada */ }
-        await bustRecs(); // una nota ≥ 8 siembra «Para ti»
         return `/serie/${serieId}`;
     }
 
@@ -87,10 +68,8 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     if (action === 'delete_rating') {
         await patchTitle('tv', serieId, { rating: null });
         try {
-            const { deleteRating } = await import('../library/ratings');
             await deleteRating('tv', serieId);
         } catch { /* ignore */ }
-        await bustRecs();
         return `/serie/${serieId}`;
     }
 
@@ -160,10 +139,8 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         try {
             const wasAbandoned = membership.has('SeriesAbandonadas');
             if (coleccion === 'SeriesAbandonadas') {
-                const { appendActivity } = await import('../library/activityLog');
                 await appendActivity({ verb: 'abandon', media_type: 'tv', tmdb_id: serieId });
             } else if (coleccion === 'SeriesSiguiendo' && wasAbandoned) {
-                const { appendActivity } = await import('../library/activityLog');
                 await appendActivity({ verb: 'resume', media_type: 'tv', tmdb_id: serieId });
             }
         } catch { /* bitácora opcional */ }
@@ -175,7 +152,6 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         // (se pierde el added_at). Dejar de seguir tiene verbo propio; el resto, 'remove'.
         // Los borrados en CASCADA (al mover con 'add') NO pasan por aquí → no se registran.
         try {
-            const { appendActivity } = await import('../library/activityLog');
             await appendActivity({
                 verb: coleccion === 'SeriesSiguiendo' ? 'unfollow' : 'remove',
                 media_type: 'tv', tmdb_id: serieId, meta: { collection: coleccion },
@@ -207,43 +183,13 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             await setPosition('SeriesFavs', serieId, newPos);
             // §5 · bitácora (best-effort): mover un favorito de sitio es intencional.
             try {
-                const { appendActivity } = await import('../library/activityLog');
                 await appendActivity({ verb: 'reorder', media_type: 'tv', tmdb_id: serieId, meta: { from: oldPos, to: newPos } });
             } catch { /* bitácora opcional */ }
         }
     }
 
-    if (action === 'add' || action === 'remove') {
-        try {
-            const { invalidateYearStatsCache } = await import('../stats/yearStats');
-            invalidateYearStatsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidateGenrePreferencesCache } = await import('../recs/genrePreferences');
-            invalidateGenrePreferencesCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidatePersonalRecsCache } = await import('../recs/personalRecommendations');
-            invalidatePersonalRecsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidateTopActorsCache } = await import('../stats/topActorsLibrary');
-            invalidateTopActorsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidatePersonalIndexCache } = await import('../library/personalIndex');
-            invalidatePersonalIndexCache(); // 4.3 · buscador "lo mío"
-        } catch { /* ignore */ }
-        try {
-            const { invalidateLibrarySnapshot } = await import('../library/librarySnapshot');
-            invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
-        } catch { /* ignore */ }
-        try {
-            const { invalidateActivityFeed } = await import('../library/activityFeed');
-            invalidateActivityFeed(); // §5 · altas/bajas/abandono/reorden salen en el feed
-        } catch { /* ignore */ }
-    }
-
+    // Las cachés que leen tus listas (Tu año, Para ti, ⌘K, Actividad…) se vacían solas: cada escritura
+    // de library.ts avisa (services/library/libraryChanges.ts).
     return `/serie/${serieId}`;
 }
 
@@ -349,6 +295,7 @@ async function insertEpisodes(serieId: string, eps: { season: number; episode: n
         .upsert(rows, { onConflict: 'user_id,serie_id,season,episode', ignoreDuplicates: true })
         .select('serie_id, season, episode, watched_at');
     if (error) throw new Error(error.message);
+    if (data?.length) libraryChanged('episodes'); // Tu año y Actividad
     return (data ?? []) as EpisodeRow[];
 }
 
@@ -359,6 +306,7 @@ async function deleteEpisodes(serieId: string, filter: { season?: number; episod
     if (filter.episode !== undefined) q = q.eq('episode', filter.episode);
     const { error } = await q;
     if (error) throw new Error(error.message);
+    libraryChanged('episodes');
 }
 
 export async function getWatchedProgress(serieId: string): Promise<WatchedProgress | null> {
@@ -391,7 +339,6 @@ export async function toggleWatchedEpisode(serieId: string, season: number, epis
         await deleteEpisodes(serieId, { season, episode });
         await unlogEpisode(serieId, season, episode);
     }
-    await bustYearStats();
 }
 
 /**
@@ -403,7 +350,6 @@ export async function markWatchedEpisode(serieId: string, season: number, episod
     const inserted = await insertEpisodes(serieId, [{ season, episode }], new Date().toISOString());
     if (!inserted.length) return; // ya visto
     await logEpisode(serieId, season, episode);
-    await bustYearStats();
 }
 
 /**
@@ -416,7 +362,6 @@ export async function unmarkWatchedEpisode(serieId: string, season: number, epis
     if (!progress?.watched_episodes.some((w) => w.season === season && w.episode === episode)) return;
     await deleteEpisodes(serieId, { season, episode });
     await unlogEpisode(serieId, season, episode);
-    await bustYearStats();
 }
 
 /**
@@ -428,7 +373,6 @@ export async function markWatchedEpisodes(serieId: string, season: number, episo
     const inserted = await insertEpisodes(serieId, episodes.map((episode) => ({ season, episode })), new Date().toISOString());
     if (!inserted.length) return 0;
     await logSeasonEpisodes(serieId, inserted.map((r) => ({ season: r.season, episode: r.episode })));
-    await bustYearStats();
     return inserted.length;
 }
 
@@ -449,8 +393,8 @@ export async function unmarkWatchedEpisodes(
         .select('episode, watched_at');
     if (error) throw new Error(error.message);
     const removed = ((data ?? []) as { episode: number; watched_at: string | null }[]).sort((a, b) => a.episode - b.episode);
+    if (removed.length) libraryChanged('episodes');
     if (opts.unlog) for (const r of removed) await unlogEpisode(serieId, season, r.episode);
-    if (removed.length) await bustYearStats();
     return removed;
 }
 
@@ -470,6 +414,7 @@ export async function restoreWatchedEpisodes(
             { onConflict: 'user_id,serie_id,season,episode', ignoreDuplicates: true })
         .select('episode');
     if (error) throw new Error(error.message);
+    if (data?.length) libraryChanged('episodes');
     if (opts.relog) {
         const back = new Set(((data ?? []) as { episode: number }[]).map((r) => r.episode));
         for (const r of rows) {
@@ -478,7 +423,6 @@ export async function restoreWatchedEpisodes(
             try { await appendWatchLog({ media_type: 'tv', tmdb_id: serieId, season, episode: r.episode, watched_on, logged_at: r.watched_at ?? undefined }); } catch { /* diario opcional */ }
         }
     }
-    await bustYearStats();
     return (data ?? []).length;
 }
 
@@ -487,12 +431,10 @@ export async function markSeasonWatched(serieId: string, season: number, episode
     await deleteEpisodes(serieId, { season });
     await insertEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })), new Date().toISOString());
     await logSeasonEpisodes(serieId, episodeNumbers.map(ep => ({ season, episode: ep })));
-    await bustYearStats();
 }
 
 export async function unmarkSeasonWatched(serieId: string, season: number): Promise<void> {
     await deleteEpisodes(serieId, { season });
-    await bustYearStats();
 }
 
 export async function markAllWatched(serieId: string, allEpisodes: { season: number; episode: number }[]): Promise<void> {
@@ -500,12 +442,10 @@ export async function markAllWatched(serieId: string, allEpisodes: { season: num
     await deleteEpisodes(serieId);
     await insertEpisodes(serieId, allEpisodes.map(e => ({ season: e.season, episode: e.episode })), new Date().toISOString());
     await logSeasonEpisodes(serieId, allEpisodes.map(e => ({ season: e.season, episode: e.episode })));
-    await bustYearStats();
 }
 
 export async function unmarkAllWatched(serieId: string): Promise<void> {
     await deleteEpisodes(serieId);
-    await bustYearStats();
 }
 
 export async function getWatchedProgressBatch(serieIds: string[]): Promise<Record<string, { watched: number; total?: number; bySeasons?: Record<number, number>; lastWatchedAt?: number }>> {

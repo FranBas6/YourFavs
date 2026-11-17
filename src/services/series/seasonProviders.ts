@@ -7,7 +7,7 @@
  * llamadas a TMDB por ficha. La caché (L1 memoria + L2 Netlify Blobs, 24 h) es lo que lo paga:
  * los catálogos cambian de mes en mes, no de minuto en minuto.
  */
-import { getSeasonWatchProviders } from './InfoSeries';
+import { getSeasonWatchProviders } from './serieDetail';
 import { getCached, setCached } from '../cache/recsBlobCache';
 
 const TTL_MS = 24 * 60 * 60 * 1000;

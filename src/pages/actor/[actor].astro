@@ -4,25 +4,24 @@ import {
     getMoviesAndSeriesByActorId,
     getActorDetailsById, fetchActorImages, fetchTaggedImages,
     getActorCrewCredits
-} from "../../services/people/InfoActor";
-import type { CrewCredit } from "../../services/people/InfoActor";
+} from "../../services/people/actorDetail";
+import type { CrewCredit } from "../../services/people/actorDetail";
 import { getGenreName, genresMap } from "../../utils/titles/genres";
-import { calculateAge, getCareerRange } from "../../utils/titles/actor-helpers";
+import { calculateAge, getCareerRange } from "../../utils/titles/actorHelpers";
 import { posterUrl } from "../../services/tmdb/tmdbClient";
 import FilmographyList, { type FilmRow } from "../../components/person/FilmographyList.astro";
 import ActorDubbingSection from "../../components/title/ActorDubbingSection.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
-import { handleActorFavAction, getActorsFav } from "../../services/people/yourfavsActor";
-import type { ActorsFavs } from "../../services/people/yourfavsActor";
-import { getFollowedPerson, handlePersonFollowAction } from "../../services/people/yourfavsPeople";
-import { invalidateUpcomingPeopleCache } from "../../services/people/upcomingReleases";
+import { handleActorFavAction, getActorsFav } from "../../services/people/favoriteActors";
+import type { ActorsFavs } from "../../services/people/favoriteActors";
+import { getFollowedPerson, handlePersonFollowAction } from "../../services/people/followedPeople";
 import FollowPersonButton from "../../components/person/FollowPersonButton.astro";
 import { SOCIAL_PHASE } from "../../utils/social/social";
-import type { ActorImage, TaggedImage } from "../../services/people/InfoActor";
+import type { ActorImage, TaggedImage } from "../../services/people/actorDetail";
 import { safeFetch } from "../../utils/core/safeFetch";
 import { getLibrarySnapshot } from "../../services/library/librarySnapshot";
-import { departmentEs } from "../../utils/titles/team-helpers";
+import { departmentEs } from "../../utils/titles/teamHelpers";
 
 const { actor } = Astro.params;
 
@@ -36,7 +35,7 @@ if (Astro.request.method === 'POST') {
         const formData = await Astro.request.formData();
         if (String(formData.get('actionType')) === 'follow_person') {
             await handlePersonFollowAction(formData);
-            invalidateUpcomingPeopleCache(); // el calendario debe reflejarlo ya
+            // Seguir o dejar de seguir ya vacía los estrenos de quien sigues (libraryChanges.ts).
             return Astro.redirect(`/actor/${actor}`);
         }
         const url = await handleActorFavAction(formData);

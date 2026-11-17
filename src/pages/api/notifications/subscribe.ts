@@ -2,10 +2,11 @@
  * POST /api/notifications/subscribe — «Avisarme del estreno» sin recargar (TMDB D4, ficha de episodio).
  *
  * Body { media_type: 'movie' | 'tv', tmdb_id, on: boolean }. Es la misma suscripción que el botón
- * «Notificar estreno» de las fichas (`NotificationBell`, que va por POST de formulario).
+ * «Avisarme del estreno» de la barra de acciones de las fichas (`components/title/FichaActions.astro`,
+ * que va por POST de formulario).
  */
 import type { APIRoute } from 'astro';
-import { addNotificationSub, removeNotificationSub } from '../../../services/notifications/yourfavsNotifications';
+import { addNotificationSub, removeNotificationSub } from '../../../services/notifications/notificationSubs';
 
 export const prerender = false;
 

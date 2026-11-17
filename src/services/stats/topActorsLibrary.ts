@@ -2,6 +2,7 @@ import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from '../library/libraryChanges';
 
 const TTL_MS = 60 * 60 * 1000;
 const MAX_CAST_ORDER = 10;
@@ -18,13 +19,15 @@ export interface TopActor {
 // Por uid: el top sale de TU biblioteca. Con una única variable, la instancia caliente
 // le servía a cualquier usuario el top del último que lo calculó.
 const cache = new Map<string, { data: TopActor[]; expires: number }>();
+// Se vacía sola cuando cambian tus listas (services/library/libraryChanges.ts).
+onLibraryChange(['lists'], () => invalidateTopActorsCache());
 
 /**
  * Invalida SOLO el top del usuario de la petición: con varias cuentas, que uno marque una película
  * no tiene por qué tirar el top ya calculado de los demás. Fuera de una petición (sin uid) no hay a
  * quién apuntar, así que se vacía todo como antes.
  */
-export function invalidateTopActorsCache() {
+function invalidateTopActorsCache() {
     const uid = getCurrentUid();
     if (uid) cache.delete(uid);
     else cache.clear();

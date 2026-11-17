@@ -19,6 +19,7 @@
  * igual que el resto de fuentes del feed; así los handlers registran sin datos extra.
  */
 import { db, fetchAll, getAuthId } from '../db/userScope';
+import { libraryChanged } from './libraryChanges';
 
 export type ActivityVerb =
     | 'unwatch'    // desmarcar / vaciar episodios
@@ -61,10 +62,8 @@ export async function appendActivity(e: ActivityInput): Promise<void> {
         meta: e.meta && Object.keys(e.meta).length ? (e.meta as never) : null,
     });
     if (error) throw new Error(error.message);
-    // Toda acción intencional (quitar/dejar de seguir/abandonar/retomar/reordenar) pasa
-    // por aquí → invalidamos la caché del feed de Actividad en un solo sitio (import
-    // dinámico para evitar ciclo; activityFeed importa activityLog dinámicamente también).
-    try { const m = await import('./activityFeed'); m.invalidateActivityFeed(); } catch { /* ignore */ }
+    // Toda acción intencional (quitar/dejar de seguir/abandonar/retomar/reordenar) pasa por aquí.
+    libraryChanged('activity');
 }
 
 /** Todas las entradas de la bitácora (el feed las ordena/mezcla con el resto de fuentes). */

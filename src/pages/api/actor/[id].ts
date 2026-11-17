@@ -2,7 +2,7 @@
  * GET /api/actor/[id]
  *
  * Ficha de ACTOR/PERSONA en JSON para la app móvil. Reúne el mismo dato TMDB
- * público que `pages/actor/[actor].astro` (servicios de `InfoActor.ts`), sin
+ * público que `pages/actor/[actor].astro` (servicios de `services/people/actorDetail.ts`), sin
  * duplicar lógica. Espejo de `/api/movie/[id]` y `/api/serie/[id]`.
  *
  * NO incluye estado personal (favoritos, seguir persona, avisos): la app lo lee
@@ -20,7 +20,7 @@ import {
     getActorCrewCredits,
     fetchActorImages,
     fetchTaggedImages,
-} from '../../../services/people/InfoActor';
+} from '../../../services/people/actorDetail';
 import { posterUrl } from '../../../services/tmdb/tmdbClient';
 import { toItem } from '../../../services/tmdb/summaryItem';
 import { safeFetch } from '../../../utils/core/safeFetch';

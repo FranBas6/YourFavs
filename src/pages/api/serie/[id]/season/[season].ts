@@ -6,7 +6,7 @@
  * Público. `still_path` va en RUTA CRUDA.
  */
 import type { APIRoute } from 'astro';
-import { getEpisodesBySeasonNumber } from '../../../../../services/series/InfoSeries';
+import { getEpisodesBySeasonNumber } from '../../../../../services/series/serieDetail';
 
 export const prerender = false;
 

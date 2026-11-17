@@ -26,7 +26,7 @@ export const POST: APIRoute = async ({ locals, url }) => {
 
         const [{ calculateLifetimeStats }, { getMaxWatchStreak }, { deriveArchetype }] = await Promise.all([
             import('../../../services/stats/yearStats'),
-            import('../../../services/series/yourfavsSerie'),
+            import('../../../services/series/serieLibrary'),
             import('../../../services/stats/cinemaIdentity'),
         ]);
         const [stats, streak] = await Promise.all([calculateLifetimeStats(), getMaxWatchStreak()]);

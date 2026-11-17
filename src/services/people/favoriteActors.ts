@@ -1,4 +1,5 @@
 import { db, fetchAll, getAuthId, requireAuthId } from "../db/userScope";
+import { libraryChanged } from "../library/libraryChanges";
 
 interface ActorsFavs {
     id: string;
@@ -24,12 +25,14 @@ async function actorPositions(): Promise<ActorsFavs[]> {
 async function rpc(name: 'shift_actor_fav_positions' | 'renumber_actor_favs', args?: Record<string, unknown>): Promise<void> {
     const { error } = await db().rpc(name as never, args as never);
     if (error) throw new Error(error.message);
+    libraryChanged('people');
 }
 
 async function setActorPosition(actorId: string, position: number): Promise<void> {
     const { error } = await db().from('actor_favs').update({ position })
         .eq('user_id', requireAuthId()).eq('person_id', Number(actorId));
     if (error) throw new Error(error.message);
+    libraryChanged('people');
 }
 
 // Gestionar acciones POST de actores favoritos (add, remove, update position)
@@ -57,6 +60,7 @@ export async function handleActorFavAction(formData: FormData): Promise<string> 
             { onConflict: 'user_id,person_id' },
         );
         if (error) throw new Error(error.message);
+        libraryChanged('people');
 
     } else if (action === 'remove' && actorExiste) {
         await removeActorFromFavorites(actorId);
@@ -119,6 +123,7 @@ export const removeActorFromFavorites = async (actorId: string): Promise<void> =
         const { error } = await db().from('actor_favs').delete()
             .eq('user_id', requireAuthId()).eq('person_id', Number(actorId));
         if (error) throw new Error(error.message);
+        libraryChanged('people');
         console.log(`Actor ${actorId} eliminado de favoritos`);
     } catch (error) {
         console.error("Error al eliminar el actor de favoritos:", error);

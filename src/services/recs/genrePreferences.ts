@@ -1,11 +1,13 @@
 import { getTitleDetails } from '../tmdb/tmdbTitleCache';
-import { getCached, setCached, invalidateCached } from '../cache/recsBlobCache';
+import { getCached, setCached } from '../cache/recsBlobCache';
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from '../library/libraryChanges';
+import { RECS_TOPICS, genrePrefsBlobKey } from './recsCacheKeys';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getUserTaste } from '../profile/userTaste';
 import { getCustomLists, getListItems } from '../library/customLists';
 import { listRatings } from '../library/ratings';
-import { toTimestamp } from '../../utils/titles/media-helpers';
+import { toTimestamp } from '../../utils/titles/mediaHelpers';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
 // que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).
@@ -87,10 +89,11 @@ type SerializedGenrePrefs = Omit<GenrePrefs, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'genrePrefs_v7';        // v7: cupo de semillas por señal; v6: semillas = favs + me gusta + onboarding + notas ≥ 8 + vistas recientes, con recencia; v5 exclusión = todas las listas
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min en memoria de la Lambda
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h en Netlify Blobs
 const l1 = new Map<string, { data: GenrePrefs; expires: number }>();
+// La memoria se vacía sola cuando cambia lo que lee; la copia compartida la borra libraryChanges.
+onLibraryChange(RECS_TOPICS, () => { l1.delete(getCurrentUid() ?? 'guest'); });
 
 function deserialize(s: SerializedGenrePrefs): GenrePrefs {
     return {
@@ -216,7 +219,7 @@ function aggregateGenres(
 
 export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     const uidKey = getCurrentUid() ?? 'guest';
-    const blobKey = `${BLOB_KEY}:${uidKey}`;
+    const blobKey = genrePrefsBlobKey(uidKey);
     const now = Date.now();
 
     const hit = l1.get(uidKey);
@@ -310,10 +313,4 @@ export async function calculateGenrePreferences(): Promise<GenrePrefs> {
     // L2 write fire-and-forget (no bloquear la respuesta esperando al Blob)
     setCached(blobKey, serialize(data), L2_TTL_MS).catch(() => {});
     return data;
-}
-
-export function invalidateGenrePreferencesCache() {
-    const uidKey = getCurrentUid() ?? 'guest';
-    l1.delete(uidKey);
-    invalidateCached(`${BLOB_KEY}:${uidKey}`).catch(() => {});
 }

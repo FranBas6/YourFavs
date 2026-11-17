@@ -16,6 +16,8 @@
  * entre sí y Favoritos está por encima (nunca se baja de Favoritos a Me gusta).
  */
 import { db, fetchAll, requireAuthId } from '../db/userScope';
+import { libraryChanged } from '../library/libraryChanges';
+import { cleanName, createList } from '../library/customLists';
 
 export type ImportSource = 'imdb' | 'letterboxd' | 'tmdb' | 'trakt';
 
@@ -194,20 +196,12 @@ export function planImport(items: ImportItem[], state: Map<string, TitleState>):
     return ops;
 }
 
-/** Las cachés que dependen de tus listas (las mismas que vacía marcar a mano en la ficha). */
-async function invalidateLibraryCaches(): Promise<void> {
-    // Rutas fijas (Vite solo empaqueta los `import()` que puede leer) y cada una por su lado: si una
-    // falla, esa caché caduca sola.
-    await Promise.allSettled([
-        import('../titles/collectionsDiscovery').then((m) => m.invalidateUserCollectionsCache()),
-        import('../stats/yearStats').then((m) => m.invalidateYearStatsCache()),
-        import('../recs/genrePreferences').then((m) => m.invalidateGenrePreferencesCache()),
-        import('../recs/personalRecommendations').then((m) => m.invalidatePersonalRecsCache()),
-        import('../stats/topActorsLibrary').then((m) => m.invalidateTopActorsCache()),
-        import('../library/personalIndex').then((m) => m.invalidatePersonalIndexCache()),
-        import('../library/librarySnapshot').then((m) => m.invalidateLibrarySnapshot()),
-        import('../library/activityFeed').then((m) => m.invalidateActivityFeed()),
-    ]);
+/**
+ * Una importación (o su «deshacer») escribe de golpe, con funciones de la base de datos, en listas, notas,
+ * colecciones, diario y episodios: se avisa de todo a la vez a las cachés que lo leen (libraryChanges.ts).
+ */
+function importChangedLibrary(): void {
+    libraryChanged('lists', 'ratings', 'customLists', 'diary', 'episodes');
 }
 
 export async function createImportJob(input: {
@@ -249,7 +243,7 @@ export async function applyImportBatch(jobId: string, batch: {
     }
     const { data, error } = await db().rpc('import_apply', { p_job: jobId, p_ops: ops as any });
     if (error) throw new Error(error.message);
-    await invalidateLibraryCaches();
+    importChangedLibrary();
     return data as Record<string, number>;
 }
 
@@ -262,7 +256,6 @@ export async function createImportList(jobId: string, input: {
     name: string; description: string; suffix: string; cover: { poster_path: string; tmdb_id: number } | null;
 }): Promise<{ id: string; reused: boolean }> {
     const userId = requireAuthId();
-    const { cleanName, createList } = await import('../library/customLists');
     const base = cleanName(input.name) || 'Lista importada';
     const suffixed = cleanName(`${base} (${input.suffix})`);
 
@@ -302,7 +295,7 @@ export async function undoImport(jobId: string): Promise<Record<string, number>>
     requireAuthId();
     const { data, error } = await db().rpc('import_undo', { p_job: jobId });
     if (error) throw new Error(error.message);
-    await invalidateLibraryCaches();
+    importChangedLibrary();
     return data as Record<string, number>;
 }
 

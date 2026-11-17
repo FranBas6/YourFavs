@@ -12,6 +12,8 @@
  * Borrar una lista se lleva sus items por la FK (`on delete cascade`), y borrar la cuenta, todo.
  */
 import { db, fetchAll, getAuthId, requireAuthId } from '../db/userScope';
+import { libraryChanged } from './libraryChanges';
+import { appendActivity } from './activityLog';
 
 export type ColorStamp = 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
 export const LIST_COLORS: ColorStamp[] = ['red', 'amber', 'blue', 'green', 'purple', 'pink', 'slate'];
@@ -207,6 +209,7 @@ export async function createList(input: CustomListInput): Promise<string> {
         position: maxPos + 1,
     }).select('id').single();
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
     return data.id;
 }
 
@@ -226,6 +229,7 @@ export async function updateList(listId: string, patch: Partial<CustomListInput>
     const { data, error } = await db().from('custom_lists').update(update as never)
         .eq('user_id', userId).eq('id', listId).select('id');
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
     if (!data?.length) throw new Error('Lista no encontrada');
 }
 
@@ -234,6 +238,7 @@ export async function deleteList(listId: string): Promise<void> {
     // Los items se van con la lista (FK on delete cascade).
     const { error } = await db().from('custom_lists').delete().eq('user_id', userId).eq('id', listId);
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
 }
 
 /** Reordena las listas del hub: `orderedIds` = nuevo orden completo → position = índice+1. */
@@ -241,6 +246,7 @@ export async function reorderLists(orderedIds: string[]): Promise<void> {
     requireAuthId();
     const { error } = await db().rpc('reorder_custom_lists', { p_ids: orderedIds });
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
 }
 
 // ---- escrituras: items ----
@@ -271,6 +277,7 @@ export async function addItemToList(listId: string, item: CustomListItemInput): 
         position: maxPos + 1,
     }, { onConflict: 'user_id,list_id,media_type,tmdb_id', ignoreDuplicates: true }).select('tmdb_id');
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
     return { itemCount: list.itemCount + (inserted?.length ? 1 : 0) };
 }
 
@@ -282,11 +289,11 @@ export async function removeItemFromList(listId: string, itemId: string): Promis
         .eq('user_id', userId).eq('list_id', listId).eq('media_type', key.media_type).eq('tmdb_id', key.tmdb_id)
         .select('tmdb_id');
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
     if (!removed?.length) return; // ya no estaba → nada que registrar
 
     // §5 · bitácora (best-effort): quitar un título de una colección es intencional.
     try {
-        const { appendActivity } = await import('./activityLog');
         await appendActivity({
             verb: 'remove',
             media_type: key.media_type,
@@ -301,4 +308,5 @@ export async function reorderItems(listId: string, orderedItemIds: string[]): Pr
     requireAuthId();
     const { error } = await db().rpc('reorder_custom_list_items', { p_list_id: listId, p_item_ids: orderedItemIds });
     if (error) throw new Error(error.message);
+    libraryChanged('customLists'); // tus gustos por género (y «Para ti») leen las colecciones
 }

@@ -6,10 +6,10 @@
  * detalles por TMDB (processBatch, 5 en paralelo). Orden: empezadas más recientes
  * primero. Sin sesión → [].
  */
-import { getMoviesViendo } from './yourfavsMovie';
+import { getMoviesViendo } from './movieLibrary';
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { processBatch } from '../../utils/core/processBatch';
-import { toTimestamp } from '../../utils/titles/media-helpers';
+import { toTimestamp } from '../../utils/titles/mediaHelpers';
 
 export interface ViendoMovie {
     id: string;

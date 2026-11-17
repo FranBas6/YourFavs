@@ -21,7 +21,7 @@
 import type { APIRoute } from 'astro';
 import {
     markWatchedEpisode, markWatchedEpisodes, unmarkWatchedEpisode, unmarkWatchedEpisodes, restoreWatchedEpisodes, getWatchedProgress,
-} from '../../../services/series/yourfavsSerie';
+} from '../../../services/series/serieLibrary';
 
 export const prerender = false;
 

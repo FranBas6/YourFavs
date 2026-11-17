@@ -14,7 +14,7 @@
  */
 import type { APIRoute } from 'astro';
 import { toItem, type SummaryItem } from '../../../services/tmdb/summaryItem';
-import { getCombinedCastCredits } from '../../../services/people/tmdbActor';
+import { getCombinedCastCredits } from '../../../services/people/actorCredits';
 
 export const prerender = false;
 

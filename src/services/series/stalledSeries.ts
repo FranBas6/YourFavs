@@ -11,8 +11,8 @@
  * detalle y la temporada del hueco en TMDB (`computeNextEpisode`), para saber qué te toca y desde cuándo.
  * Al abandonar (§1.1) la serie sale de Siguiendo → deja de aparecer aquí automáticamente.
  */
-import { getSeriesSiguiendo, getWatchedProgress, getWatchedProgressBatch } from './yourfavsSerie';
-import { fetchSerieDetails } from './tmdbSeries';
+import { getSeriesSiguiendo, getWatchedProgress, getWatchedProgressBatch } from './serieLibrary';
+import { fetchSerieDetails } from './serieCatalog';
 import { computeNextEpisode } from './nextEpisode';
 import { episodeHref } from '../../utils/titles/episodeView';
 import { resumeReason } from '../../utils/titles/resumeReason';

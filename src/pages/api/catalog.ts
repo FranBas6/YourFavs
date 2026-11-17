@@ -14,12 +14,12 @@ import {
     getLatestMovies,
     getMostPopularMovies,
     getTopRatedMovies,
-} from '../../services/movies/tmdbMovies';
+} from '../../services/movies/movieCatalog';
 import {
     getLatestSeries,
     getMostPopularSeries,
     getTopRatedSeries,
-} from '../../services/series/tmdbSeries';
+} from '../../services/series/serieCatalog';
 
 export const prerender = false;
 

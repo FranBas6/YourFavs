@@ -24,7 +24,7 @@ import { getCurrentUid } from '../db/userScope';
 import { readUserState, writeUserState } from '../db/userState';
 import { getUserProfile } from '../profile/userProfile';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
-import { getWatchStreak } from '../series/yourfavsSerie';
+import { getWatchStreak } from '../series/serieLibrary';
 import { readProviderState, writeProviderState, type ProviderSnapEntry } from './providerState';
 import { appDateParts } from '../../utils/core/appTime';
 import { seriesSignals, subscribedMovieSignals, watchlistMovieSignals } from './titleSignals';

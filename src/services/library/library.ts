@@ -5,8 +5,11 @@
  * (`{ id, added_at, opinion?, rating?, position? }`, con `id` = tmdb_id en texto), para que
  * las páginas y los handlers no noten el cambio. `collection` es literalmente el nombre de la
  * colección de siempre.
+ *
+ * Cada escritura avisa a las cachés que leen las listas (`libraryChanged('lists')`, ver libraryChanges.ts).
  */
 import { db, fetchAll, getAuthId, requireAuthId } from '../db/userScope';
+import { libraryChanged } from './libraryChanges';
 
 export interface ListDoc {
     id: string;
@@ -109,6 +112,7 @@ export async function addToCollections(
     const { error } = await db().from('library_items')
         .upsert(rows, { onConflict: 'user_id,collection,tmdb_id', ignoreDuplicates: true });
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }
 
 /** Baja de una o varias colecciones. */
@@ -118,6 +122,7 @@ export async function removeFromCollections(tmdbId: number | string, collections
     const { error } = await db().from('library_items').delete()
         .eq('user_id', userId).eq('tmdb_id', Number(tmdbId)).in('collection', collections);
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }
 
 /** Vacía una colección entera. */
@@ -125,6 +130,7 @@ export async function clearCollection(collection: string): Promise<void> {
     const userId = requireAuthId();
     const { error } = await db().from('library_items').delete().eq('user_id', userId).eq('collection', collection);
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }
 
 /**
@@ -141,6 +147,7 @@ export async function patchTitle(
     const { error } = await db().from('library_items').update(patch)
         .eq('user_id', userId).eq('media_type', mediaType).eq('tmdb_id', Number(tmdbId));
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }
 
 /** Posición de un título en su colección (listas ordenables). */
@@ -149,6 +156,7 @@ export async function setPosition(collection: string, tmdbId: number | string, p
     const { error } = await db().from('library_items').update({ position })
         .eq('user_id', userId).eq('collection', collection).eq('tmdb_id', Number(tmdbId));
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }
 
 /** Desplaza posiciones en [from, to] (to null = hasta el final). Ver migración list_positions. */
@@ -157,10 +165,12 @@ export async function shiftPositions(collection: string, from: number, to: numbe
         p_collection: collection, p_from: from, p_to: to as number, p_delta: delta,
     });
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }
 
 /** Renumera 1..n respetando el orden actual. */
 export async function renumberPositions(collection: string): Promise<void> {
     const { error } = await db().rpc('renumber_list_positions', { p_collection: collection });
     if (error) throw new Error(error.message);
+    libraryChanged('lists');
 }

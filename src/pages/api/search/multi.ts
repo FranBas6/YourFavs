@@ -10,7 +10,7 @@
  */
 import type { APIRoute } from 'astro';
 import { tmdbFetch, posterUrl } from '../../../services/tmdb/tmdbClient';
-import { DEPARTMENT_ES } from '../../../utils/titles/team-helpers';
+import { DEPARTMENT_ES } from '../../../utils/titles/teamHelpers';
 
 export const prerender = false;
 

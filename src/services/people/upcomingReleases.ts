@@ -1,7 +1,8 @@
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { processBatch } from '../../utils/core/processBatch';
-import { getAllFollowedPeople } from './yourfavsPeople';
+import { getAllFollowedPeople } from './followedPeople';
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from '../library/libraryChanges';
 
 /**
  * Estrenos futuros de las personas que sigues (handoff v2 §③).
@@ -25,6 +26,8 @@ const TTL_MS = 6 * 60 * 60 * 1000;
 // Caché POR USUARIO: con multiusuario una caché global filtraría los estrenos
 // de las personas que sigue un usuario a otro. Clave = uid de la sesión.
 const memCache = new Map<string, { data: PersonUpcoming[]; expires: number }>();
+// Se vacía sola cuando sigues o dejas de seguir a alguien (services/library/libraryChanges.ts).
+onLibraryChange(['people'], () => invalidateUpcomingPeopleCache());
 
 /**
  * Ruido de los créditos que no es un estreno de verdad (N4, 2026-10-28): galas, especiales,
@@ -43,7 +46,7 @@ function isNoise(c: any): boolean {
     return NOISE_TITLE.test(String(title || ''));
 }
 
-export function invalidateUpcomingPeopleCache() {
+function invalidateUpcomingPeopleCache() {
     const uid = getCurrentUid();
     if (uid) memCache.delete(uid); else memCache.clear();
 }

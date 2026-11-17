@@ -8,9 +8,9 @@
  */
 import type { APIRoute } from 'astro';
 import { tmdbFetch, posterUrl } from '../../../services/tmdb/tmdbClient';
-import { getActorsFav } from '../../../services/people/yourfavsActor';
-import { getMovieFav } from '../../../services/movies/yourfavsMovie';
-import { getSerieFav } from '../../../services/series/yourfavsSerie';
+import { getActorsFav } from '../../../services/people/favoriteActors';
+import { getMovieFav } from '../../../services/movies/movieLibrary';
+import { getSerieFav } from '../../../services/series/serieLibrary';
 import { processBatch } from '../../../utils/core/processBatch';
 import { getTitleDetails } from '../../../services/tmdb/tmdbTitleCache';
 

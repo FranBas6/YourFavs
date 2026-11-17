@@ -3,7 +3,10 @@ import {
     clearCollection, patchTitle,
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
-import { normalizeScore } from "../../utils/titles/media-helpers";
+import { normalizeScore } from "../../utils/titles/mediaHelpers";
+import { setRating, deleteRating } from "../library/ratings";
+import { appendWatchLog } from "../library/watchLog";
+import { appendActivity } from "../library/activityLog";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
 
@@ -15,17 +18,6 @@ const LIST_TYPE_MAP: Record<string, string> = {
     'liked': 'LikedMovies',
     'viendo': 'MoviesViendo',
 };
-
-/** Vacía las cachés de «Para ti» (semillas y resultado) de este usuario. */
-async function bustRecs(): Promise<void> {
-    try {
-        const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-            import('../recs/genrePreferences'), import('../recs/personalRecommendations'),
-        ]);
-        invalidateGenrePreferencesCache();
-        invalidatePersonalRecsCache();
-    } catch { /* la caché caduca sola */ }
-}
 
 export async function handleMovieFavAction(formData: FormData): Promise<string> {
     const movieId = String(formData.get('id'));
@@ -74,18 +66,14 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         await updateExisting({ rating: ratingNum });
         // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
         try {
-            const { setRating } = await import('../library/ratings');
             await setRating('movie', movieId, ratingNum);
         } catch { /* la nota inline ya está guardada */ }
-        await bustRecs(); // una nota ≥ 8 siembra «Para ti»
         return `/movie/${movieId}`;
     }
 
     if (action === 'delete_rating') {
         await updateExisting({ rating: null });
-        await bustRecs();
         try {
-            const { deleteRating } = await import('../library/ratings');
             await deleteRating('movie', movieId);
         } catch { /* ignore */ }
         return `/movie/${movieId}`;
@@ -102,7 +90,6 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
 
     const exists = membership.has(collectionName);
 
-    let mutated = false;
     let logPase = false;
     if (action === 'add' && !exists) {
         // Modelo de 2 capas: aplica la transición (mover + limpiar). Marcar Visto/Fav/Me gusta
@@ -113,64 +100,26 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         await addToCollections(movieId, [collectionName, ...tr.alsoAdd.filter(c => !membership.has(c))]
             .map(collection => ({ collection, ...movieData })));
         await removeFromCollections(movieId, tr.remove.filter(c => membership.has(c)));
-        mutated = true;
         logPase = tr.logPase;
         // Diario (L5): cada entrada a "visto" registra el visionado (fecha = hoy). dedupe:
         // solo la PRIMERA vez (mover de lista o curar algo ya visto NO duplica el pase).
         if (logPase) {
             try {
-                const { appendWatchLog } = await import('../library/watchLog');
                 await appendWatchLog({ media_type: 'movie', tmdb_id: movieId, dedupe: true });
             } catch { /* diario opcional */ }
         }
     } else if (action === 'remove' && exists) {
         // Quitar es un borrado simple: no auto-restaura estados previos.
         await removeFromCollections(movieId, [collectionName]);
-        mutated = true;
         // §5 · bitácora (best-effort): quitar de una lista es intencional y NO derivable
         // (se pierde el added_at). Los borrados en cascada del branch 'add' NO llegan aquí.
         try {
-            const { appendActivity } = await import('../library/activityLog');
             await appendActivity({ verb: 'remove', media_type: 'movie', tmdb_id: movieId, meta: { collection: collectionName } });
         } catch { /* bitácora opcional */ }
     }
 
-    // Invalida la cache de "Tus sagas" al cambiar colecciones de movies
-    if (mutated) {
-        try {
-            const { invalidateUserCollectionsCache } = await import('../titles/collectionsDiscovery');
-            invalidateUserCollectionsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidateYearStatsCache } = await import('../stats/yearStats');
-            invalidateYearStatsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidateGenrePreferencesCache } = await import('../recs/genrePreferences');
-            invalidateGenrePreferencesCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidatePersonalRecsCache } = await import('../recs/personalRecommendations');
-            invalidatePersonalRecsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidateTopActorsCache } = await import('../stats/topActorsLibrary');
-            invalidateTopActorsCache();
-        } catch { /* ignore */ }
-        try {
-            const { invalidatePersonalIndexCache } = await import('../library/personalIndex');
-            invalidatePersonalIndexCache(); // 4.3 · buscador "lo mío"
-        } catch { /* ignore */ }
-        try {
-            const { invalidateLibrarySnapshot } = await import('../library/librarySnapshot');
-            invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
-        } catch { /* ignore */ }
-        try {
-            const { invalidateActivityFeed } = await import('../library/activityFeed');
-            invalidateActivityFeed(); // §5 · altas/bajas salen en el feed
-        } catch { /* ignore */ }
-    }
-
+    // Las cachés que leen tus listas (sagas, Tu año, Para ti, ⌘K, Actividad…) se vacían solas: cada
+    // escritura de library.ts y del diario avisa (services/library/libraryChanges.ts).
     return `/movie/${movieId}`;
 }
 
@@ -234,24 +183,15 @@ export async function finishViewingMovie(movieId: string): Promise<void> {
         fd.set('id', movieId);
         fd.set('action', 'add');
         fd.set('list_type', 'vistas');
-        await handleMovieFavAction(fd); // reutiliza transición + diario + invalidaciones
+        await handleMovieFavAction(fd); // reutiliza transición + diario
         return;
     }
 
     // Re-visionado terminado: fuera de Viendo + pase en el diario.
     await removeFromCollections(movieId, ['MoviesViendo']);
     try {
-        const { appendWatchLog } = await import('../library/watchLog');
         await appendWatchLog({ media_type: 'movie', tmdb_id: movieId }); // sin dedupe → pase
     } catch { /* diario opcional */ }
-    try {
-        const { invalidateLibrarySnapshot } = await import('../library/librarySnapshot');
-        invalidateLibrarySnapshot();
-    } catch { /* ignore */ }
-    try {
-        const { invalidateYearStatsCache } = await import('../stats/yearStats');
-        invalidateYearStatsCache();
-    } catch { /* ignore */ }
 }
 
 /**

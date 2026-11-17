@@ -2,8 +2,10 @@ import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch, tmdbFetchList } from '../tmdb/tmdbClient';
 import { getTrending } from '../catalog/tmdbDiscoverService';
 import { calculateGenrePreferences, type Seed, type SeedWhy } from './genrePreferences';
-import { getCached, setCached, invalidateCached } from '../cache/recsBlobCache';
+import { getCached, setCached } from '../cache/recsBlobCache';
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from '../library/libraryChanges';
+import { RECS_TOPICS, personalRecsKeys } from './recsCacheKeys';
 import { appDateParts } from '../../utils/core/appTime';
 import { dedupeFranchises } from '../catalog/catalogRows';
 
@@ -67,10 +69,11 @@ type SerializedRecs = Omit<PersonalRecResult, 'libraryIds'> & {
     libraryIds: { movies: string[]; tv: string[] };
 };
 
-const BLOB_KEY = 'personalRecs_v13';    // v13: `rows` para las filas por motivo; v12: 2 huecos principales para señales que no sean favorito y peso mínimo en variedad; v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales, cuota de variedad y rotación diaria; v9 _recSeedTitle
 const L1_TTL_MS = 30 * 60 * 1000;       // 30min memoria
 const L2_TTL_MS = 6 * 60 * 60 * 1000;   // 6h Netlify Blobs
 const l1 = new Map<string, { data: PersonalRecResult; expires: number }>();
+// La memoria se vacía sola cuando cambia lo que leen los gustos; la copia compartida la borra libraryChanges.
+onLibraryChange(RECS_TOPICS, () => { l1.delete(personalRecsKeys(getCurrentUid() ?? 'guest').l1Key); });
 
 function deserializeRecs(s: SerializedRecs): PersonalRecResult {
     return {
@@ -227,8 +230,7 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     const uidKey = getCurrentUid() ?? 'guest';
     const now = Date.now();
     // El día en la clave: la rotación diaria no debe servirse desde la caché de ayer.
-    const l1Key = `${uidKey}:${appDateParts(now).key}`;
-    const blobKey = `${BLOB_KEY}:${l1Key}`;
+    const { l1Key, blobKey } = personalRecsKeys(uidKey, now);
 
     const hit = l1.get(l1Key);
     if (hit && hit.expires > now) return hit.data;
@@ -434,11 +436,4 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     l1.set(l1Key, { data, expires: now + L1_TTL_MS });
     setCached(blobKey, serializeRecs(data), L2_TTL_MS).catch(() => {});
     return data;
-}
-
-export function invalidatePersonalRecsCache() {
-    const uidKey = getCurrentUid() ?? 'guest';
-    const key = `${uidKey}:${appDateParts(Date.now()).key}`;
-    l1.delete(key);
-    invalidateCached(`${BLOB_KEY}:${key}`).catch(() => {});
 }
