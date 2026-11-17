@@ -200,6 +200,22 @@ Spanish; it is the one I use every day.
 | App       | PWA with its own service worker, web manifest and private `.ics` calendar feed      |
 | Quality   | pgTAP, TypeScript type checking, browser checks with headless Chrome (Puppeteer)    |
 
+## Code structure
+
+The top level of `src/` says **where code runs**; inside each, the **same topic folders** repeat
+(`series`, `library`, `social`, `stats`…):
+
+| Folder        | What lives there                                                                        |
+| ------------- | --------------------------------------------------------------------------------------- |
+| `pages/`      | Astro routes and `api/` endpoints                                                        |
+| `components/` | `.astro` views by topic, plus `ui/` (basic pieces) and `shell/` (on every page)          |
+| `services/`   | server only: Supabase, TMDB and secrets; infrastructure in `db/`, `tmdb/`, `cache/`, `http/` |
+| `utils/`      | pure code shared by server and browser                                                   |
+| `scripts/`    | browser code                                                                             |
+
+The boundaries between them (for example, nothing the browser loads may import `services/`) are
+checked by `npm run check:structure`. Details and the reasoning behind each rule: [`CLAUDE.md`](CLAUDE.md).
+
 ---
 
 More about this project and my other work on my portfolio: [franbasguil.netlify.app](https://franbasguil.netlify.app/en/projects/yourfavs/)
