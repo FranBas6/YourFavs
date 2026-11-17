@@ -9,12 +9,12 @@
  *   · Cabecera (`.eh.tph`): la de la ficha de episodio con el póster de la temporada a la izquierda;
  *     sinopsis o, si TMDB no la tiene (lo normal), cómo se emitió; cuenta atrás si está anunciada.
  *   · Barra «Tu temporada» (`.ea.tea`, paso 2): la pinta `utils/titles/seasonView.ts::seasonBar`, aquí y en el
- *     navegador (`scripts/serie/season.ts`) al marcar sin recargar. Recomendar, Enviar a… y la plataforma.
+ *     navegador (`scripts/series/season.ts`) al marcar sin recargar. Recomendar, Enviar a… y la plataforma.
  *   · Navegación (`.en`): temporada anterior y siguiente, la tira de temporadas con tu progreso
  *     (especiales aparte) y el selector.
  *   · Episodios (`.tl`, paso 3): con fotograma o compacta (desde 16 episodios, y se recuerda), filtro
  *     «Sin ver», «Visto» en cada fila y «Te toca» destacado. No se despliegan: el detalle está en la
- *     ficha del episodio. `scripts/serie/seasonList.ts` las mantiene al día al marcar.
+ *     ficha del episodio. `scripts/series/seasonList.ts` las mantiene al día al marcar.
  *   · Cuerpo (paso 4): notas por episodio (barras con la paleta de la tira, mejor y peor), reparto y
  *     equipo de la temporada con su nº de episodios (`aggregate_credits`), vídeos y pósters. Lateral: Tu
  *     temporada (`seasonSide`), Esta temporada, dónde verla y amigos (de la serie).
@@ -34,9 +34,9 @@ import { getSeasonWatchProviders } from '../../../../services/series/InfoSeries'
 import { SOCIAL_PHASE } from '../../../../utils/social/social';
 import { backdropUrl, posterUrl, stillUrl } from '../../../../services/tmdb/tmdbClient';
 import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seasonSide, seenLabel, type TpState } from '../../../../utils/titles/seasonView';
-import FriendsSeen from '../../../../components/detail/FriendsSeen.astro';
+import FriendsSeen from '../../../../components/title/FriendsSeen.astro';
 import { SUPPORTED_COUNTRIES } from '../../../../services/tmdb/tmdbInfoService';
-import SectionHeader from '../../../../components/SectionHeader.astro';
+import SectionHeader from '../../../../components/ui/SectionHeader.astro';
 import { safeFetch } from '../../../../utils/core/safeFetch';
 import { distinctOriginalTitle } from '../../../../utils/titles/media-helpers';
 import {
@@ -810,9 +810,9 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
 </Layout>
 
 <script>
-    import '../../../../scripts/shared/spoil';
-    import '../../../../scripts/serie/season';
-    import '../../../../scripts/serie/seasonList';
+    import '../../../../scripts/ui/spoil';
+    import '../../../../scripts/series/season';
+    import '../../../../scripts/series/seasonList';
 
     // La tira de temporadas, centrada en la actual y con el borde difuminado por donde quedan más.
     const strip = document.querySelector<HTMLElement>('[data-tp-strip]');

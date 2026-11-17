@@ -1,5 +1,5 @@
 /**
- * «Estás viendo» / «Continuar viendo» (`components/Sections/NextEpisode.astro`) sin recargar.
+ * «Estás viendo» / «Continuar viendo» (`components/home/NextEpisode.astro`) sin recargar.
  *
  *   · Flechas ‹ ›: desplazan 4 tarjetas; se desactivan en los extremos.
  *   · «Marcar visto»: `POST /api/episodes/watched` y `GET /api/series/{id}/next-episode`. La tarjeta
@@ -10,7 +10,7 @@
  *   · Invitado: guarda la intención y pide entrar; tras entrar (la página recarga) se repite sola.
  * El marcado sale de `utils/home/nextEpisodeView.ts`, el mismo que pinta el servidor.
  */
-import '../shared/spoil';
+import '../ui/spoil';
 import { showToast } from '../social/toast';
 import { doneCard, movieDoneCard, serieCard } from '../../utils/home/nextEpisodeView';
 import type { NextEpisodeItem } from '../../services/series/nextEpisode';

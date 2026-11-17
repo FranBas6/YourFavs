@@ -1,0 +1,936 @@
+---
+import '../../styles/components/header.css';
+import { Icon } from 'astro-icon/components';
+import Stamp from '../ui/Stamp.astro';
+import { SUPPORTED_COUNTRIES } from '../../services/tmdb/tmdbInfoService';
+import { withMode } from '../../utils/catalog/catalogUrl';
+import { SOCIAL_PHASE } from '../../utils/social/social';
+
+const currentPath = Astro.url.pathname;
+
+// `/` y `/catalogo` son portadas de sección y se comparan EXACTO: por prefijo, «Catálogo» saldría
+// activo también en Tendencias, Cartelera y las demás subpáginas, que tienen su propia entrada.
+const EXACT_NAV = ['/', '/catalogo'];
+function isActive(href: string): boolean {
+    if (EXACT_NAV.includes(href)) return currentPath === href;
+    return currentPath.startsWith(href);
+}
+
+// Modo del catálogo activo: los enlaces del menú lo arrastran para que no se pierda al saltar de una
+// subpágina a otra (si estás en Series y entras en Plataformas, sigues en Series). `withMode` no
+// escribe nada cuando el modo es "Todo", así que las URLs siguen limpias por defecto.
+const catalogMode = Astro.locals.catalogMode;
+
+// Nav principal (desktop): Inicio · Catálogo · Tendencias · Cartelera · Descubrir▾
+// «Catálogo» es la portada de la sección (`/catalogo`), con el conmutador Todo · Películas · Series.
+// Para hacerle sitio sin pasar de cinco entradas, «Plataformas» se movió al desplegable Descubrir,
+// que es donde están sus hermanas.
+const navMain = [
+    { href: "/", label: "Inicio", icon: "sparkles" },
+    { href: "/catalogo", label: "Catálogo", icon: "library" },
+    { href: "/catalogo/tendencias", label: "Tendencias", icon: "trending-up" },
+    { href: "/catalogo/cartelera", label: "Cartelera", icon: "clapperboard" },
+];
+
+// Dropdown "Descubrir" (7 items — Categorías y Sagas son cosas distintas)
+const discoverItems = [
+    { href: "/catalogo/ultimoslanzamientos", color: "green",  icon: "sparkles",     title: "Últimos lanzamientos", desc: "Estrenos en streaming" },
+    { href: "/catalogo/maspopulares",        color: "pink",   icon: "flame",        title: "Más populares",        desc: "Lo que todo el mundo ve" },
+    { href: "/catalogo/plataformas",         color: "slate",  icon: "layout-grid",  title: "Plataformas",          desc: "Por dónde se ve" },
+    { href: "/catalogo/topmovies",           color: "amber",  icon: "star",         title: "Top películas",        desc: "Las mejores de siempre" },
+    { href: "/catalogo/topseries",           color: "blue",   icon: "trophy",       title: "Top series",           desc: "Imprescindibles TV" },
+    { href: "/catalogo/categorias",          color: "slate",  icon: "layers",       title: "Categorías",           desc: "Por género" },
+    { href: "/catalogo/colecciones",         color: "purple", icon: "tag",          title: "Sagas",                desc: "Colecciones y franquicias" },
+];
+const discoverActive = discoverItems.some((i) => currentPath.startsWith(i.href));
+
+// Sesión (la rellena el middleware). Header en dos estados: invitado → "Entrar";
+// con sesión → avatar + menú de cuenta.
+const user = Astro.locals.user;
+const displayName = user ? (user.name || user.email?.split('@')[0] || 'Tú') : '';
+function computeInitials(u: { name: string | null; email: string | null }): string {
+    const name = u.name?.trim();
+    if (name) {
+        const parts = name.split(/\s+/);
+        return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase();
+    }
+    return (u.email || '').slice(0, 2).toUpperCase() || '??';
+}
+const avatarInitials = user ? computeInitials(user) : '';
+const currentRegion = user?.region ?? 'ES';
+
+// Dropdown "Mis listas" (solo con sesión). Replica el patrón de "Descubrir".
+const myListsItems = [
+    { href: "/mislistas/favoritos",  color: "red",    icon: "heart",    title: "Favoritos",  desc: "Tus imprescindibles" },
+    { href: "/mislistas/megusta",    color: "amber",  icon: "star",     title: "Me gusta",   desc: "Lo que te gustó" },
+    { href: "/mislistas/vistos",     color: "green",  icon: "eye",      title: "Vistos",     desc: "Ya las viste" },
+    { href: "/mislistas/pendientes", color: "blue",   icon: "bookmark", title: "Pendientes", desc: "Para ver pronto" },
+    { href: "/mislistas/verpronto",  color: "purple", icon: "clock",    title: "Ver pronto", desc: "En tu radar" },
+    { href: "/mislistas/siguiendo",  color: "pink",   icon: "tv",       title: "Siguiendo",  desc: "Series al día" },
+    { href: "/mislistas/actores",    color: "slate",  icon: "user",     title: "Actores",    desc: "Favoritos y avisos" },
+    { href: "/mislistas/colecciones", color: "purple", icon: "library", title: "Mis colecciones", desc: "Listas personalizadas" },
+    { href: "/mislistas/actividad",  color: "green",  icon: "activity", title: "Actividad",  desc: "Tu historial" },
+    // Capa social (F2): el globo es de solicitudes de amistad sin responder (F3), lo rellena bell.ts.
+    { href: "/mislistas/amigos",     color: "pink",   icon: "handshake", title: "Amigos",   desc: "Seguir y amistad", pendingBadge: true },
+];
+const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
+---
+<header class="header-main">
+    <div class="header-inner">
+        <!-- Logo -->
+        <a href="/" class="header-logo">
+            <span class="header-logo-text">YOURFAVS</span>
+        </a>
+
+        <!-- Nav desktop: 5 items (Inicio · Tendencias · Cartelera · Descubrir▾ · Plataformas) -->
+        <nav aria-label="Navegación principal" class="header-nav-desktop">
+            {navMain.map(item => (
+                <a href={withMode(item.href, catalogMode)}
+                   class={`header-nav-link ${isActive(item.href) ? 'is-active' : ''}`}>
+                    <Icon name={`lucide:${item.icon}`} class="w-4 h-4" />
+                    {item.label}
+                </a>
+            ))}
+
+            <!-- Descubrir + dropdown -->
+            <div class="header-discover" id="discover">
+                <button type="button"
+                        class={`header-nav-link header-discover-btn ${discoverActive ? 'is-active' : ''}`}
+                        id="discover-btn" aria-haspopup="true" aria-expanded="false">
+                    <Icon name="lucide:compass" class="w-4 h-4" />
+                    Descubrir
+                    <svg class="header-discover-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <div class="header-discover-panel" id="discover-panel">
+                    <div class="header-discover-kicker">Explorar el catálogo</div>
+                    <div class="header-discover-grid">
+                        {discoverItems.map(it => (
+                            <a href={withMode(it.href, catalogMode)} class="header-discover-item">
+                                <Stamp color={it.color as any} icon={it.icon} size={32} />
+                                <span class="hd-body">
+                                    <span class="hd-t">{it.title}</span>
+                                    <span class="hd-s">{it.desc}</span>
+                                </span>
+                            </a>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mis listas + dropdown (solo con sesión) -->
+            {user && (
+                <div class="header-discover" id="mislistas">
+                    <button type="button"
+                            class={`header-nav-link header-discover-btn ${myListsActive ? 'is-active' : ''}`}
+                            id="mislistas-btn" aria-haspopup="true" aria-expanded="false">
+                        <Icon name="lucide:bookmark" class="w-4 h-4" />
+                        Mis listas
+                        <span class="header-pending-badge js-pending-badge" hidden></span>
+                        <svg class="header-discover-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <div class="header-discover-panel" id="mislistas-panel">
+                        <div class="header-discover-kicker">Tus colecciones</div>
+                        <div class="header-discover-grid">
+                            {myListsItems.map(it => (
+                                <a href={it.href} class="header-discover-item">
+                                    <Stamp color={it.color as any} icon={it.icon} size={32} />
+                                    <span class="hd-body">
+                                        <span class="hd-t">{it.title}</span>
+                                        <span class="hd-s">{it.desc}</span>
+                                    </span>
+                                    {it.pendingBadge && <span class="header-pending-badge js-pending-badge" hidden></span>}
+                                    {it.pendingBadge && SOCIAL_PHASE.messages && <span class="mcnt js-msg-badge header-msg-badge" hidden><Icon name="lucide:message-circle" /><span class="js-msg-n"></span></span>}
+                                </a>
+                            ))}
+                        </div>
+                        <a href="/mislistas/year" class="header-mylists-foot">
+                            <Icon name="lucide:bar-chart-3" class="w-4 h-4" />
+                            Tu año en cine
+                        </a>
+                    </div>
+                </div>
+            )}
+
+        </nav>
+
+        <!-- Acciones desktop: búsqueda + theme toggle -->
+        <div class="header-actions">
+            <form action="/catalogo/busqueda" method="get" class="header-search-form">
+                <label for="header-search" class="sr-only">Buscar películas y series</label>
+                <svg class="header-search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input id="header-search" name="query" type="text" placeholder="Buscar..." autocomplete="off" class="header-search-input"/>
+                <kbd class="header-search-kbd" aria-hidden="true" hidden>⌘K</kbd>
+                <button type="submit" aria-label="Buscar" class="header-search-btn">
+                    <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Calendario desktop: dropdown -->
+            <button class="header-calendar-btn" id="calendar-toggle-btn" aria-label="Abrir calendario de estrenos" title="Calendario de estrenos">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+            </button>
+            <div class="header-calendar-dropdown" id="calendar-dropdown" style="display:none;">
+                <div class="calendar-dropdown-header">
+                    <button id="cal-prev" class="cal-nav-btn" aria-label="Mes anterior">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span id="cal-month-title" class="cal-month-title"></span>
+                    <button id="cal-next" class="cal-nav-btn" aria-label="Mes siguiente">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+                <div class="cal-weekdays">
+                    <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+                </div>
+                <div id="cal-grid" class="cal-grid"></div>
+                <div id="cal-day-detail" class="cal-day-detail" style="display:none;" role="dialog" aria-modal="true" aria-label="Detalle del día" tabindex="-1"></div>
+                <div id="cal-notifications" class="cal-notifications">
+                    <p class="cal-notif-title">Tus notificaciones</p>
+                    <div id="cal-notif-list" class="cal-notif-list">
+                        <p class="cal-notif-empty">Cargando...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mensajes (M3b): acceso rápido junto a la campana, con el contador neutro de mensajes sin
+                 leer. En escritorio abre las conversaciones recientes; en móvil lleva a Mensajes, igual que
+                 la campana. Lo atiende scripts/social/messages/headerMsgs.ts; el número, bell.ts. -->
+            {user && SOCIAL_PHASE.messages && (
+                <div class="header-notif header-msgs" id="msgs">
+                    <a class="header-notif-btn" id="msgs-toggle-btn" href="/mislistas/amigos/mensajes" aria-label="Mensajes" title="Mensajes" aria-haspopup="true" aria-expanded="false">
+                        <Icon name="lucide:message-circle" class="w-5 h-5" />
+                        <span class="header-msg-badge js-msg-badge" hidden><span class="js-msg-n"></span></span>
+                    </a>
+                    <div class="header-notif-dropdown" id="msgs-dropdown" style="display:none;" role="dialog" aria-label="Mensajes">
+                        <div class="notif-head">
+                            <span class="notif-title">Mensajes</span>
+                            <button type="button" class="notif-markall" id="msgs-clear" hidden title="Vacía este desplegable y el contador. No marca nada como leído.">Limpiar</button>
+                        </div>
+                        <ul class="hm-list" id="msgs-list" aria-label="Conversaciones recientes">
+                            <li class="notif-empty">Cargando…</li>
+                        </ul>
+                        <a href="/mislistas/amigos/mensajes" class="notif-footer">Ver todos los mensajes</a>
+                    </div>
+                </div>
+            )}
+
+            <!-- Campana (Bloque 4): buzón de notificaciones (solo con sesión) -->
+            {user && (
+                <div class="header-notif" id="notif">
+                    <button class="header-notif-btn" id="notif-toggle-btn" aria-label="Notificaciones" title="Notificaciones" aria-haspopup="true" aria-expanded="false">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 16v-5a6 6 0 0 0-12 0v5l-2 3h16z"/><path d="M10 21a2 2 0 0 0 4 0"/>
+                        </svg>
+                        <span class="header-notif-badge js-notif-badge" hidden aria-label="notificaciones sin leer"></span>
+                    </button>
+                    <div class="header-notif-dropdown" id="notif-dropdown" style="display:none;" role="dialog" aria-label="Notificaciones">
+                        <div class="notif-head">
+                            <span class="notif-title">Notificaciones</span>
+                            <button type="button" class="notif-markall" id="notif-markall">Marcar leídas</button>
+                        </div>
+                        <div class="notif-list" id="notif-list">
+                            <p class="notif-empty">Cargando…</p>
+                        </div>
+                        <a href="/mislistas/notificaciones" class="notif-footer">Ver todas</a>
+                    </div>
+                </div>
+            )}
+
+            {!user && (
+                <button class="theme-toggle" aria-label="Cambiar tema">
+                    <svg class="theme-icon-sun" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    <svg class="theme-icon-moon" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                </button>
+            )}
+
+            <!-- Usuario: sin sesión → "Entrar"; con sesión → avatar + menú de cuenta (Tema vive ahí) -->
+            {user ? (
+                <div class="header-account" id="account">
+                    <button type="button" class="header-avatar-btn" id="account-btn" aria-haspopup="true" aria-expanded="false" aria-label="Tu cuenta" title={displayName}>
+                        {user.picture
+                            ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
+                            : <span class="header-avatar-initials">{avatarInitials}</span>}
+                    </button>
+                    <div class="account-menu" id="account-menu" role="menu" aria-label="Menú de cuenta">
+                        <div class="account-menu-head">
+                            <span class="account-menu-avatar">
+                                {user.picture
+                                    ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
+                                    : avatarInitials}
+                            </span>
+                            <span class="account-menu-id">
+                                <span class="account-menu-name">{displayName}</span>
+                                <span class="account-menu-email">{user.email}</span>
+                            </span>
+                        </div>
+                        <a href="/perfil" class="account-menu-item account-menu-item-2l" role="menuitem">
+                            <Icon name="lucide:settings" />
+                            <span class="ami-body">
+                                <span class="ami-title">Configuración del perfil</span>
+                                <span class="ami-sub">Nombre, avatar, región</span>
+                            </span>
+                        </a>
+                        {/* Perfil público (F1 social): con él activo (Público o Solo amigos), a tu página; si no, a activarlo. */}
+                        {user.publicHandle && user.publicVisibility && user.publicVisibility !== 'off' ? (
+                            <a href={`/u/${user.publicHandle}`} class="account-menu-item account-menu-item-2l" role="menuitem">
+                                <Icon name="lucide:at-sign" />
+                                <span class="ami-body">
+                                    <span class="ami-title">Tu perfil público</span>
+                                    <span class="ami-sub">@{user.publicHandle}</span>
+                                </span>
+                            </a>
+                        ) : (
+                            <a href="/perfil/publico" class="account-menu-item account-menu-item-2l" role="menuitem">
+                                <Icon name="lucide:at-sign" />
+                                <span class="ami-body">
+                                    <span class="ami-title">Activar perfil público</span>
+                                    <span class="ami-sub">Una página para enseñar lo que ves</span>
+                                </span>
+                            </a>
+                        )}
+                        <a href="/mislistas/actividad" class="account-menu-item" role="menuitem">
+                            <Icon name="lucide:activity" /> Tu actividad
+                        </a>
+                        <a href="/mislistas/year" class="account-menu-item" role="menuitem">
+                            <Icon name="lucide:bar-chart-3" /> Tu año en cine
+                        </a>
+                        <div class="account-menu-sep"></div>
+                        <div class="account-menu-row">
+                            <span class="amr-label"><Icon name="lucide:globe" /> Región</span>
+                            <select class="amr-region" id="acc-region" aria-label="Región de streaming">
+                                {SUPPORTED_COUNTRIES.map((c) => (
+                                    <option value={c.code} selected={c.code === currentRegion}>{c.code}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div class="account-menu-row">
+                            <span class="amr-label"><Icon name="lucide:sun" /> Tema</span>
+                            <span class="amr-theme" role="group" aria-label="Tema">
+                                <button type="button" data-theme-set="light">Claro</button>
+                                <button type="button" data-theme-set="dark">Oscuro</button>
+                            </span>
+                        </div>
+                        <div class="account-menu-sep"></div>
+                        <button type="button" class="account-menu-item is-danger" data-auth-logout role="menuitem">
+                            <Icon name="lucide:log-out" /> Cerrar sesión
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <button type="button" class="header-entrar-btn" data-auth-open>
+                    <Icon name="lucide:user" class="w-4 h-4" /> Entrar
+                </button>
+            )}
+        </div>
+
+        <!-- Móvil: la navegación vive en el tab bar inferior (MobileTabBar) + hojas
+             (MobileNavSheets). El header móvil queda mínimo: logo + calendario. -->
+    </div>
+</header>
+
+<script is:inline>
+// Búsqueda desktop → command palette (⌘K). Mejora progresiva: sin JS el form
+// sigue haciendo GET a /catalogo/busqueda. El form móvil NO se toca.
+(function () {
+    var form = document.querySelector('.header-search-form');
+    var input = document.getElementById('header-search');
+    if (!form || !input) return;
+
+    // Con JS activo el input ya no es escribible: lo vestimos de trigger
+    // (readonly + cursor pointer + hint ⌘K) para no dar falsa affordance.
+    form.classList.add('is-palette-trigger');
+    input.readOnly = true;
+    input.setAttribute('aria-label', 'Abrir búsqueda rápida');
+    var kbd = form.querySelector('.header-search-kbd');
+    if (kbd) {
+        var isMac = /Mac|iPhone|iPad/.test(navigator.platform || '');
+        kbd.textContent = isMac ? '⌘K' : 'Ctrl K';
+        kbd.hidden = false;
+    }
+
+    function openPalette(e) {
+        e.preventDefault();
+        input.blur();
+        document.dispatchEvent(new CustomEvent('yf:open-palette'));
+    }
+    input.addEventListener('focus', openPalette);
+    input.addEventListener('click', openPalette);
+    form.addEventListener('submit', openPalette);
+})();
+
+/**
+ * Los paneles de la cabecera son EXCLUYENTES: abrir uno cierra los demás.
+ *
+ * Son cinco (Descubrir, Mis listas, cuenta, calendario y notificaciones) y cada uno era un bloque
+ * aislado con su propio `isOpen`, sin saber de los otros: se podían abrir a la vez y sus paneles se
+ * solapaban encima. Este registro es el único sitio que sabe de todos; cada panel se apunta con cómo
+ * saber si está abierto y cómo cerrarse, porque no todos usan el mismo mecanismo (tres van con la clase
+ * `is-open`, el calendario y las notificaciones con `style.display`).
+ */
+window.yfHeaderPanels = [];
+function yfClosePanels(except) {
+    window.yfHeaderPanels.forEach(function (p) {
+        if (p !== except && p.isOpen()) p.close();
+    });
+}
+
+/** Registra un desplegable de los que se abren con la clase `is-open`. */
+function yfRegisterDropdown(wrapId, btnId) {
+    var wrap = document.getElementById(wrapId);
+    var btn = document.getElementById(btnId);
+    if (!wrap || !btn) return null;
+    var open = false;
+    function setOpen(v) {
+        open = v;
+        wrap.classList.toggle('is-open', v);
+        btn.setAttribute('aria-expanded', v ? 'true' : 'false');
+    }
+    var panel = { isOpen: function () { return open; }, close: function () { setOpen(false); } };
+    window.yfHeaderPanels.push(panel);
+    // Solo click, sin hover: con hover se abriría al pasar el ratón por encima.
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var next = !open;
+        if (next) yfClosePanels(panel);
+        setOpen(next);
+    });
+    document.addEventListener('click', function (e) { if (open && !wrap.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && open) setOpen(false); });
+    return panel;
+}
+
+yfRegisterDropdown('discover', 'discover-btn');
+yfRegisterDropdown('mislistas', 'mislistas-btn');
+yfRegisterDropdown('account', 'account-btn');
+
+// Extras del menú de cuenta (región e interruptor de tema); su apertura la lleva el registro de arriba.
+(function () {
+    var wrap = document.getElementById('account');
+    if (!wrap) return;
+
+    // Región inline: guarda y recarga (para que los proveedores SSR usen la nueva región).
+    var accRegion = document.getElementById('acc-region');
+    if (accRegion) accRegion.addEventListener('change', function () {
+        fetch('/api/profile/preferences', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ region: accRegion.value }),
+        }).then(function () { location.reload(); }).catch(function () {});
+    });
+
+    // Tema segmentado: aplica al instante (data-theme + localStorage) y guarda en el perfil.
+    var themeBtns = wrap.querySelectorAll('[data-theme-set]');
+    function syncThemeSeg() {
+        var cur = document.documentElement.getAttribute('data-theme') || 'light';
+        themeBtns.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-theme-set') === cur); });
+    }
+    themeBtns.forEach(function (b) {
+        b.addEventListener('click', function () {
+            var v = b.getAttribute('data-theme-set');
+            // Pasa por yfApplyTheme (Layout) en vez de escribir localStorage a mano: si no,
+            // este botón dejaría `themeChoice` en 'system' y la elección se perdería al recargar.
+            if (window.yfApplyTheme) window.yfApplyTheme(v);
+            syncThemeSeg();
+            fetch('/api/profile/preferences', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ theme: v }),
+            }).catch(function () {});
+        });
+    });
+    syncThemeSeg();
+    // El tema puede cambiarlo la hoja móvil o Ajustes; el segmentado se pone al día.
+    document.addEventListener('yf:theme', syncThemeSeg);
+})();
+
+// Calendar dropdown
+(function () {
+    var calBtn = document.getElementById('calendar-toggle-btn');
+    var calDrop = document.getElementById('calendar-dropdown');
+    var calGrid = document.getElementById('cal-grid');
+    var calTitle = document.getElementById('cal-month-title');
+    var calPrev = document.getElementById('cal-prev');
+    var calNext = document.getElementById('cal-next');
+    var calDayDetail = document.getElementById('cal-day-detail');
+    var calNotifList = document.getElementById('cal-notif-list');
+    if (!calBtn || !calDrop) return;
+
+    var months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    var now = new Date();
+    var curYear = now.getFullYear();
+    var curMonth = now.getMonth() + 1;
+    var calData = null;
+    var isOpen = false;
+
+    var panel = {
+        isOpen: function () { return isOpen; },
+        close: function () { isOpen = false; calDrop.style.display = 'none'; },
+    };
+    if (window.yfHeaderPanels) window.yfHeaderPanels.push(panel);
+
+    function toggle() {
+        isOpen = !isOpen;
+        if (isOpen) yfClosePanels(panel);
+        calDrop.style.display = isOpen ? 'block' : 'none';
+        if (isOpen && !calData) loadMonth(curYear, curMonth);
+    }
+
+    calBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        // Móvil (<1024px): el dropdown es un popover de ratón → mejor la página
+        // completa (responsive, con vista lista + ICS). Desktop conserva el dropdown.
+        if (window.matchMedia('(max-width: 1023px)').matches) {
+            window.location.href = '/mislistas/calendario';
+            return;
+        }
+        toggle();
+    });
+
+    document.addEventListener('click', function (e) {
+        if (isOpen && !calDrop.contains(e.target) && e.target !== calBtn) {
+            isOpen = false;
+            calDrop.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && isOpen) { isOpen = false; calDrop.style.display = 'none'; }
+    });
+
+    calPrev.addEventListener('click', function () {
+        curMonth--; if (curMonth < 1) { curMonth = 12; curYear--; }
+        loadMonth(curYear, curMonth);
+    });
+    calNext.addEventListener('click', function () {
+        curMonth++; if (curMonth > 12) { curMonth = 1; curYear++; }
+        loadMonth(curYear, curMonth);
+    });
+
+    function loadMonth(y, m) {
+        calTitle.textContent = months[m - 1] + ' ' + y;
+        calGrid.innerHTML = '<p style="text-align:center;padding:1rem;color:#9CA3AF;font-size:12px;">Cargando...</p>';
+        calDayDetail.style.display = 'none';
+
+        var ym = y + '-' + String(m).padStart(2, '0');
+        fetch('/api/calendar/' + ym)
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                calData = data;
+                renderGrid(data);
+                renderNotifications(data);
+            })
+            .catch(function () {
+                calGrid.innerHTML = '<p style="text-align:center;padding:1rem;color:#EF4444;font-size:12px;">Error al cargar</p>';
+            });
+    }
+
+    function renderGrid(data) {
+        var daysInMonth = new Date(data.year, data.month, 0).getDate();
+        var firstDay = (new Date(data.year, data.month - 1, 1).getDay() + 6) % 7;
+        var eventsMap = {};
+        (data.days || []).forEach(function (d) { eventsMap[d.date] = d.events; });
+
+        var html = '';
+        for (var i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-empty"></div>';
+
+        for (var d = 1; d <= daysInMonth; d++) {
+            var dateStr = data.year + '-' + String(data.month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+            var events = eventsMap[dateStr] || [];
+            var isToday = dateStr === data.today;
+            var cls = 'cal-cell' + (isToday ? ' cal-today' : '') + (events.length ? ' cal-has-events' : '');
+            html += '<div class="' + cls + '" data-date="' + dateStr + '">';
+            html += '<span class="cal-day-num">' + d + '</span>';
+            if (events.length) {
+                html += '<div class="cal-dots">';
+                var hasMovie = events.some(function (e) { return e.media_type === 'movie'; });
+                var hasSerie = events.some(function (e) { return e.event_type === 'episode'; });
+                var hasSeason = events.some(function (e) { return e.event_type === 'season_premiere'; });
+                if (hasMovie) html += '<span class="cal-dot cal-dot-movie"></span>';
+                if (hasSerie) html += '<span class="cal-dot cal-dot-serie"></span>';
+                if (hasSeason) html += '<span class="cal-dot cal-dot-season"></span>';
+                html += '</div>';
+            }
+            html += '</div>';
+        }
+        calGrid.innerHTML = html;
+
+        // Day click handler
+        calGrid.querySelectorAll('.cal-has-events').forEach(function (cell) {
+            cell.addEventListener('click', function () {
+                var date = cell.getAttribute('data-date');
+                var events = eventsMap[date] || [];
+                showDayDetail(date, events, cell);
+            });
+        });
+    }
+
+    var dayDetailReturnFocus = null;
+
+    function escapeAttr(s) {
+        return String(s || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    function clearSelectedDay() {
+        if (!calGrid) return;
+        calGrid.querySelectorAll('.cal-selected').forEach(function (c) { c.classList.remove('cal-selected'); });
+    }
+
+    function closeDayDetail() {
+        calDayDetail.style.display = 'none';
+        clearSelectedDay();
+        if (dayDetailReturnFocus && typeof dayDetailReturnFocus.focus === 'function') {
+            dayDetailReturnFocus.focus();
+            dayDetailReturnFocus = null;
+        }
+    }
+
+    function showDayDetail(date, events, triggerEl) {
+        dayDetailReturnFocus = triggerEl || document.activeElement;
+        clearSelectedDay();
+        if (triggerEl && triggerEl.classList) triggerEl.classList.add('cal-selected');
+        var d = new Date(date + 'T12:00:00');
+        var dayName = d.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
+        var html = '<div class="cal-detail-header"><span>' + dayName + '</span><button id="cal-detail-close" class="cal-detail-close" aria-label="Cerrar detalle del día">&times;</button></div>';
+        events.forEach(function (ev) {
+            var typeClass = ev.media_type === 'movie' ? 'cal-ev-movie' : (ev.event_type === 'season_premiere' ? 'cal-ev-season' : 'cal-ev-serie');
+            var link = ev.href || (ev.media_type === 'movie' ? '/movie/' + ev.tmdb_id : '/serie/' + ev.tmdb_id); // TMDB D4: episodio → su ficha
+            html += '<a href="' + link + '" class="cal-event ' + typeClass + '">';
+            if (ev.poster_path) html += '<img src="' + ev.poster_path + '" alt="' + escapeAttr(ev.title) + '" class="cal-ev-poster"/>';
+            html += '<div class="cal-ev-info"><span class="cal-ev-title">' + escapeAttr(ev.title) + '</span><span class="cal-ev-label">' + escapeAttr(ev.label) + '</span></div></a>';
+        });
+        calDayDetail.innerHTML = html;
+        calDayDetail.style.display = 'block';
+        var closeBtn = document.getElementById('cal-detail-close');
+        closeBtn.addEventListener('click', closeDayDetail);
+        closeBtn.focus();
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && calDayDetail && calDayDetail.style.display === 'block') {
+            e.stopPropagation();
+            closeDayDetail();
+        }
+    });
+
+    function renderNotifications(data) {
+        var subs = [];
+        (data.days || []).forEach(function (d) {
+            d.events.forEach(function (ev) {
+                if (ev.is_subscribed) subs.push({ date: d.date, event: ev });
+            });
+        });
+        if (subs.length === 0) {
+            calNotifList.innerHTML = '<p class="cal-notif-empty">No hay notificaciones este mes</p>';
+            return;
+        }
+
+        // Agrupar por media+tmdb_id+title
+        var map = {};
+        subs.forEach(function (s) {
+            var key = s.event.media_type + ':' + s.event.tmdb_id + ':' + s.event.title;
+            if (!map[key]) map[key] = [];
+            map[key].push(s);
+        });
+        var todayStr = new Date().toISOString().slice(0, 10);
+        var groups = Object.keys(map).map(function (k) {
+            var items = map[k].slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+            var upcoming = items.filter(function (s) { return s.date >= todayStr; });
+            var nextDate = upcoming.length ? upcoming[0].date : items[items.length - 1].date;
+            return { items: items, firstDate: items[0].date, nextDate: nextDate, hasUpcoming: upcoming.length > 0, head: items[0].event };
+        }).sort(function (a, b) { return a.nextDate.localeCompare(b.nextDate); });
+
+        var fmt = function (date) {
+            return new Date(date + 'T12:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        };
+
+        var html = '';
+        groups.forEach(function (g) {
+            var head = g.head;
+            var link = head.media_type === 'movie' ? '/movie/' + head.tmdb_id : '/serie/' + head.tmdb_id;
+            var poster = head.poster_path
+                ? '<img src="' + head.poster_path + '" alt="" class="cal-notif-poster"/>'
+                : '<div class="cal-notif-poster-empty">?</div>';
+
+            if (g.items.length === 1) {
+                html += '<a href="' + link + '" class="cal-notif-item">';
+                html += poster;
+                html += '<div class="cal-notif-body">';
+                html += '<div class="cal-notif-top"><span class="cal-notif-name">' + escapeAttr(head.title) + '</span><span class="cal-notif-date">' + fmt(g.firstDate) + '</span></div>';
+                html += '<span class="cal-notif-label">' + escapeAttr(head.label) + '</span>';
+                html += '</div></a>';
+                return;
+            }
+
+            var startOpen = g.items.length <= 3;
+            html += '<details class="cal-notif-group"' + (startOpen ? ' open' : '') + '>';
+            html += '<summary class="cal-notif-item cal-notif-summary">';
+            html += poster;
+            html += '<div class="cal-notif-body">';
+            html += '<div class="cal-notif-top"><span class="cal-notif-name">' + escapeAttr(head.title) + '</span><span class="cal-notif-count">' + g.items.length + (head.media_type === 'movie' ? ' fechas' : ' episodios') + '</span></div>';
+            html += '<span class="cal-notif-label">' + (g.hasUpcoming ? 'Próximo: ' : 'Último: ') + fmt(g.nextDate) + '</span>';
+            html += '</div>';
+            html += '<svg class="cal-notif-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>';
+            html += '</summary>';
+            html += '<ul class="cal-notif-sublist">';
+            g.items.forEach(function (s) {
+                html += '<li><a href="' + link + '" class="cal-notif-subitem">';
+                html += '<span class="cal-notif-sublabel">' + escapeAttr(s.event.label) + '</span>';
+                html += '<span class="cal-notif-subdate">' + fmt(s.date) + '</span>';
+                html += '</a></li>';
+            });
+            html += '</ul>';
+            html += '</details>';
+        });
+        calNotifList.innerHTML = html;
+    }
+})();
+
+// ── Campana (Bloque 4): el globo y el desplegable viven en scripts/notifications/bell.ts
+// (módulo, debajo): desde la F2 social pintan avisos con botones con utils/social/ui.ts. ──
+</script>
+
+<script>
+    // Campana: globos de no leídos y de solicitudes, y el desplegable. Sin sesión no hay campana
+    // ni globos, y el módulo no hace nada.
+    import '../../scripts/notifications/bell';
+</script>
+
+
+<style>
+    /* === Auth en el header (B.3) === */
+
+    /* "Entrar" (sin sesión) — píldora blanca sobre el header azul */
+    .header-entrar-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 36px;
+        padding: 0 15px;
+        border-radius: 0.5rem;
+        background: #fff;
+        color: #1e40af;
+        border: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background 0.2s ease;
+    }
+    .header-entrar-btn:hover { background: rgba(255, 255, 255, 0.88); }
+
+    /* Avatar (con sesión) */
+    .header-account { position: relative; }
+    .header-avatar-btn {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.45);
+        background: rgba(255, 255, 255, 0.16);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        overflow: hidden;
+        flex-shrink: 0;
+        transition: background 0.2s ease;
+    }
+    .header-avatar-btn:hover { background: rgba(255, 255, 255, 0.28); }
+    .header-avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+    .header-avatar-initials { font-size: 13px; font-weight: 700; }
+
+    /* Menú de cuenta (dropdown, adapta a tema con tokens) */
+    .account-menu {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        width: 264px;
+        background: var(--bg-elev);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+        padding: 8px;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-6px);
+        transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+        z-index: 1000;
+    }
+    .header-account.is-open .account-menu { opacity: 1; visibility: visible; transform: none; }
+
+    .account-menu-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 8px 12px;
+        border-bottom: 1px solid var(--border);
+        margin-bottom: 6px;
+    }
+    .account-menu-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: var(--primary);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 14px;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .account-menu-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .account-menu-id { min-width: 0; display: flex; flex-direction: column; }
+    .account-menu-name {
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--text);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .account-menu-email {
+        font-size: 12px;
+        color: var(--text-3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .account-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 9px 10px;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 13.5px;
+        color: var(--text-2);
+        text-decoration: none;
+        background: none;
+        border: none;
+        cursor: pointer;
+        text-align: left;
+    }
+    .account-menu-item:hover { background: var(--bg-tint); color: var(--text); }
+    .account-menu-item :global(svg) { width: 17px; height: 17px; flex-shrink: 0; }
+    .account-menu-sep { height: 1px; background: var(--border); margin: 6px 4px; }
+    .account-menu-item.is-danger { color: #ef4444; }
+    .account-menu-item.is-danger:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+    /* Item de dos líneas (Configuración + subtítulo) */
+    .account-menu-item-2l { align-items: flex-start; }
+    .account-menu-item-2l .ami-body { display: flex; flex-direction: column; gap: 1px; }
+    .ami-title { font-size: 13.5px; color: var(--text-2); }
+    .account-menu-item-2l:hover .ami-title { color: var(--text); }
+    .ami-sub { font-size: 11.5px; color: var(--text-4); }
+
+    /* Filas con control inline (Región / Tema) */
+    .account-menu-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 10px; padding: 7px 10px;
+    }
+    .amr-label { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--text-2); }
+    .amr-label :global(svg) { width: 17px; height: 17px; color: var(--text-3); }
+    .amr-region {
+        border: 1px solid var(--border); background: var(--bg); color: var(--text);
+        border-radius: 7px; padding: 3px 6px; font-size: 12.5px; font-weight: 600;
+        font-family: var(--font-mono, inherit); cursor: pointer;
+    }
+    .amr-theme { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+    .amr-theme button {
+        border: none; background: none; color: var(--text-3);
+        font-size: 12px; font-weight: 600; padding: 4px 11px; cursor: pointer; font-family: inherit;
+    }
+    .amr-theme button.is-active { background: var(--accent); color: #fff; }
+
+    /* Pie "Tu año en cine" del dropdown Mis listas (panel oscuro) */
+    .header-mylists-foot {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 8px;
+        padding: 11px 12px 4px;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 13px;
+        font-weight: 600;
+        text-decoration: none;
+        border-radius: 0 0 6px 6px;
+        transition: color 0.15s ease;
+    }
+    .header-mylists-foot:hover { color: #fff; }
+
+    /* Avatar móvil */
+    .header-mobile-avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 999px;
+        object-fit: cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.22);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    /* Sección Cuenta (panel móvil) */
+    .mobile-account-id { display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px; }
+    .mobile-account-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 999px;
+        background: var(--primary);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        overflow: hidden;
+        flex-shrink: 0;
+    }
+    .mobile-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .mobile-account-text { min-width: 0; display: flex; flex-direction: column; }
+    .mobile-account-name { font-weight: 600; color: var(--text); }
+    .mobile-account-email {
+        font-size: 12px;
+        color: var(--text-3);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mobile-logout { color: #ef4444; cursor: pointer; }
+    .mobile-entrar-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        width: 100%;
+        padding: 12px;
+        border-radius: 10px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+</style>

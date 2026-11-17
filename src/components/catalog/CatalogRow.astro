@@ -1,0 +1,69 @@
+---
+/**
+ * Fila de catálogo de la Home (tendencias, populares, top…), extraída de index.astro
+ * para poder renderizarla dentro del bucle ordenable de "Home a tu medida" (§4).
+ */
+import SectionHeader from "../ui/SectionHeader.astro";
+import CardMovie from "../cards/CardMovie.astro";
+import CardSerie from "../cards/CardSerie.astro";
+import { posterUrl } from "../../services/tmdb/tmdbClient";
+import { getGenreName } from "../../utils/titles/genres";
+
+import Row from "../ui/Row.astro";
+
+interface Props { section: any; }
+const { section } = Astro.props;
+
+// Sistema v2 (Fase 3): una sola fila horizontal por sección, con películas y series intercaladas
+// (antes, dos rejillas 2 × 5 una debajo de otra). La rejilla completa queda para «Ver más».
+const movies = (section.movies ?? []).slice(0, 10);
+const series = (section.series ?? []).slice(0, 10);
+const items: { kind: 'movie' | 'tv'; item: any }[] = [];
+for (let k = 0; k < Math.max(movies.length, series.length); k++) {
+    if (movies[k]) items.push({ kind: 'movie', item: movies[k] });
+    if (series[k]) items.push({ kind: 'tv', item: series[k] });
+}
+// Sin contador: lo que trae la fila (20 + 20) no es el total de la sección, que está en «Ver más».
+const railId = `rail-${String(section.key ?? section.title ?? 'fila').toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
+const genresOf = (it: any) => it.genre_ids?.map((id: number) => ({ id, name: getGenreName(id) }));
+---
+<article class="yf-row">
+    <SectionHeader
+        title={section.title}
+        link={section.link}
+        color={section.color as any}
+        icon={section.lucide}
+        subtitle={section.subtitle}
+        why={section.why}
+        railId={items.length > 0 ? railId : undefined}
+    />
+
+    <Row id={railId} label={section.title} moreHref={section.link}>
+        {items.map(({ kind, item }) => kind === 'movie' ? (
+            <CardMovie
+                id={item.id.toString()}
+                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                title={item.title}
+                platform={item._platform}
+                vote_average={item.vote_average}
+                overview={item.overview}
+                release_date={item.release_date}
+                genres={genresOf(item)}
+            />
+        ) : (
+            <CardSerie
+                id={item.id.toString()}
+                img={posterUrl(item.poster_path) || "/placeholder.jpg"}
+                name={item.name}
+                platform={item._platform}
+                vote_average={item.vote_average}
+                overview={item.overview}
+                first_air_date={item.first_air_date}
+                seasons={item.seasons}
+                last_episode_to_air={item.last_episode_to_air}
+                next_episode_to_air={item.next_episode_to_air}
+                genres={genresOf(item)}
+            />
+        ))}
+    </Row>
+</article>
