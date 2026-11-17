@@ -9,7 +9,7 @@
  */
 import type { APIRoute } from 'astro';
 import { toItem, type SummaryItem } from '../../services/tmdb/summaryItem';
-import { getTrending } from '../../services/API/shared/tmdbDiscoverService';
+import { getTrending } from '../../services/catalog/tmdbDiscoverService';
 import {
     getLatestMovies,
     getMostPopularMovies,

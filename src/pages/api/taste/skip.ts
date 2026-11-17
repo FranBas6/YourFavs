@@ -5,7 +5,7 @@
  * siguen siendo editables luego desde el perfil; esto solo registra la decisión.
  */
 import type { APIRoute } from 'astro';
-import { setUserProfile } from '../../../services/BD/profile/userProfile';
+import { setUserProfile } from '../../../services/profile/userProfile';
 
 export const prerender = false;
 

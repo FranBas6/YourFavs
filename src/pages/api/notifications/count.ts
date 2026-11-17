@@ -4,10 +4,10 @@
  * Invitado → { count: 0 }.
  */
 import type { APIRoute } from 'astro';
-import { syncNotifications } from '../../../services/API/notifications/generator';
-import { syncPlanToday } from '../../../services/BD/social/plans';
+import { syncNotifications } from '../../../services/notifications/generator';
+import { syncPlanToday } from '../../../services/social/plans';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
-import { unreadCount } from '../../../services/BD/notifications/notifications';
+import { unreadCount } from '../../../services/notifications/notifications';
 
 export const prerender = false;
 

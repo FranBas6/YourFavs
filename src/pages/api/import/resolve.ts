@@ -11,7 +11,7 @@
  * elegir), `missing` o `error` (fallo de TMDB: el navegador lo reintenta).
  */
 import type { APIRoute } from 'astro';
-import { resolveImdbIds, resolveByTitle, resolveTmdbIds } from '../../../services/API/shared/importResolve';
+import { resolveImdbIds, resolveByTitle, resolveTmdbIds } from '../../../services/import/importResolve';
 import { db, getCurrentLanguage, requireAuthId } from '../../../services/db/userScope';
 import { json } from './_shared';
 

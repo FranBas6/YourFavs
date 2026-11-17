@@ -1,8 +1,8 @@
 import {
     titleMembership, listCollection, inCollection, addToCollections, removeFromCollections,
     clearCollection, patchTitle,
-} from "../BD/shared/library";
-import { getTransition } from "../BD/shared/stateTransitions";
+} from "../library/library";
+import { getTransition } from "../library/stateTransitions";
 import { normalizeScore } from "../../utils/constants/helpers/media-helpers";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
@@ -74,7 +74,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         await updateExisting({ rating: ratingNum });
         // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
         try {
-            const { setRating } = await import('../BD/lists/ratings');
+            const { setRating } = await import('../library/ratings');
             await setRating('movie', movieId, ratingNum);
         } catch { /* la nota inline ya está guardada */ }
         await bustRecs(); // una nota ≥ 8 siembra «Para ti»
@@ -85,7 +85,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         await updateExisting({ rating: null });
         await bustRecs();
         try {
-            const { deleteRating } = await import('../BD/lists/ratings');
+            const { deleteRating } = await import('../library/ratings');
             await deleteRating('movie', movieId);
         } catch { /* ignore */ }
         return `/movie/${movieId}`;
@@ -119,7 +119,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         // solo la PRIMERA vez (mover de lista o curar algo ya visto NO duplica el pase).
         if (logPase) {
             try {
-                const { appendWatchLog } = await import('../BD/lists/watchLog');
+                const { appendWatchLog } = await import('../library/watchLog');
                 await appendWatchLog({ media_type: 'movie', tmdb_id: movieId, dedupe: true });
             } catch { /* diario opcional */ }
         }
@@ -130,7 +130,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         // §5 · bitácora (best-effort): quitar de una lista es intencional y NO derivable
         // (se pierde el added_at). Los borrados en cascada del branch 'add' NO llegan aquí.
         try {
-            const { appendActivity } = await import('../BD/shared/activityLog');
+            const { appendActivity } = await import('../library/activityLog');
             await appendActivity({ verb: 'remove', media_type: 'movie', tmdb_id: movieId, meta: { collection: collectionName } });
         } catch { /* bitácora opcional */ }
     }
@@ -158,15 +158,15 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
             invalidateTopActorsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidatePersonalIndexCache } = await import('../BD/shared/personalIndex');
+            const { invalidatePersonalIndexCache } = await import('../library/personalIndex');
             invalidatePersonalIndexCache(); // 4.3 · buscador "lo mío"
         } catch { /* ignore */ }
         try {
-            const { invalidateLibrarySnapshot } = await import('../BD/shared/librarySnapshot');
+            const { invalidateLibrarySnapshot } = await import('../library/librarySnapshot');
             invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
         } catch { /* ignore */ }
         try {
-            const { invalidateActivityFeed } = await import('../BD/shared/activityFeed');
+            const { invalidateActivityFeed } = await import('../library/activityFeed');
             invalidateActivityFeed(); // §5 · altas/bajas salen en el feed
         } catch { /* ignore */ }
     }
@@ -241,11 +241,11 @@ export async function finishViewingMovie(movieId: string): Promise<void> {
     // Re-visionado terminado: fuera de Viendo + pase en el diario.
     await removeFromCollections(movieId, ['MoviesViendo']);
     try {
-        const { appendWatchLog } = await import('../BD/lists/watchLog');
+        const { appendWatchLog } = await import('../library/watchLog');
         await appendWatchLog({ media_type: 'movie', tmdb_id: movieId }); // sin dedupe → pase
     } catch { /* diario opcional */ }
     try {
-        const { invalidateLibrarySnapshot } = await import('../BD/shared/librarySnapshot');
+        const { invalidateLibrarySnapshot } = await import('../library/librarySnapshot');
         invalidateLibrarySnapshot();
     } catch { /* ignore */ }
     try {

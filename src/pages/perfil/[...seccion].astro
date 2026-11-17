@@ -16,9 +16,9 @@
 import Layout from "../../layouts/Layout.astro";
 import "../../styles/pages/ajustes.css";
 
-import { getUserProfile, setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from "../../services/BD/profile/userProfile";
-import { getIcsToken, icsPath } from "../../services/BD/profile/icsToken";
-import { clearUserTaste } from "../../services/BD/profile/userTaste";
+import { getUserProfile, setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from "../../services/profile/userProfile";
+import { getIcsToken, icsPath } from "../../services/calendar/icsToken";
+import { clearUserTaste } from "../../services/profile/userTaste";
 import { sanitizePlatformIds } from "../../services/tmdb/watchProviders";
 import { HOME_SECTIONS } from "../../utils/constants/homeSections";
 import { SUPPORTED_COUNTRIES } from "../../services/tmdb/tmdbInfoService";
@@ -41,7 +41,7 @@ import SeccionApariencia from "../../components/ajustes/SeccionApariencia.astro"
 import SeccionCalendario from "../../components/ajustes/SeccionCalendario.astro";
 import SeccionCuenta from "../../components/ajustes/SeccionCuenta.astro";
 import SeccionImportar from "../../components/ajustes/SeccionImportar.astro";
-import { listImportJobs, type ImportJob } from "../../services/BD/import/importLibrary";
+import { listImportJobs, type ImportJob } from "../../services/import/importLibrary";
 
 // Protegida por el middleware (`/perfil*` sin sesión → redirige a /). Aquí ya hay user.
 const user = Astro.locals.user!;
@@ -167,7 +167,7 @@ if (Astro.request.method === 'POST') {
         // preferencias (antes se invalidaba en cualquier guardado del perfil).
         if (touchedNotifs) {
             try {
-                const { invalidateNotifSync } = await import('../../services/API/notifications/generator');
+                const { invalidateNotifSync } = await import('../../services/notifications/generator');
                 invalidateNotifSync();
             } catch { /* se re-sincroniza igual al día siguiente */ }
         }

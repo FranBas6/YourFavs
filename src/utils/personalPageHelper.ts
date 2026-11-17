@@ -29,7 +29,7 @@ export interface PersonalPageData {
     sort: string;
     pageUrl: URL;
     itemsPerPage: number;
-    // Filas de la biblioteca tal cual (ver `services/BD/shared/library.ts`)
+    // Filas de la biblioteca tal cual (ver `services/library/library.ts`)
     seriesData: any[];
     moviesData: any[];
     // TMDB details (all fetched, non-null)

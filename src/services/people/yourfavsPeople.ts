@@ -41,7 +41,7 @@ export async function removeFollowedPerson(id: string): Promise<void> {
     const meta: Record<string, unknown> = d ? { name: d.name, profile_path: d.profile_path ?? null } : {};
     // §5 · bitácora (best-effort): dejar de seguir es intencional y borra el added_at.
     try {
-        const { appendActivity } = await import('../BD/shared/activityLog');
+        const { appendActivity } = await import('../library/activityLog');
         await appendActivity({ verb: 'unfollow', media_type: 'person', tmdb_id: id, meta });
     } catch { /* bitácora opcional */ }
 }

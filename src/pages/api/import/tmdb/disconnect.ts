@@ -3,7 +3,7 @@
  * en TMDB y borra la cookie (TMDB D3c). Siempre responde ok: si TMDB falla, la cookie se borra igual.
  */
 import type { APIRoute } from 'astro';
-import { revokeAccessToken } from '../../../../services/API/shared/tmdbAccount';
+import { revokeAccessToken } from '../../../../services/import/tmdbAccount';
 import { json } from '../_shared';
 import { clearAccess, getAccess } from './_session';
 

@@ -12,7 +12,7 @@ import {
     ELDOBLAJE_BASE,
     type DubbingEntry,
     type SeasonFicha,
-} from '../../../../services/scraping/eldoblaje';
+} from '../../../../services/dubbing/eldoblaje';
 
 export const prerender = false;
 

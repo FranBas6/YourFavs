@@ -1,6 +1,6 @@
 import { processBatch } from './processBatch';
 import { tmdbFetch } from '../services/tmdb/tmdbClient';
-import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
+import { getLibrarySnapshot } from '../services/library/librarySnapshot';
 import { getCurrentUid } from '../services/db/userScope';
 
 const TTL_MS = 60 * 60 * 1000;

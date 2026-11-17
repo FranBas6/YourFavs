@@ -12,10 +12,10 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
-import { syncNotifications } from '../../../services/API/notifications/generator';
-import { unreadCount } from '../../../services/BD/notifications/notifications';
-import { pendingReceivedCount } from '../../../services/BD/social/graph';
-import { unreadTotal } from '../../../services/BD/social/messages';
+import { syncNotifications } from '../../../services/notifications/generator';
+import { unreadCount } from '../../../services/notifications/notifications';
+import { pendingReceivedCount } from '../../../services/social/graph';
+import { unreadTotal } from '../../../services/social/messages';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 
 export const prerender = false;

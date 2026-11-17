@@ -1,7 +1,7 @@
 import { type Movie } from "../../types/ApiMovie.ts";
 import { tmdbFetch, tmdbFetchList } from '../tmdb/tmdbClient';
 import { getCurrentRegion } from '../db/userScope';
-import { getMostPopular, getTopRated, searchByTitle } from '../API/shared/tmdbDiscoverService';
+import { getMostPopular, getTopRated, searchByTitle } from '../catalog/tmdbDiscoverService';
 
 // --- Fetch de detalles (específico de movies por el endpoint) ---
 

@@ -1,4 +1,4 @@
-import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
+import { getLibrarySnapshot } from '../services/library/librarySnapshot';
 
 /**
  * Títulos que has visto, como claves `movie_<id>` / `tv_<id>` («Visto» = Vistas ∪ Favoritos ∪ Me gusta,

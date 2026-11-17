@@ -8,8 +8,8 @@
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../services/http/http';
 import { badRequest, serverError, tooMany, unauthorized } from '../../../../../lib/social/http';
-import { actRec, receivedOne, type RecAction } from '../../../../../services/BD/social/recommendations';
-import { allowSocialWrite } from '../../../../../services/BD/social/graph';
+import { actRec, receivedOne, type RecAction } from '../../../../../services/social/recommendations';
+import { allowSocialWrite } from '../../../../../services/social/graph';
 
 export const prerender = false;
 

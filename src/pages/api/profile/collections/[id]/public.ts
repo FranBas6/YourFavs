@@ -6,8 +6,8 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../services/http/http';
-import { getOwnPublicSettings, setOwnCollectionPublic } from '../../../../../services/BD/social/publicSettings';
-import { invalidatePublicProfileCache } from '../../../../../services/BD/social/publicProfile';
+import { getOwnPublicSettings, setOwnCollectionPublic } from '../../../../../services/social/publicSettings';
+import { invalidatePublicProfileCache } from '../../../../../services/social/publicProfile';
 
 export const prerender = false;
 

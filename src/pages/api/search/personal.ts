@@ -8,7 +8,7 @@
  */
 import type { APIRoute } from 'astro';
 import { posterUrl } from '../../../services/tmdb/tmdbClient';
-import { buildPersonalIndex, foldText } from '../../../services/BD/shared/personalIndex';
+import { buildPersonalIndex, foldText } from '../../../services/library/personalIndex';
 import { formatScore } from '../../../utils/constants/helpers/media-helpers';
 
 export const prerender = false;

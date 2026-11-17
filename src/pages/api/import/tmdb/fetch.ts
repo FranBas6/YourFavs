@@ -5,7 +5,7 @@
  * índice de listas, y `total_pages`. Sin conexión (o caducada) → 401 y el navegador lo dice.
  */
 import type { APIRoute } from 'astro';
-import { ACCOUNT_KINDS, fetchAccountPage, type AccountKind } from '../../../../services/API/shared/tmdbAccount';
+import { ACCOUNT_KINDS, fetchAccountPage, type AccountKind } from '../../../../services/import/tmdbAccount';
 import { db, getCurrentLanguage, requireAuthId } from '../../../../services/db/userScope';
 import { json } from '../_shared';
 import { getAccess } from './_session';

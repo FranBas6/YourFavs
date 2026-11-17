@@ -6,7 +6,7 @@
  * saveFixed. Invitado → 401 (gating). El uid sale de la sesión (locals.user).
  */
 import type { APIRoute } from 'astro';
-import { saveFixed, isFixedList } from '../../../services/BD/lists/fixedLists';
+import { saveFixed, isFixedList } from '../../../services/library/fixedLists';
 
 export const prerender = false;
 

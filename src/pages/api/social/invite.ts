@@ -6,7 +6,7 @@
  * enseña su página pública, así que no pide sesión y se puede cachear como ella.
  */
 import type { APIRoute } from 'astro';
-import { findInviter } from '../../../services/BD/social/referral';
+import { findInviter } from '../../../services/social/referral';
 import { firstName } from '../../../lib/social/ui';
 
 export const prerender = false;

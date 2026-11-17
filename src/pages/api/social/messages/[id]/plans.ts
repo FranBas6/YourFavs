@@ -10,7 +10,7 @@
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../../lib/social/http';
-import { PLAN_NOTE_MAX, isPlanDate, isPlanTime, proposePlan } from '../../../../../services/BD/social/plans';
+import { PLAN_NOTE_MAX, isPlanDate, isPlanTime, proposePlan } from '../../../../../services/social/plans';
 import { SOCIAL_PHASE } from '../../../../../utils/constants/social';
 
 export const prerender = false;

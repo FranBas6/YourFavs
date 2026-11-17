@@ -9,7 +9,7 @@ import {
     tokenSet,
     ELDOBLAJE_BASE,
     type DubberWork,
-} from '../../../services/scraping/eldoblaje';
+} from '../../../services/dubbing/eldoblaje';
 
 export const prerender = false;
 

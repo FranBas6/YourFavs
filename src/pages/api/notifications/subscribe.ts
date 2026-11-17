@@ -5,7 +5,7 @@
  * «Notificar estreno» de las fichas (`NotificationBell`, que va por POST de formulario).
  */
 import type { APIRoute } from 'astro';
-import { addNotificationSub, removeNotificationSub } from '../../../services/BD/notifications/yourfavsNotifications';
+import { addNotificationSub, removeNotificationSub } from '../../../services/notifications/yourfavsNotifications';
 
 export const prerender = false;
 

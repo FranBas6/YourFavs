@@ -196,7 +196,7 @@ export const RATING_MAX = 10;
  * La escala pasó de enteros a medios puntos (poder poner un 7,5); cuantizar impide que
  * entren decimales arbitrarios (7,37) por un input manipulado o un redondeo del navegador.
  * Devuelve `null` si no hay número válido → el handler entonces no escribe nada.
- * Vive aquí (y no en `BD/lists/ratings.ts`) por ser pura: así no arrastra el cliente de la base de datos.
+ * Vive aquí (y no en `services/library/ratings.ts`) por ser pura: así no arrastra el cliente de la base de datos.
  */
 export function normalizeScore(raw: unknown): number | null {
     const n = Number(raw);

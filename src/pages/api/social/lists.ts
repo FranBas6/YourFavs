@@ -11,8 +11,8 @@
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, serverError, unauthorized } from '../../../lib/social/http';
-import { listTab } from '../../../services/BD/social/graph';
-import { listReceived, listSent } from '../../../services/BD/social/recommendations';
+import { listTab } from '../../../services/social/graph';
+import { listReceived, listSent } from '../../../services/social/recommendations';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 import type { FriendsTab } from '../../../lib/social/types';
 

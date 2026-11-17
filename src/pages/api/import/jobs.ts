@@ -5,7 +5,7 @@
  * encontradas, no encontradas, ignoradas); lo que se aplica lo suma `import_apply` después.
  */
 import type { APIRoute } from 'astro';
-import { createImportJob, type ImportSource } from '../../../services/BD/import/importLibrary';
+import { createImportJob, type ImportSource } from '../../../services/import/importLibrary';
 import { json } from './_shared';
 
 export const prerender = false;

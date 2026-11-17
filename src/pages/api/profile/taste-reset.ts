@@ -7,7 +7,7 @@
  * no existen hasta que caducara el blob.
  */
 import type { APIRoute } from 'astro';
-import { clearUserTaste } from '../../../services/BD/profile/userTaste';
+import { clearUserTaste } from '../../../services/profile/userTaste';
 
 export const prerender = false;
 

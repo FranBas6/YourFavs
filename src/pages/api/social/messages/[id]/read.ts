@@ -6,7 +6,7 @@
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../../lib/social/http';
-import { markRead } from '../../../../../services/BD/social/messages';
+import { markRead } from '../../../../../services/social/messages';
 import { SOCIAL_PHASE } from '../../../../../utils/constants/social';
 
 export const prerender = false;

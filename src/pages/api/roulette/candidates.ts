@@ -5,7 +5,7 @@ import { getMoviesPendientes } from '../../../services/movies/yourfavsMovie';
 import { getSeriesPendientes } from '../../../services/series/yourfavsSerie';
 import { processBatch } from '../../../utils/processBatch';
 import { getCurrentRegion } from '../../../services/db/userScope';
-import { pendingCommon } from '../../../services/BD/social/inCommon';
+import { pendingCommon } from '../../../services/social/inCommon';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 
 export const prerender = false;

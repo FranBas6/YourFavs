@@ -10,8 +10,8 @@ import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
 import {
     PublicSettingsError, getOwnPublicSettings, hideOwnTitle, unhideOwnTitle,
-} from '../../../services/BD/social/publicSettings';
-import { invalidatePublicProfileCache } from '../../../services/BD/social/publicProfile';
+} from '../../../services/social/publicSettings';
+import { invalidatePublicProfileCache } from '../../../services/social/publicProfile';
 
 export const prerender = false;
 

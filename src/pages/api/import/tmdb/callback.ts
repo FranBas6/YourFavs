@@ -4,7 +4,7 @@
  * Ajustes → Importar, que empieza a leer sola. Si no lo aprobó, vuelve con un aviso.
  */
 import type { APIRoute } from 'astro';
-import { createAccessToken } from '../../../../services/API/shared/tmdbAccount';
+import { createAccessToken } from '../../../../services/import/tmdbAccount';
 import { setAccess, takeRequestToken } from './_session';
 
 export const prerender = false;

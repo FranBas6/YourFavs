@@ -1,10 +1,10 @@
 import { getTitleDetails } from '../services/tmdb/tmdbTitleCache';
 import { getCached, setCached, invalidateCached } from '../services/cache/recsBlobCache';
 import { getCurrentUid } from '../services/db/userScope';
-import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
-import { getUserTaste } from '../services/BD/profile/userTaste';
-import { getCustomLists, getListItems } from '../services/BD/lists/customLists';
-import { listRatings } from '../services/BD/lists/ratings';
+import { getLibrarySnapshot } from '../services/library/librarySnapshot';
+import { getUserTaste } from '../services/profile/userTaste';
+import { getCustomLists, getListItems } from '../services/library/customLists';
+import { listRatings } from '../services/library/ratings';
 import { toTimestamp } from './constants/helpers/media-helpers';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo

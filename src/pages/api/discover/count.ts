@@ -10,7 +10,7 @@
  */
 import type { APIRoute } from 'astro';
 import { tmdbFetch } from '../../../services/tmdb/tmdbClient';
-import { buildDiscoverFilterParams, type AdvancedFilters } from '../../../services/API/shared/tmdbDiscoverService';
+import { buildDiscoverFilterParams, type AdvancedFilters } from '../../../services/catalog/tmdbDiscoverService';
 
 export const prerender = false;
 

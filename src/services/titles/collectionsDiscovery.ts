@@ -1,7 +1,7 @@
 import { tmdbFetch, tmdbFetchList } from "../tmdb/tmdbClient";
 import { processBatch } from "../../utils/processBatch";
 import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/InfoMovies";
-import { getLibrarySnapshot } from "../BD/shared/librarySnapshot";
+import { getLibrarySnapshot } from "../library/librarySnapshot";
 import { getCurrentUid } from "../db/userScope";
 import { toTimestamp } from "../../utils/constants/helpers/media-helpers";
 import { SEED_COLLECTION_IDS } from "../../utils/constants/featuredCollections";

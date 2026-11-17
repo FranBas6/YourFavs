@@ -7,7 +7,7 @@
  * vista/episodios lo hacen los handlers en servidor. Invitado → 401; uid de la sesión.
  */
 import type { APIRoute } from 'astro';
-import { appendWatchLog } from '../../services/BD/lists/watchLog';
+import { appendWatchLog } from '../../services/library/watchLog';
 
 export const prerender = false;
 

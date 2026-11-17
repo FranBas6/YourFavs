@@ -8,8 +8,8 @@
  * Persiste en users/{uid}/taste/current y marca onboarding='done' en el perfil.
  */
 import type { APIRoute } from 'astro';
-import { setUserTaste, type TasteTitle, type TastePerson } from '../../../services/BD/profile/userTaste';
-import { setUserProfile } from '../../../services/BD/profile/userProfile';
+import { setUserTaste, type TasteTitle, type TastePerson } from '../../../services/profile/userTaste';
+import { setUserProfile } from '../../../services/profile/userProfile';
 import { splitGenreIds } from '../../../utils/constants/tasteGenres';
 
 export const prerender = false;

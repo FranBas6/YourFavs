@@ -2,9 +2,9 @@ import { db, fetchAll, getAuthId, requireAuthId } from "../db/userScope";
 import {
     titleMembership, listCollection, addToCollections, removeFromCollections, clearCollection,
     patchTitle, setPosition, shiftPositions, renumberPositions,
-} from "../BD/shared/library";
-import { getTransition } from "../BD/shared/stateTransitions";
-import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../BD/lists/watchLog";
+} from "../library/library";
+import { getTransition } from "../library/stateTransitions";
+import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../library/watchLog";
 import { normalizeScore } from "../../utils/constants/helpers/media-helpers";
 import { appDateParts } from "../../utils/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../types/DbSerie";
@@ -76,7 +76,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         await patchTitle('tv', serieId, { rating: ratingNum });
         // 4.2 · almacén canónico de notas con timestamp → alimenta Actividad (best-effort).
         try {
-            const { setRating } = await import('../BD/lists/ratings');
+            const { setRating } = await import('../library/ratings');
             await setRating('tv', serieId, ratingNum);
         } catch { /* la nota inline ya está guardada */ }
         await bustRecs(); // una nota ≥ 8 siembra «Para ti»
@@ -87,7 +87,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
     if (action === 'delete_rating') {
         await patchTitle('tv', serieId, { rating: null });
         try {
-            const { deleteRating } = await import('../BD/lists/ratings');
+            const { deleteRating } = await import('../library/ratings');
             await deleteRating('tv', serieId);
         } catch { /* ignore */ }
         await bustRecs();
@@ -160,10 +160,10 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         try {
             const wasAbandoned = membership.has('SeriesAbandonadas');
             if (coleccion === 'SeriesAbandonadas') {
-                const { appendActivity } = await import('../BD/shared/activityLog');
+                const { appendActivity } = await import('../library/activityLog');
                 await appendActivity({ verb: 'abandon', media_type: 'tv', tmdb_id: serieId });
             } else if (coleccion === 'SeriesSiguiendo' && wasAbandoned) {
-                const { appendActivity } = await import('../BD/shared/activityLog');
+                const { appendActivity } = await import('../library/activityLog');
                 await appendActivity({ verb: 'resume', media_type: 'tv', tmdb_id: serieId });
             }
         } catch { /* bitácora opcional */ }
@@ -175,7 +175,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
         // (se pierde el added_at). Dejar de seguir tiene verbo propio; el resto, 'remove'.
         // Los borrados en CASCADA (al mover con 'add') NO pasan por aquí → no se registran.
         try {
-            const { appendActivity } = await import('../BD/shared/activityLog');
+            const { appendActivity } = await import('../library/activityLog');
             await appendActivity({
                 verb: coleccion === 'SeriesSiguiendo' ? 'unfollow' : 'remove',
                 media_type: 'tv', tmdb_id: serieId, meta: { collection: coleccion },
@@ -207,7 +207,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             await setPosition('SeriesFavs', serieId, newPos);
             // §5 · bitácora (best-effort): mover un favorito de sitio es intencional.
             try {
-                const { appendActivity } = await import('../BD/shared/activityLog');
+                const { appendActivity } = await import('../library/activityLog');
                 await appendActivity({ verb: 'reorder', media_type: 'tv', tmdb_id: serieId, meta: { from: oldPos, to: newPos } });
             } catch { /* bitácora opcional */ }
         }
@@ -231,15 +231,15 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             invalidateTopActorsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidatePersonalIndexCache } = await import('../BD/shared/personalIndex');
+            const { invalidatePersonalIndexCache } = await import('../library/personalIndex');
             invalidatePersonalIndexCache(); // 4.3 · buscador "lo mío"
         } catch { /* ignore */ }
         try {
-            const { invalidateLibrarySnapshot } = await import('../BD/shared/librarySnapshot');
+            const { invalidateLibrarySnapshot } = await import('../library/librarySnapshot');
             invalidateLibrarySnapshot(); // snapshot compartido de la biblioteca
         } catch { /* ignore */ }
         try {
-            const { invalidateActivityFeed } = await import('../BD/shared/activityFeed');
+            const { invalidateActivityFeed } = await import('../library/activityFeed');
             invalidateActivityFeed(); // §5 · altas/bajas/abandono/reorden salen en el feed
         } catch { /* ignore */ }
     }

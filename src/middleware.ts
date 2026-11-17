@@ -14,7 +14,7 @@ import { createSupabaseServerClient } from './services/db/server';
 import { SESSION_FLAG, clearSessionFlag, setSessionFlag } from './services/db/authHttp';
 import { runWithUser, setRequestPrefs, startTmdbMeter } from './services/db/userScope';
 import { installTmdbMeter, withTmdbReport } from './services/tmdb/tmdbMeter';
-import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
+import { getUserProfile, resolveSpoilerSettings } from './services/profile/userProfile';
 import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalogUrl';
 
 /**

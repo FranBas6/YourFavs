@@ -8,12 +8,12 @@
  *          sin `id` se crea (o se reutiliza) la colección y se devuelve `list_id` para los lotes
  *          siguientes de la misma lista.
  * Las reglas (no bajar de nivel, tu nota manda, fecha original) están en
- * `services/BD/import/importLibrary.ts`.
+ * `services/import/importLibrary.ts`.
  */
 import type { APIRoute } from 'astro';
 import {
     applyImportBatch, createImportList, type ImportEpisode, type ImportItem, type ImportListed, type ImportLog,
-} from '../../../services/BD/import/importLibrary';
+} from '../../../services/import/importLibrary';
 import { normalizeScore } from '../../../utils/constants/helpers/media-helpers';
 import { json, isUuid } from './_shared';
 

@@ -4,7 +4,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../services/http/http';
-import { icsPath, rotateIcsToken } from '../../../../services/BD/profile/icsToken';
+import { icsPath, rotateIcsToken } from '../../../../services/calendar/icsToken';
 
 export const prerender = false;
 

@@ -5,7 +5,7 @@
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../services/http/http';
 import { serverError, unauthorized } from '../../../../lib/social/http';
-import { dismissReferralSuggestion } from '../../../../services/BD/social/referral';
+import { dismissReferralSuggestion } from '../../../../services/social/referral';
 
 export const prerender = false;
 

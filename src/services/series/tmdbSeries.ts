@@ -1,6 +1,6 @@
 import { type Serie } from "../../types/ApiSerie.ts";
 import { tmdbFetchList } from '../tmdb/tmdbClient';
-import { getMostPopular, getTopRated, searchByTitle } from '../API/shared/tmdbDiscoverService';
+import { getMostPopular, getTopRated, searchByTitle } from '../catalog/tmdbDiscoverService';
 
 // --- Fetch de detalles (específico de series por el endpoint) ---
 
