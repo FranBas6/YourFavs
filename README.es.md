@@ -169,6 +169,10 @@ renderizada en el servidor que se instala como una app. Está en español; es la
   de un solo uso, sin perder datos de nadie.
 - **Las fechas, bien.** El servidor va en UTC, pero los días, meses y años se cuentan en la zona
   horaria del usuario: una peli vista a las 00:30 cuenta para el día que toca.
+- **Cachés que se vacían solas.** Cada caché que lee tu biblioteca (estadísticas,
+  recomendaciones, buscador, actividad) declara de qué depende, y cada escritura avisa de lo que ha
+  cambiado: nada se queda desfasado porque a alguien se le olvidara vaciarla, tampoco las copias
+  compartidas entre instancias del servidor.
 
 ## Cómo trabajo
 
@@ -190,7 +194,7 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 
 | Commits | Páginas | Rutas de API | Migraciones | Tests de base de datos |
 | :-----: | :-----: | :----------: | :---------: | :--------------------: |
-|   422   |   48    |     118      |     27      |          344           |
+|   471   |   49    |     118      |     27      |          344           |
 
 ## Stack
 
@@ -201,7 +205,7 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 | Datos     | Supabase: PostgreSQL con RLS, Auth, Realtime y Storage                                |
 | Contenido | API de TMDB (películas, series, personas; disponibilidad de JustWatch)                |
 | App       | PWA con service worker propio, manifest y feed de calendario `.ics` privado          |
-| Calidad   | pgTAP, chequeo de tipos de TypeScript, comprobaciones en Chrome sin interfaz (Puppeteer) |
+| Calidad   | pgTAP, chequeo de tipos de TypeScript, fronteras entre carpetas y ciclos de imports, comprobaciones en Chrome sin interfaz (Puppeteer) |
 
 ## Estructura del código
 
