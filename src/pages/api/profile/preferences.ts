@@ -13,7 +13,7 @@
 import type { APIRoute } from 'astro';
 import { setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from '../../../services/profile/userProfile';
 import { sanitizePlatformIds } from '../../../services/tmdb/watchProviders';
-import { CONTENT_LANGUAGE_CODES } from '../../../utils/constants/languages';
+import { CONTENT_LANGUAGE_CODES } from '../../../utils/titles/languages';
 import { SUPPORTED_COUNTRIES } from '../../../services/tmdb/tmdbInfoService';
 
 export const prerender = false;

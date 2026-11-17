@@ -7,7 +7,7 @@
  * `getMaxWatchStreak`. Catálogo de ~8 arquetipos con prioridad; el primero que
  * casa gana, y siempre hay un fallback.
  */
-import { getGenreName } from './constants/genres';
+import { getGenreName } from '../../utils/titles/genres';
 import type { YearStats } from './yearStats';
 
 export interface CinemaArchetype {

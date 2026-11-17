@@ -10,7 +10,7 @@
  */
 import type { APIRoute } from 'astro';
 import { setUserProfile } from '../../../services/profile/userProfile';
-import { HOME_SECTIONS } from '../../../utils/constants/homeSections';
+import { HOME_SECTIONS } from '../../../utils/home/homeSections';
 
 export const prerender = false;
 

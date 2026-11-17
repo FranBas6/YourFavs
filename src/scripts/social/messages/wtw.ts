@@ -11,10 +11,10 @@
  *
  * Se abre con cualquier `[data-wtw-open-chat]` (el ＋ y el «Tirar otra vez» de las tarjetas).
  */
-import { avatarHtml, btn, esc, firstName, icon } from '../../../lib/social/ui';
-import { titleMeta, wtwCount } from '../../../lib/social/chatView';
+import { avatarHtml, btn, esc, firstName, icon } from '../../../utils/social/ui';
+import { titleMeta, wtwCount } from '../../../utils/social/chatView';
 import { showToast } from '../toast';
-import type { ChatMessage, ChatView, PersonCard, WtwCardRef } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, PersonCard, WtwCardRef } from '../../../utils/social/types';
 
 const POSTER = (p: string) => `https://image.tmdb.org/t/p/w185${p}`;
 const TIMES = [['60', '< 1 h'], ['150', '~2 h'], ['any', 'El que sea']] as const;

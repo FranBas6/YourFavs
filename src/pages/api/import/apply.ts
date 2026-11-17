@@ -14,7 +14,7 @@ import type { APIRoute } from 'astro';
 import {
     applyImportBatch, createImportList, type ImportEpisode, type ImportItem, type ImportListed, type ImportLog,
 } from '../../../services/import/importLibrary';
-import { normalizeScore } from '../../../utils/constants/helpers/media-helpers';
+import { normalizeScore } from '../../../utils/titles/media-helpers';
 import { json, isUuid } from './_shared';
 
 export const prerender = false;

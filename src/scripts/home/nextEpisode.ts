@@ -8,11 +8,11 @@
  *     «Deshacer» desmarca (`action: 'unmark'`) y vuelve a pintar ese episodio.
  *   · «Terminar» (películas): `POST /api/movies/finish` → «Terminada».
  *   · Invitado: guarda la intención y pide entrar; tras entrar (la página recarga) se repite sola.
- * El marcado sale de `lib/nextEpisodeView.ts`, el mismo que pinta el servidor.
+ * El marcado sale de `utils/home/nextEpisodeView.ts`, el mismo que pinta el servidor.
  */
 import '../shared/spoil';
 import { showToast } from '../social/toast';
-import { doneCard, movieDoneCard, serieCard } from '../../lib/nextEpisodeView';
+import { doneCard, movieDoneCard, serieCard } from '../../utils/home/nextEpisodeView';
 import type { NextEpisodeItem } from '../../services/series/nextEpisode';
 
 const JUST_MS = 6000;

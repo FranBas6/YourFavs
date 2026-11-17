@@ -18,10 +18,10 @@
  * Ids deterministas (uno por episodio / temporada / hito), como el resto de la campana.
  */
 import { tmdbFetch } from '../tmdb/tmdbClient';
-import { processBatch } from '../../utils/processBatch';
-import { appDateParts } from '../../utils/appTime';
-import { episodeTypeLabel } from '../../utils/episodeType';
-import { episodeHref, seasonHref } from '../../utils/episodeView';
+import { processBatch } from '../../utils/core/processBatch';
+import { appDateParts } from '../../utils/core/appTime';
+import { episodeTypeLabel } from '../../utils/titles/episodeType';
+import { episodeHref, seasonHref } from '../../utils/titles/episodeView';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getAllNotificationSubs } from './yourfavsNotifications';
 import { getCurrentRegion } from '../db/userScope';

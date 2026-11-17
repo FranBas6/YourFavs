@@ -5,8 +5,8 @@ import {
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../library/watchLog";
-import { normalizeScore } from "../../utils/constants/helpers/media-helpers";
-import { appDateParts } from "../../utils/appTime";
+import { normalizeScore } from "../../utils/titles/media-helpers";
+import { appDateParts } from "../../utils/core/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 
@@ -31,7 +31,7 @@ async function unlogEpisode(serieId: string, season: number, episode: number): P
 async function bustRecs(): Promise<void> {
     try {
         const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-            import('../../utils/genrePreferences'), import('../../utils/personalRecommendations'),
+            import('../recs/genrePreferences'), import('../recs/personalRecommendations'),
         ]);
         invalidateGenrePreferencesCache();
         invalidatePersonalRecsCache();
@@ -40,7 +40,7 @@ async function bustRecs(): Promise<void> {
 
 async function bustYearStats(): Promise<void> {
     try {
-        const { invalidateYearStatsCache } = await import('../../utils/yearStats');
+        const { invalidateYearStatsCache } = await import('../stats/yearStats');
         invalidateYearStatsCache();
     } catch { /* la caché caduca sola */ }
 }
@@ -215,19 +215,19 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
     if (action === 'add' || action === 'remove') {
         try {
-            const { invalidateYearStatsCache } = await import('../../utils/yearStats');
+            const { invalidateYearStatsCache } = await import('../stats/yearStats');
             invalidateYearStatsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateGenrePreferencesCache } = await import('../../utils/genrePreferences');
+            const { invalidateGenrePreferencesCache } = await import('../recs/genrePreferences');
             invalidateGenrePreferencesCache();
         } catch { /* ignore */ }
         try {
-            const { invalidatePersonalRecsCache } = await import('../../utils/personalRecommendations');
+            const { invalidatePersonalRecsCache } = await import('../recs/personalRecommendations');
             invalidatePersonalRecsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateTopActorsCache } = await import('../../utils/topActorsLibrary');
+            const { invalidateTopActorsCache } = await import('../stats/topActorsLibrary');
             invalidateTopActorsCache();
         } catch { /* ignore */ }
         try {

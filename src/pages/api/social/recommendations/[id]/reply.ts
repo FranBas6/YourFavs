@@ -7,7 +7,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../services/http/http';
-import { badRequest, serverError, tooMany, unauthorized } from '../../../../../lib/social/http';
+import { badRequest, serverError, tooMany, unauthorized } from '../../../../../services/social/http';
 import { isQuickKey, replyRec } from '../../../../../services/social/recommendations';
 import { allowSocialWrite } from '../../../../../services/social/graph';
 

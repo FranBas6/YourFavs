@@ -1,14 +1,14 @@
-import { processBatch } from './processBatch';
-import { tmdbFetch } from '../services/tmdb/tmdbClient';
-import { getTitleDetails } from '../services/tmdb/tmdbTitleCache';
-import { toTimestamp } from './constants/helpers/media-helpers';
-import { appDateParts } from './appTime';
-import { getCurrentUid } from '../services/db/userScope';
-import { getLibrarySnapshot } from '../services/library/librarySnapshot';
+import { processBatch } from '../../utils/core/processBatch';
+import { tmdbFetch } from '../tmdb/tmdbClient';
+import { getTitleDetails } from '../tmdb/tmdbTitleCache';
+import { toTimestamp } from '../../utils/titles/media-helpers';
+import { appDateParts } from '../../utils/core/appTime';
+import { getCurrentUid } from '../db/userScope';
+import { getLibrarySnapshot } from '../library/librarySnapshot';
 import {
     unionEpisodeWatches, watchLogInstant,
     type EpisodeWatch, type WatchLogRow,
-} from '../services/library/episodeWatches';
+} from '../library/episodeWatches';
 
 const TTL_MS = 60 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
@@ -447,8 +447,8 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     let logRows: WatchLogRow[] = [];
     try {
         if (getCurrentUid()) {
-            const { getAllWatchedProgress } = await import('../services/series/yourfavsSerie');
-            const { getAllWatchLog } = await import('../services/library/watchLog');
+            const { getAllWatchedProgress } = await import('../series/yourfavsSerie');
+            const { getAllWatchLog } = await import('../library/watchLog');
             const [live, log] = await Promise.all([getAllWatchedProgress(), getAllWatchLog()]);
             watches = unionEpisodeWatches(live, log);
             logRows = log;

@@ -1,7 +1,7 @@
 import { getCurrentUid } from "../db/userScope";
 import type { LiveProgress, WatchLogRow } from "./episodeWatches";
 import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
-import { toTimestamp, formatScore } from "../../utils/constants/helpers/media-helpers";
+import { toTimestamp, formatScore } from "../../utils/titles/media-helpers";
 
 export interface ActivityEvent {
     type: 'movie' | 'serie' | 'person';
@@ -280,7 +280,7 @@ async function fetchActorFavEvents(): Promise<ActivityEvent[]> {
         const favs = await getActorsFav();
         if (!favs.length) return [];
         const { tmdbFetch } = await import('../tmdb/tmdbClient');
-        const { processBatch } = await import('../../utils/processBatch');
+        const { processBatch } = await import('../../utils/core/processBatch');
         const events = await processBatch(
             favs,
             async (f: any): Promise<ActivityEvent | null> => {

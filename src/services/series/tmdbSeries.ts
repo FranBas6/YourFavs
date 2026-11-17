@@ -47,7 +47,7 @@ export const getLatestSeries = async ({ page }: { page?: string }): Promise<Seri
 
 // --- Categorías (lógica única: "on_the_air" y "horror") ---
 
-import { SERIE_GENRE_SLUGS as genreMap } from '../../utils/constants/genreSlugs';
+import { SERIE_GENRE_SLUGS as genreMap } from '../../utils/titles/genreSlugs';
 
 export const getSeriesByCategory = async (category: string, page: string = "1"): Promise<Serie[]> => {
     const normalizedCategory = category.trim().toLowerCase();
@@ -95,4 +95,4 @@ export const getSeriesByTitle = async ({ title, page }: { title: string; page?: 
     searchByTitle<Serie>('tv', title, page);
 
 // Los envoltorios por plataforma (getNetflixSeries, getHBOMaxSeries…) se retiraron: solo los usaba
-// `utils/constants/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.
+// `services/catalog/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.

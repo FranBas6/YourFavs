@@ -1,4 +1,4 @@
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { getCurrentUid } from '../db/userScope';
 import { getAllMediaTags } from '../titles/mediaTags';

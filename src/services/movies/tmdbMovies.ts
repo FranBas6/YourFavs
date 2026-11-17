@@ -66,7 +66,7 @@ export const getNowPlayingMoviesInSpain = async ({ page }: { page?: string }): P
 
 // --- Categorías (lógica única: "upcoming") ---
 
-import { MOVIE_GENRE_SLUGS as genreMap } from '../../utils/constants/genreSlugs';
+import { MOVIE_GENRE_SLUGS as genreMap } from '../../utils/titles/genreSlugs';
 
 const isUpcomingMovie = (releaseDate: string): boolean => {
     const today = new Date();
@@ -124,4 +124,4 @@ export const getMoviesByTitle = async ({ title, page }: { title: string; page?: 
     searchByTitle<Movie>('movie', title, page);
 
 // Los envoltorios por plataforma (getNetflixMovies, getHBOMaxMovies…) se retiraron: solo los usaba
-// `utils/constants/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.
+// `services/catalog/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.

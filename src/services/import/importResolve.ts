@@ -5,7 +5,7 @@
  */
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { getTitleDetails } from '../tmdb/tmdbTitleCache';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 
 /** Llamadas a la vez dentro de un lote. Un lote de 50 tarda ~1-2 s; TMDB aguanta ~50/s. */
 const CONCURRENCY = 25;

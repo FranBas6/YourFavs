@@ -7,10 +7,10 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../services/http/http';
-import { badRequest, isUuid, serverError, unauthorized } from '../../../../lib/social/http';
+import { badRequest, isUuid, serverError, unauthorized } from '../../../../services/social/http';
 import { normalizeHandle } from '../../../../services/social/handles';
 import { idByHandle, openDirect } from '../../../../services/social/messages';
-import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../utils/social/social';
 
 export const prerender = false;
 

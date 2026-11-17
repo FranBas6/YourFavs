@@ -1,4 +1,4 @@
-import { getLibrarySnapshot } from '../services/library/librarySnapshot';
+import { getLibrarySnapshot } from './librarySnapshot';
 
 /**
  * Títulos que has visto, como claves `movie_<id>` / `tv_<id>` («Visto» = Vistas ∪ Favoritos ∪ Me gusta,

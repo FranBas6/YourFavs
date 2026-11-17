@@ -7,11 +7,11 @@
  *     envía). Una sola respuesta: después queda citada y no hay más botones. No es un chat.
  *
  * La pieza (`[data-rec]`) no desaparece al actuar: su zona pasa al estado final en el mismo sitio,
- * pintada con `lib/social/recUi.ts` a partir de la recomendación que devuelve el servidor.
+ * pintada con `utils/social/recUi.ts` a partir de la recomendación que devuelve el servidor.
  */
-import { recActionsHtml, recAriaLabel, recStatusHtml, replyWriteHtml } from '../../lib/social/recUi';
+import { recActionsHtml, recAriaLabel, recStatusHtml, replyWriteHtml } from '../../utils/social/recUi';
 import { showToast } from './toast';
-import type { RecReceived } from '../../lib/social/types';
+import type { RecReceived } from '../../utils/social/types';
 
 function repaint(host: HTMLElement, rec: RecReceived) {
     const pending = rec.shown === 'pending' && !rec.reply;

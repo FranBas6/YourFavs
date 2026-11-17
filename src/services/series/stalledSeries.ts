@@ -14,10 +14,10 @@
 import { getSeriesSiguiendo, getWatchedProgress, getWatchedProgressBatch } from './yourfavsSerie';
 import { fetchSerieDetails } from './tmdbSeries';
 import { computeNextEpisode } from './nextEpisode';
-import { episodeHref } from '../../utils/episodeView';
-import { resumeReason } from '../../utils/resumeReason';
+import { episodeHref } from '../../utils/titles/episodeView';
+import { resumeReason } from '../../utils/titles/resumeReason';
 import { getCurrentUid } from '../db/userScope';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 
 export interface StalledSerie {
     id: string;

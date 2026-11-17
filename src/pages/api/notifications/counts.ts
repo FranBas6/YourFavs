@@ -16,7 +16,7 @@ import { syncNotifications } from '../../../services/notifications/generator';
 import { unreadCount } from '../../../services/notifications/notifications';
 import { pendingReceivedCount } from '../../../services/social/graph';
 import { unreadTotal } from '../../../services/social/messages';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
 
 export const prerender = false;
 

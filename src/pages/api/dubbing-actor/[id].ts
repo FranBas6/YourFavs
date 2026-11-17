@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { tmdbFetch } from '../../../services/tmdb/tmdbClient';
 import { getCached, setCached, invalidateCached } from '../../../services/cache/recsBlobCache';
-import { processBatch } from '../../../utils/processBatch';
+import { processBatch } from '../../../utils/core/processBatch';
 import {
     searchDubberFichaId,
     fetchDubberFilmography,

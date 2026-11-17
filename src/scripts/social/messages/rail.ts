@@ -11,7 +11,7 @@
  *   · Avisos que vienen de otra página (`yf:ms-flash` en sessionStorage): «Has salido de «X»» o
  *     quién se quedó fuera al crear un grupo.
  */
-import { railListHtml, unreadOf } from '../../../lib/social/chatView';
+import { railListHtml, unreadOf } from '../../../utils/social/chatView';
 import { msgApi } from './api';
 import { createPoller } from './poller';
 import { showToast } from '../toast';

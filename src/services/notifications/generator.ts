@@ -26,7 +26,7 @@ import { getUserProfile } from '../profile/userProfile';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getWatchStreak } from '../series/yourfavsSerie';
 import { readProviderState, writeProviderState, type ProviderSnapEntry } from './providerState';
-import { appDateParts } from '../../utils/appTime';
+import { appDateParts } from '../../utils/core/appTime';
 import { seriesSignals, subscribedMovieSignals, watchlistMovieSignals } from './titleSignals';
 import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
 

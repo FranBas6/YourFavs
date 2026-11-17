@@ -6,9 +6,9 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../../services/http/http';
-import { badRequest, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
+import { badRequest, posInt, serverError, unauthorized } from '../../../../../../services/social/http';
 import { rsvpPlan } from '../../../../../../services/social/plans';
-import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../../../utils/social/social';
 
 export const prerender = false;
 

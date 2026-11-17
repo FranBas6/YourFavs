@@ -7,7 +7,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
-import { serverError, tooMany, unauthorized } from '../../../lib/social/http';
+import { serverError, tooMany, unauthorized } from '../../../services/social/http';
 import { allowSocialWrite, searchPeople } from '../../../services/social/graph';
 
 export const prerender = false;

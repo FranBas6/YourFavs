@@ -10,11 +10,11 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
-import { badRequest, serverError, unauthorized } from '../../../lib/social/http';
+import { badRequest, serverError, unauthorized } from '../../../services/social/http';
 import { listTab } from '../../../services/social/graph';
 import { listReceived, listSent } from '../../../services/social/recommendations';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
-import type { FriendsTab } from '../../../lib/social/types';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
+import type { FriendsTab } from '../../../utils/social/types';
 
 export const prerender = false;
 

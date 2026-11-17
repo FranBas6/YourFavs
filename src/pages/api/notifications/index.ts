@@ -12,7 +12,7 @@
 import type { APIRoute } from 'astro';
 import { syncNotifications } from '../../../services/notifications/generator';
 import { syncPlanToday } from '../../../services/social/plans';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
 import { listNotifications, unreadCount, markRead, markReadMany, markAllRead } from '../../../services/notifications/notifications';
 import { withSocialState } from '../../../services/social/notifState';
 

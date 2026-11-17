@@ -8,12 +8,12 @@
  *     Actividad no cambia.
  *   · «Visto» de «Te toca» → marca ese episodio; «Deshacer» lo desmarca.
  *   · Aviso de estreno (`POST /api/notifications/subscribe`) y «Entrar» sin sesión.
- * Tras cada cambio se repinta con `utils/seasonView.ts::seasonBar`, el mismo código que usa el servidor.
+ * Tras cada cambio se repinta con `utils/titles/seasonView.ts::seasonBar`, el mismo código que usa el servidor.
  * La lista de episodios (`seasonList.ts`) pide marcar con `yf:season-mark` y se repinta con
  * `yf:season-watched`; si algo falla, `yf:season-error`.
  */
 import { showToast } from '../social/toast';
-import { seasonBar, seasonChip, seasonSide, type TpState } from '../../utils/seasonView';
+import { seasonBar, seasonChip, seasonSide, type TpState } from '../../utils/titles/seasonView';
 
 const raw = document.getElementById('tp-data')?.textContent;
 if (raw) init(JSON.parse(raw) as TpState);

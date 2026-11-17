@@ -3,7 +3,7 @@
  * `{ ok, status, data }`; nunca lanzan (sin red → `status: 0`), para que el que llama decida entre
  * «No se ha enviado · Reintentar», un toast o el vacío de error.
  */
-import type { ChatMessage, ChatView, ConvSummary, PersonCard, SpoilerRef } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, ConvSummary, PersonCard, SpoilerRef } from '../../../utils/social/types';
 
 const BASE = '/api/social/messages';
 

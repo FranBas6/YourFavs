@@ -18,7 +18,7 @@
  */
 import { claimAppState, readAppState, releaseAppState, writeAppState } from '../db/appState';
 import { tmdbFetch } from '../tmdb/tmdbClient';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 
 /** Página de `/discover/tv` que se procesa en cada recarga incremental. */
 const CANDIDATES_PER_RUN = 1;

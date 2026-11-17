@@ -21,7 +21,7 @@ import {
     getMovieRecommendationsOrSimilar,
     type MovieBundle,
 } from '../../../services/movies/InfoMovies';
-import { safeFetch } from '../../../utils/safeFetch';
+import { safeFetch } from '../../../utils/core/safeFetch';
 
 export const prerender = false;
 

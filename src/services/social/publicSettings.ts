@@ -10,8 +10,8 @@
  */
 import { db, requireAuthId } from '../db/userScope';
 import { checkHandle, type HandleProblem } from './handles';
-import { resolvePublicSections, type PublicSectionPref } from '../../utils/constants/publicSections';
-import { SOCIAL_PHASE } from '../../utils/constants/social';
+import { resolvePublicSections, type PublicSectionPref } from '../../utils/settings/publicSections';
+import { SOCIAL_PHASE } from '../../utils/social/social';
 
 export type PublicVisibility = 'off' | 'public' | 'friends';
 

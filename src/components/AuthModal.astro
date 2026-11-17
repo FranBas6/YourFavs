@@ -22,7 +22,7 @@
  * público), el registro enseña «Te invita Ana · @ana». Con `SIGNUP_MODE=invite` y sin invitación, la
  * pestaña Crear cuenta sale deshabilitada y el aviso lo explica. `?auth=invite` = Google rechazado.
  */
-import { signupMode } from '../lib/social/signupMode';
+import { signupMode } from '../services/social/signupMode';
 const mode = signupMode();
 
 const svg = (d: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -399,7 +399,7 @@ const I = {
 
 <script>
     import type * as AuthActions from '../utils/authActions';
-    import { SOCIAL_PHASE } from '../utils/constants/social';
+    import { SOCIAL_PHASE } from '../utils/social/social';
 
     const overlay = document.getElementById('auth-modal') as HTMLElement | null;
     if (overlay) {

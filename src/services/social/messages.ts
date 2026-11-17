@@ -11,12 +11,12 @@
  */
 import { supabaseAdmin } from '../db/admin';
 import { getPeople, getRelations } from './graph';
-import { previewOf } from '../../lib/social/messagesText';
+import { previewOf } from '../../utils/social/messagesText';
 import { resolveCards } from './chatCards';
 import type { Json } from '../db/database.types';
 import type {
     ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, SpoilerRef, TitleCardRef, WtwCardRef,
-} from '../../lib/social/types';
+} from '../../utils/social/types';
 
 export const MSG_MAX = 2000;
 export const GROUP_NAME_MAX = 40;

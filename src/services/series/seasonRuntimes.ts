@@ -8,7 +8,7 @@
  * duración media de la serie.
  */
 import { tmdbFetch } from '../tmdb/tmdbClient';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 const FAIL_TTL_MS = 5 * 60 * 1000;

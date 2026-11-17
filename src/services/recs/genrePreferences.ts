@@ -1,11 +1,11 @@
-import { getTitleDetails } from '../services/tmdb/tmdbTitleCache';
-import { getCached, setCached, invalidateCached } from '../services/cache/recsBlobCache';
-import { getCurrentUid } from '../services/db/userScope';
-import { getLibrarySnapshot } from '../services/library/librarySnapshot';
-import { getUserTaste } from '../services/profile/userTaste';
-import { getCustomLists, getListItems } from '../services/library/customLists';
-import { listRatings } from '../services/library/ratings';
-import { toTimestamp } from './constants/helpers/media-helpers';
+import { getTitleDetails } from '../tmdb/tmdbTitleCache';
+import { getCached, setCached, invalidateCached } from '../cache/recsBlobCache';
+import { getCurrentUid } from '../db/userScope';
+import { getLibrarySnapshot } from '../library/librarySnapshot';
+import { getUserTaste } from '../profile/userTaste';
+import { getCustomLists, getListItems } from '../library/customLists';
+import { listRatings } from '../library/ratings';
+import { toTimestamp } from '../../utils/titles/media-helpers';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
 // que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).

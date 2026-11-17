@@ -1,4 +1,4 @@
-import { getPersonalRecommendations } from '../../utils/personalRecommendations';
+import { getPersonalRecommendations } from './personalRecommendations';
 
 export interface ForYouItem {
     kind: 'movie' | 'tv';

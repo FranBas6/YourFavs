@@ -20,14 +20,14 @@ import { getUserProfile, setUserProfile, STRIP_PALETTES, type UserProfile, type 
 import { getIcsToken, icsPath } from "../../services/calendar/icsToken";
 import { clearUserTaste } from "../../services/profile/userTaste";
 import { sanitizePlatformIds } from "../../services/tmdb/watchProviders";
-import { HOME_SECTIONS } from "../../utils/constants/homeSections";
+import { HOME_SECTIONS } from "../../utils/home/homeSections";
 import { SUPPORTED_COUNTRIES } from "../../services/tmdb/tmdbInfoService";
-import { CONTENT_LANGUAGE_CODES } from "../../utils/constants/languages";
+import { CONTENT_LANGUAGE_CODES } from "../../utils/titles/languages";
 import {
     DEFAULT_SETTINGS_SECTION,
     SETTINGS_SECTION_KEYS,
     findSettingsSection,
-} from "../../utils/constants/settingsSections";
+} from "../../utils/settings/settingsSections";
 
 import SettingsNav from "../../components/ajustes/SettingsNav.astro";
 import SeccionPerfil from "../../components/ajustes/SeccionPerfil.astro";
@@ -73,8 +73,8 @@ if (Astro.request.method === 'POST') {
         // Los gustos alimentan el motor de recomendaciones → invalidar sus cachés.
         try {
             const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../utils/genrePreferences'),
-                import('../../utils/personalRecommendations'),
+                import('../../services/recs/genrePreferences'),
+                import('../../services/recs/personalRecommendations'),
             ]);
             invalidateGenrePreferencesCache();
             invalidatePersonalRecsCache();

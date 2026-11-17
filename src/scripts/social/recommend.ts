@@ -16,10 +16,10 @@
  *
  * Al enviar: se cierra y sale un toast con Deshacer (6 s), que retira la recomendación.
  */
-import { avatarHtml, esc, firstName, icon } from '../../lib/social/ui';
-import { recLeadHtml } from '../../lib/social/recUi';
+import { avatarHtml, esc, firstName, icon } from '../../utils/social/ui';
+import { recLeadHtml } from '../../utils/social/recUi';
 import { showToast } from './toast';
-import type { PersonCard, RecTarget } from '../../lib/social/types';
+import type { PersonCard, RecTarget } from '../../utils/social/types';
 
 declare global {
     interface Window {

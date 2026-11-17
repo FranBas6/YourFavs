@@ -5,10 +5,10 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../../../services/http/http';
-import { badRequest, isUuid, posInt, serverError, tooMany, unauthorized } from '../../../../../../../lib/social/http';
+import { badRequest, isUuid, posInt, serverError, tooMany, unauthorized } from '../../../../../../../services/social/http';
 import { makeAdmin } from '../../../../../../../services/social/messages';
 import { allowSocialWrite } from '../../../../../../../services/social/graph';
-import { SOCIAL_PHASE } from '../../../../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../../../../utils/social/social';
 
 export const prerender = false;
 

@@ -18,11 +18,11 @@
  */
 import { claimAppState, readAppState, releaseAppState, writeAppState } from '../db/appState';
 import { tmdbFetch } from '../tmdb/tmdbClient';
-import { isoWeekKey } from '../../utils/appTime';
+import { isoWeekKey } from '../../utils/core/appTime';
 import {
     normalizeRankingPlatforms, rankingDocId, withMovement,
     type RankedEntry, type RankingItem,
-} from '../../utils/rankingCore';
+} from './rankingCore';
 
 export { rankingDocId, withMovement };
 export type { RankedEntry, RankingItem };

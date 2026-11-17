@@ -12,7 +12,7 @@
 import { supabaseAdmin } from '../db/admin';
 import { getTitleSummaries, titleKey } from '../tmdb/titleSummaries';
 import { recViewsForNotifs } from './recommendations';
-import type { CardPerson, CardViewer, ChatMessage, PlanCard, PlanView, RecCard, SpoilerRef, TitleCard, TitleCardRef, WtwCard } from '../../lib/social/types';
+import type { CardPerson, CardViewer, ChatMessage, PlanCard, PlanView, RecCard, SpoilerRef, TitleCard, TitleCardRef, WtwCard } from '../../utils/social/types';
 
 /** La copia de TMDB para una tarjeta nueva. null si TMDB no conoce el título. */
 export async function titleCardRef(mediaType: 'movie' | 'tv', tmdbId: number): Promise<TitleCardRef | null> {

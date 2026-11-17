@@ -3,10 +3,10 @@ import { tmdbFetch } from '../../../services/tmdb/tmdbClient';
 import { mapAndDeduplicateProviders } from '../../../services/tmdb/tmdbInfoService';
 import { getMoviesPendientes } from '../../../services/movies/yourfavsMovie';
 import { getSeriesPendientes } from '../../../services/series/yourfavsSerie';
-import { processBatch } from '../../../utils/processBatch';
+import { processBatch } from '../../../utils/core/processBatch';
 import { getCurrentRegion } from '../../../services/db/userScope';
 import { pendingCommon } from '../../../services/social/inCommon';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
 
 export const prerender = false;
 

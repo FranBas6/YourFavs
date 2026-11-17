@@ -1,16 +1,16 @@
 /**
  * Centro «Amigos» (`/mislistas/amigos`): pestañas, «Cargar más», buscador y copiar tu enlace.
  * La página llega con la pestaña de `?tab=` ya pintada; esto pinta el resto con
- * `lib/social/amigosView.ts`, el mismo marcado del servidor. Los botones de las filas los atiende
+ * `utils/social/amigosView.ts`, el mismo marcado del servidor. Los botones de las filas los atiende
  * `scripts/social/relations.ts`.
  *
  *   · Pestañas (`tablist`): clic o ←/→/Inicio/Fin. La pestaña va a la URL (`?tab=`) sin recargar.
  *   · Buscador: desde 2 caracteres y 250 ms sin teclear, los resultados SUSTITUYEN a pestañas y
  *     panel. Esc o vaciar el campo devuelve la vista anterior. «/» pone el foco en él.
  */
-import { moreButtonHtml, panelHtml, rowsHtml, searchHtml } from '../../lib/social/amigosView';
-import { SOCIAL_PHASE } from '../../utils/constants/social';
-import type { FriendsTab, PersonEntry, RecReceived, RecSent, Relation } from '../../lib/social/types';
+import { moreButtonHtml, panelHtml, rowsHtml, searchHtml } from '../../utils/social/amigosView';
+import { SOCIAL_PHASE } from '../../utils/social/social';
+import type { FriendsTab, PersonEntry, RecReceived, RecSent, Relation } from '../../utils/social/types';
 
 const root = document.querySelector<HTMLElement>('[data-am]');
 if (root) init(root);

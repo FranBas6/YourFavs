@@ -5,7 +5,7 @@
  */
 import { supabaseAdmin } from '../db/admin';
 import { getPeople } from './graph';
-import type { PersonCard } from '../../lib/social/types';
+import type { PersonCard } from '../../utils/social/types';
 
 export interface ReportView {
     id: number;

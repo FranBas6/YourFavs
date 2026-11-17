@@ -3,7 +3,7 @@
  * atrás, las etiquetas y los textos de fecha. Todo en hora de Madrid (`APP_TZ`): TMDB solo da el DÍA
  * de emisión, y «hoy» es el día de Madrid.
  */
-import { APP_TZ, appDateParts } from './appTime';
+import { APP_TZ, appDateParts } from '../core/appTime';
 
 export type AirState = 'aired' | 'today' | 'soon';
 

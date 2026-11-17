@@ -1,12 +1,12 @@
-import { getWatchedProgressBatch, getWatchStreak } from "../services/series/yourfavsSerie";
-import { tmdbFetch } from "../services/tmdb/tmdbClient";
-import { getTitleDetails } from "../services/tmdb/tmdbTitleCache";
-import { getCurrentRegion } from "../services/db/userScope";
-import { mapAndDeduplicateProviders } from "../services/tmdb/tmdbInfoService";
-import { getGenreName } from "./constants/genres";
-import { processBatch } from "./processBatch";
+import { getWatchedProgressBatch, getWatchStreak } from "../series/yourfavsSerie";
+import { tmdbFetch } from "../tmdb/tmdbClient";
+import { getTitleDetails } from "../tmdb/tmdbTitleCache";
+import { getCurrentRegion } from "../db/userScope";
+import { mapAndDeduplicateProviders } from "../tmdb/tmdbInfoService";
+import { getGenreName } from "../../utils/titles/genres";
+import { processBatch } from "../../utils/core/processBatch";
 import { calculateStats } from "./calculateStats";
-import { getMediaTagsBatch, type MediaTagsDoc } from "../services/titles/mediaTags";
+import { getMediaTagsBatch, type MediaTagsDoc } from "../titles/mediaTags";
 
 const ITEMS_PER_PAGE = 20;
 

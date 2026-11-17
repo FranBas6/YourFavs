@@ -11,11 +11,11 @@
  * En los dos, solo TUS amigos (`/api/social/messages/candidates`); al llegar a 10 las filas sin
  * marcar pasan a «Grupo lleno», y quien está en 20 grupos sale con «Está en demasiados grupos».
  */
-import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
-import { GROUP_MAX, GROUP_NAME_MAX, gavHtml } from '../../../lib/social/chatView';
+import { avatarHtml, esc, firstName, icon } from '../../../utils/social/ui';
+import { GROUP_MAX, GROUP_NAME_MAX, gavHtml } from '../../../utils/social/chatView';
 import { msgApi } from './api';
 import { showToast } from '../toast';
-import type { PersonCard } from '../../../lib/social/types';
+import type { PersonCard } from '../../../utils/social/types';
 
 interface Cand { person: PersonCard; inGroup: boolean; full: boolean }
 interface State {

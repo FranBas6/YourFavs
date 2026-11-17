@@ -7,7 +7,7 @@
  * lo sigue re-exportando, así que `catalog`, `search/cast` y `actor/[id]` no cambian.
  */
 import { posterUrl, backdropUrl } from './tmdbClient';
-import { getGenreName } from '../../utils/constants/genres';
+import { getGenreName } from '../../utils/titles/genres';
 
 export interface SummaryItem {
     id: number;

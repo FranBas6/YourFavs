@@ -3,7 +3,7 @@ import {
     clearCollection, patchTitle,
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
-import { normalizeScore } from "../../utils/constants/helpers/media-helpers";
+import { normalizeScore } from "../../utils/titles/media-helpers";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
 
@@ -20,7 +20,7 @@ const LIST_TYPE_MAP: Record<string, string> = {
 async function bustRecs(): Promise<void> {
     try {
         const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-            import('../../utils/genrePreferences'), import('../../utils/personalRecommendations'),
+            import('../recs/genrePreferences'), import('../recs/personalRecommendations'),
         ]);
         invalidateGenrePreferencesCache();
         invalidatePersonalRecsCache();
@@ -142,19 +142,19 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
             invalidateUserCollectionsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateYearStatsCache } = await import('../../utils/yearStats');
+            const { invalidateYearStatsCache } = await import('../stats/yearStats');
             invalidateYearStatsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateGenrePreferencesCache } = await import('../../utils/genrePreferences');
+            const { invalidateGenrePreferencesCache } = await import('../recs/genrePreferences');
             invalidateGenrePreferencesCache();
         } catch { /* ignore */ }
         try {
-            const { invalidatePersonalRecsCache } = await import('../../utils/personalRecommendations');
+            const { invalidatePersonalRecsCache } = await import('../recs/personalRecommendations');
             invalidatePersonalRecsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateTopActorsCache } = await import('../../utils/topActorsLibrary');
+            const { invalidateTopActorsCache } = await import('../stats/topActorsLibrary');
             invalidateTopActorsCache();
         } catch { /* ignore */ }
         try {
@@ -249,7 +249,7 @@ export async function finishViewingMovie(movieId: string): Promise<void> {
         invalidateLibrarySnapshot();
     } catch { /* ignore */ }
     try {
-        const { invalidateYearStatsCache } = await import('../../utils/yearStats');
+        const { invalidateYearStatsCache } = await import('../stats/yearStats');
         invalidateYearStatsCache();
     } catch { /* ignore */ }
 }

@@ -21,11 +21,11 @@
 import { supabaseAdmin } from '../db/admin';
 import { normalizeHandle, handleShapeProblem } from './handles';
 import { sanitizeFour, type PublicPick, type PublicArchetype, type PublicVisibility } from './publicSettings';
-import { resolvePublicSections, type PublicSectionPref } from '../../utils/constants/publicSections';
+import { resolvePublicSections, type PublicSectionPref } from '../../utils/settings/publicSections';
 import { getTitleSummaries, titleKey, type TitleRef } from '../tmdb/titleSummaries';
 import { getRelation, isBlockedBy } from './graph';
 import { inCommon, type CommonView } from './inCommon';
-import type { Relation } from '../../lib/social/types';
+import type { Relation } from '../../utils/social/types';
 
 export type ViewerRole = 'owner' | 'member' | 'guest';
 

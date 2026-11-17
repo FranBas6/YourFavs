@@ -10,7 +10,7 @@
 import type { APIRoute } from 'astro';
 import { setUserTaste, type TasteTitle, type TastePerson } from '../../../services/profile/userTaste';
 import { setUserProfile } from '../../../services/profile/userProfile';
-import { splitGenreIds } from '../../../utils/constants/tasteGenres';
+import { splitGenreIds } from '../../../utils/titles/tasteGenres';
 
 export const prerender = false;
 
@@ -74,8 +74,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
         // que "Para ti" refleje los cambios ya en la siguiente carga.
         try {
             const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../../utils/genrePreferences'),
-                import('../../../utils/personalRecommendations'),
+                import('../../../services/recs/genrePreferences'),
+                import('../../../services/recs/personalRecommendations'),
             ]);
             invalidateGenrePreferencesCache();
             invalidatePersonalRecsCache();

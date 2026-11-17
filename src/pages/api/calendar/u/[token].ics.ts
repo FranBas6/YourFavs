@@ -8,7 +8,7 @@
 import type { APIRoute } from 'astro';
 import { icsOwner } from '../../../../services/calendar/icsToken';
 import { userFeed } from '../../../../services/calendar/icsFeed';
-import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../utils/social/social';
 
 export const prerender = false;
 

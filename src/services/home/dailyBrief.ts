@@ -18,9 +18,9 @@ import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getWatchLogOnDate } from '../library/watchLog';
 import { getCurrentUid, getCurrentRegion } from '../db/userScope';
 import { getCached, setCached } from '../cache/recsBlobCache';
-import { processBatch } from '../../utils/processBatch';
-import { appDateParts, APP_TZ } from '../../utils/appTime';
-import { episodeTypeLabel } from '../../utils/episodeType';
+import { processBatch } from '../../utils/core/processBatch';
+import { appDateParts, APP_TZ } from '../../utils/core/appTime';
+import { episodeTypeLabel } from '../../utils/titles/episodeType';
 
 export type BriefSignalKind = 'new_episode' | 'on_platform' | 'anniversary' | 'finishing';
 

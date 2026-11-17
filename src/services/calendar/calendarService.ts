@@ -4,9 +4,9 @@ import { getAllNotificationSubs } from '../notifications/yourfavsNotifications';
 import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
 import { fetchSerieDetails } from '../series/tmdbSeries';
 import { getCurrentRegion } from '../db/userScope';
-import { processBatch } from '../../utils/processBatch';
-import { episodeTypeLabel } from '../../utils/episodeType';
-import { episodeHref, seasonHref } from '../../utils/episodeView';
+import { processBatch } from '../../utils/core/processBatch';
+import { episodeTypeLabel } from '../../utils/titles/episodeType';
+import { episodeHref, seasonHref } from '../../utils/titles/episodeView';
 
 export interface CalendarEvent {
     tmdb_id: string;

@@ -6,8 +6,8 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../services/http/http';
-import { isAdmin } from '../../../../lib/admin';
-import { badRequest, posInt, serverError } from '../../../../lib/social/http';
+import { isAdmin } from '../../../../services/social/admin';
+import { badRequest, posInt, serverError } from '../../../../services/social/http';
 import { deleteReportedMessage, resolveReport } from '../../../../services/social/reports';
 
 export const prerender = false;

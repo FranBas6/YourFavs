@@ -13,9 +13,9 @@
  * Al proponer, la tarjeta entra en el chat (`yf:ms-card-sent`); al cambiar, se repinta la del plan
  * (`yf:ms-plan`).
  */
-import { esc, icon } from '../../../lib/social/ui';
-import { planLong, planShort } from '../../../lib/social/chatView';
-import type { ChatMessage, PlanView } from '../../../lib/social/types';
+import { esc, icon } from '../../../utils/social/ui';
+import { planLong, planShort } from '../../../utils/social/chatView';
+import type { ChatMessage, PlanView } from '../../../utils/social/types';
 import { intoMiniLayer } from './miniLayer';
 
 export interface PlanPickOpen {
