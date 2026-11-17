@@ -4,8 +4,8 @@ import type { CastMember, ProductionCompany } from "../../types/Media";
 import {
     getLanguageDisplayName, getContentRating, distinctOriginalTitle,
     formatDate, formatTrailerUrl, providerLinks
-} from "../../utils/constants/helpers/media-helpers";
-import {formatCurrency} from "../../utils/constants/helpers/movie-helpers";
+} from "../../utils/titles/media-helpers";
+import {formatCurrency} from "../../utils/titles/movie-helpers";
 import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/movies/yourfavsMovie";
 import SagaProgress from "../../components/detail/SagaProgress.astro";
 import '../../styles/shared/detail-common.css';
@@ -20,7 +20,7 @@ import { getCurrentRegion } from "../../services/db/userScope";
 import { checkMediaExistence } from "../../services/titles/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/titles/mediaTags";
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
-import { SOCIAL_PHASE } from "../../utils/constants/social";
+import { SOCIAL_PHASE } from "../../utils/social/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/detail/FriendsSeen.astro";
 import { countMoviePasses } from "../../services/library/watchLog";
@@ -39,7 +39,7 @@ import CrossMediaSection from "../../components/detail/CrossMediaSection.astro";
 import { getCrossMediaRelated } from "../../services/titles/crossMediaRelated";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import StarRating from "../../components/detail/StarRating.astro";
-import {safeFetch} from "../../utils/safeFetch";
+import {safeFetch} from "../../utils/core/safeFetch";
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 

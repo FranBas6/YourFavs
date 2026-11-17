@@ -10,7 +10,7 @@ import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, tooMany, unauthorized } from '../../../../../../services/social/http';
 import { addMembers } from '../../../../../../services/social/messages';
 import { allowSocialWrite } from '../../../../../../services/social/graph';
-import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../../../utils/social/social';
 
 export const prerender = false;
 

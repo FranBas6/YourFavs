@@ -18,10 +18,10 @@
  *   · «Plan para verla» (`[data-plan-title]`, desde el ＋; M5): el mismo buscador que «Compartir» y
  *     «Siguiente: día y hora», que abre el selector de `planPick.ts` con el título puesto.
  */
-import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
-import { MSG_MAX, gavHtml } from '../../../lib/social/chatView';
+import { avatarHtml, esc, firstName, icon } from '../../../utils/social/ui';
+import { MSG_MAX, gavHtml } from '../../../utils/social/chatView';
 import { showToast } from '../toast';
-import type { ChatMessage, ConvSummary, PersonCard, SpoilerRef } from '../../../lib/social/types';
+import type { ChatMessage, ConvSummary, PersonCard, SpoilerRef } from '../../../utils/social/types';
 import { intoMiniLayer } from './miniLayer';
 
 interface Title { type: 'movie' | 'tv'; id: number; title: string; sub: string; image: string | null }

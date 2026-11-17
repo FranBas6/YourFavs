@@ -10,7 +10,7 @@
 import type { APIRoute } from 'astro';
 import { setUserTaste, type TasteTitle, type TastePerson } from '../../../services/profile/userTaste';
 import { setUserProfile } from '../../../services/profile/userProfile';
-import { splitGenreIds } from '../../../utils/constants/tasteGenres';
+import { splitGenreIds } from '../../../utils/titles/tasteGenres';
 
 export const prerender = false;
 

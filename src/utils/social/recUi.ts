@@ -10,7 +10,7 @@
  * no lleva el texto de la respuesta: enlaza a Pendientes → Enviadas.
  */
 import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
-import { formatScore } from '../../utils/constants/helpers/media-helpers';
+import { formatScore } from '../titles/media-helpers';
 import { QUICK_TEXT, type NotifView, type PersonCard, type QuickKey, type RecReceived, type RecSent, type RecShown, type RecView } from './types';
 
 const IMG = (size: 'w92' | 'w185', path: string) => `https://image.tmdb.org/t/p/${size}${path}`;

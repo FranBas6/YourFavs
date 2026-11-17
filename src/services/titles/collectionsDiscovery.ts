@@ -1,10 +1,10 @@
 import { tmdbFetch, tmdbFetchList } from "../tmdb/tmdbClient";
-import { processBatch } from "../../utils/processBatch";
+import { processBatch } from "../../utils/core/processBatch";
 import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/InfoMovies";
 import { getLibrarySnapshot } from "../library/librarySnapshot";
 import { getCurrentUid } from "../db/userScope";
-import { toTimestamp } from "../../utils/constants/helpers/media-helpers";
-import { SEED_COLLECTION_IDS } from "../../utils/constants/featuredCollections";
+import { toTimestamp } from "../../utils/titles/media-helpers";
+import { SEED_COLLECTION_IDS } from "../../utils/catalog/featuredCollections";
 
 interface CacheEntry<T> { data: T; expires: number }
 const POPULAR_TTL_MS = 60 * 60 * 1000;

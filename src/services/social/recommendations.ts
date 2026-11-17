@@ -19,7 +19,7 @@ import { saveFixed } from '../library/fixedLists';
 import { addFollowedPerson } from '../people/yourfavsPeople';
 import type {
     PersonCard, QuickKey, RecReceived, RecReply, RecSent, RecShown, RecStatus, RecTarget, RecView,
-} from '../../lib/social/types';
+} from '../../utils/social/types';
 
 export type RecAction = 'add' | 'alerts' | 'open' | 'discard';
 const ACTION_STATUS: Record<RecAction, RecStatus> = { add: 'added', alerts: 'alerts', open: 'opened', discard: 'discarded' };

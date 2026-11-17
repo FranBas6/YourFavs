@@ -1,7 +1,7 @@
 import { getSeriesSiguiendo, getWatchedProgress } from './yourfavsSerie';
 import { fetchSerieDetails } from './tmdbSeries';
 import { getEpisodesBySeasonNumber } from './InfoSeries';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 import type { WatchedProgress } from '../../types/DbSerie';
 
 /**

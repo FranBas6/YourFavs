@@ -10,10 +10,10 @@
  * más «spoiler» del episodio y está a un toque, en su ficha). Los estilos, en
  * `styles/components/next-episode.css`. Todo lo que viene de TMDB pasa por `esc()`.
  */
-import { esc, icon } from './social/ui';
-import type { NextEpisodeItem } from '../services/series/nextEpisode';
-import type { ViendoMovie } from '../services/movies/viendoMovies';
-import { decimal, episodeHref, isPlaceholderTitle, todayKey } from '../utils/episodeView';
+import { esc, icon } from '../social/ui';
+import type { NextEpisodeItem } from '../../services/series/nextEpisode';
+import type { ViendoMovie } from '../../services/movies/viendoMovies';
+import { decimal, episodeHref, isPlaceholderTitle, todayKey } from '../titles/episodeView';
 
 const IMG = 'https://image.tmdb.org/t/p';
 const img = (path: string, size: string) => `${IMG}/${size}${path}`;

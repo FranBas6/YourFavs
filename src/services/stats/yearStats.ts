@@ -1,8 +1,8 @@
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { getTitleDetails } from '../tmdb/tmdbTitleCache';
-import { toTimestamp } from '../../utils/constants/helpers/media-helpers';
-import { appDateParts } from '../../utils/appTime';
+import { toTimestamp } from '../../utils/titles/media-helpers';
+import { appDateParts } from '../../utils/core/appTime';
 import { getCurrentUid } from '../db/userScope';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import {

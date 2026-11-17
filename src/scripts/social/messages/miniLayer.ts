@@ -6,7 +6,7 @@
  * cabecera, con «‹ Volver al chat» encima. El mismo elemento se MUEVE dentro y, al cerrar, vuelve a
  * su sitio en la página (así los selectores no cambian y en la página grande todo sigue igual).
  */
-import { icon } from '../../../lib/social/ui';
+import { icon } from '../../../utils/social/ui';
 
 /** La ventanita del mini-chat que contiene `el`, o null. */
 export const miniWindowOf = (el: Element | null | undefined) => el?.closest<HTMLElement>('[data-mw-win]') ?? null;

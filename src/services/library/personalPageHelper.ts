@@ -3,8 +3,8 @@ import { tmdbFetch } from "../tmdb/tmdbClient";
 import { getTitleDetails } from "../tmdb/tmdbTitleCache";
 import { getCurrentRegion } from "../db/userScope";
 import { mapAndDeduplicateProviders } from "../tmdb/tmdbInfoService";
-import { getGenreName } from "../../utils/constants/genres";
-import { processBatch } from "../../utils/processBatch";
+import { getGenreName } from "../../utils/titles/genres";
+import { processBatch } from "../../utils/core/processBatch";
 import { calculateStats } from "./calculateStats";
 import { getMediaTagsBatch, type MediaTagsDoc } from "../titles/mediaTags";
 

@@ -23,7 +23,7 @@ import {
 } from '../../../services/people/InfoActor';
 import { posterUrl } from '../../../services/tmdb/tmdbClient';
 import { toItem } from '../../../services/tmdb/summaryItem';
-import { safeFetch } from '../../../utils/safeFetch';
+import { safeFetch } from '../../../utils/core/safeFetch';
 
 export const prerender = false;
 

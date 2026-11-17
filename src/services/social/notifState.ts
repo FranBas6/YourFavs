@@ -11,8 +11,8 @@
  * una persona bloqueada o cuya cuenta ya no existe.
  */
 import type { NotificationDoc } from '../notifications/notifications';
-import type { NotifView, RecView } from '../../lib/social/types';
-import { SOCIAL_NOTIF_TYPES } from '../../lib/social/ui';
+import type { NotifView, RecView } from '../../utils/social/types';
+import { SOCIAL_NOTIF_TYPES } from '../../utils/social/ui';
 import { supabaseAdmin } from '../db/admin';
 import { getPeople, getRelations } from './graph';
 import { recViewsForNotifs } from './recommendations';

@@ -7,16 +7,16 @@
  * Con `SOCIAL_PHASE.messages` apagado pinta la rejilla de siempre del centro «Amigos» (`.am-grid`),
  * para que todo quede como en F6.
  *
- * La lista la pinta el servidor con `lib/social/chatView.ts` y la refresca cada 30 s
+ * La lista la pinta el servidor con `utils/social/chatView.ts` y la refresca cada 30 s
  * `scripts/social/messages/rail.ts` con el mismo marcado.
  *
  * Grupos (M2, `SOCIAL_PHASE.groups`): «＋ Nuevo grupo» en el rótulo «MENSAJES» (oculto sin amigos) y
  * el selector de grupo (`#ms-gp`, sobre el `.rk` de F4), que también abre «Añadir personas».
  */
 import { Icon } from 'astro-icon/components';
-import { railListHtml } from '../../../lib/social/chatView';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
-import type { ConvSummary } from '../../../lib/social/types';
+import { railListHtml } from '../../../utils/social/chatView';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
+import type { ConvSummary } from '../../../utils/social/types';
 import '../../../styles/pages/social/mensajes.css';
 
 interface Props {
@@ -76,7 +76,7 @@ const groups = enabled && SOCIAL_PHASE.groups;
 {enabled && (
     <script>
         import '../../../scripts/social/messages/rail';
-        import { SOCIAL_PHASE } from '../../../utils/constants/social';
+        import { SOCIAL_PHASE } from '../../../utils/social/social';
         if (SOCIAL_PHASE.groups) import('../../../scripts/social/messages/groupPicker');
     </script>
 )}

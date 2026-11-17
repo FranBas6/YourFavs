@@ -14,7 +14,7 @@
  *     `number_of_episodes` NO existen en `/discover/tv`, solo en el detalle de cada título. Se usa
  *     `with_type=2`, que es el tipo *Miniseries* de TMDB: dato del propio título y una sola llamada.
  */
-import type { CatalogMode } from '../catalogUrl';
+import type { CatalogMode } from './catalogUrl';
 
 export interface CatalogRowDef {
     key: string;

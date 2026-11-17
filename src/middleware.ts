@@ -15,7 +15,7 @@ import { SESSION_FLAG, clearSessionFlag, setSessionFlag } from './services/db/au
 import { runWithUser, setRequestPrefs, startTmdbMeter } from './services/db/userScope';
 import { installTmdbMeter, withTmdbReport } from './services/tmdb/tmdbMeter';
 import { getUserProfile, resolveSpoilerSettings } from './services/profile/userProfile';
-import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalogUrl';
+import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalog/catalogUrl';
 
 /**
  * Rutas que para un INVITADO son contenido público y merecen caché de CDN.

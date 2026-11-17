@@ -8,7 +8,7 @@
  * amistad, ⌘K). Al pulsar:
  *   1. el botón cambia al momento (optimista) y queda `aria-busy`;
  *   2. se llama al endpoint, que devuelve la relación NUEVA;
- *   3. se repintan TODAS las piezas de esa persona en la página con `lib/social/ui.ts`, el mismo
+ *   3. se repintan TODAS las piezas de esa persona en la página con `utils/social/ui.ts`, el mismo
  *      marcado que pinta el servidor;
  *   4. si falla, se deja como estaba y sale un toast.
  *
@@ -21,10 +21,10 @@
 import {
     cmdkActionsHtml, firstName, notifSentenceHtml, notifZoneHtml, personRowHtml,
     profileActionsHtml, rowActionsHtml, type RowActions,
-} from '../../lib/social/ui';
-import { SOCIAL_PHASE } from '../../utils/constants/social';
+} from '../../utils/social/ui';
+import { SOCIAL_PHASE } from '../../utils/social/social';
 import { showToast } from './toast';
-import type { NotifView, PersonCard, PersonEntry, Relation } from '../../lib/social/types';
+import type { NotifView, PersonCard, PersonEntry, Relation } from '../../utils/social/types';
 
 const phase = SOCIAL_PHASE;
 

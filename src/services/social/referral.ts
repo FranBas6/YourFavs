@@ -13,7 +13,7 @@
 import { supabaseAdmin } from '../db/admin';
 import { findPublicProfileRow } from './publicProfile';
 import { follow, getPeople } from './graph';
-import type { PersonCard, Relation } from '../../lib/social/types';
+import type { PersonCard, Relation } from '../../utils/social/types';
 
 export const REF_COOKIE = 'yf_ref';
 

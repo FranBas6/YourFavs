@@ -5,8 +5,8 @@ import {
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../library/watchLog";
-import { normalizeScore } from "../../utils/constants/helpers/media-helpers";
-import { appDateParts } from "../../utils/appTime";
+import { normalizeScore } from "../../utils/titles/media-helpers";
+import { appDateParts } from "../../utils/core/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../types/DbSerie";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 

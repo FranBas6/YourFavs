@@ -8,7 +8,7 @@ import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../../../../services/social/http';
 import { spoilerBody } from '../../../../../../../services/social/messages';
-import { SOCIAL_PHASE } from '../../../../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../../../../utils/social/social';
 
 export const prerender = false;
 

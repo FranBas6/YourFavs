@@ -7,9 +7,9 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
-import { avatarHtml } from '../../../lib/social/ui';
+import { avatarHtml } from '../../../utils/social/ui';
 import { rouletteFriends } from '../../../services/social/inCommon';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
 
 export const prerender = false;
 

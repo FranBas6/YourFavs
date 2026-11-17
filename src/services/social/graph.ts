@@ -12,8 +12,8 @@
  * bloqueado». Si alguien te bloqueó, simplemente no apareces en sus cosas ni ella en las tuyas.
  */
 import { supabaseAdmin } from '../db/admin';
-import { NO_RELATION, type FriendsTab, type PersonCard, type PersonEntry, type Relation } from '../../lib/social/types';
-import { initialsOf, stampFor } from '../../lib/social/ui';
+import { NO_RELATION, type FriendsTab, type PersonCard, type PersonEntry, type Relation } from '../../utils/social/types';
+import { initialsOf, stampFor } from '../../utils/social/ui';
 
 export type FollowResult = 'ok' | 'self' | 'blocked' | 'not_public';
 export type RequestResult = 'ok' | 'friends' | 'no_profile' | 'not_public' | 'blocked' | 'cap' | 'self';

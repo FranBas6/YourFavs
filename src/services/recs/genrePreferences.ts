@@ -5,7 +5,7 @@ import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getUserTaste } from '../profile/userTaste';
 import { getCustomLists, getListItems } from '../library/customLists';
 import { listRatings } from '../library/ratings';
-import { toTimestamp } from '../../utils/constants/helpers/media-helpers';
+import { toTimestamp } from '../../utils/titles/media-helpers';
 
 // Listas fijas del usuario por tipo — para EXCLUIR de las recomendaciones todo lo
 // que ya tiene guardado en cualquier lista (no solo los favoritos/semillas).

@@ -10,7 +10,7 @@
  * El handle viejo NO redirige al cambiarlo: da 404. Así nadie hereda los enlaces de otro.
  */
 import { supabaseAdmin } from '../db/admin';
-import { RESERVED_HANDLES } from '../../utils/constants/reservedHandles';
+import { RESERVED_HANDLES } from '../../utils/settings/reservedHandles';
 
 export const HANDLE_MIN = 3;
 export const HANDLE_MAX = 20;

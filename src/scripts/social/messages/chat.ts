@@ -12,20 +12,20 @@
  *   · compositor: crece hasta 6 líneas, Enter envía en escritorio, contador desde 1.800, borrador
  *     en sessionStorage; en móvil pegado al teclado (visualViewport).
  *
- * Todo el marcado sale de `lib/social/chatView.ts` (el mismo del servidor). El registro se repinta
+ * Todo el marcado sale de `utils/social/chatView.ts` (el mismo del servidor). El registro se repinta
  * entero; por eso los nuevos de otras personas se anuncian en una región aparte (`data-ms-live`).
  */
 import {
     GROUP_NAME_MAX, MSG_MAX, cardHref, chatSubtitle, hm, infoHtml, logHtml, newAnchor, num, otherOf, renameHtml, spoilerLabel, type PendingMsg,
-} from '../../../lib/social/chatView';
-import { DELETED_ACCOUNT, FOLDED_TEXT } from '../../../lib/social/messagesText';
-import { avatarHtml, esc, firstName, icon } from '../../../lib/social/ui';
+} from '../../../utils/social/chatView';
+import { DELETED_ACCOUNT, FOLDED_TEXT } from '../../../utils/social/messagesText';
+import { avatarHtml, esc, firstName, icon } from '../../../utils/social/ui';
 import { msgApi } from './api';
 import { createPoller } from './poller';
 import { initWtw } from './wtw';
 import { openPlanPick } from './planPick';
 import { showToast } from '../toast';
-import type { ChatMessage, ChatView, PlanView, RecShown, SpoilerRef } from '../../../lib/social/types';
+import type { ChatMessage, ChatView, PlanView, RecShown, SpoilerRef } from '../../../utils/social/types';
 
 /** uuid v4 (crypto.randomUUID solo existe en contextos seguros). */
 function uuid(): string {

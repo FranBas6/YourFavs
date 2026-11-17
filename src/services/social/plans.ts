@@ -15,7 +15,7 @@ import { handleSerieFavAction } from '../series/yourfavsSerie';
 import { saveFixed } from '../library/fixedLists';
 import { planViews, resolveCards } from './chatCards';
 import { toMessage } from './messages';
-import type { ChatMessage, PlanView } from '../../lib/social/types';
+import type { ChatMessage, PlanView } from '../../utils/social/types';
 
 const db = () => supabaseAdmin();
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

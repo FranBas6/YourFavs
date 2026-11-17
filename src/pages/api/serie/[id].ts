@@ -22,7 +22,7 @@ import {
     getSerieRecommendationsOrSimilar,
     type SeriesBundle,
 } from '../../../services/series/InfoSeries';
-import { safeFetch } from '../../../utils/safeFetch';
+import { safeFetch } from '../../../utils/core/safeFetch';
 
 export const prerender = false;
 

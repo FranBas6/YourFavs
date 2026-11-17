@@ -8,7 +8,7 @@
  *
  *   · Cabecera (`.eh.tph`): la de la ficha de episodio con el póster de la temporada a la izquierda;
  *     sinopsis o, si TMDB no la tiene (lo normal), cómo se emitió; cuenta atrás si está anunciada.
- *   · Barra «Tu temporada» (`.ea.tea`, paso 2): la pinta `utils/seasonView.ts::seasonBar`, aquí y en el
+ *   · Barra «Tu temporada» (`.ea.tea`, paso 2): la pinta `utils/titles/seasonView.ts::seasonBar`, aquí y en el
  *     navegador (`scripts/serie/season.ts`) al marcar sin recargar. Recomendar, Enviar a… y la plataforma.
  *   · Navegación (`.en`): temporada anterior y siguiente, la tira de temporadas con tu progreso
  *     (especiales aparte) y el selector.
@@ -31,18 +31,18 @@ import { getSpoilerPref } from '../../../../services/titles/spoilerPrefs';
 import { getNotificationSub } from '../../../../services/notifications/yourfavsNotifications';
 import { getCurrentRegion } from '../../../../services/db/userScope';
 import { getSeasonWatchProviders } from '../../../../services/series/InfoSeries';
-import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../utils/social/social';
 import { backdropUrl, posterUrl, stillUrl } from '../../../../services/tmdb/tmdbClient';
-import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seasonSide, seenLabel, type TpState } from '../../../../utils/seasonView';
+import { seasonBar, seasonCardStatus, seasonChip, seasonCounts, seasonSide, seenLabel, type TpState } from '../../../../utils/titles/seasonView';
 import FriendsSeen from '../../../../components/detail/FriendsSeen.astro';
 import { SUPPORTED_COUNTRIES } from '../../../../services/tmdb/tmdbInfoService';
 import SectionHeader from '../../../../components/SectionHeader.astro';
-import { safeFetch } from '../../../../utils/safeFetch';
-import { distinctOriginalTitle } from '../../../../utils/constants/helpers/media-helpers';
+import { safeFetch } from '../../../../utils/core/safeFetch';
+import { distinctOriginalTitle } from '../../../../utils/titles/media-helpers';
 import {
     airState, countdown, dateRange, decimal, episodeCrew, episodeHref, mediumDate, PROVIDER_KIND, isPlaceholderSeasonName, isPlaceholderTitle, longDate, phraseDate,
     relativeAgo, runtimeLabel, seasonHref, seasonLabel, shortDate, seasonSchedule, seasonStatus, todayKey, SEASON_STATUS_STYLE, TAG_STYLE,
-} from '../../../../utils/episodeView';
+} from '../../../../utils/titles/episodeView';
 
 // Mismos topes que la ficha de episodio: ids de serie de hasta 9 cifras, temporadas de hasta 4.
 const posInt = (v: string | undefined, min: number, digits: number) =>

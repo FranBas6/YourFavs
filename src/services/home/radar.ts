@@ -17,8 +17,8 @@ import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
 import { getPendientesOnMyPlatforms } from './dailyBrief';
 import { getCurrentUid } from '../db/userScope';
 import { getCached, setCached } from '../cache/recsBlobCache';
-import { processBatch } from '../../utils/processBatch';
-import { appDateParts } from '../../utils/appTime';
+import { processBatch } from '../../utils/core/processBatch';
+import { appDateParts } from '../../utils/core/appTime';
 
 export interface RadarItem {
     tmdb_id: string;

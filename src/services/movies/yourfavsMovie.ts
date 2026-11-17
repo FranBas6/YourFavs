@@ -3,7 +3,7 @@ import {
     clearCollection, patchTitle,
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
-import { normalizeScore } from "../../utils/constants/helpers/media-helpers";
+import { normalizeScore } from "../../utils/titles/media-helpers";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
 

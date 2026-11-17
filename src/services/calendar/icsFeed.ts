@@ -19,7 +19,7 @@ import type { SupabaseServer } from '../db/server';
 import { supabaseAdmin } from '../db/admin';
 import { resolveSpoilerSettings, type UserProfile } from '../profile/userProfile';
 import { myPlans, type MyPlan } from '../social/plans';
-import { appDateParts } from '../../utils/appTime';
+import { appDateParts } from '../../utils/core/appTime';
 
 const MONTHS_AHEAD = 3;
 /** Los planes de hasta un mes atrás se quedan en el calendario de la app. */

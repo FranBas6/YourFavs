@@ -6,7 +6,7 @@ import CardSerie from "../../components/Cards/CardSerie.astro";
 import {getMostPopularMovies} from "../../services/movies/tmdbMovies";
 import {getMostPopularSeries} from "../../services/series/tmdbSeries";
 import {discoverContent, parseAdvancedFilters, hasActiveFilters, sortByFor} from "../../services/catalog/tmdbDiscoverService";
-import {getGenreName} from "../../utils/constants/genres";
+import {getGenreName} from "../../utils/titles/genres";
 import {posterUrl} from "../../services/tmdb/tmdbClient";
 import CatalogModes from "../../components/CatalogModes.astro";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
@@ -16,8 +16,8 @@ import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import '../../styles/pages/catalogo/shared.css';
 import '../../styles/pages/catalogo/card-animations.css';
-import { resolveMineFilter } from "../../utils/platformFilter";
-import { catalogUrls, resolveCatalogMode } from "../../utils/catalogUrl";
+import { resolveMineFilter } from "../../utils/catalog/platformFilter";
+import { catalogUrls, resolveCatalogMode } from "../../utils/catalog/catalogUrl";
 
 const urlParams = new URL(Astro.request.url).searchParams;
 const page = Number(urlParams.get('page') || 1);
@@ -29,7 +29,7 @@ const filters = parseAdvancedFilters(urlParams);
 const filtersActive = hasActiveFilters(filters);
 // "Solo en mis plataformas" (3.2b): with_watch_providers desde el perfil.
 // Filtro por plataformas: la URL manda (`mine=0|1`); sin parámetro decide el perfil
-// («Filtrar siempre por mis plataformas»). Ver utils/platformFilter.ts.
+// («Filtrar siempre por mis plataformas»). Ver utils/catalog/platformFilter.ts.
 const { mine, mineDefault } = resolveMineFilter(urlParams, Astro.locals.user);
 const myProviders = (mine && Astro.locals.user?.platforms?.length) ? Astro.locals.user.platforms.join('|') : '';
 const myRegion = Astro.locals.user?.region || 'ES';
@@ -53,7 +53,7 @@ const countCtx = [
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { 'vote_count.gte': '100' } }] : []),
 ];
 
-// Los dos constructores de URL son compartidos (`utils/catalogUrl.ts`): había seis copias de esto
+// Los dos constructores de URL son compartidos (`utils/catalog/catalogUrl.ts`): había seis copias de esto
 // repartidas por las páginas de catálogo, y la de cambiar de modo se olvidaba de limpiar `cert`.
 const { buildFilterUrl, buildTypeUrl } = catalogUrls(urlParams);
 ---

@@ -13,7 +13,7 @@ import { supabaseAdmin } from '../db/admin';
 import { getTitleSummaries, titleKey } from '../tmdb/titleSummaries';
 import { toMessage } from './messages';
 import { resolveCards } from './chatCards';
-import type { ChatMessage, WtwCardRef } from '../../lib/social/types';
+import type { ChatMessage, WtwCardRef } from '../../utils/social/types';
 
 interface PoolRow { media_type: 'movie' | 'tv'; tmdb_id: number; have: string[]; of: number }
 

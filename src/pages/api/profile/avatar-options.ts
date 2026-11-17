@@ -11,7 +11,7 @@ import { tmdbFetch, posterUrl } from '../../../services/tmdb/tmdbClient';
 import { getActorsFav } from '../../../services/people/yourfavsActor';
 import { getMovieFav } from '../../../services/movies/yourfavsMovie';
 import { getSerieFav } from '../../../services/series/yourfavsSerie';
-import { processBatch } from '../../../utils/processBatch';
+import { processBatch } from '../../../utils/core/processBatch';
 import { getTitleDetails } from '../../../services/tmdb/tmdbTitleCache';
 
 /** Cuántos favoritos de cada tipo se miran para sacar pósters (luego se recorta a 24). */

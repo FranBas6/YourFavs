@@ -10,7 +10,7 @@
  */
 import { tmdbFetch } from './tmdbClient';
 import { toItem } from './summaryItem';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 import { getCurrentLanguage } from '../db/userScope';
 
 export interface TitleRef {

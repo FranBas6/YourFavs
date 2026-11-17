@@ -6,7 +6,7 @@
  * Estados: sin sesión · anunciada · sin empezar · a medias («Te toca») · al día de una en emisión · vista.
  * Todo lo que viene de TMDB se escapa (`esc`): los nombres de episodio acaban dentro de HTML.
  */
-import { appDateParts } from './appTime';
+import { appDateParts } from '../core/appTime';
 import { daysBetween, episodeHref, phraseDate, runtimeLabel, seasonHref, shortDate, tinyDate, type SeasonStatus } from './episodeView';
 
 /** Un episodio de la temporada, lo justo para la barra (y, en el paso 3, para la lista). */

@@ -3,7 +3,7 @@
  *
  *   · Una sola ventanita abajo a la derecha (≥ 1024 px). Se abre desde el desplegable «Mensajes» de
  *     la cabecera (`window.yfMiniChat.open`). Dentro, la conversación de siempre: `mountChat` de
- *     chat.ts sobre el marcado de `lib/social/miniChatView.ts`, en talla compacta.
+ *     chat.ts sobre el marcado de `utils/social/miniChatView.ts`, en talla compacta.
  *   · Minimizar ≠ cerrar: minimizada se queda abajo como una barra (con «Nuevos» y el número) y
  *     vuelve en cada página; cerrada no vuelve.
  *   · La web recarga al navegar: el estado va en `localStorage` (`yf:mw`, 12 h) y lo pintado en
@@ -19,12 +19,12 @@ import { msgApi } from './api';
 import { createPoller } from './poller';
 import { showToast } from '../toast';
 import { intoMiniLayer } from './miniLayer';
-import { infoHtml } from '../../../lib/social/chatView';
-import { icon } from '../../../lib/social/ui';
+import { infoHtml } from '../../../utils/social/chatView';
+import { icon } from '../../../utils/social/ui';
 import {
     headOfChat, headOfConv, miniBarHtml, miniGoneHtml, miniLoadingHtml, miniMenuHtml, miniWindowHtml, type MiniHead,
-} from '../../../lib/social/miniChatView';
-import type { ConvSummary } from '../../../lib/social/types';
+} from '../../../utils/social/miniChatView';
+import type { ConvSummary } from '../../../utils/social/types';
 
 type MiniState = { uid: string; convId: number; state: 'open' | 'min' | 'closed'; at: number };
 interface MiniCache { head: MiniHead; mw?: string; mwm?: string; unread?: number }

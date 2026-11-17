@@ -16,8 +16,8 @@
  * falta — un revisionado completo re-marca las mismas claves y se comería el pase
  * original entero, que es justo el historial que queremos pintar.
  */
-import { toTimestamp } from '../../utils/constants/helpers/media-helpers';
-import { appDateParts } from '../../utils/appTime';
+import { toTimestamp } from '../../utils/titles/media-helpers';
+import { appDateParts } from '../../utils/core/appTime';
 
 export interface EpisodeWatch {
     serieId: string;

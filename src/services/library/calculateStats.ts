@@ -1,5 +1,5 @@
-import {getGenreName} from "../../utils/constants/genres";
-import {toTimestamp} from "../../utils/constants/helpers/media-helpers";
+import {getGenreName} from "../../utils/titles/genres";
+import {toTimestamp} from "../../utils/titles/media-helpers";
 
 interface StatsInput {
     seriesData: any[];

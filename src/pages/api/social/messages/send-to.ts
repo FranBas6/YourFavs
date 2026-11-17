@@ -12,7 +12,7 @@ import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../
 import { normalizeHandle } from '../../../../services/social/handles';
 import { MSG_MAX, SEND_STATUS, idByHandle, openDirect, sendMessage } from '../../../../services/social/messages';
 import { readSpoiler, readTitleCard } from '../../../../services/social/chatCards';
-import { SOCIAL_PHASE } from '../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../utils/social/social';
 
 export const prerender = false;
 

@@ -1,6 +1,6 @@
 /**
  * Iconos Lucide que pintan las piezas sociales compartidas por servidor y navegador
- * (`lib/social/ui.ts`). Generado desde `@iconify-json/lucide` con solo los que se usan, para no
+ * (`utils/social/ui.ts`). Generado desde `@iconify-json/lucide` con solo los que se usan, para no
  * meter el set entero en el bundle del cliente. Para añadir uno: copiar su `body` del JSON.
  */
 export const ICONS: Record<string, string> = {

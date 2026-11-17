@@ -10,7 +10,7 @@ import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, readUserId, serverError, tooMany, unauthorized } from '../../../services/social/http';
 import { allowSocialWrite, follow, getRelation, unfollow } from '../../../services/social/graph';
-import { SOCIAL_PHASE } from '../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../utils/social/social';
 
 export const prerender = false;
 

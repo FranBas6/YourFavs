@@ -8,11 +8,11 @@
  *     navega solo.
  *   · «Tienes N anteriores sin ver · Marcarlos»: los marca de una vez (`episodes: […]`).
  *   · Sin emitir: «Avisarme del estreno» (`POST /api/notifications/subscribe`).
- * Los textos del progreso salen de `utils/episodeView.ts::progressLine`, lo mismo que en el servidor.
+ * Los textos del progreso salen de `utils/titles/episodeView.ts::progressLine`, lo mismo que en el servidor.
  */
 import { showToast } from '../social/toast';
 import { revealSpoiler } from '../shared/spoil';
-import { earlierUnseen, progressLine, watchedLabel, type SeasonEp } from '../../utils/episodeView';
+import { earlierUnseen, progressLine, watchedLabel, type SeasonEp } from '../../utils/titles/episodeView';
 
 interface Data {
     seriesId: number;

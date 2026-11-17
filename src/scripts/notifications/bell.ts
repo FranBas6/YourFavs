@@ -3,7 +3,7 @@
  *
  * Antes vivía dentro del script en línea de `Header.astro` y pintaba cada aviso como un enlace. Con
  * los avisos entre personas (que llevan botones) pasa a este módulo para pintar con
- * `lib/social/ui.ts`, el mismo marcado que la página `/mislistas/notificaciones` pinta en el
+ * `utils/social/ui.ts`, el mismo marcado que la página `/mislistas/notificaciones` pinta en el
  * servidor. Los botones de los avisos los atiende `scripts/social/relations.ts`.
  *
  *   · Globos: `.js-notif-badge` (no leídos: campana, pestaña Perfil y hoja Perfil en móvil) y
@@ -16,9 +16,9 @@
  *   · Desplegable (≥1024 px): se piden los avisos CADA vez que se abre, con el estado actual de
  *     cada relación. En móvil la campana lleva a la página.
  */
-import { notifFeedHtml } from '../../lib/social/ui';
-import { SOCIAL_PHASE } from '../../utils/constants/social';
-import type { NotifView } from '../../lib/social/types';
+import { notifFeedHtml } from '../../utils/social/ui';
+import { SOCIAL_PHASE } from '../../utils/social/social';
+import type { NotifView } from '../../utils/social/types';
 
 declare global {
     interface Window {

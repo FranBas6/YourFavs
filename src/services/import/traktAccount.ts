@@ -16,7 +16,7 @@
  * que pedir a Trakt una app «Production» (`docs/PLAN_TMDB.md`, lote F).
  */
 import { createHash, randomBytes } from 'node:crypto';
-import { appDateParts } from '../../utils/appTime';
+import { appDateParts } from '../../utils/core/appTime';
 
 // Solo en desarrollo: `TRAKT_FAKE_URL` apunta a un Trakt de mentira para probar sin cuenta (lote F2).
 // En producción `import.meta.env.DEV` es false y se ignora siempre.

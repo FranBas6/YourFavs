@@ -8,8 +8,8 @@
  */
 import { getMoviesViendo } from './yourfavsMovie';
 import { tmdbFetch } from '../tmdb/tmdbClient';
-import { processBatch } from '../../utils/processBatch';
-import { toTimestamp } from '../../utils/constants/helpers/media-helpers';
+import { processBatch } from '../../utils/core/processBatch';
+import { toTimestamp } from '../../utils/titles/media-helpers';
 
 export interface ViendoMovie {
     id: string;

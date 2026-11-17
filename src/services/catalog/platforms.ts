@@ -2,7 +2,7 @@ import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
 import {fetchByProvider, PROVIDERS} from "./tmdbDiscoverService";
 import {getCached, setCached} from "../cache/recsBlobCache";
-import {appDateParts} from "../../utils/appTime";
+import {appDateParts} from "../../utils/core/appTime";
 
 export interface PlatformInfo {
     slug: string;

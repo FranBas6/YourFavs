@@ -10,7 +10,7 @@
  * pone cara a los ids. Cliente admin con los dos uid explícitos, como el resto de `social/`.
  */
 import { supabaseAdmin } from '../db/admin';
-import type { PersonCard } from '../../lib/social/types';
+import type { PersonCard } from '../../utils/social/types';
 import { getTitleSummaries, titleKey, type TitleRef } from '../tmdb/titleSummaries';
 import { getPeople } from './graph';
 

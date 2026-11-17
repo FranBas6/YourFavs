@@ -7,7 +7,7 @@
  */
 import type { APIRoute } from 'astro';
 import { findInviter } from '../../../services/social/referral';
-import { firstName } from '../../../lib/social/ui';
+import { firstName } from '../../../utils/social/ui';
 
 export const prerender = false;
 

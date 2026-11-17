@@ -1,7 +1,7 @@
 import { type Serie } from "../../types/ApiSerie.ts";
 import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../tmdb/tmdbClient';
 import { getCurrentLanguage, getCurrentRegion } from "../db/userScope";
-import { getGenreName } from "../../utils/constants/genres";
+import { getGenreName } from "../../utils/titles/genres";
 import {
     mapAndDeduplicateProviders,
     buildProvidersByCountry,

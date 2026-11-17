@@ -1,10 +1,10 @@
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch, tmdbFetchList } from '../tmdb/tmdbClient';
 import { getTrending } from '../catalog/tmdbDiscoverService';
 import { calculateGenrePreferences, type Seed, type SeedWhy } from './genrePreferences';
 import { getCached, setCached, invalidateCached } from '../cache/recsBlobCache';
 import { getCurrentUid } from '../db/userScope';
-import { appDateParts } from '../../utils/appTime';
+import { appDateParts } from '../../utils/core/appTime';
 import { dedupeFranchises } from '../catalog/catalogRows';
 
 /**

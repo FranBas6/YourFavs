@@ -11,11 +11,11 @@
  */
 import { discoverContent, type AdvancedFilters } from './tmdbDiscoverService';
 import { getCached, setCached } from '../cache/recsBlobCache';
-import { appDateParts } from '../../utils/appTime';
+import { appDateParts } from '../../utils/core/appTime';
 import { resolveProviderNames } from '../tmdb/watchProviders';
 import type { Movie } from '../../types/ApiMovie';
 import type { Serie } from '../../types/ApiSerie';
-import type { CatalogRowDef } from '../../utils/constants/catalogRows';
+import type { CatalogRowDef } from '../../utils/catalog/catalogRows';
 
 /** 6 h: el catálogo de TMDB no cambia en una tarde, y así la portada es barata. */
 const L2_TTL_MS = 6 * 60 * 60 * 1000;

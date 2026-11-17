@@ -3,8 +3,8 @@ import Layout from "../../layouts/Layout.astro";
 import {
     getLanguageDisplayName, getContentRating, distinctOriginalTitle,
     formatDate, formatTrailerUrl, providerLinks
-} from "../../utils/constants/helpers/media-helpers";
-import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
+} from "../../utils/titles/media-helpers";
+import {formatRuntime, getSeasonStats} from "../../utils/titles/serie-helpers";
 import type { GuestStar } from "../../types/Media";
 import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/series/yourfavsSerie";
 import { countSeriesPasses } from "../../services/library/watchLog";
@@ -12,7 +12,7 @@ import type {WatchedProgress} from "../../services/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
 import '../../styles/shared/spoil.css'; // modo sin spoilers, compartido con la ficha de episodio (TMDB D4)
-import { episodeHref, seasonHref } from '../../utils/episodeView';
+import { episodeHref, seasonHref } from '../../utils/titles/episodeView';
 import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
 } from "../../services/series/InfoSeries";
@@ -22,7 +22,7 @@ import { peekTopActors } from "../../services/stats/topActorsLibrary";
 import { checkMediaExistence } from "../../services/titles/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/titles/mediaTags";
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
-import { SOCIAL_PHASE } from "../../utils/constants/social";
+import { SOCIAL_PHASE } from "../../utils/social/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/detail/FriendsSeen.astro";
 import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/yourfavsNotifications";
@@ -41,7 +41,7 @@ import { getCrossMediaRelated } from "../../services/titles/crossMediaRelated";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import SeasonHeatmap from "../../components/detail/SeasonHeatmap.astro";
 import StarRating from "../../components/detail/StarRating.astro";
-import {safeFetch} from "../../utils/safeFetch";
+import {safeFetch} from "../../utils/core/safeFetch";
 import { getSpoilerPref, setSpoilerPref, clearSpoilerPref } from "../../services/titles/spoilerPrefs";
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL

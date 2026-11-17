@@ -14,10 +14,10 @@
  * Se coordina con los demás desplegables de la cabecera (`window.yfHeaderPanels`). El número del
  * botón lo pinta `scripts/notifications/bell.ts` (`.js-msg-badge`).
  */
-import { esc, icon } from '../../../lib/social/ui';
-import { railListHtml, unreadOf } from '../../../lib/social/chatView';
+import { esc, icon } from '../../../utils/social/ui';
+import { railListHtml, unreadOf } from '../../../utils/social/chatView';
 import { msgApi } from './api';
-import type { ConvSummary } from '../../../lib/social/types';
+import type { ConvSummary } from '../../../utils/social/types';
 
 const btn = document.getElementById('msgs-toggle-btn');
 const drop = document.getElementById('msgs-dropdown');

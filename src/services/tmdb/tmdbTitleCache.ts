@@ -14,7 +14,7 @@
  */
 import { supabaseAdmin } from '../db/admin';
 import { getCurrentLanguage } from '../db/userScope';
-import { processBatch } from '../../utils/processBatch';
+import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetchWithFreshness, type MediaType } from './tmdbClient';
 
 /** Llamadas a TMDB a la vez. Con 10 (lo de antes) 180 fichas sin caché de TMDB tardaban 6-7 s; con 30, ~5 s y sin 429. */

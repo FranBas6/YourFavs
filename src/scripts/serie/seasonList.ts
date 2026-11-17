@@ -11,7 +11,7 @@
  *     (no cambia el ajuste); la tarjeta de la gráfica con todo oculto, solo la gráfica.
  */
 import { revealSpoiler } from '../shared/spoil';
-import { seasonCounts, seenLabel, type TpState } from '../../utils/seasonView';
+import { seasonCounts, seenLabel, type TpState } from '../../utils/titles/seasonView';
 
 const DENSITY_KEY = 'yf-season-density';
 const raw = document.getElementById('tp-data')?.textContent;

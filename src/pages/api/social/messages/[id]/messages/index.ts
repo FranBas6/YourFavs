@@ -14,7 +14,7 @@ import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../services/social/http';
 import { MSG_MAX, SEND_STATUS, sendMessage } from '../../../../../../services/social/messages';
 import { readSpoiler, readTitleCard } from '../../../../../../services/social/chatCards';
-import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
+import { SOCIAL_PHASE } from '../../../../../../utils/social/social';
 
 export const prerender = false;
 
