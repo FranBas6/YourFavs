@@ -6,7 +6,7 @@
  * Mensajes sigue enseñándolas todas.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, serverError, tooMany, unauthorized } from '../../../../lib/social/http';
 import { clearInbox } from '../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../services/BD/social/graph';

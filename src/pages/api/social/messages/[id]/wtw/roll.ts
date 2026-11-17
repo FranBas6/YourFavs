@@ -6,7 +6,7 @@
  * `exclude`: lo ya tirado en esta sesión («movie:123»), para que «Otra» no repita.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
 import { wtwRoll } from '../../../../../../services/BD/social/wtw';
 import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';

@@ -13,7 +13,7 @@
  *
  * Al borrar la cuenta, el `on delete cascade` de `user_state` se lo lleva → sin pasos extra.
  */
-import { db, getAuthId, requireAuthId } from '../shared/userScope';
+import { db, getAuthId, requireAuthId } from '../../db/userScope';
 
 export interface TasteTitle {
     id: number;

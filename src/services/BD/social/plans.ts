@@ -8,8 +8,8 @@
  *   · «Marcar como vista» es el mismo gesto que en la ficha (Vistas + pase en el diario).
  * Y devolver la tarjeta resuelta para repintarla.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
-import { getTitleSummaries, titleKey } from '../../API/shared/titleSummaries';
+import { supabaseAdmin } from '../../db/admin';
+import { getTitleSummaries, titleKey } from '../../tmdb/titleSummaries';
 import { handleMovieFavAction } from '../movies/yourfavsMovie';
 import { handleSerieFavAction } from '../series/yourfavsSerie';
 import { saveFixed } from '../lists/fixedLists';

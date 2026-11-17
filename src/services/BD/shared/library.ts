@@ -6,7 +6,7 @@
  * las páginas y los handlers no noten el cambio. `collection` es literalmente el nombre de la
  * colección de siempre.
  */
-import { db, fetchAll, getAuthId, requireAuthId } from './userScope';
+import { db, fetchAll, getAuthId, requireAuthId } from '../../db/userScope';
 
 export interface ListDoc {
     id: string;

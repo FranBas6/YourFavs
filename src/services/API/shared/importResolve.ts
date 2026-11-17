@@ -3,8 +3,8 @@
  * es exacto, una llamada por título y ya trae título, año y póster en tu idioma, así que la vista
  * previa y la importación no necesitan nada más de TMDB.
  */
-import { tmdbFetch } from './tmdbClient';
-import { getTitleDetails } from './tmdbTitleCache';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
+import { getTitleDetails } from '../../tmdb/tmdbTitleCache';
 import { processBatch } from '../../../utils/processBatch';
 
 /** Llamadas a la vez dentro de un lote. Un lote de 50 tarda ~1-2 s; TMDB aguanta ~50/s. */

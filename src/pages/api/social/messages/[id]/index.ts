@@ -9,7 +9,7 @@
  * PATCH: `muted` es solo para ti; `name` (renombrar) solo para admins de un grupo.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../lib/http';
+import { jsonNoStore } from '../../../../../services/http/http';
 import { badRequest, posInt, serverError, tooMany, unauthorized } from '../../../../../lib/social/http';
 import { getHistory, renameGroup, setMuted } from '../../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../../services/BD/social/graph';

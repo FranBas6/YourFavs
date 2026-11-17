@@ -7,12 +7,12 @@
  * ver /api/profile/avatar-upload.
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch, posterUrl } from '../../../services/API/shared/tmdbClient';
+import { tmdbFetch, posterUrl } from '../../../services/tmdb/tmdbClient';
 import { getActorsFav } from '../../../services/BD/actors/yourfavsActor';
 import { getMovieFav } from '../../../services/BD/movies/yourfavsMovie';
 import { getSerieFav } from '../../../services/BD/series/yourfavsSerie';
 import { processBatch } from '../../../utils/processBatch';
-import { getTitleDetails } from '../../../services/API/shared/tmdbTitleCache';
+import { getTitleDetails } from '../../../services/tmdb/tmdbTitleCache';
 
 /** Cuántos favoritos de cada tipo se miran para sacar pósters (luego se recorta a 24). */
 const POSTER_SOURCE = 18;

@@ -9,7 +9,7 @@
  * mantiene como "Ver todos los resultados" — esto es solo el camino rápido.
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch, posterUrl } from '../../../services/API/shared/tmdbClient';
+import { tmdbFetch, posterUrl } from '../../../services/tmdb/tmdbClient';
 import { DEPARTMENT_ES } from '../../../utils/constants/helpers/team-helpers';
 
 export const prerender = false;

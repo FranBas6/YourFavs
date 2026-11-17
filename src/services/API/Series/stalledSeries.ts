@@ -16,7 +16,7 @@ import { fetchSerieDetails } from './tmdbSeries';
 import { computeNextEpisode } from './nextEpisode';
 import { episodeHref } from '../../../utils/episodeView';
 import { resumeReason } from '../../../utils/resumeReason';
-import { getCurrentUid } from '../../BD/shared/userScope';
+import { getCurrentUid } from '../../db/userScope';
 import { processBatch } from '../../../utils/processBatch';
 
 export interface StalledSerie {

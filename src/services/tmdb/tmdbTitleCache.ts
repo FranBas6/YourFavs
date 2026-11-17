@@ -12,9 +12,9 @@
  * con la clave secreta, solo en servidor (la tabla no tiene políticas, como `app_state`). Si la
  * tabla falla, se cae al camino de siempre: pedirlo todo a TMDB.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
-import { getCurrentLanguage } from '../../BD/shared/userScope';
-import { processBatch } from '../../../utils/processBatch';
+import { supabaseAdmin } from '../db/admin';
+import { getCurrentLanguage } from '../db/userScope';
+import { processBatch } from '../../utils/processBatch';
 import { tmdbFetchWithFreshness, type MediaType } from './tmdbClient';
 
 /** Llamadas a TMDB a la vez. Con 10 (lo de antes) 180 fichas sin caché de TMDB tardaban 6-7 s; con 30, ~5 s y sin 429. */

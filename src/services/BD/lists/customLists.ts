@@ -11,7 +11,7 @@
  *
  * Borrar una lista se lleva sus items por la FK (`on delete cascade`), y borrar la cuenta, todo.
  */
-import { db, fetchAll, getAuthId, requireAuthId } from '../shared/userScope';
+import { db, fetchAll, getAuthId, requireAuthId } from '../../db/userScope';
 
 export type ColorStamp = 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
 export const LIST_COLORS: ColorStamp[] = ['red', 'amber', 'blue', 'green', 'purple', 'pink', 'slate'];

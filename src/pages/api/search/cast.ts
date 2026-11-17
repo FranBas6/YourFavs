@@ -13,7 +13,7 @@
  * Público (solo dato TMDB). Convención `{ ok, count, items }`.
  */
 import type { APIRoute } from 'astro';
-import { toItem, type SummaryItem } from '../summary';
+import { toItem, type SummaryItem } from '../../../services/tmdb/summaryItem';
 import { getCombinedCastCredits } from '../../../services/API/Actors/tmdbActor';
 
 export const prerender = false;

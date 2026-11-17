@@ -8,7 +8,7 @@
  * Público (solo dato TMDB). Convención `{ ok, items }`. `?page` opcional (1).
  */
 import type { APIRoute } from 'astro';
-import { toItem, type SummaryItem } from './summary';
+import { toItem, type SummaryItem } from '../../services/tmdb/summaryItem';
 import { getTrending } from '../../services/API/shared/tmdbDiscoverService';
 import {
     getLatestMovies,

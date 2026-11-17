@@ -13,7 +13,7 @@
 import type { NotificationDoc } from '../notifications/notifications';
 import type { NotifView, RecView } from '../../../lib/social/types';
 import { SOCIAL_NOTIF_TYPES } from '../../../lib/social/ui';
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { getPeople, getRelations } from './graph';
 import { recViewsForNotifs } from './recommendations';
 

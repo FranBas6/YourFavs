@@ -9,11 +9,11 @@
  * Lo que sale hacia el navegador nunca dice por qué un 1:1 está en solo lectura (no amigos o
  * bloqueo, en cualquier sentido): solo `readOnly`.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { getPeople, getRelations } from './graph';
 import { previewOf } from '../../../lib/social/messagesText';
 import { resolveCards } from './chatCards';
-import type { Json } from '../../../lib/supabase/database.types';
+import type { Json } from '../../db/database.types';
 import type {
     ChatMember, ChatMessage, ChatView, ConvKind, ConvRole, ConvSummary, MsgSys, PersonCard, RecCardRef, SpoilerRef, TitleCardRef, WtwCardRef,
 } from '../../../lib/social/types';

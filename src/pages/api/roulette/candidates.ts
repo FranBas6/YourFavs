@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
-import { tmdbFetch } from '../../../services/API/shared/tmdbClient';
-import { mapAndDeduplicateProviders } from '../../../services/API/shared/tmdbInfoService';
+import { tmdbFetch } from '../../../services/tmdb/tmdbClient';
+import { mapAndDeduplicateProviders } from '../../../services/tmdb/tmdbInfoService';
 import { getMoviesPendientes } from '../../../services/BD/movies/yourfavsMovie';
 import { getSeriesPendientes } from '../../../services/BD/series/yourfavsSerie';
 import { processBatch } from '../../../utils/processBatch';
-import { getCurrentRegion } from '../../../services/BD/shared/userScope';
+import { getCurrentRegion } from '../../../services/db/userScope';
 import { pendingCommon } from '../../../services/BD/social/inCommon';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 

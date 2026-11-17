@@ -16,8 +16,8 @@
  * de propina se sabe **en qué plataforma** está cada título, que es lo que necesitan el aviso de
  * «no todas están en tus plataformas» y los tratamientos de ranking con etiqueta de plataforma.
  */
-import { claimAppState, readAppState, releaseAppState, writeAppState } from './appState';
-import { tmdbFetch } from './tmdbClient';
+import { claimAppState, readAppState, releaseAppState, writeAppState } from '../../db/appState';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { isoWeekKey } from '../../../utils/appTime';
 import {
     normalizeRankingPlatforms, rankingDocId, withMovement,

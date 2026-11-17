@@ -10,8 +10,8 @@
  */
 import { tmdbFetch } from './tmdbClient';
 import { toItem } from './summaryItem';
-import { processBatch } from '../../../utils/processBatch';
-import { getCurrentLanguage } from '../../BD/shared/userScope';
+import { processBatch } from '../../utils/processBatch';
+import { getCurrentLanguage } from '../db/userScope';
 
 export interface TitleRef {
     media_type: 'movie' | 'tv';

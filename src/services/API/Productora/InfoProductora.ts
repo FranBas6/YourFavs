@@ -1,5 +1,5 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
-import { tmdbFetch, posterUrl, backdropUrl } from '../shared/tmdbClient';
+import { tmdbFetch, posterUrl, backdropUrl } from '../../tmdb/tmdbClient';
 
 export async function getMoviesAndSeriesByCompanyName(
     companyName: string,

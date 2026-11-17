@@ -4,7 +4,7 @@
  * Leído hasta `lastId` (nunca hacia atrás). Sirve para «Visto» (1:1), «Nuevos» y el contador.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../lib/http';
+import { jsonNoStore } from '../../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../../lib/social/http';
 import { markRead } from '../../../../../services/BD/social/messages';
 import { SOCIAL_PHASE } from '../../../../../utils/constants/social';

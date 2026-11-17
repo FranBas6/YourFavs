@@ -6,7 +6,7 @@
  * `rate` (30 envíos al día), `all_skipped` (todos la tenían ya). Handoff F4 §4.2.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, isUuid, serverError, tooMany, unauthorized } from '../../../../lib/social/http';
 import { isRecTarget, sendRec } from '../../../../services/BD/social/recommendations';
 import { allowSocialWrite } from '../../../../services/BD/social/graph';

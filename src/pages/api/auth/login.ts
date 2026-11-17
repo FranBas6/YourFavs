@@ -2,10 +2,10 @@
  * POST /api/auth/login   { email, password }
  *
  * Entra con email y contraseña. Supabase deja la sesión en cookies `httpOnly` (ver
- * `lib/supabase/server.ts`); a partir de ahí el middleware reconoce al usuario en cada request.
+ * `services/db/server.ts`); a partir de ahí el middleware reconoce al usuario en cada request.
  */
 import type { APIRoute } from 'astro';
-import { json, mapAuthError, setSessionFlag } from '../../../lib/supabase/authHttp';
+import { json, mapAuthError, setSessionFlag } from '../../../services/db/authHttp';
 
 export const prerender = false;
 

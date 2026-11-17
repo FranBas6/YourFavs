@@ -8,7 +8,7 @@
  * Valida en el servidor TODO lo que el cliente ya valida (handoff §9): un PATCH a mano no puede
  * saltarse el formato del handle, los 30 días, el tope de la bio o publicar sin dirección.
  */
-import { db, requireAuthId } from '../shared/userScope';
+import { db, requireAuthId } from '../../db/userScope';
 import { checkHandle, type HandleProblem } from './handles';
 import { resolvePublicSections, type PublicSectionPref } from '../../../utils/constants/publicSections';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';

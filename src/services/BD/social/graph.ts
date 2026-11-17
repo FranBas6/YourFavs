@@ -11,7 +11,7 @@
  * Lo que sale de aquí hacia el navegador es `PersonCard` + `Relation`: nunca email, nunca «me ha
  * bloqueado». Si alguien te bloqueó, simplemente no apareces en sus cosas ni ella en las tuyas.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { NO_RELATION, type FriendsTab, type PersonCard, type PersonEntry, type Relation } from '../../../lib/social/types';
 import { initialsOf, stampFor } from '../../../lib/social/ui';
 

@@ -5,7 +5,7 @@
  * y el filtro por `user_id` lo garantizan, y si el id no es tuyo responde 404.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../lib/http';
+import { jsonNoStore } from '../../../../../services/http/http';
 import { getOwnPublicSettings, setOwnCollectionPublic } from '../../../../../services/BD/social/publicSettings';
 import { invalidatePublicProfileCache } from '../../../../../services/BD/social/publicProfile';
 

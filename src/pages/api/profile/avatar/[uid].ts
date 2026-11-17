@@ -7,7 +7,7 @@
  * lleva `?v=<timestamp>` (cache-bust), así que cacheamos agresivo.
  */
 import type { APIRoute } from 'astro';
-import { supabaseAdmin } from '../../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../../../services/db/admin';
 
 // Solo ids de Supabase: nada de rutas raras dentro del bucket.
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

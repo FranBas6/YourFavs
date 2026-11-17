@@ -3,7 +3,7 @@
  * en `ADMIN_UIDS`; lee con el cliente admin. Cada reporte guarda una copia del texto al reportar,
  * así que se ve aunque el autor lo borre después.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { getPeople } from './graph';
 import type { PersonCard } from '../../../lib/social/types';
 

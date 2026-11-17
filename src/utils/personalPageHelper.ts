@@ -1,8 +1,8 @@
 import { getWatchedProgressBatch, getWatchStreak } from "../services/BD/series/yourfavsSerie";
-import { tmdbFetch } from "../services/API/shared/tmdbClient";
-import { getTitleDetails } from "../services/API/shared/tmdbTitleCache";
-import { getCurrentRegion } from "../services/BD/shared/userScope";
-import { mapAndDeduplicateProviders } from "../services/API/shared/tmdbInfoService";
+import { tmdbFetch } from "../services/tmdb/tmdbClient";
+import { getTitleDetails } from "../services/tmdb/tmdbTitleCache";
+import { getCurrentRegion } from "../services/db/userScope";
+import { mapAndDeduplicateProviders } from "../services/tmdb/tmdbInfoService";
 import { getGenreName } from "./constants/genres";
 import { processBatch } from "./processBatch";
 import { calculateStats } from "./calculateStats";

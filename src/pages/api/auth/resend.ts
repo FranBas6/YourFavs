@@ -9,7 +9,7 @@
  * envíos, que es lo único que el usuario puede corregir esperando.
  */
 import type { APIRoute } from 'astro';
-import { json, mapAuthError } from '../../../lib/supabase/authHttp';
+import { json, mapAuthError } from '../../../services/db/authHttp';
 
 export const prerender = false;
 

@@ -17,15 +17,15 @@
  *
  * Ids deterministas (uno por episodio / temporada / hito), como el resto de la campana.
  */
-import { tmdbFetch } from '../shared/tmdbClient';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts } from '../../../utils/appTime';
 import { episodeTypeLabel } from '../../../utils/episodeType';
 import { episodeHref, seasonHref } from '../../../utils/episodeView';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
-import { getCurrentRegion } from '../../BD/shared/userScope';
-import { mapAndDeduplicateProviders } from '../shared/tmdbInfoService';
+import { getCurrentRegion } from '../../db/userScope';
+import { mapAndDeduplicateProviders } from '../../tmdb/tmdbInfoService';
 import type { NotifInput } from '../../BD/notifications/notifications';
 
 /** `always`: lo pediste título a título («Avisarme»), así que llega aunque el interruptor esté apagado. */

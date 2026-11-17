@@ -18,7 +18,7 @@
  * El título/póster NO se congelan aquí: la página de Actividad los resuelve por TMDB,
  * igual que el resto de fuentes del feed; así los handlers registran sin datos extra.
  */
-import { db, fetchAll, getAuthId } from './userScope';
+import { db, fetchAll, getAuthId } from '../../db/userScope';
 
 export type ActivityVerb =
     | 'unwatch'    // desmarcar / vaciar episodios

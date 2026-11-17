@@ -10,9 +10,9 @@
  * cachearlas llenaría el almacén de entradas de un solo uso.
  */
 import { discoverContent, type AdvancedFilters } from './tmdbDiscoverService';
-import { getCached, setCached } from '../../../utils/recsBlobCache';
+import { getCached, setCached } from '../../cache/recsBlobCache';
 import { appDateParts } from '../../../utils/appTime';
-import { resolveProviderNames } from './watchProviders';
+import { resolveProviderNames } from '../../tmdb/watchProviders';
 import type { Movie } from '../../../types/ApiMovie';
 import type { Serie } from '../../../types/ApiSerie';
 import type { CatalogRowDef } from '../../../utils/constants/catalogRows';

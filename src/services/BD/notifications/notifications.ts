@@ -6,7 +6,7 @@
  * para que re-sincronizar (materializar al abrir) sea idempotente y no duplique ni
  * pise el estado `read`. Ver el generador en services/API/notifications/generator.ts.
  */
-import { db, getAuthId, requireAuthId } from '../shared/userScope';
+import { db, getAuthId, requireAuthId } from '../../db/userScope';
 
 export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anniversary' | 'platform_change' | 'streak'
     // Títulos (N1/N2, 2026-10-28): temporada nueva de una serie de tus listas o suscrita

@@ -5,7 +5,7 @@
  * mensaje para todos. Solo `ADMIN_UIDS`; a cualquier otra persona, 404.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { isAdmin } from '../../../../lib/admin';
 import { badRequest, posInt, serverError } from '../../../../lib/social/http';
 import { deleteReportedMessage, resolveReport } from '../../../../services/BD/social/reports';

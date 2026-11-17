@@ -7,7 +7,7 @@
  * enviar desde el chat.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../lib/social/http';
 import { normalizeHandle } from '../../../../services/BD/social/handles';
 import { MSG_MAX, SEND_STATUS, idByHandle, openDirect, sendMessage } from '../../../../services/BD/social/messages';

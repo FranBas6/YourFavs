@@ -10,7 +10,7 @@
  * el resto de la app va a poder cruzar.
  */
 import type { APIRoute } from 'astro';
-import { getRegionProviders } from '../../../services/API/shared/watchProviders';
+import { getRegionProviders } from '../../../services/tmdb/watchProviders';
 
 export const prerender = false;
 

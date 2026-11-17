@@ -12,7 +12,7 @@
  * porque un catálogo de plataformas cambia de mes en mes, no de minuto en minuto.
  */
 import { tmdbFetch } from './tmdbClient';
-import { getCached, setCached } from '../../../utils/recsBlobCache';
+import { getCached, setCached } from '../cache/recsBlobCache';
 
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
 

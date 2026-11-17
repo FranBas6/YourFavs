@@ -9,8 +9,8 @@
  * en `msg_card_states` (migración `20261028090000_messages_cards.sql`), que reutiliza el filtro de
  * «Amigos que la han visto». Aquí solo se ordena y se calcula el siguiente episodio con TMDB.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
-import { getTitleSummaries, titleKey } from '../../API/shared/titleSummaries';
+import { supabaseAdmin } from '../../db/admin';
+import { getTitleSummaries, titleKey } from '../../tmdb/titleSummaries';
 import { recViewsForNotifs } from './recommendations';
 import type { CardPerson, CardViewer, ChatMessage, PlanCard, PlanView, RecCard, SpoilerRef, TitleCard, TitleCardRef, WtwCard } from '../../../lib/social/types';
 

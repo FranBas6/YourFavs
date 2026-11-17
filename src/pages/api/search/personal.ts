@@ -7,7 +7,7 @@
  * para que el palette lo renderice sin código nuevo.
  */
 import type { APIRoute } from 'astro';
-import { posterUrl } from '../../../services/API/shared/tmdbClient';
+import { posterUrl } from '../../../services/tmdb/tmdbClient';
 import { buildPersonalIndex, foldText } from '../../../services/BD/shared/personalIndex';
 import { formatScore } from '../../../utils/constants/helpers/media-helpers';
 

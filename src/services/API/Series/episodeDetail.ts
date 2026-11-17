@@ -10,9 +10,9 @@
  *
  * Sin caché propia: los datos de TMDB se muestran siempre como TMDB los da (regla de Fran, C4).
  */
-import { tmdbFetch } from '../shared/tmdbClient';
-import { getCurrentLanguage } from '../../BD/shared/userScope';
-import { buildProviderLinksByCountry, buildProvidersByCountry } from '../shared/tmdbInfoService';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
+import { getCurrentLanguage } from '../../db/userScope';
+import { buildProviderLinksByCountry, buildProvidersByCountry } from '../../tmdb/tmdbInfoService';
 
 /** Lo mínimo de un episodio para la tira y para anterior / siguiente. */
 export interface EpisodeRef {

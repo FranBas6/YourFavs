@@ -5,7 +5,7 @@
  * estaba. Errores: `owner` (400: quien lo propone ya va), `closed` (409), `none` (404).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
 import { rsvpPlan } from '../../../../../../services/BD/social/plans';
 import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';

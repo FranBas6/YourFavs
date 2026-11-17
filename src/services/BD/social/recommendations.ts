@@ -13,7 +13,7 @@
  *     abrir sin responder se le enseña como «Enviada» (privacidad de quien recibe).
  *   · Con un bloqueo en cualquier sentido, las recomendaciones entre esas dos personas no se pintan.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { getPeople } from './graph';
 import { saveFixed } from '../lists/fixedLists';
 import { addFollowedPerson } from '../people/yourfavsPeople';

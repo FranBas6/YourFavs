@@ -5,7 +5,7 @@
  * alguien ya actuó o respondió (se retira solo para los demás). Solo quien la envió.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, serverError, unauthorized } from '../../../../lib/social/http';
 import { withdrawRec } from '../../../../services/BD/social/recommendations';
 

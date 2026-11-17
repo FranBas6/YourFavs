@@ -5,7 +5,7 @@
  * y tus amigos sin conversación todavía («Empezaréis una conversación»).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, serverError, unauthorized } from '../../../../lib/social/http';
 import { sendTargets } from '../../../../services/BD/social/messages';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';

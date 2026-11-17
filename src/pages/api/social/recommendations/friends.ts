@@ -7,7 +7,7 @@
  * Para el selector de recomendar (handoff F4 §5.1). Solo amigos y sin bloqueos.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, serverError, unauthorized } from '../../../../lib/social/http';
 import { isRecTarget, pickerFriend, pickerFriends } from '../../../../services/BD/social/recommendations';
 

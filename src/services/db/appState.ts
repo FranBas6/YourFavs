@@ -9,7 +9,7 @@
  * la vez: `claim_app_state` es un UPDATE condicional (atómico por sí solo) que devuelve los
  * datos si te llevas el cerrojo y NULL si otra instancia lo tiene desde hace menos de `ttl`.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from './admin';
 
 export async function readAppState<T>(key: string): Promise<T | null> {
     const { data, error } = await supabaseAdmin().from('app_state').select('data').eq('key', key).maybeSingle();

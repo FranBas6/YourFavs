@@ -11,7 +11,7 @@
  * miraste". El diff solo tiene sentido con memoria del estado anterior; esa memoria
  * es esta fila.
  */
-import { readUserState, writeUserState } from '../shared/userState';
+import { readUserState, writeUserState } from '../../db/userState';
 
 export interface ProviderSnapEntry {
     name: string;                   // nombre del proveedor (p.ej. "Netflix")

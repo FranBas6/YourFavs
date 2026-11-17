@@ -10,7 +10,7 @@
  * Con el registro por email el handle viaja en los metadatos de la cuenta (`yf_ref`), porque el
  * enlace de confirmación puede abrirse en otro dispositivo, sin la cookie.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { findPublicProfileRow } from './publicProfile';
 import { follow, getPeople } from './graph';
 import type { PersonCard, Relation } from '../../../lib/social/types';

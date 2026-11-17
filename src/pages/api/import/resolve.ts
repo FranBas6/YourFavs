@@ -12,7 +12,7 @@
  */
 import type { APIRoute } from 'astro';
 import { resolveImdbIds, resolveByTitle, resolveTmdbIds } from '../../../services/API/shared/importResolve';
-import { db, getCurrentLanguage, requireAuthId } from '../../../services/BD/shared/userScope';
+import { db, getCurrentLanguage, requireAuthId } from '../../../services/db/userScope';
 import { json } from './_shared';
 
 export const prerender = false;

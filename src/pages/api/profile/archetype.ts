@@ -8,7 +8,7 @@
  * (mismo patrón que `api/home/hooks-refresh`): el visitante solo lee el resultado.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { getOwnPublicSettings, saveOwnArchetype } from '../../../services/BD/social/publicSettings';
 import { invalidatePublicProfileCache } from '../../../services/BD/social/publicProfile';
 

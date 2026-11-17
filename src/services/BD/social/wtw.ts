@@ -9,8 +9,8 @@
  *
  * Reglas y privacidad en `20261031090000_messages_wtw.sql`; aquí, el azar, el tiempo y TMDB.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
-import { getTitleSummaries, titleKey } from '../../API/shared/titleSummaries';
+import { supabaseAdmin } from '../../db/admin';
+import { getTitleSummaries, titleKey } from '../../tmdb/titleSummaries';
 import { toMessage } from './messages';
 import { resolveCards } from './chatCards';
 import type { ChatMessage, WtwCardRef } from '../../../lib/social/types';

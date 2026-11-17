@@ -1,9 +1,9 @@
 import { processBatch } from './processBatch';
-import { tmdbFetch } from '../services/API/shared/tmdbClient';
-import { getTitleDetails } from '../services/API/shared/tmdbTitleCache';
+import { tmdbFetch } from '../services/tmdb/tmdbClient';
+import { getTitleDetails } from '../services/tmdb/tmdbTitleCache';
 import { toTimestamp } from './constants/helpers/media-helpers';
 import { appDateParts } from './appTime';
-import { getCurrentUid } from '../services/BD/shared/userScope';
+import { getCurrentUid } from '../services/db/userScope';
 import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import {
     unionEpisodeWatches, watchLogInstant,

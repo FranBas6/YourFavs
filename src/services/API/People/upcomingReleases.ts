@@ -1,7 +1,7 @@
-import { tmdbFetch } from '../shared/tmdbClient';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { getAllFollowedPeople } from '../../BD/people/yourfavsPeople';
-import { getCurrentUid } from '../../BD/shared/userScope';
+import { getCurrentUid } from '../../db/userScope';
 
 /**
  * Estrenos futuros de las personas que sigues (handoff v2 §③).

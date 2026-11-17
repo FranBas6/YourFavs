@@ -19,7 +19,7 @@
  * caso necesita el grafo de Wikidata (P144 «basado en» / P179 «parte de la serie»), que queda
  * fuera de esta fase a propósito.
  */
-import { tmdbFetch } from './tmdbClient';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 
 export type MediaType = 'movie' | 'tv';
 

@@ -21,8 +21,8 @@
  * y se vuelve con `?auth=invite`: Google no deja saber antes si la cuenta es nueva.
  */
 import type { APIRoute } from 'astro';
-import { safeNext, setSessionFlag } from '../../lib/supabase/authHttp';
-import { supabaseAdmin } from '../../lib/supabase/admin';
+import { safeNext, setSessionFlag } from '../../services/db/authHttp';
+import { supabaseAdmin } from '../../services/db/admin';
 import { signupMode } from '../../lib/social/signupMode';
 import { REF_COOKIE, applyReferral, findInviter } from '../../services/BD/social/referral';
 

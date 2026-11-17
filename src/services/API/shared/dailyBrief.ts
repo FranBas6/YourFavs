@@ -11,13 +11,13 @@
  * pendientes×proveedores (lo único caro) se aísla en `getPendientesOnMyPlatforms`,
  * también cacheado por día, para que el Radar (②) lo reutilice sin recomputar.
  */
-import { tmdbFetch } from './tmdbClient';
-import { mapAndDeduplicateProviders } from './tmdbInfoService';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
+import { mapAndDeduplicateProviders } from '../../tmdb/tmdbInfoService';
 import { getNextEpisodesData, type NextEpisodeItem } from '../Series/nextEpisode';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getWatchLogOnDate } from '../../BD/lists/watchLog';
-import { getCurrentUid, getCurrentRegion } from '../../BD/shared/userScope';
-import { getCached, setCached } from '../../../utils/recsBlobCache';
+import { getCurrentUid, getCurrentRegion } from '../../db/userScope';
+import { getCached, setCached } from '../../cache/recsBlobCache';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts, APP_TZ } from '../../../utils/appTime';
 import { episodeTypeLabel } from '../../../utils/episodeType';

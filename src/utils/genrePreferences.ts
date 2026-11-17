@@ -1,6 +1,6 @@
-import { getTitleDetails } from '../services/API/shared/tmdbTitleCache';
-import { getCached, setCached, invalidateCached } from './recsBlobCache';
-import { getCurrentUid } from '../services/BD/shared/userScope';
+import { getTitleDetails } from '../services/tmdb/tmdbTitleCache';
+import { getCached, setCached, invalidateCached } from '../services/cache/recsBlobCache';
+import { getCurrentUid } from '../services/db/userScope';
 import { getLibrarySnapshot } from '../services/BD/shared/librarySnapshot';
 import { getUserTaste } from '../services/BD/profile/userTaste';
 import { getCustomLists, getListItems } from '../services/BD/lists/customLists';

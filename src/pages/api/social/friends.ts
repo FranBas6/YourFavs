@@ -5,7 +5,7 @@
  * `POST /api/social/friends/restore` (el toast «Deshacer» de 6 s).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, readUserId, serverError, tooMany, unauthorized } from '../../../lib/social/http';
 import { allowSocialWrite, getRelation, unfriend } from '../../../services/BD/social/graph';
 

@@ -5,7 +5,7 @@
  * sobre el ajuste global del perfil: si hay override, se usa; si no, se sigue el global.
  * Una fila por serie, igual que `notification_subs`/`media_tags`.
  */
-import { db, getAuthId, requireAuthId } from './userScope';
+import { db, getAuthId, requireAuthId } from '../../db/userScope';
 
 /** Override de la serie: `true`/`false` explícito, o `null` = seguir el global del perfil. */
 export async function getSpoilerPref(serieId: string | number): Promise<boolean | null> {

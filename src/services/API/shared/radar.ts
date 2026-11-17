@@ -15,8 +15,8 @@ import { fetchSerieDetails } from '../Series/tmdbSeries';
 import { getSeriesSiguiendo } from '../../BD/series/yourfavsSerie';
 import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
 import { getPendientesOnMyPlatforms } from './dailyBrief';
-import { getCurrentUid } from '../../BD/shared/userScope';
-import { getCached, setCached } from '../../../utils/recsBlobCache';
+import { getCurrentUid } from '../../db/userScope';
+import { getCached, setCached } from '../../cache/recsBlobCache';
 import { processBatch } from '../../../utils/processBatch';
 import { appDateParts } from '../../../utils/appTime';
 

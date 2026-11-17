@@ -8,9 +8,9 @@
  *
  * Caché L1 de 2 minutos por usuario: la portada se recarga a menudo y esto no cambia tan deprisa.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import type { PersonCard } from '../../../lib/social/types';
-import { getTitleSummaries, titleKey, type TitleRef } from '../../API/shared/titleSummaries';
+import { getTitleSummaries, titleKey, type TitleRef } from '../../tmdb/titleSummaries';
 import { getPeople } from './graph';
 
 export interface ActivityWho {

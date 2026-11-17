@@ -1,4 +1,4 @@
-import { db, fetchAll, getAuthId, requireAuthId } from "../shared/userScope";
+import { db, fetchAll, getAuthId, requireAuthId } from "../../db/userScope";
 import {
     titleMembership, listCollection, addToCollections, removeFromCollections, clearCollection,
     patchTitle, setPosition, shiftPositions, renumberPositions,

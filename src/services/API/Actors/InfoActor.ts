@@ -1,7 +1,7 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
 import { type Movie } from "../../../types/ApiMovie.ts";
-import { tmdbFetch, originalUrl } from '../shared/tmdbClient';
-import { getCurrentLanguage } from "../../BD/shared/userScope";
+import { tmdbFetch, originalUrl } from '../../tmdb/tmdbClient';
+import { getCurrentLanguage } from "../../db/userScope";
 
 const sortByPopularityAndRating = (a: any, b: any) => {
     const popDiff = b.popularity - a.popularity;

@@ -14,9 +14,9 @@
  *     Plan» y el enlace al chat. Sin la nota ni los nombres, por si la dirección se comparte.
  */
 import { getCalendarData, hideEpisodeTitlesFor, type CalendarData } from './calendarService';
-import { runWithUser, setRequestPrefs } from '../../BD/shared/userScope';
-import type { SupabaseServer } from '../../../lib/supabase/server';
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { runWithUser, setRequestPrefs } from '../../db/userScope';
+import type { SupabaseServer } from '../../db/server';
+import { supabaseAdmin } from '../../db/admin';
 import { resolveSpoilerSettings, type UserProfile } from '../../BD/profile/userProfile';
 import { myPlans, type MyPlan } from '../../BD/social/plans';
 import { appDateParts } from '../../../utils/appTime';

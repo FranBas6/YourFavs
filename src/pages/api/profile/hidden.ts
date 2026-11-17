@@ -7,7 +7,7 @@
  * Los dos son idempotentes: ocultar dos veces o mostrar algo que no estaba oculto no falla.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import {
     PublicSettingsError, getOwnPublicSettings, hideOwnTitle, unhideOwnTitle,
 } from '../../../services/BD/social/publicSettings';

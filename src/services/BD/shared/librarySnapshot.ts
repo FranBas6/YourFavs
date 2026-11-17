@@ -1,4 +1,4 @@
-import { getCurrentUid } from './userScope';
+import { getCurrentUid } from '../../db/userScope';
 import {
     getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
 } from '../movies/yourfavsMovie';

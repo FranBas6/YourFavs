@@ -1,5 +1,5 @@
 import { tmdbFetch, type MediaType } from './tmdbClient';
-import { getCurrentLanguage } from '../../BD/shared/userScope';
+import { getCurrentLanguage } from '../db/userScope';
 
 /** Idioma del perfil en ISO-639-1 (`es-ES` → `es`). */
 const primaryLang = () => getCurrentLanguage().slice(0, 2);

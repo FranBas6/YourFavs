@@ -11,7 +11,7 @@
  * de no leídas) y el generador diario ya está guardado por día.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { syncNotifications } from '../../../services/API/notifications/generator';
 import { unreadCount } from '../../../services/BD/notifications/notifications';
 import { pendingReceivedCount } from '../../../services/BD/social/graph';

@@ -6,7 +6,7 @@
  * ruleta es inline y no comparte módulos con el resto de la capa social.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { avatarHtml } from '../../../lib/social/ui';
 import { rouletteFriends } from '../../../services/BD/social/inCommon';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';

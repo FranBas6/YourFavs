@@ -15,7 +15,7 @@
  * Me gusta y Favoritos (Letterboxd, D3b) siguen el modelo de dos capas: implican Vistas, se excluyen
  * entre sí y Favoritos está por encima (nunca se baja de Favoritos a Me gusta).
  */
-import { db, fetchAll, requireAuthId } from '../shared/userScope';
+import { db, fetchAll, requireAuthId } from '../../db/userScope';
 
 export type ImportSource = 'imdb' | 'letterboxd' | 'tmdb' | 'trakt';
 

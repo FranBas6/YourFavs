@@ -4,7 +4,7 @@
  * Dar permisos de administración a otra persona del grupo (solo admins). Puede haber varias.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, tooMany, unauthorized } from '../../../../../../../lib/social/http';
 import { makeAdmin } from '../../../../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../../../../services/BD/social/graph';

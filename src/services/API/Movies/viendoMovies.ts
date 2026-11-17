@@ -7,7 +7,7 @@
  * primero. Sin sesión → [].
  */
 import { getMoviesViendo } from '../../BD/movies/yourfavsMovie';
-import { tmdbFetch } from '../shared/tmdbClient';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 import { toTimestamp } from '../../../utils/constants/helpers/media-helpers';
 

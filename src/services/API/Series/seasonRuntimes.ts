@@ -7,7 +7,7 @@
  * en bloque de 20+ temporadas), se piden como mucho `max` y el resto lo estima quien llama con la
  * duración media de la serie.
  */
-import { tmdbFetch } from '../shared/tmdbClient';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 
 const TTL_MS = 24 * 60 * 60 * 1000;

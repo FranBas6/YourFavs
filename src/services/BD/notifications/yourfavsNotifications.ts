@@ -1,4 +1,4 @@
-import { db, fetchAll, getAuthId, requireAuthId } from "../shared/userScope";
+import { db, fetchAll, getAuthId, requireAuthId } from "../../db/userScope";
 
 // Tabla `notification_subs` (antes users/{uid}/NotificationSubs/{type}_{id}). Hacia fuera, la
 // forma de siempre: id "movie_12345" y tmdb_id en texto.

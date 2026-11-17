@@ -1,4 +1,4 @@
-import { tmdbFetch, tmdbFetchList } from '../shared/tmdbClient';
+import { tmdbFetch, tmdbFetchList } from '../../tmdb/tmdbClient';
 
 export interface Actor {
     id: number;

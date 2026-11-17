@@ -5,7 +5,7 @@
  * crea el trigger `on_auth_user_created`. Hacia fuera se mantiene la forma de siempre en
  * camelCase (`platformsFilterDefault`, `notifPrefs`…); las columnas van en snake_case.
  */
-import { db, getAuthId, requireAuthId } from '../shared/userScope';
+import { db, getAuthId, requireAuthId } from '../../db/userScope';
 
 /**
  * Modo sin spoilers, desglosado.

@@ -8,7 +8,7 @@
  * «Solicitud enviada»: el rechazo es silencioso (handoff social §5.2).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, readUserId, serverError, tooMany, unauthorized } from '../../../lib/social/http';
 import { allowSocialWrite, cancelRequest, getRelation, sendRequest } from '../../../services/BD/social/graph';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';

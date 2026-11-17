@@ -1,4 +1,4 @@
-import { db, fetchAll, getAuthId } from "../shared/userScope";
+import { db, fetchAll, getAuthId } from "../../db/userScope";
 
 /**
  * 4.2 · Tabla ligera de valoraciones: `ratings` (clave usuario + media_type + tmdb_id).

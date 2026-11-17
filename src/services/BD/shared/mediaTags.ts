@@ -1,4 +1,4 @@
-import { db, fetchAll, getAuthId, requireAuthId } from './userScope';
+import { db, fetchAll, getAuthId, requireAuthId } from '../../db/userScope';
 
 // Tabla `media_tags` (antes users/{uid}/MediaTags/{type}_{id}). Hacia fuera se devuelve la
 // forma de documento de siempre: `id` = "movie_550" y `tmdb_id` en texto.

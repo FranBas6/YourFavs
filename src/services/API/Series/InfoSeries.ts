@@ -1,6 +1,6 @@
 import { type Serie } from "../../../types/ApiSerie.ts";
-import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
-import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
+import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../../tmdb/tmdbClient';
+import { getCurrentLanguage, getCurrentRegion } from "../../db/userScope";
 import { getGenreName } from "../../../utils/constants/genres";
 import {
     mapAndDeduplicateProviders,
@@ -14,7 +14,7 @@ import {
     pickBestTrailerKey,
     pickTitleLogo,
     videoLanguages,
-} from '../shared/tmdbInfoService';
+} from '../../tmdb/tmdbInfoService';
 
 // --- Funciones únicas de series ---
 

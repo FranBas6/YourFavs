@@ -9,7 +9,7 @@
  * público no enseña a quién sigues ni quién te sigue (handoff §14, duda 3).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, serverError, unauthorized } from '../../../lib/social/http';
 import { listTab } from '../../../services/BD/social/graph';
 import { listReceived, listSent } from '../../../services/BD/social/recommendations';

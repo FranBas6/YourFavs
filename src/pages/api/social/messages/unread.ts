@@ -6,7 +6,7 @@
  * ligero para el sondeo de 30 s en las páginas de mensajes.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { unreadTotal } from '../../../../services/BD/social/messages';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 

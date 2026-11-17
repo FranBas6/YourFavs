@@ -6,7 +6,7 @@
  * estás en 20) y `rate` (200 conversaciones nuevas al día).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, isUuid, serverError, tooMany, unauthorized } from '../../../../lib/social/http';
 import { createGroup } from '../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../services/BD/social/graph';

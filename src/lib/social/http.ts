@@ -2,7 +2,7 @@
  * Ayudas de los endpoints `api/social/*`: todos piden sesión, reciben `{ userId }` y responden
  * `{ ok, relation?, error? }` sin caché (handoff §9).
  */
-import { jsonNoStore } from '../http';
+import { jsonNoStore } from '../../services/http/http';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

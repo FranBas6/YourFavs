@@ -5,7 +5,7 @@
  * nueva» la cambia y la anterior deja de funcionar al momento. Las reglas viven en
  * `20261103090000_ics_tokens.sql`. Solo se le enseña a su dueño.
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 
 const db = () => supabaseAdmin();
 

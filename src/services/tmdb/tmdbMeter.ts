@@ -12,7 +12,7 @@
  * los componentes hacen sus propias llamadas mientras se envía la página.
  * En producción el middleware ni lo instala: `import.meta.env.DEV` es `false` y Vite lo elimina.
  */
-import { recordTmdbCall } from '../../services/BD/shared/userScope';
+import { recordTmdbCall } from '../db/userScope';
 
 let installed = false;
 

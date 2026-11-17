@@ -5,7 +5,7 @@
  * persona admin, el cargo pasa a quien lleva más tiempo; si no queda nadie, el grupo se borra.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, tooMany, unauthorized } from '../../../../../../../lib/social/http';
 import { removeMember } from '../../../../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../../../../services/BD/social/graph';

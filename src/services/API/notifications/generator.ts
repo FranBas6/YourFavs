@@ -20,8 +20,8 @@
 import { getRadar } from '../shared/radar';
 import { anniversarySignal, getLibraryOnMyPlatforms, type LibraryOrigin } from '../shared/dailyBrief';
 import { upsertMany, type NotifInput, type NotifType } from '../../BD/notifications/notifications';
-import { getCurrentUid } from '../../BD/shared/userScope';
-import { readUserState, writeUserState } from '../../BD/shared/userState';
+import { getCurrentUid } from '../../db/userScope';
+import { readUserState, writeUserState } from '../../db/userState';
 import { getUserProfile } from '../../BD/profile/userProfile';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getWatchStreak } from '../../BD/series/yourfavsSerie';

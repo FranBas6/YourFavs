@@ -1,4 +1,4 @@
-import { tmdbFetchList, type MediaType } from './tmdbClient';
+import { tmdbFetchList, type MediaType } from '../../tmdb/tmdbClient';
 
 // Proveedores de streaming (IDs de TMDB)
 export const PROVIDERS = {

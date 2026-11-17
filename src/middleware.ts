@@ -10,10 +10,10 @@
  * un POST a /api/auth/session en cada página.
  */
 import { defineMiddleware } from 'astro:middleware';
-import { createSupabaseServerClient } from './lib/supabase/server';
-import { SESSION_FLAG, clearSessionFlag, setSessionFlag } from './lib/supabase/authHttp';
-import { runWithUser, setRequestPrefs, startTmdbMeter } from './services/BD/shared/userScope';
-import { installTmdbMeter, withTmdbReport } from './lib/dev/tmdbMeter';
+import { createSupabaseServerClient } from './services/db/server';
+import { SESSION_FLAG, clearSessionFlag, setSessionFlag } from './services/db/authHttp';
+import { runWithUser, setRequestPrefs, startTmdbMeter } from './services/db/userScope';
+import { installTmdbMeter, withTmdbReport } from './services/tmdb/tmdbMeter';
 import { getUserProfile, resolveSpoilerSettings } from './services/BD/profile/userProfile';
 import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from './utils/catalogUrl';
 

@@ -15,9 +15,9 @@
  * usarlo cuando el de la temporada falte. Sin caché propia: los datos de
  * TMDB se muestran como TMDB los da (regla de Fran, C4), igual que la ficha de episodio.
  */
-import { tmdbFetch } from '../shared/tmdbClient';
-import { buildProviderLinksByCountry, buildProvidersByCountry } from '../shared/tmdbInfoService';
-import { getCurrentLanguage } from '../../BD/shared/userScope';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
+import { buildProviderLinksByCountry, buildProvidersByCountry } from '../../tmdb/tmdbInfoService';
+import { getCurrentLanguage } from '../../db/userScope';
 
 /** Una temporada de la serie, lo justo para la navegación. */
 export interface SeasonRef {

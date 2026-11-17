@@ -1,9 +1,9 @@
-import { tmdbFetch, tmdbFetchList, posterUrl } from '../shared/tmdbClient';
+import { tmdbFetch, tmdbFetchList, posterUrl } from '../../tmdb/tmdbClient';
 import { getSeriesSiguiendo } from '../../BD/series/yourfavsSerie';
 import { getAllNotificationSubs } from '../../BD/notifications/yourfavsNotifications';
 import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
 import { fetchSerieDetails } from '../Series/tmdbSeries';
-import { getCurrentRegion } from '../../BD/shared/userScope';
+import { getCurrentRegion } from '../../db/userScope';
 import { processBatch } from '../../../utils/processBatch';
 import { episodeTypeLabel } from '../../../utils/episodeType';
 import { episodeHref, seasonHref } from '../../../utils/episodeView';

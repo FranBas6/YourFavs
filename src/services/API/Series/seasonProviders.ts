@@ -8,7 +8,7 @@
  * los catálogos cambian de mes en mes, no de minuto en minuto.
  */
 import { getSeasonWatchProviders } from './InfoSeries';
-import { getCached, setCached } from '../../../utils/recsBlobCache';
+import { getCached, setCached } from '../../cache/recsBlobCache';
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 

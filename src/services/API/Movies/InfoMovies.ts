@@ -1,6 +1,6 @@
 import { type Movie } from "../../../types/ApiMovie.ts";
-import { getCurrentLanguage, getCurrentRegion } from "../../BD/shared/userScope";
-import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../shared/tmdbClient';
+import { getCurrentLanguage, getCurrentRegion } from "../../db/userScope";
+import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../../tmdb/tmdbClient';
 import {
     mapAndDeduplicateProviders,
     buildProvidersByCountry,
@@ -13,7 +13,7 @@ import {
     pickBestTrailerKey,
     pickTitleLogo,
     videoLanguages,
-} from '../shared/tmdbInfoService';
+} from '../../tmdb/tmdbInfoService';
 
 // --- Funciones únicas de películas ---
 

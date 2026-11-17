@@ -6,7 +6,7 @@
  */
 import type { APIRoute } from 'astro';
 import { ACCOUNT_KINDS, fetchAccountPage, type AccountKind } from '../../../../services/API/shared/tmdbAccount';
-import { db, getCurrentLanguage, requireAuthId } from '../../../../services/BD/shared/userScope';
+import { db, getCurrentLanguage, requireAuthId } from '../../../../services/db/userScope';
 import { json } from '../_shared';
 import { getAccess } from './_session';
 

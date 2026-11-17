@@ -10,7 +10,7 @@
  * Postgres lo vuelve a comprobar en cada consulta.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { SupabaseServer } from '../../../lib/supabase/server';
+import type { SupabaseServer } from './server';
 
 interface RequestContext {
     uid: string | null;
@@ -20,7 +20,7 @@ interface RequestContext {
     db: SupabaseServer | null;
     /** Id de Supabase Auth del usuario (dueño de las filas en Postgres). */
     authId: string | null;
-    /** Solo en `astro dev`: llamadas a TMDB de esta petición (C0, `lib/dev/tmdbMeter.ts`). */
+    /** Solo en `astro dev`: llamadas a TMDB de esta petición (C0, `services/tmdb/tmdbMeter.ts`). */
     tmdbCalls?: string[];
 }
 

@@ -16,8 +16,8 @@
  * la nota de la serie, los géneros, el póster, el fotograma y la duración del piloto, TODA la primera
  * temporada y los proveedores por región. Verificado.
  */
-import { claimAppState, readAppState, releaseAppState, writeAppState } from './appState';
-import { tmdbFetch } from './tmdbClient';
+import { claimAppState, readAppState, releaseAppState, writeAppState } from '../../db/appState';
+import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { processBatch } from '../../../utils/processBatch';
 
 /** Página de `/discover/tv` que se procesa en cada recarga incremental. */

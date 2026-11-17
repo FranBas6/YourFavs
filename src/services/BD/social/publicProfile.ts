@@ -18,11 +18,11 @@
  * o la visibilidad se vacía la entrada de esta instancia; en otras instancias y en el CDN puede
  * tardar hasta unos minutos en verse (asumido en docs/PLAN_SOCIAL.md).
  */
-import { supabaseAdmin } from '../../../lib/supabase/admin';
+import { supabaseAdmin } from '../../db/admin';
 import { normalizeHandle, handleShapeProblem } from './handles';
 import { sanitizeFour, type PublicPick, type PublicArchetype, type PublicVisibility } from './publicSettings';
 import { resolvePublicSections, type PublicSectionPref } from '../../../utils/constants/publicSections';
-import { getTitleSummaries, titleKey, type TitleRef } from '../../API/shared/titleSummaries';
+import { getTitleSummaries, titleKey, type TitleRef } from '../../tmdb/titleSummaries';
 import { getRelation, isBlockedBy } from './graph';
 import { inCommon, type CommonView } from './inCommon';
 import type { Relation } from '../../../lib/social/types';

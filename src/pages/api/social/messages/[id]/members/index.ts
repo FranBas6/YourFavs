@@ -6,7 +6,7 @@
  * `not_friends` (403), `full` (409), `none` (404).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, tooMany, unauthorized } from '../../../../../../lib/social/http';
 import { addMembers } from '../../../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../../../services/BD/social/graph';

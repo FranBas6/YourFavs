@@ -12,9 +12,9 @@
  */
 import type { APIRoute } from 'astro';
 import { setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from '../../../services/BD/profile/userProfile';
-import { sanitizePlatformIds } from '../../../services/API/shared/watchProviders';
+import { sanitizePlatformIds } from '../../../services/tmdb/watchProviders';
 import { CONTENT_LANGUAGE_CODES } from '../../../utils/constants/languages';
-import { SUPPORTED_COUNTRIES } from '../../../services/API/shared/tmdbInfoService';
+import { SUPPORTED_COUNTRIES } from '../../../services/tmdb/tmdbInfoService';
 
 export const prerender = false;
 

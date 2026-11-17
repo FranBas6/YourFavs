@@ -13,7 +13,7 @@
  * congelan aquí: la página del diario (L6) los resuelve por TMDB (como el resto de
  * páginas personales), así los handlers pueden registrar sin datos extra.
  */
-import { db, fetchAll, getAuthId, requireAuthId } from '../shared/userScope';
+import { db, fetchAll, getAuthId, requireAuthId } from '../../db/userScope';
 import type { WatchLogRow } from '../shared/episodeWatches';
 
 const COLUMNS = 'id, media_type, tmdb_id, season, episode, watched_on, rewatch, note, logged_at, source';

@@ -6,7 +6,7 @@
  * `/admin/reportes`; quien escribió el mensaje no sabe quién lo reportó.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../../services/http/http';
 import { badRequest, posInt, serverError, tooMany, unauthorized } from '../../../../../../../lib/social/http';
 import { isReportReason, reportMessage } from '../../../../../../../services/BD/social/messages';
 import { allowSocialWrite } from '../../../../../../../services/BD/social/graph';
