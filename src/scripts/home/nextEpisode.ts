@@ -1,5 +1,5 @@
 /**
- * «Estás viendo» / «Continuar viendo» (`components/Sections/NextEpisode.astro`) sin recargar.
+ * «Estás viendo» / «Continuar viendo» (`components/home/NextEpisode.astro`) sin recargar.
  *
  *   · Flechas ‹ ›: desplazan 4 tarjetas; se desactivan en los extremos.
  *   · «Marcar visto»: `POST /api/episodes/watched` y `GET /api/series/{id}/next-episode`. La tarjeta
