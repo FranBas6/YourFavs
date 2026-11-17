@@ -25,7 +25,7 @@
  */
 import type { APIRoute } from 'astro';
 import { json, mapAuthError, safeNext, setSessionFlag } from '../../../services/db/authHttp';
-import { signupMode } from '../../../lib/social/signupMode';
+import { signupMode } from '../../../services/social/signupMode';
 import { REF_COOKIE, applyReferral, findInviter } from '../../../services/social/referral';
 
 export const prerender = false;

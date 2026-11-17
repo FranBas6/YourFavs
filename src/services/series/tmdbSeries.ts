@@ -95,4 +95,4 @@ export const getSeriesByTitle = async ({ title, page }: { title: string; page?: 
     searchByTitle<Serie>('tv', title, page);
 
 // Los envoltorios por plataforma (getNetflixSeries, getHBOMaxSeries…) se retiraron: solo los usaba
-// `utils/constants/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.
+// `services/catalog/platforms.ts`, que ahora llama a `fetchByProvider` con el provider_id y la región.

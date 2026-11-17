@@ -31,7 +31,7 @@ async function unlogEpisode(serieId: string, season: number, episode: number): P
 async function bustRecs(): Promise<void> {
     try {
         const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-            import('../../utils/genrePreferences'), import('../../utils/personalRecommendations'),
+            import('../recs/genrePreferences'), import('../recs/personalRecommendations'),
         ]);
         invalidateGenrePreferencesCache();
         invalidatePersonalRecsCache();
@@ -40,7 +40,7 @@ async function bustRecs(): Promise<void> {
 
 async function bustYearStats(): Promise<void> {
     try {
-        const { invalidateYearStatsCache } = await import('../../utils/yearStats');
+        const { invalidateYearStatsCache } = await import('../stats/yearStats');
         invalidateYearStatsCache();
     } catch { /* la caché caduca sola */ }
 }
@@ -215,19 +215,19 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
     if (action === 'add' || action === 'remove') {
         try {
-            const { invalidateYearStatsCache } = await import('../../utils/yearStats');
+            const { invalidateYearStatsCache } = await import('../stats/yearStats');
             invalidateYearStatsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateGenrePreferencesCache } = await import('../../utils/genrePreferences');
+            const { invalidateGenrePreferencesCache } = await import('../recs/genrePreferences');
             invalidateGenrePreferencesCache();
         } catch { /* ignore */ }
         try {
-            const { invalidatePersonalRecsCache } = await import('../../utils/personalRecommendations');
+            const { invalidatePersonalRecsCache } = await import('../recs/personalRecommendations');
             invalidatePersonalRecsCache();
         } catch { /* ignore */ }
         try {
-            const { invalidateTopActorsCache } = await import('../../utils/topActorsLibrary');
+            const { invalidateTopActorsCache } = await import('../stats/topActorsLibrary');
             invalidateTopActorsCache();
         } catch { /* ignore */ }
         try {

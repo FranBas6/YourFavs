@@ -7,7 +7,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../../services/http/http';
-import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
+import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../services/social/http';
 import { wtwSend } from '../../../../../../services/social/wtw';
 import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
 

@@ -8,7 +8,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../services/http/http';
-import { badRequest, serverError, unauthorized } from '../../../../lib/social/http';
+import { badRequest, serverError, unauthorized } from '../../../../services/social/http';
 import { isRecTarget, pickerFriend, pickerFriends } from '../../../../services/social/recommendations';
 
 export const prerender = false;

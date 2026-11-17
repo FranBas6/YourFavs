@@ -7,7 +7,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../../services/http/http';
-import { badRequest, posInt, serverError, unauthorized } from '../../../../../lib/social/http';
+import { badRequest, posInt, serverError, unauthorized } from '../../../../../services/social/http';
 import { planViews } from '../../../../../services/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../../utils/constants/social';
 

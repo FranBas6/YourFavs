@@ -21,8 +21,8 @@ export const POST: APIRoute = async ({ locals }) => {
         await clearUserTaste();
         try {
             const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../../utils/genrePreferences'),
-                import('../../../utils/personalRecommendations'),
+                import('../../../services/recs/genrePreferences'),
+                import('../../../services/recs/personalRecommendations'),
             ]);
             invalidateGenrePreferencesCache();
             invalidatePersonalRecsCache();

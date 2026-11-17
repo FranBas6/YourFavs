@@ -23,7 +23,7 @@
 import type { APIRoute } from 'astro';
 import { safeNext, setSessionFlag } from '../../services/db/authHttp';
 import { supabaseAdmin } from '../../services/db/admin';
-import { signupMode } from '../../lib/social/signupMode';
+import { signupMode } from '../../services/social/signupMode';
 import { REF_COOKIE, applyReferral, findInviter } from '../../services/social/referral';
 
 export const prerender = false;

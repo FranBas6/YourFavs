@@ -200,10 +200,10 @@ async function invalidateLibraryCaches(): Promise<void> {
     // falla, esa caché caduca sola.
     await Promise.allSettled([
         import('../titles/collectionsDiscovery').then((m) => m.invalidateUserCollectionsCache()),
-        import('../../utils/yearStats').then((m) => m.invalidateYearStatsCache()),
-        import('../../utils/genrePreferences').then((m) => m.invalidateGenrePreferencesCache()),
-        import('../../utils/personalRecommendations').then((m) => m.invalidatePersonalRecsCache()),
-        import('../../utils/topActorsLibrary').then((m) => m.invalidateTopActorsCache()),
+        import('../stats/yearStats').then((m) => m.invalidateYearStatsCache()),
+        import('../recs/genrePreferences').then((m) => m.invalidateGenrePreferencesCache()),
+        import('../recs/personalRecommendations').then((m) => m.invalidatePersonalRecsCache()),
+        import('../stats/topActorsLibrary').then((m) => m.invalidateTopActorsCache()),
         import('../library/personalIndex').then((m) => m.invalidatePersonalIndexCache()),
         import('../library/librarySnapshot').then((m) => m.invalidateLibrarySnapshot()),
         import('../library/activityFeed').then((m) => m.invalidateActivityFeed()),

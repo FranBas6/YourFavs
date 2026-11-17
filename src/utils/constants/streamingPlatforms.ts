@@ -6,7 +6,7 @@
 export interface StreamingPlatform {
     id: number;
     label: string;
-    /** Mismo slug que `utils/constants/platforms.ts` → `/logos/plataformas/{slug}.svg`. */
+    /** Mismo slug que `services/catalog/platforms.ts` → `/logos/plataformas/{slug}.svg`. */
     slug: string;
 }
 

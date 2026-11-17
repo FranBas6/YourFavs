@@ -22,7 +22,7 @@ import { isoWeekKey } from '../../utils/appTime';
 import {
     normalizeRankingPlatforms, rankingDocId, withMovement,
     type RankedEntry, type RankingItem,
-} from '../../utils/rankingCore';
+} from './rankingCore';
 
 export { rankingDocId, withMovement };
 export type { RankedEntry, RankingItem };

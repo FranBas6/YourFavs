@@ -1,7 +1,7 @@
-import { processBatch } from './processBatch';
-import { tmdbFetch } from '../services/tmdb/tmdbClient';
-import { getLibrarySnapshot } from '../services/library/librarySnapshot';
-import { getCurrentUid } from '../services/db/userScope';
+import { processBatch } from '../../utils/processBatch';
+import { tmdbFetch } from '../tmdb/tmdbClient';
+import { getLibrarySnapshot } from '../library/librarySnapshot';
+import { getCurrentUid } from '../db/userScope';
 
 const TTL_MS = 60 * 60 * 1000;
 const MAX_CAST_ORDER = 10;

@@ -6,7 +6,7 @@
  */
 import type { APIRoute } from 'astro';
 import { jsonNoStore } from '../../../../services/http/http';
-import { badRequest, serverError, unauthorized } from '../../../../lib/social/http';
+import { badRequest, serverError, unauthorized } from '../../../../services/social/http';
 import { withdrawRec } from '../../../../services/social/recommendations';
 
 export const prerender = false;

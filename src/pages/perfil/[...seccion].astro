@@ -73,8 +73,8 @@ if (Astro.request.method === 'POST') {
         // Los gustos alimentan el motor de recomendaciones → invalidar sus cachés.
         try {
             const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../utils/genrePreferences'),
-                import('../../utils/personalRecommendations'),
+                import('../../services/recs/genrePreferences'),
+                import('../../services/recs/personalRecommendations'),
             ]);
             invalidateGenrePreferencesCache();
             invalidatePersonalRecsCache();

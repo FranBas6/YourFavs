@@ -74,8 +74,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
         // que "Para ti" refleje los cambios ya en la siguiente carga.
         try {
             const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../../utils/genrePreferences'),
-                import('../../../utils/personalRecommendations'),
+                import('../../../services/recs/genrePreferences'),
+                import('../../../services/recs/personalRecommendations'),
             ]);
             invalidateGenrePreferencesCache();
             invalidatePersonalRecsCache();

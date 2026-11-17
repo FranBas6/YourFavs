@@ -25,9 +25,9 @@ export const POST: APIRoute = async ({ locals, url }) => {
         if (!force && Date.now() - computedAt < STALE_MS) return jsonNoStore({ ok: true, fresh: true });
 
         const [{ calculateLifetimeStats }, { getMaxWatchStreak }, { deriveArchetype }] = await Promise.all([
-            import('../../../utils/yearStats'),
+            import('../../../services/stats/yearStats'),
             import('../../../services/series/yourfavsSerie'),
-            import('../../../utils/cinemaIdentity'),
+            import('../../../services/stats/cinemaIdentity'),
         ]);
         const [stats, streak] = await Promise.all([calculateLifetimeStats(), getMaxWatchStreak()]);
         const a = deriveArchetype(stats, streak.max);
