@@ -199,7 +199,7 @@ async function invalidateLibraryCaches(): Promise<void> {
     // Rutas fijas (Vite solo empaqueta los `import()` que puede leer) y cada una por su lado: si una
     // falla, esa caché caduca sola.
     await Promise.allSettled([
-        import('../../API/shared/collectionsDiscovery').then((m) => m.invalidateUserCollectionsCache()),
+        import('../../titles/collectionsDiscovery').then((m) => m.invalidateUserCollectionsCache()),
         import('../../../utils/yearStats').then((m) => m.invalidateYearStatsCache()),
         import('../../../utils/genrePreferences').then((m) => m.invalidateGenrePreferencesCache()),
         import('../../../utils/personalRecommendations').then((m) => m.invalidatePersonalRecsCache()),

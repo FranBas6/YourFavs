@@ -253,7 +253,7 @@ async function fetchRatingEvents(): Promise<ActivityEvent[]> {
 // FollowedPeople guarda name/profile_path/added_at → sin fetch extra a TMDB.
 async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
     try {
-        const { getAllFollowedPeople } = await import('../people/yourfavsPeople');
+        const { getAllFollowedPeople } = await import('../../people/yourfavsPeople');
         const people = await getAllFollowedPeople();
         return people
             .map((p): ActivityEvent => ({
@@ -276,7 +276,7 @@ async function fetchFollowPersonEvents(): Promise<ActivityEvent[]> {
 // ActorsFavs solo guarda { id, added_at, position } → resolvemos nombre/foto por TMDB.
 async function fetchActorFavEvents(): Promise<ActivityEvent[]> {
     try {
-        const { getActorsFav } = await import('../actors/yourfavsActor');
+        const { getActorsFav } = await import('../../people/yourfavsActor');
         const favs = await getActorsFav();
         if (!favs.length) return [];
         const { tmdbFetch } = await import('../../tmdb/tmdbClient');
@@ -374,7 +374,7 @@ export async function fetchAllActivityEvents(): Promise<ActivityEvent[]> {
     if (cachedFeed && cachedFeed.expires > Date.now()) return cachedFeed.data;
     // WatchLog se lee UNA sola vez y se comparte entre episodios vistos y re-visionados
     // (antes se escaneaba dos veces → doble de lecturas en la colección más grande).
-    const { getAllWatchedProgress } = await import('../series/yourfavsSerie');
+    const { getAllWatchedProgress } = await import('../../series/yourfavsSerie');
     const { getAllWatchLog } = await import('../lists/watchLog');
     const [snapshot, logRows, live] = await Promise.all([
         getLibrarySnapshot(),          // las listas (cacheado)

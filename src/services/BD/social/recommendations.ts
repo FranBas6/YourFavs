@@ -16,7 +16,7 @@
 import { supabaseAdmin } from '../../db/admin';
 import { getPeople } from './graph';
 import { saveFixed } from '../lists/fixedLists';
-import { addFollowedPerson } from '../people/yourfavsPeople';
+import { addFollowedPerson } from '../../people/yourfavsPeople';
 import type {
     PersonCard, QuickKey, RecReceived, RecReply, RecSent, RecShown, RecStatus, RecTarget, RecView,
 } from '../../../lib/social/types';

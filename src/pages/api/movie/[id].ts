@@ -20,7 +20,7 @@ import {
     getMovieCollectionInfo,
     getMovieRecommendationsOrSimilar,
     type MovieBundle,
-} from '../../../services/API/Movies/InfoMovies';
+} from '../../../services/movies/InfoMovies';
 import { safeFetch } from '../../../utils/safeFetch';
 
 export const prerender = false;

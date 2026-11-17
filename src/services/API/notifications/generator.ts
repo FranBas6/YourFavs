@@ -24,11 +24,11 @@ import { getCurrentUid } from '../../db/userScope';
 import { readUserState, writeUserState } from '../../db/userState';
 import { getUserProfile } from '../../BD/profile/userProfile';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
-import { getWatchStreak } from '../../BD/series/yourfavsSerie';
+import { getWatchStreak } from '../../series/yourfavsSerie';
 import { readProviderState, writeProviderState, type ProviderSnapEntry } from '../../BD/notifications/providerState';
 import { appDateParts } from '../../../utils/appTime';
 import { seriesSignals, subscribedMovieSignals, watchlistMovieSignals } from './titleSignals';
-import { getUpcomingFromFollowedPeople } from '../People/upcomingReleases';
+import { getUpcomingFromFollowedPeople } from '../../people/upcomingReleases';
 
 // type de notificación → clave del toggle en el perfil (UserProfile.notifPrefs)
 const TYPE_TO_PREF: Record<NotifType, string> = {

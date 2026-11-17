@@ -6,7 +6,7 @@
  * `handleSerieFavAction`. Body JSON: { id, actionType, action }. Invitado → 401.
  */
 import type { APIRoute } from 'astro';
-import { handleSerieFavAction } from '../../../services/BD/series/yourfavsSerie';
+import { handleSerieFavAction } from '../../../services/series/yourfavsSerie';
 
 export const prerender = false;
 

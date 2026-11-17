@@ -7,7 +7,7 @@
  * render SSR (computeNextEpisode), así nunca divergen.
  */
 import type { APIRoute } from 'astro';
-import { getNextEpisode } from '../../../../services/API/Series/nextEpisode';
+import { getNextEpisode } from '../../../../services/series/nextEpisode';
 
 export const prerender = false;
 

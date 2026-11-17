@@ -1,11 +1,11 @@
 import { getCurrentUid } from '../../db/userScope';
 import {
     getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
-} from '../movies/yourfavsMovie';
+} from '../../movies/yourfavsMovie';
 import {
     getSerieFav, getSeriesPendientes, getSeriesVistas, getSeriesSiguiendo,
     getLikedSeries, getSeriesVerPronto, getSeriesAbandonadas
-} from '../series/yourfavsSerie';
+} from '../../series/yourfavsSerie';
 
 /**
  * Snapshot compartido de la biblioteca (una sola lectura de las listas por petición).

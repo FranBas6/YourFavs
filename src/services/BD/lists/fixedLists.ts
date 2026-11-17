@@ -10,8 +10,8 @@
  * Ver pronto, Siguiendo) siguen gestionándose en la ficha.
  */
 import { titleMembership, countCollection } from '../shared/library';
-import { handleMovieFavAction } from '../movies/yourfavsMovie';
-import { handleSerieFavAction } from '../series/yourfavsSerie';
+import { handleMovieFavAction } from '../../movies/yourfavsMovie';
+import { handleSerieFavAction } from '../../series/yourfavsSerie';
 
 export type FixedList = 'favorites' | 'pendientes' | 'vistas';
 export const FIXED_LISTS: FixedList[] = ['favorites', 'pendientes', 'vistas'];

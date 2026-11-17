@@ -1,7 +1,7 @@
 import { processBatch } from '../../../utils/processBatch';
 import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { getCurrentUid } from '../../db/userScope';
-import { getAllMediaTags } from './mediaTags';
+import { getAllMediaTags } from '../../titles/mediaTags';
 import { getLibrarySnapshot } from './librarySnapshot';
 
 /**

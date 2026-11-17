@@ -447,7 +447,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     let logRows: WatchLogRow[] = [];
     try {
         if (getCurrentUid()) {
-            const { getAllWatchedProgress } = await import('../services/BD/series/yourfavsSerie');
+            const { getAllWatchedProgress } = await import('../services/series/yourfavsSerie');
             const { getAllWatchLog } = await import('../services/BD/lists/watchLog');
             const [live, log] = await Promise.all([getAllWatchedProgress(), getAllWatchLog()]);
             watches = unionEpisodeWatches(live, log);

@@ -10,8 +10,8 @@
  */
 import { supabaseAdmin } from '../../db/admin';
 import { getTitleSummaries, titleKey } from '../../tmdb/titleSummaries';
-import { handleMovieFavAction } from '../movies/yourfavsMovie';
-import { handleSerieFavAction } from '../series/yourfavsSerie';
+import { handleMovieFavAction } from '../../movies/yourfavsMovie';
+import { handleSerieFavAction } from '../../series/yourfavsSerie';
 import { saveFixed } from '../lists/fixedLists';
 import { planViews, resolveCards } from './chatCards';
 import { toMessage } from './messages';

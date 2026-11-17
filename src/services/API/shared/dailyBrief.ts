@@ -13,7 +13,7 @@
  */
 import { tmdbFetch } from '../../tmdb/tmdbClient';
 import { mapAndDeduplicateProviders } from '../../tmdb/tmdbInfoService';
-import { getNextEpisodesData, type NextEpisodeItem } from '../Series/nextEpisode';
+import { getNextEpisodesData, type NextEpisodeItem } from '../../series/nextEpisode';
 import { getLibrarySnapshot } from '../../BD/shared/librarySnapshot';
 import { getWatchLogOnDate } from '../../BD/lists/watchLog';
 import { getCurrentUid, getCurrentRegion } from '../../db/userScope';
