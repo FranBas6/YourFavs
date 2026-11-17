@@ -1,4 +1,6 @@
 import { db, fetchAll, getAuthId, requireAuthId } from "../db/userScope";
+import { libraryChanged } from "../library/libraryChanges";
+import { appendActivity } from "../library/activityLog";
 
 /**
  * Personas seguidas (handoff v2 §③ "Avísame de estrenos"): actores/directores
@@ -29,6 +31,7 @@ export async function addFollowedPerson(id: string, name: string, profilePath: s
         { onConflict: 'user_id,person_id' },
     );
     if (error) throw new Error(error.message);
+    libraryChanged('people');
 }
 
 export async function removeFollowedPerson(id: string): Promise<void> {
@@ -37,11 +40,11 @@ export async function removeFollowedPerson(id: string): Promise<void> {
     const { data, error } = await db().from('followed_people').delete()
         .eq('user_id', requireAuthId()).eq('person_id', Number(id)).select('name, profile_path');
     if (error) throw new Error(error.message);
+    libraryChanged('people');
     const d = data?.[0];
     const meta: Record<string, unknown> = d ? { name: d.name, profile_path: d.profile_path ?? null } : {};
     // §5 · bitácora (best-effort): dejar de seguir es intencional y borra el added_at.
     try {
-        const { appendActivity } = await import('../library/activityLog');
         await appendActivity({ verb: 'unfollow', media_type: 'person', tmdb_id: id, meta });
     } catch { /* bitácora opcional */ }
 }

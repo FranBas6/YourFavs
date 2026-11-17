@@ -48,8 +48,8 @@ src/
 │   ├─ http/       respuestas JSON de las rutas api/
 │   └─ temas:      movies · series · titles (lo común a película y serie: sagas, cine↔TV, etiquetas,
 │                  spoilers) · people · catalog · home · library (listas, diario, progreso, transiciones,
-│                  feed de Actividad, ⌘K) · stats (Tu año) · recs (Para ti, gustos) · notifications ·
-│                  calendar · profile · social · import · dubbing
+│                  feed de Actividad, ⌘K, libraryChanges: avisos a las cachés) · stats (Tu año) ·
+│                  recs (Para ti, gustos) · notifications · calendar · profile · social · import · dubbing
 ├─ utils/        COMPARTIDO: puro y seguro para el navegador (sin Supabase, TMDB ni variables de entorno)
 │   ├─ core/       appTime (fechas en Madrid), processBatch, safeFetch, withTimeout, buildUrl…
 │   ├─ titles/     media-helpers y demás helpers, episodeView, seasonView, géneros, idiomas…
@@ -82,22 +82,30 @@ src/
 | R4 `services/{db,tmdb,cache,http}` | esas cuatro, `utils/`, `types/` | La infraestructura va debajo de todo; si tirara de un tema nacerían ciclos al cargar. |
 | R5 `components/`, `layouts/` | todo menos `pages/` | |
 | R6 `pages/` | todo menos otra ruta (sí sus `_*.ts`) | Una ruta no es una librería: si dos rutas comparten algo, va a `services/` o `utils/`. |
-| R7 `import()` entre temas de `services/` | solo los de la lista blanca | Ver «ciclos» abajo. |
+| R7 `import()` entre temas de `services/` | ninguno (lista blanca vacía) | Un `import()` entre temas suele esconder un ciclo: ver «cachés» abajo. |
 | R8 sin índices | nada de `index.ts` que reexporte una carpeta (fuera de `pages/`) | Import directo al archivo. |
 | R9 nombres | carpetas en minúscula; nunca dos archivos que solo difieran en mayúsculas o extensión | macOS y Windows no distinguen mayúsculas. |
+| R10 sin ciclos al cargar | ningún círculo de imports normales (salvo `ui.ts` ↔ `recUi.ts`, abajo) | Con un ciclo, algo que se usa al cargar (una constante, una clave) puede no existir todavía. |
 | R0 | todo import relativo existe | |
 
 Los `import type` valen de cualquier sitio (se borran al compilar), salvo de una ruta.
 
 ## Trampas conocidas
 
-- **Ciclos y `import()`.** Al marcar o favear (`services/movies/yourfavsMovie.ts`, `services/series/yourfavsSerie.ts`,
-  `services/import/importLibrary.ts`) se vacían cachés que a su vez leen la biblioteca (Tu año, Para ti, sagas,
-  top de actores, ⌘K, snapshot, feed de Actividad). Con imports normales sería un ciclo al cargar; por eso son
-  `import()` dinámicos, y R7 los limita a la lista blanca de `check-structure.mjs`. **No añadas combinaciones
-  sin motivo.** El arreglo de raíz (un registro de invalidación en `services/library/`) está anotado como plan
-  aparte. Queda además un ciclo pequeño al cargar entre `utils/social/ui.ts` y `utils/social/recUi.ts`: funciona
-  porque al cargar solo se usan funciones, no constantes; no metas constantes compartidas entre ellos.
+- **Cachés que leen la biblioteca: `services/library/libraryChanges.ts`.** Snapshot de listas, ⌘K, Tu año, top
+  de actores, sagas, gustos, «Para ti», feed de Actividad y estrenos de quien sigues se vacían solos:
+  - una caché nueva se apunta al cargarse: `onLibraryChange(['lists', 'diary'], () => …vaciar lo del usuario…)`;
+  - una escritura nueva avisa DESPUÉS de escribir: `libraryChanged('lists')` (temas: `lists`, `ratings`,
+    `customLists`, `episodes`, `diary`, `activity`, `people`, `taste`, `tags`). Va en la capa de datos
+    (library.ts, ratings.ts, watchLog.ts…), no en los manejadores, para que nadie pueda olvidarlo.
+  - Las copias compartidas (Netlify Blobs) de gustos y «Para ti» se borran por su clave (`recs/recsCacheKeys.ts`)
+    aunque la instancia no haya cargado esos módulos. Una caché nueva con copia compartida necesita lo mismo.
+  - Antes esto eran `import()` copiados en tres sitios para esquivar un ciclo (y se olvidaban casos: las
+    colecciones propias no vaciaban los gustos; «Apuntar visionado» no vaciaba Tu año). No vuelvas a ese patrón.
+  - Si editas `libraryChanges.ts` con el dev levantado, **reinicia el dev**: la recarga en caliente vacía la lista
+    de cachés apuntadas y las que no se recarguen dejan de enterarse (solo pasa en desarrollo).
+- **Ciclo conocido:** `utils/social/ui.ts` ↔ `utils/social/recUi.ts` (permitido en R10). Funciona porque al cargar
+  solo se usan funciones, no constantes; no metas constantes compartidas entre ellos.
 - **Sin índices («barrels»).** Un `index.ts` obliga a cargar el tema entero y es la forma típica de crear ciclos
   al cargar (algo usado al cargar —una constante, una clave— que todavía no existe). Por eso R8.
 - **Mayúsculas en macOS.** `Cards/` y `cards/` son la misma carpeta. Para renombrar solo mayúsculas, mover en dos

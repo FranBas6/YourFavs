@@ -1,4 +1,5 @@
 import { db, fetchAll, getAuthId } from "../db/userScope";
+import { libraryChanged } from "./libraryChanges";
 
 /**
  * 4.2 · Tabla ligera de valoraciones: `ratings` (clave usuario + media_type + tmdb_id).
@@ -37,6 +38,7 @@ export async function setRating(mediaType: RatingMediaType, tmdbId: string | num
         { onConflict: 'user_id,media_type,tmdb_id', defaultToNull: false },
     );
     if (error) throw new Error(error.message);
+    libraryChanged('ratings');
 }
 
 /** Borra la nota (cuando el usuario elimina su valoración). */
@@ -46,6 +48,7 @@ export async function deleteRating(mediaType: RatingMediaType, tmdbId: string | 
     const { error } = await db().from('ratings').delete()
         .eq('user_id', userId).eq('media_type', mediaType).eq('tmdb_id', Number(tmdbId));
     if (error) throw new Error(error.message);
+    libraryChanged('ratings');
 }
 
 /** Todas las notas del usuario (fuente "Has valorado" de Actividad). */

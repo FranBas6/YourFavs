@@ -70,16 +70,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         await setUserTaste({ movieGenres, tvGenres, titles, people });
         await setUserProfile({ onboarding: 'done' });
 
-        // Los gustos alimentan el motor → invalidar las cachés (de este uid) para
-        // que "Para ti" refleje los cambios ya en la siguiente carga.
-        try {
-            const [{ invalidateGenrePreferencesCache }, { invalidatePersonalRecsCache }] = await Promise.all([
-                import('../../../services/recs/genrePreferences'),
-                import('../../../services/recs/personalRecommendations'),
-            ]);
-            invalidateGenrePreferencesCache();
-            invalidatePersonalRecsCache();
-        } catch { /* la caché caduca sola igualmente */ }
+        // Los gustos alimentan «Para ti»: setUserTaste ya avisa a sus cachés (libraryChanges.ts).
 
         return json({ ok: true });
     } catch (err) {

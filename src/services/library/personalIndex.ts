@@ -1,6 +1,7 @@
 import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from './libraryChanges';
 import { getAllMediaTags } from '../titles/mediaTags';
 import { getLibrarySnapshot } from './librarySnapshot';
 
@@ -29,8 +30,10 @@ export interface PersonalIndexItem {
 
 interface CacheEntry { data: PersonalIndexItem[]; expires: number }
 const cache = new Map<string, CacheEntry>();
+// Se vacía sola cuando cambian tus listas o tus etiquetas (libraryChanges.ts).
+onLibraryChange(['lists', 'tags'], () => invalidatePersonalIndexCache(getCurrentUid() ?? undefined));
 
-export function invalidatePersonalIndexCache(uid?: string) {
+function invalidatePersonalIndexCache(uid?: string) {
     if (uid) cache.delete(uid); else cache.clear();
 }
 

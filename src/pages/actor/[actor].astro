@@ -16,7 +16,6 @@ import '../../styles/pages/actor/actor.css';
 import { handleActorFavAction, getActorsFav } from "../../services/people/yourfavsActor";
 import type { ActorsFavs } from "../../services/people/yourfavsActor";
 import { getFollowedPerson, handlePersonFollowAction } from "../../services/people/yourfavsPeople";
-import { invalidateUpcomingPeopleCache } from "../../services/people/upcomingReleases";
 import FollowPersonButton from "../../components/person/FollowPersonButton.astro";
 import { SOCIAL_PHASE } from "../../utils/social/social";
 import type { ActorImage, TaggedImage } from "../../services/people/InfoActor";
@@ -36,7 +35,7 @@ if (Astro.request.method === 'POST') {
         const formData = await Astro.request.formData();
         if (String(formData.get('actionType')) === 'follow_person') {
             await handlePersonFollowAction(formData);
-            invalidateUpcomingPeopleCache(); // el calendario debe reflejarlo ya
+            // Seguir o dejar de seguir ya vacía los estrenos de quien sigues (libraryChanges.ts).
             return Astro.redirect(`/actor/${actor}`);
         }
         const url = await handleActorFavAction(formData);

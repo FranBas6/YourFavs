@@ -14,6 +14,7 @@
  * Al borrar la cuenta, el `on delete cascade` de `user_state` se lo lleva → sin pasos extra.
  */
 import { db, getAuthId, requireAuthId } from '../db/userScope';
+import { libraryChanged } from '../library/libraryChanges';
 
 export interface TasteTitle {
     id: number;
@@ -60,6 +61,7 @@ export async function setUserTaste(patch: Partial<UserTaste>): Promise<void> {
         { onConflict: 'user_id,key' },
     );
     if (error) throw new Error(error.message);
+    libraryChanged('taste');
 }
 
 /** Reinicia los gustos (borra la fila). El estado de onboarding se gestiona aparte. */
@@ -68,4 +70,5 @@ export async function clearUserTaste(): Promise<void> {
     if (!userId) return;
     const { error } = await db().from('user_state').delete().eq('user_id', userId).eq('key', KEY);
     if (error) throw new Error(error.message);
+    libraryChanged('taste');
 }

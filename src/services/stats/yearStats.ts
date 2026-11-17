@@ -4,11 +4,14 @@ import { getTitleDetails } from '../tmdb/tmdbTitleCache';
 import { toTimestamp } from '../../utils/titles/media-helpers';
 import { appDateParts } from '../../utils/core/appTime';
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from '../library/libraryChanges';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import {
     unionEpisodeWatches, watchLogInstant,
     type EpisodeWatch, type WatchLogRow,
 } from '../library/episodeWatches';
+import { getAllWatchedProgress } from '../series/yourfavsSerie';
+import { getAllWatchLog } from '../library/watchLog';
 
 const TTL_MS = 60 * 60 * 1000;
 const FALLBACK_EPISODE_RUNTIME = 45;
@@ -142,6 +145,8 @@ export interface YearStats {
  * pósters de tu biblioteca el escape sería contenido, no solo números.
  */
 const cache = new Map<string, { data: YearStats; expires: number }>();
+// Se vacía sola cuando cambian tus listas, tus episodios o tu diario (services/library/libraryChanges.ts).
+onLibraryChange(['lists', 'episodes', 'diary'], () => invalidateYearStatsCache());
 function cacheKey(scope: StatsScope): string { return `${getCurrentUid() || 'anon'}:${scope}`; }
 
 const COLLECTION_LABELS: Record<string, string> = {
@@ -447,8 +452,6 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
     let logRows: WatchLogRow[] = [];
     try {
         if (getCurrentUid()) {
-            const { getAllWatchedProgress } = await import('../series/yourfavsSerie');
-            const { getAllWatchLog } = await import('../library/watchLog');
             const [live, log] = await Promise.all([getAllWatchedProgress(), getAllWatchLog()]);
             watches = unionEpisodeWatches(live, log);
             logRows = log;
@@ -885,7 +888,7 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
 }
 
 /** Tira lo cacheado del usuario actual (no el de todos: la clave lleva uid). */
-export function invalidateYearStatsCache() {
+function invalidateYearStatsCache() {
     const uid = getCurrentUid();
     if (!uid) { cache.clear(); return; }
     for (const k of cache.keys()) if (k.startsWith(`${uid}:`)) cache.delete(k);

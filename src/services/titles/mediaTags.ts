@@ -1,4 +1,5 @@
 import { db, fetchAll, getAuthId, requireAuthId } from '../db/userScope';
+import { libraryChanged } from '../library/libraryChanges';
 
 // Tabla `media_tags` (antes users/{uid}/MediaTags/{type}_{id}). Hacia fuera se devuelve la
 // forma de documento de siempre: `id` = "movie_550" y `tmdb_id` en texto.
@@ -101,6 +102,7 @@ export async function setMediaTags(
             const { error } = await db().from('media_tags').delete()
                 .eq('user_id', key.user_id).eq('media_type', key.media_type).eq('tmdb_id', key.tmdb_id);
             if (error) throw new Error(error.message);
+            libraryChanged('tags');
         }
         return;
     }
@@ -110,6 +112,7 @@ export async function setMediaTags(
         { onConflict: 'user_id,media_type,tmdb_id' },
     );
     if (error) throw new Error(error.message);
+    libraryChanged('tags');
 }
 
 export async function handleMediaTagsAction(formData: FormData): Promise<string> {

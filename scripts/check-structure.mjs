@@ -12,10 +12,11 @@
  *   R4  infraestructura (services/db, tmdb, cache, http) → infraestructura, utils/, types/
  *   R5  components/ y layouts/ → todo menos pages/
  *   R6  pages/ → nunca otra ruta (sí sus ayudas `_*.ts`, que Astro no publica como ruta)
- *   R7  import() entre temas distintos de services/ → solo los de la lista blanca
+ *   R7  nada de import() entre temas distintos de services/ (salvo lista blanca, hoy vacía)
  *   R8  sin índices («barrels»): ni index.ts ni index.js fuera de pages/
  *   R9  carpetas en minúscula (fuera de pages/) y nunca dos archivos que solo difieran en mayúsculas
  *   R0  todo import relativo tiene que existir
+ *   R10 sin ciclos al cargar (imports normales que se cierran en círculo), salvo los de la lista
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,23 +31,12 @@ const rel = (p) => path.relative(SRC, p).split(path.sep).join('/');
 const INFRA = new Set(['db', 'tmdb', 'cache', 'http']);
 
 /**
- * R7 · Lista blanca de `import()` entre temas de services/. Son los que tapan el ciclo de la
- * invalidación de cachés (al tocar la biblioteca se vacían Tu año, Para ti, sagas…, que a su vez leen
- * la biblioteca). Arreglo de raíz: docs/Estructura/PLAN_ESTRUCTURA.md §7.1. No añadir sin motivo.
- * Formato: 'tema-origen -> tema-destino'.
+ * R7 · `import()` entre temas de services/ permitidos. Vacía a propósito: los que había tapaban el ciclo de
+ * la invalidación de cachés, que ya no existe (services/library/libraryChanges.ts). Un `import()` entre temas
+ * suele esconder un ciclo; antes de añadir uno aquí, mira si se resuelve con un import normal (R10 avisará
+ * si cierra un círculo). Formato: 'tema-origen -> tema-destino'.
  */
-const DYNAMIC_ALLOW = new Set([
-    // Marcar / favear / importar (yourfavsMovie, yourfavsSerie, importLibrary) escribe en el diario, la
-    // bitácora y las notas, y vacía las cachés que leen la biblioteca: snapshot, ⌘K, feed de Actividad…
-    'movies -> library', 'series -> library', 'import -> library',
-    'movies -> recs', 'series -> recs', 'import -> recs',        // «Para ti» y gustos por género
-    'movies -> stats', 'series -> stats', 'import -> stats',     // Tu año y top de actores
-    'movies -> titles', 'import -> titles',                      // «Tus sagas»
-    'people -> library',                                         // seguir a alguien se apunta en la bitácora
-    // Lecturas perezosas de quien a su vez escribe en la biblioteca: con import estático, ciclo al cargar.
-    'library -> people', 'library -> series',                    // el feed de Actividad (actores, personas, progreso)
-    'stats -> library', 'stats -> series',                       // Tu año (diario y progreso de episodios)
-]);
+const DYNAMIC_ALLOW = new Set([]);
 
 /** Capa de un archivo de src/: pages · layouts · components · scripts · services · infra · utils · types · styles · assets · root */
 function layerOf(r) {
@@ -58,7 +48,17 @@ function layerOf(r) {
 /** Tema dentro de services/ (`services/series/x.ts` → `series`). */
 const domainOf = (r) => r.split('/')[1];
 
+/**
+ * R10 · Ciclos al cargar conocidos (archivos del ciclo, ordenados y unidos con « · »). Funcionan porque al
+ * cargar solo se usan funciones, no constantes; no metas constantes compartidas entre ellos.
+ */
+const CYCLE_ALLOW = new Set([
+    'utils/social/recUi.ts · utils/social/ui.ts',
+]);
+
 const files = listFiles(SRC);
+/** Imports que se ejecutan AL CARGAR (no los de tipos ni los `import()`): la materia de R10. */
+const loadEdges = new Map();
 const problems = [];
 const add = (rule, where, msg) => problems.push({ rule, where, msg });
 
@@ -70,6 +70,10 @@ for (const file of files) {
         if (!imp.target) { add('R0', where, `no existe: ${imp.spec}`); continue; }
         const to = rel(imp.target);
         const tl = layerOf(to);
+        if ((imp.kind === 'static' || imp.kind === 'side') && /\.(ts|tsx|js|mjs|astro)$/.test(to)) {
+            if (!loadEdges.has(from)) loadEdges.set(from, new Set());
+            loadEdges.get(from).add(to);
+        }
         if (imp.typeOnly) {
             if (tl === 'pages' && !path.basename(to).startsWith('_') && fl !== 'pages') add('R6', where, `tipo importado de una ruta: ${to}`);
             continue;
@@ -101,6 +105,27 @@ for (const file of files) {
                 break;
         }
     }
+}
+
+// R10 · ciclos al cargar (componentes fuertemente conexos de Tarjan con más de un archivo)
+{
+    let index = 0;
+    const idx = new Map(), low = new Map(), onStack = new Set(), stack = [];
+    const visit = (v) => {
+        idx.set(v, index); low.set(v, index); index++; stack.push(v); onStack.add(v);
+        for (const w of loadEdges.get(v) || []) {
+            if (!idx.has(w)) { visit(w); low.set(v, Math.min(low.get(v), low.get(w))); }
+            else if (onStack.has(w)) low.set(v, Math.min(low.get(v), idx.get(w)));
+        }
+        if (low.get(v) === idx.get(v)) {
+            const comp = [];
+            let w;
+            do { w = stack.pop(); onStack.delete(w); comp.push(w); } while (w !== v);
+            const key = comp.sort().join(' · ');
+            if (comp.length > 1 && !CYCLE_ALLOW.has(key)) add('R10', `src/${comp[0]}`, `ciclo al cargar entre ${comp.length} archivos: ${key}`);
+        }
+    };
+    for (const v of loadEdges.keys()) if (!idx.has(v)) visit(v);
 }
 
 // R8 · índices

@@ -1,4 +1,5 @@
 import { getCurrentUid } from '../db/userScope';
+import { onLibraryChange } from './libraryChanges';
 import {
     getMovieFav, getMoviesPendientes, getMoviesVistas, getLikedMovies, getMoviesVerPronto
 } from '../movies/yourfavsMovie';
@@ -35,8 +36,10 @@ const EMPTY: LibrarySnapshot = {
 };
 
 const cache = new Map<string, { data: LibrarySnapshot; expires: number }>();
+// Se vacía sola cuando cambian tus listas (libraryChanges.ts).
+onLibraryChange(['lists'], () => invalidateLibrarySnapshot(getCurrentUid() ?? undefined));
 
-export function invalidateLibrarySnapshot(uid?: string) {
+function invalidateLibrarySnapshot(uid?: string) {
     if (uid) cache.delete(uid); else cache.clear();
 }
 

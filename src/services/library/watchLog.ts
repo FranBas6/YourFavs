@@ -15,6 +15,7 @@
  */
 import { db, fetchAll, getAuthId, requireAuthId } from '../db/userScope';
 import type { WatchLogRow } from './episodeWatches';
+import { libraryChanged } from './libraryChanges';
 
 const COLUMNS = 'id, media_type, tmdb_id, season, episode, watched_on, rewatch, note, logged_at, source';
 
@@ -35,12 +36,6 @@ function rowsKey(userId: string, tmdbId: number): string { return `${userId}:${t
 function invalidateTitleRows(tmdb_id: number | string): void {
     const userId = getAuthId();
     if (userId) rowsCache.delete(rowsKey(userId, Number(tmdb_id)));
-}
-// Cualquier escritura del diario cambia el feed de Actividad → invalidamos su caché.
-// Import dinámico para NO crear ciclo (activityFeed → librarySnapshot → yourfavsSerie →
-// watchLog importaría de vuelta a activityFeed).
-async function bustActivityFeed(): Promise<void> {
-    try { const m = await import('./activityFeed'); m.invalidateActivityFeed(); } catch { /* ignore */ }
 }
 async function getTitleRows(tmdb_id: number | string): Promise<Record<string, any>[]> {
     const userId = getAuthId();
@@ -136,7 +131,7 @@ export async function appendWatchLog(e: AppendInput): Promise<{ rewatch: boolean
     });
     if (error) throw new Error(error.message);
     invalidateTitleRows(tmdbId);
-    await bustActivityFeed();
+    libraryChanged('diary'); // Actividad y Tu año
     return { rewatch, added: true };
 }
 
@@ -185,7 +180,7 @@ export async function appendEpisodes(
         if (error) throw new Error(error.message);
     }
     invalidateTitleRows(tmdbId);
-    await bustActivityFeed();
+    libraryChanged('diary'); // Actividad y Tu año
 }
 
 /**
@@ -220,7 +215,7 @@ export async function removeEpisodeFromLog(
     const { error } = await db().from('watch_log').delete().eq('user_id', requireAuthId()).eq('id', matches[0].id);
     if (error) throw new Error(error.message);
     invalidateTitleRows(tmdbId);
-    await bustActivityFeed();
+    libraryChanged('diary'); // Actividad y Tu año
 }
 
 /** Nº de veces visto + última fecha (para "La has visto N veces" en la ficha). */
