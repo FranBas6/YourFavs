@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Fronteras entre carpetas de `src/` (CLAUDE.md § Estructura). Sin dependencias.
+ * Fronteras entre carpetas de `src/` (CLAUDE.md, «Reglas de frontera»). Sin dependencias.
  *
  *   node scripts/check-structure.mjs            sale con 1 si hay alguna infracción (`npm run check:structure`)
  *   node scripts/check-structure.mjs --report   solo informa; sale con 0 aunque las haya
  *
- * Reglas (el porqué de cada una está en CLAUDE.md):
+ * Reglas (el porqué de cada una está en CLAUDE.md, «Reglas de frontera»):
  *   R1  utils/ y types/ → solo utils/ y types/ (lo usa el navegador: nada de servidor)
  *   R2  scripts/ (navegador) → scripts/, utils/, types/ (los `import type` valen de cualquier sitio)
  *   R3  services/ → services/, utils/, types/ (el servidor no sabe de vistas)

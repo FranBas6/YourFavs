@@ -203,6 +203,22 @@ renderizada en el servidor que se instala como una app. Está en español; es la
 | App       | PWA con service worker propio, manifest y feed de calendario `.ics` privado          |
 | Calidad   | pgTAP, chequeo de tipos de TypeScript, comprobaciones en Chrome sin interfaz (Puppeteer) |
 
+## Estructura del código
+
+El primer nivel de `src/` dice **dónde corre** el código; dentro de cada uno se repiten **las mismas
+carpetas de tema** (`series`, `library`, `social`, `stats`…):
+
+| Carpeta       | Qué hay                                                                                  |
+| ------------- | ---------------------------------------------------------------------------------------- |
+| `pages/`      | rutas de Astro y endpoints de `api/`                                                      |
+| `components/` | vistas `.astro` por tema, más `ui/` (piezas básicas) y `shell/` (en todas las páginas)    |
+| `services/`   | solo servidor: Supabase, TMDB y secretos; infraestructura en `db/`, `tmdb/`, `cache/`, `http/` |
+| `utils/`      | código puro que comparten servidor y navegador                                            |
+| `scripts/`    | código del navegador                                                                      |
+
+Las fronteras entre ellas (por ejemplo, nada de lo que carga el navegador puede importar `services/`)
+las comprueba `npm run check:structure`. El detalle y el porqué de cada regla: [`CLAUDE.md`](CLAUDE.md).
+
 ---
 
 Más sobre este proyecto y el resto de mi trabajo en mi portfolio: [franbasguil.netlify.app](https://franbasguil.netlify.app/es/proyectos/yourfavs/)

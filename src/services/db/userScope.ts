@@ -1,5 +1,5 @@
 /**
- * Scope de usuario para la capa BD (Fase C) — AsyncLocalStorage.
+ * Scope de usuario para lo que lee la base de datos en services/ (Fase C) — AsyncLocalStorage.
  *
  * El middleware mete en un store por petición (`runWithUser`) el usuario de la sesión
  * verificada y el cliente de Supabase con sus cookies. Las funciones de `services/` que leen la base de datos
