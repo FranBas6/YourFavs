@@ -2,8 +2,8 @@
 /**
  * Fronteras entre carpetas de `src/` (CLAUDE.md § Estructura). Sin dependencias.
  *
- *   node scripts/check-structure.mjs            informe; sale con 0 aunque haya infracciones
- *   node scripts/check-structure.mjs --strict   sale con 1 si hay alguna (lo usa `npm run check`)
+ *   node scripts/check-structure.mjs            sale con 1 si hay alguna infracción (`npm run check:structure`)
+ *   node scripts/check-structure.mjs --report   solo informa; sale con 0 aunque las haya
  *
  * Reglas (el porqué de cada una está en CLAUDE.md):
  *   R1  utils/ y types/ → solo utils/ y types/ (lo usa el navegador: nada de servidor)
@@ -24,7 +24,7 @@ import { listFiles, readImports } from './structure/imports.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = path.join(ROOT, 'src');
-const strict = process.argv.includes('--strict');
+const strict = !process.argv.includes('--report');
 const rel = (p) => path.relative(SRC, p).split(path.sep).join('/');
 
 const INFRA = new Set(['db', 'tmdb', 'cache', 'http']);
@@ -36,6 +36,16 @@ const INFRA = new Set(['db', 'tmdb', 'cache', 'http']);
  * Formato: 'tema-origen -> tema-destino'.
  */
 const DYNAMIC_ALLOW = new Set([
+    // Marcar / favear / importar (yourfavsMovie, yourfavsSerie, importLibrary) escribe en el diario, la
+    // bitácora y las notas, y vacía las cachés que leen la biblioteca: snapshot, ⌘K, feed de Actividad…
+    'movies -> library', 'series -> library', 'import -> library',
+    'movies -> recs', 'series -> recs', 'import -> recs',        // «Para ti» y gustos por género
+    'movies -> stats', 'series -> stats', 'import -> stats',     // Tu año y top de actores
+    'movies -> titles', 'import -> titles',                      // «Tus sagas»
+    'people -> library',                                         // seguir a alguien se apunta en la bitácora
+    // Lecturas perezosas de quien a su vez escribe en la biblioteca: con import estático, ciclo al cargar.
+    'library -> people', 'library -> series',                    // el feed de Actividad (actores, personas, progreso)
+    'stats -> library', 'stats -> series',                       // Tu año (diario y progreso de episodios)
 ]);
 
 /** Capa de un archivo de src/: pages · layouts · components · scripts · services · infra · utils · types · styles · assets · root */
