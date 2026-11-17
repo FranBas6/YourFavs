@@ -24,9 +24,9 @@
  * esa cookie no se crea la cuenta (`invite_only`).
  */
 import type { APIRoute } from 'astro';
-import { json, mapAuthError, safeNext, setSessionFlag } from '../../../lib/supabase/authHttp';
+import { json, mapAuthError, safeNext, setSessionFlag } from '../../../services/db/authHttp';
 import { signupMode } from '../../../lib/social/signupMode';
-import { REF_COOKIE, applyReferral, findInviter } from '../../../services/BD/social/referral';
+import { REF_COOKIE, applyReferral, findInviter } from '../../../services/social/referral';
 
 export const prerender = false;
 

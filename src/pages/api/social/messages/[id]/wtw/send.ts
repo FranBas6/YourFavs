@@ -6,9 +6,9 @@
  * de Pendientes mientras tanto). Los demás errores, como al enviar un mensaje.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
-import { wtwSend } from '../../../../../../services/BD/social/wtw';
+import { wtwSend } from '../../../../../../services/social/wtw';
 import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
 
 export const prerender = false;

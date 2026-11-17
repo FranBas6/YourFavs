@@ -6,9 +6,9 @@
  * avisos que os hubierais provocado. Nadie recibe aviso. Desbloquear no devuelve nada de eso.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, readUserId, serverError, tooMany, unauthorized } from '../../../lib/social/http';
-import { allowSocialWrite, block, getRelation, unblock, userExists } from '../../../services/BD/social/graph';
+import { allowSocialWrite, block, getRelation, unblock, userExists } from '../../../services/social/graph';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 
 export const prerender = false;

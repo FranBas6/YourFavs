@@ -6,7 +6,7 @@
  * Sin conexión (o caducada) → 401 y el navegador lo dice.
  */
 import type { APIRoute } from 'astro';
-import { fetchTraktPage, TRAKT_KINDS, type TraktKind } from '../../../../services/API/shared/traktAccount';
+import { fetchTraktPage, TRAKT_KINDS, type TraktKind } from '../../../../services/import/traktAccount';
 import { json } from '../_shared';
 import { getAccess } from './_session';
 

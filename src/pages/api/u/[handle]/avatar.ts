@@ -12,8 +12,8 @@
  *     cookies, y con tope de tamaño.
  */
 import type { APIRoute } from 'astro';
-import { supabaseAdmin } from '../../../../lib/supabase/admin';
-import { findPublicProfileRow, resolveAvatarSource } from '../../../../services/BD/social/publicProfile';
+import { supabaseAdmin } from '../../../../services/db/admin';
+import { findPublicProfileRow, resolveAvatarSource } from '../../../../services/social/publicProfile';
 
 export const prerender = false;
 

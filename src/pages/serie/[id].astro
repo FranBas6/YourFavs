@@ -6,26 +6,26 @@ import {
 } from "../../utils/constants/helpers/media-helpers";
 import {formatRuntime, getSeasonStats} from "../../utils/constants/helpers/serie-helpers";
 import type { GuestStar } from "../../types/Media";
-import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/BD/series/yourfavsSerie";
-import { countSeriesPasses } from "../../services/BD/lists/watchLog";
-import type {WatchedProgress} from "../../services/BD/series/yourfavsSerie";
+import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/series/yourfavsSerie";
+import { countSeriesPasses } from "../../services/library/watchLog";
+import type {WatchedProgress} from "../../services/series/yourfavsSerie";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
 import '../../styles/shared/spoil.css'; // modo sin spoilers, compartido con la ficha de episodio (TMDB D4)
 import { episodeHref, seasonHref } from '../../utils/episodeView';
 import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
-} from "../../services/API/Series/InfoSeries";
-import { getAllSeasonProviders, buildProviderCoverage } from "../../services/API/Series/seasonProviders";
-import { posterUrl, originalUrl } from "../../services/API/shared/tmdbClient";
+} from "../../services/series/InfoSeries";
+import { getAllSeasonProviders, buildProviderCoverage } from "../../services/series/seasonProviders";
+import { posterUrl, originalUrl } from "../../services/tmdb/tmdbClient";
 import { peekTopActors } from "../../utils/topActorsLibrary";
-import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
-import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
+import { checkMediaExistence } from "../../services/titles/checkExistence";
+import { getMediaTags, handleMediaTagsAction } from "../../services/titles/mediaTags";
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
 import { SOCIAL_PHASE } from "../../utils/constants/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/detail/FriendsSeen.astro";
-import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
+import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/yourfavsNotifications";
 import FichaActions from "../../components/detail/FichaActions.astro";
 import FichaSections from "../../components/detail/FichaSections.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
@@ -37,12 +37,12 @@ import LightboxGallery from "../../components/detail/LightboxGallery.astro";
 import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import CrossMediaSection from "../../components/detail/CrossMediaSection.astro";
-import { getCrossMediaRelated } from "../../services/API/shared/crossMediaRelated";
+import { getCrossMediaRelated } from "../../services/titles/crossMediaRelated";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import SeasonHeatmap from "../../components/detail/SeasonHeatmap.astro";
 import StarRating from "../../components/detail/StarRating.astro";
 import {safeFetch} from "../../utils/safeFetch";
-import { getSpoilerPref, setSpoilerPref, clearSpoilerPref } from "../../services/BD/shared/spoilerPrefs";
+import { getSpoilerPref, setSpoilerPref, clearSpoilerPref } from "../../services/titles/spoilerPrefs";
 
 const {id} = Astro.params; // Obtén el parámetro id de la URL
 
@@ -434,7 +434,7 @@ const hasSpecialSeasons = specialSeasons.length > 0;
 const regularSeasonsCount = regularSeasons.length;
 const specialSeasonsCount = specialSeasons.length;
 
-import type {PosterImage} from '../../services/API/Series/InfoSeries';
+import type {PosterImage} from '../../services/series/InfoSeries';
 
 // Segundo bloque de datos — todo en paralelo
 const tmdbId = item?.id;

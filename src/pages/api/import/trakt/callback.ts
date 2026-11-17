@@ -4,7 +4,7 @@
  * Ajustes → Importar, que empieza a leer sola. Si no aprobó (o el `state` no cuadra), vuelve con aviso.
  */
 import type { APIRoute } from 'astro';
-import { exchangeCode } from '../../../../services/API/shared/traktAccount';
+import { exchangeCode } from '../../../../services/import/traktAccount';
 import { setAccess, takePkce } from './_session';
 
 export const prerender = false;

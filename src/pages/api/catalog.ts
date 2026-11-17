@@ -8,18 +8,18 @@
  * Público (solo dato TMDB). Convención `{ ok, items }`. `?page` opcional (1).
  */
 import type { APIRoute } from 'astro';
-import { toItem, type SummaryItem } from './summary';
-import { getTrending } from '../../services/API/shared/tmdbDiscoverService';
+import { toItem, type SummaryItem } from '../../services/tmdb/summaryItem';
+import { getTrending } from '../../services/catalog/tmdbDiscoverService';
 import {
     getLatestMovies,
     getMostPopularMovies,
     getTopRatedMovies,
-} from '../../services/API/Movies/tmdbMovies';
+} from '../../services/movies/tmdbMovies';
 import {
     getLatestSeries,
     getMostPopularSeries,
     getTopRatedSeries,
-} from '../../services/API/Series/tmdbSeries';
+} from '../../services/series/tmdbSeries';
 
 export const prerender = false;
 

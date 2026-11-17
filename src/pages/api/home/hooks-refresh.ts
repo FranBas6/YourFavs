@@ -11,7 +11,7 @@
  * 24 h y el claim transaccional: llamarlo mil veces seguidas solo produce mil lecturas de un documento.
  */
 import type { APIRoute } from 'astro';
-import { ensureHooksFresh } from '../../../services/API/shared/hookRows';
+import { ensureHooksFresh } from '../../../services/home/hookRows';
 
 export const POST: APIRoute = async ({ locals }) => {
     const region = locals.user?.region || 'ES';

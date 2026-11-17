@@ -7,7 +7,7 @@
  * devuelve a Supabase, y Supabase a `/auth/callback`, que canjea el código por la sesión.
  */
 import type { APIRoute } from 'astro';
-import { json, mapAuthError, safeNext } from '../../../lib/supabase/authHttp';
+import { json, mapAuthError, safeNext } from '../../../services/db/authHttp';
 
 export const prerender = false;
 

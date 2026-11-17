@@ -7,9 +7,9 @@
  * `unavailable`, sin decir cuál de las dos: un bloqueo nunca se delata (handoff §5.2).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { badRequest, readUserId, serverError, tooMany, unauthorized } from '../../../lib/social/http';
-import { allowSocialWrite, follow, getRelation, unfollow } from '../../../services/BD/social/graph';
+import { allowSocialWrite, follow, getRelation, unfollow } from '../../../services/social/graph';
 import { SOCIAL_PHASE } from '../../../utils/constants/social';
 
 export const prerender = false;

@@ -9,7 +9,7 @@
  * porque Firebase Storage exigía el plan de pago.
  */
 import type { APIRoute } from 'astro';
-import { setUserProfile } from '../../../services/BD/profile/userProfile';
+import { setUserProfile } from '../../../services/profile/userProfile';
 
 export const prerender = false;
 

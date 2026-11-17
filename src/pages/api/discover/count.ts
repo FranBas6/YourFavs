@@ -9,8 +9,8 @@
  * El `sort_by` no afecta al total, así que se ignora. Es decorativo: si algo falla → count 0.
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch } from '../../../services/API/shared/tmdbClient';
-import { buildDiscoverFilterParams, type AdvancedFilters } from '../../../services/API/shared/tmdbDiscoverService';
+import { tmdbFetch } from '../../../services/tmdb/tmdbClient';
+import { buildDiscoverFilterParams, type AdvancedFilters } from '../../../services/catalog/tmdbDiscoverService';
 
 export const prerender = false;
 

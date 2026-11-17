@@ -1,11 +1,11 @@
 import { processBatch } from './processBatch';
-import { tmdbFetch, tmdbFetchList } from '../services/API/shared/tmdbClient';
-import { getTrending } from '../services/API/shared/tmdbDiscoverService';
+import { tmdbFetch, tmdbFetchList } from '../services/tmdb/tmdbClient';
+import { getTrending } from '../services/catalog/tmdbDiscoverService';
 import { calculateGenrePreferences, type Seed, type SeedWhy } from './genrePreferences';
-import { getCached, setCached, invalidateCached } from './recsBlobCache';
-import { getCurrentUid } from '../services/BD/shared/userScope';
+import { getCached, setCached, invalidateCached } from '../services/cache/recsBlobCache';
+import { getCurrentUid } from '../services/db/userScope';
 import { appDateParts } from './appTime';
-import { dedupeFranchises } from '../services/API/shared/catalogRows';
+import { dedupeFranchises } from '../services/catalog/catalogRows';
 
 /**
  * Motor de «Para ti» (decisión de Fran, 2026-10-27: más señal y rotación; antes solo 6 favoritos

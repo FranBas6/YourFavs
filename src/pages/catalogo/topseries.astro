@@ -2,16 +2,16 @@
 import Layout from "../../layouts/Layout.astro";
 import CatalogHeader from "../../components/CatalogHeader.astro";
 import CardSerie from "../../components/Cards/CardSerie.astro";
-import {getTopRatedSeries} from "../../services/API/Series/tmdbSeries";
-import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/API/shared/tmdbDiscoverService";
-import {tmdbFetchList} from "../../services/API/shared/tmdbClient";
+import {getTopRatedSeries} from "../../services/series/tmdbSeries";
+import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/catalog/tmdbDiscoverService";
+import {tmdbFetchList} from "../../services/tmdb/tmdbClient";
 
 const NETWORK_OPTIONS = [
     { id: '', name: 'Todas' },
     ...NETWORKS.map((n) => ({ id: String(n.id), name: n.name })),
 ];
 import {getGenreName} from "../../utils/constants/genres";
-import {posterUrl} from "../../services/API/shared/tmdbClient";
+import {posterUrl} from "../../services/tmdb/tmdbClient";
 import Pagination from "../../components/Pagination.astro";
 import AdvancedFilters from "../../components/AdvancedFilters.astro";
 import EmptyState from "../../components/EmptyState.astro";

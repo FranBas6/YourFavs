@@ -20,8 +20,8 @@ import {
     updateList,
     deleteList,
     reorderLists,
-} from '../../../services/BD/lists/customLists';
-import { getFixedMembership } from '../../../services/BD/lists/fixedLists';
+} from '../../../services/library/customLists';
+import { getFixedMembership } from '../../../services/library/fixedLists';
 
 export const prerender = false;
 

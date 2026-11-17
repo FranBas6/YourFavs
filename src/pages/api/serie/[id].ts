@@ -21,7 +21,7 @@ import {
     getSeriesBundle,
     getSerieRecommendationsOrSimilar,
     type SeriesBundle,
-} from '../../../services/API/Series/InfoSeries';
+} from '../../../services/series/InfoSeries';
 import { safeFetch } from '../../../utils/safeFetch';
 
 export const prerender = false;

@@ -3,7 +3,7 @@
  * usuario a themoviedb.org a aprobarlo; TMDB lo devuelve a `/api/import/tmdb/callback`.
  */
 import type { APIRoute } from 'astro';
-import { approveUrl, createRequestToken, tmdbAccountEnabled } from '../../../../services/API/shared/tmdbAccount';
+import { approveUrl, createRequestToken, tmdbAccountEnabled } from '../../../../services/import/tmdbAccount';
 import { setRequestToken } from './_session';
 
 export const prerender = false;

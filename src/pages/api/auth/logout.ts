@@ -6,7 +6,7 @@
  * de servir, no solo se borra de este navegador. `signOut` borra además las cookies de Supabase.
  */
 import type { APIRoute } from 'astro';
-import { clearSessionFlag, json } from '../../../lib/supabase/authHttp';
+import { clearSessionFlag, json } from '../../../services/db/authHttp';
 
 export const prerender = false;
 

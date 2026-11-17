@@ -4,24 +4,24 @@ import {
     getMoviesAndSeriesByActorId,
     getActorDetailsById, fetchActorImages, fetchTaggedImages,
     getActorCrewCredits
-} from "../../services/API/Actors/InfoActor";
-import type { CrewCredit } from "../../services/API/Actors/InfoActor";
+} from "../../services/people/InfoActor";
+import type { CrewCredit } from "../../services/people/InfoActor";
 import { getGenreName, genresMap } from "../../utils/constants/genres";
 import { calculateAge, getCareerRange } from "../../utils/constants/helpers/actor-helpers";
-import { posterUrl } from "../../services/API/shared/tmdbClient";
+import { posterUrl } from "../../services/tmdb/tmdbClient";
 import FilmographyList, { type FilmRow } from "../../components/person/FilmographyList.astro";
 import ActorDubbingSection from "../../components/detail/ActorDubbingSection.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/actor/actor.css';
-import { handleActorFavAction, getActorsFav } from "../../services/BD/actors/yourfavsActor";
-import type { ActorsFavs } from "../../services/BD/actors/yourfavsActor";
-import { getFollowedPerson, handlePersonFollowAction } from "../../services/BD/people/yourfavsPeople";
-import { invalidateUpcomingPeopleCache } from "../../services/API/People/upcomingReleases";
+import { handleActorFavAction, getActorsFav } from "../../services/people/yourfavsActor";
+import type { ActorsFavs } from "../../services/people/yourfavsActor";
+import { getFollowedPerson, handlePersonFollowAction } from "../../services/people/yourfavsPeople";
+import { invalidateUpcomingPeopleCache } from "../../services/people/upcomingReleases";
 import FollowPersonButton from "../../components/personal/FollowPersonButton.astro";
 import { SOCIAL_PHASE } from "../../utils/constants/social";
-import type { ActorImage, TaggedImage } from "../../services/API/Actors/InfoActor";
+import type { ActorImage, TaggedImage } from "../../services/people/InfoActor";
 import { safeFetch } from "../../utils/safeFetch";
-import { getLibrarySnapshot } from "../../services/BD/shared/librarySnapshot";
+import { getLibrarySnapshot } from "../../services/library/librarySnapshot";
 import { departmentEs } from "../../utils/constants/helpers/team-helpers";
 
 const { actor } = Astro.params;

@@ -5,9 +5,9 @@
  * ha salido en esta conversación y lo que estás viendo. `404` si no estás en ella.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../lib/social/http';
-import { spoilerSuggest } from '../../../../services/BD/social/chatCards';
+import { spoilerSuggest } from '../../../../services/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 
 export const prerender = false;

@@ -11,10 +11,10 @@
  * esté declarado en `UserProfile`.
  */
 import type { APIRoute } from 'astro';
-import { setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from '../../../services/BD/profile/userProfile';
-import { sanitizePlatformIds } from '../../../services/API/shared/watchProviders';
+import { setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } from '../../../services/profile/userProfile';
+import { sanitizePlatformIds } from '../../../services/tmdb/watchProviders';
 import { CONTENT_LANGUAGE_CODES } from '../../../utils/constants/languages';
-import { SUPPORTED_COUNTRIES } from '../../../services/API/shared/tmdbInfoService';
+import { SUPPORTED_COUNTRIES } from '../../../services/tmdb/tmdbInfoService';
 
 export const prerender = false;
 
@@ -121,7 +121,7 @@ const handler: APIRoute = async ({ request, locals }) => {
 
         if (touchedNotifs) {
             try {
-                const { invalidateNotifSync } = await import('../../../services/API/notifications/generator');
+                const { invalidateNotifSync } = await import('../../../services/notifications/generator');
                 invalidateNotifSync();
             } catch { /* se re-sincroniza igual al día siguiente */ }
         }

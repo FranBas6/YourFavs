@@ -13,7 +13,7 @@ import {
     addItemToList,
     removeItemFromList,
     reorderItems,
-} from '../../../services/BD/lists/customLists';
+} from '../../../services/library/customLists';
 
 export const prerender = false;
 

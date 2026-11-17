@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getCalendarData, hideEpisodeTitlesFor } from '../../../services/API/Calendar/calendarService';
+import { getCalendarData, hideEpisodeTitlesFor } from '../../../services/calendar/calendarService';
 
 export const GET: APIRoute = async ({ params, locals }) => {
     const { yearMonth } = params;

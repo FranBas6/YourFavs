@@ -5,9 +5,9 @@
  * marcando quién está ya dentro. `full`: está en 20 grupos («Está en demasiados grupos»).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../lib/social/http';
-import { groupCandidates } from '../../../../services/BD/social/messages';
+import { groupCandidates } from '../../../../services/social/messages';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 
 export const prerender = false;

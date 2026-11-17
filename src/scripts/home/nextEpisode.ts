@@ -13,7 +13,7 @@
 import '../shared/spoil';
 import { showToast } from '../social/toast';
 import { doneCard, movieDoneCard, serieCard } from '../../lib/nextEpisodeView';
-import type { NextEpisodeItem } from '../../services/API/Series/nextEpisode';
+import type { NextEpisodeItem } from '../../services/series/nextEpisode';
 
 const JUST_MS = 6000;
 const PENDING_KEY = 'yf_pending_fetch';

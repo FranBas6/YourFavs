@@ -9,8 +9,8 @@
  * Invitado → 401. El uid sale SIEMPRE de la sesión (locals.user).
  */
 import type { APIRoute } from 'astro';
-import { getLibrarySnapshot } from '../../../services/BD/shared/librarySnapshot';
-import { getCustomLists } from '../../../services/BD/lists/customLists';
+import { getLibrarySnapshot } from '../../../services/library/librarySnapshot';
+import { getCustomLists } from '../../../services/library/customLists';
 
 export const prerender = false;
 

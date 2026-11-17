@@ -1,0 +1,149 @@
+import { getCurrentLanguage } from '../db/userScope';
+
+export const API_KEY = import.meta.env.TMDB_API_KEY;
+/**
+ * Token de lectura v4 (E4). Es lo que recomienda TMDB: va en la cabecera `Authorization: Bearer`,
+ * así la clave no viaja en la URL (que acaba en logs de CDN, proxies y del medidor de dev). Sin
+ * token, o si TMDB lo rechaza (401), se usa `api_key` como hasta ahora.
+ */
+const READ_TOKEN = import.meta.env.TMDB_READ_TOKEN;
+
+if (!API_KEY && !READ_TOKEN) {
+    throw new Error("🚨 No se encontró la clave de API de TMDB. Define TMDB_READ_TOKEN (o TMDB_API_KEY) en tu .env");
+}
+
+/** Token rechazado una vez → el resto de la vida del proceso, con `api_key` (sin un 401 por llamada). */
+let bearerRejected = false;
+
+export const BASE_URL = "https://api.themoviedb.org/3";
+export const IMAGE_BASE = "https://image.tmdb.org/t/p";
+
+// Helpers para construir URLs de imagen TMDB
+export const posterUrl = (path: string | null, size: string = "w500") =>
+    path ? `${IMAGE_BASE}/${size}${path}` : "";
+export const backdropUrl = (path: string | null, size: string = "w780") =>
+    path ? `${IMAGE_BASE}/${size}${path}` : "";
+export const originalUrl = (path: string | null) =>
+    path ? `${IMAGE_BASE}/original${path}` : "";
+/** Fotograma de un episodio (`still_path`). w300 es el tamaño que pide el handoff para 16/9. */
+export const stillUrl = (path: string | null, size: string = "w300") =>
+    path ? `${IMAGE_BASE}/${size}${path}` : "";
+
+export type MediaType = 'movie' | 'tv';
+
+// 5xx de TMDB o su CDN (CloudFront) y 429 (rate limit) suelen ser TRANSITORIOS.
+// Los 4xx (401/404…) NO se reintentan.
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const MAX_RETRIES = 1;    // 2 intentos en total (un reintento barato para blips)
+const TIMEOUT_MS = 6000;  // corta un upstream colgado: sin esto, un fetch bloqueado espera ~30s
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Fetch genérico a la API de TMDB con manejo de errores centralizado.
+ * Se autentica con el token (cabecera) o `api_key`, y añade el idioma del usuario (perfil →
+ * contexto ALS; default es-ES).
+ * Un `language` explícito en `params` sigue teniendo prioridad.
+ *
+ * Cada intento tiene TIMEOUT (AbortController): si TMDB se cuelga, cortamos rápido en vez
+ * de esperar el timeout del socket (~30s) — clave para que la Home no tarde una eternidad
+ * cuando el CDN de TMDB va lento. Un único reintento cubre los 504 esporádicos sin
+ * multiplicar la latencia en una caída generalizada. Tras agotar, lanza como antes
+ * (los callers como `tmdbFetchList`/`safeFetch` ya lo capturan → sección vacía, sin crash).
+ */
+export async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+    const res = await tmdbRequest(path, params);
+    return res.json() as Promise<T>;
+}
+
+/**
+ * Como `tmdbFetch`, pero dice además durante cuánto tiempo considera TMDB válida la respuesta
+ * (`Cache-Control: max-age` menos `Age`, en ms; 0 si no lo dice). TMDB sirve las fichas desde su
+ * CDN y, mientras dura ese tiempo, pedirlas otra vez devuelve exactamente lo mismo: es el plazo que
+ * se puede guardar una respuesta sin enseñar nada más viejo que TMDB (C4, `tmdbTitleCache.ts`).
+ */
+export async function tmdbFetchWithFreshness<T>(
+    path: string,
+    params: Record<string, string> = {},
+): Promise<{ data: T; freshForMs: number }> {
+    const res = await tmdbRequest(path, params);
+    const maxAge = Number(/max-age=(\d+)/.exec(res.headers.get('cache-control') || '')?.[1] ?? 0);
+    const age = Number(res.headers.get('age') || 0);
+    const freshForMs = Math.max(0, (maxAge - (Number.isFinite(age) ? age : 0)) * 1000);
+    return { data: (await res.json()) as T, freshForMs };
+}
+
+/** Petición a TMDB con idioma, timeout y un reintento; devuelve la respuesta OK o lanza. */
+async function tmdbRequest(path: string, params: Record<string, string>): Promise<Response> {
+    const allParams = new URLSearchParams({
+        language: getCurrentLanguage(),
+        ...params,
+    });
+    // `language: ''` = petición SIN idioma. No es lo mismo que mandarlo vacío: `/images` sin
+    // `language` devuelve todas las imágenes y con `language=` vacío se deja algunas (C1).
+    if (params.language === '') allParams.delete('language');
+
+    let useBearer = Boolean(READ_TOKEN) && !bearerRejected;
+    const request = () => {
+        if (useBearer) return { url: `${BASE_URL}${path}?${allParams.toString()}`, headers: { Authorization: `Bearer ${READ_TOKEN}` } };
+        const withKey = new URLSearchParams(allParams);
+        withKey.set('api_key', API_KEY);
+        return { url: `${BASE_URL}${path}?${withKey.toString()}`, headers: undefined };
+    };
+
+    for (let attempt = 0; ; attempt++) {
+        const { url, headers } = request();
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+        let res: Response;
+        try {
+            res = await fetch(url, { signal: ctrl.signal, headers });
+        } catch (err) {
+            clearTimeout(timer);
+            const aborted = (err as Error)?.name === 'AbortError';
+            // Timeout propio (aborted) → NO reintentar: ya esperamos 6s; reintentar solo dobla la
+            // espera y la carga si TMDB va lento. Fallo de red puntual (no-abort) → un reintento.
+            if (!aborted && attempt < MAX_RETRIES) { await sleep(250); continue; }
+            console.error(`❌ TMDB ${aborted ? 'timeout' : 'red'} [${path}] tras ${attempt + 1} intento(s)`);
+            throw err;
+        }
+        clearTimeout(timer);
+
+        if (res.ok) return res;
+
+        // Token caducado o mal copiado: no tumbar la web. Se pasa a `api_key` (si hay) y se avisa
+        // una vez en el log; este reintento no cuenta como uno de los de red.
+        if (res.status === 401 && useBearer && API_KEY) {
+            await res.body?.cancel().catch(() => {});
+            if (!bearerRejected) console.warn('⚠️ TMDB rechaza TMDB_READ_TOKEN (401): se sigue con TMDB_API_KEY. Revisa la variable.');
+            bearerRejected = true;
+            useBearer = false;
+            attempt--;
+            continue;
+        }
+
+        if (RETRYABLE_STATUS.has(res.status) && attempt < MAX_RETRIES) {
+            await res.body?.cancel().catch(() => {}); // libera la conexión antes de reintentar
+            await sleep(250);
+            continue;
+        }
+
+        const errorBody = await res.text();
+        // Trunca: un 504 de CloudFront vuelca una página HTML entera que ensucia la consola.
+        console.error(`❌ TMDB error [${res.status}] ${path}:`, errorBody.slice(0, 200));
+        throw new Error(`Error en la solicitud: ${res.statusText}`);
+    }
+}
+
+/**
+ * Fetch que devuelve directamente el array .results de la respuesta paginada de TMDB.
+ */
+export async function tmdbFetchList<T>(path: string, params: Record<string, string> = {}): Promise<T[]> {
+    try {
+        const data = await tmdbFetch<{ results: T[] }>(path, params);
+        return Array.isArray(data.results) ? data.results : [];
+    } catch (error) {
+        console.error(`❌ Error al obtener lista desde ${path}:`, error);
+        return [];
+    }
+}

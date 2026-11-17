@@ -1,0 +1,348 @@
+/**
+ * Generador de notificaciones (Bloque 4) — "materializar al abrir".
+ *
+ * Lee las señales que YA tenemos (radar: episodios/plataformas/personas + efeméride
+ * del brief) y hace upsert idempotente en users/{uid}/notifications con id
+ * determinista. No requiere cron. Respeta los toggles del perfil (por defecto, todo
+ * activado). Guardado por uid+día en memoria: solo materializa una vez al día por
+ * instancia (el radar ya está cacheado por día; esto evita el fetch de la efeméride
+ * en cada carga de página del badge).
+ *
+ * El "cambio de plataforma" (entró/salió) también es on-open: NO usa cron. Compara el
+ * estado de HOY contra un snapshot por usuario (providerState) y materializa solo los
+ * cambios. Ver platformChangeItems() más abajo.
+ *
+ * 2026-10-28 (N1/N2/N4, tras meses de campana casi muda): los episodios avisan EL DÍA que salen,
+ * hay aviso de temporada nueva para toda serie de tus listas, lo marcado con «Avisarme» en una
+ * ficha avisa de verdad (cines, digital, plataforma), los estrenos de quien sigues avisan también el
+ * día del estreno, y «cambió de plataforma» ignora los bandazos (ver `titleSignals.ts`).
+ */
+import { getRadar } from '../home/radar';
+import { anniversarySignal, getLibraryOnMyPlatforms, type LibraryOrigin } from '../home/dailyBrief';
+import { upsertMany, type NotifInput, type NotifType } from './notifications';
+import { getCurrentUid } from '../db/userScope';
+import { readUserState, writeUserState } from '../db/userState';
+import { getUserProfile } from '../profile/userProfile';
+import { getLibrarySnapshot } from '../library/librarySnapshot';
+import { getWatchStreak } from '../series/yourfavsSerie';
+import { readProviderState, writeProviderState, type ProviderSnapEntry } from './providerState';
+import { appDateParts } from '../../utils/appTime';
+import { seriesSignals, subscribedMovieSignals, watchlistMovieSignals } from './titleSignals';
+import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
+
+// type de notificación → clave del toggle en el perfil (UserProfile.notifPrefs)
+const TYPE_TO_PREF: Record<NotifType, string> = {
+    new_episode: 'episodes',
+    new_season: 'episodes',
+    premiere: 'releases',
+    on_platform: 'platform',
+    person_release: 'releases',
+    anniversary: 'anniversary',
+    platform_change: 'platform',
+    streak: 'streak',
+    // Entre personas: no los genera este archivo; la preferencia la respeta la BD al crearlos.
+    follow: 'social',
+    friend_request: 'social',
+    friend_accepted: 'social',
+    recommendation: 'social',
+    rec_reply: 'social',
+    rec_watched: 'social',
+    // Planes para verla (Mensajes M5): los escribe la BD al cambiar o cancelar un plan, y el día
+    // del plan al abrir la campana (`syncPlanToday`).
+    plan_changed: 'social',
+    plan_cancelled: 'social',
+    plan_today: 'social',
+};
+
+// Heredado de Firestore, que no admitía '/' en los ids: se mantiene para que los ids de los
+// avisos ya guardados sigan coincidiendo.
+function safeId(s: string): string {
+    return s.replace(/\//g, ':');
+}
+
+const syncedDay = new Map<string, string>(); // uid → "YYYY-MM-DD" ya materializado
+
+export async function syncNotifications(platforms: number[] = [], force = false): Promise<void> {
+    const uid = getCurrentUid();
+    if (!uid) return;
+    const day = appDateParts(Date.now()).key;
+    if (!force && syncedDay.get(uid) === day) return; // fast-path (proceso caliente)
+
+    // Guard PERSISTENTE (dieta de lecturas): en serverless cada cold start reinicia el
+    // Map en memoria → sin esto, el generador (radar + snapshot + efeméride + platform
+    // diff) se re-ejecutaría en CADA arranque de instancia. Un doc meta barato recuerda
+    // el último día materializado entre instancias: si ya es de hoy, salimos con 1 lectura.
+    if (!force) {
+        try {
+            const meta = await readUserState<{ day?: string }>('notif_sync');
+            if (meta?.day === day) {
+                syncedDay.set(uid, day);
+                return;
+            }
+        } catch { /* si el meta falla, materializamos igualmente */ }
+    }
+
+    // Preferencias por tipo (si no hay, todo activado).
+    let prefs: Record<string, boolean> | null = null;
+    try {
+        const p = await getUserProfile();
+        prefs = (p as any)?.notifPrefs ?? null;
+    } catch { /* sin perfil → todo activado */ }
+    const enabled = (type: NotifType) => !prefs || prefs[TYPE_TO_PREF[type]] !== false;
+
+    const items: NotifInput[] = [];
+
+    // Episodios (el día que salen) y temporadas nuevas. Lo suscrito con «Avisarme» llega aunque el
+    // interruptor de series esté apagado: lo pediste título a título.
+    try {
+        for (const { always, ...it } of await seriesSignals()) {
+            if (always || enabled(it.type)) items.push(it);
+        }
+    } catch (error) {
+        console.error('[notifications] series:', (error as Error).message);
+    }
+
+    // Películas con «Avisarme»: cines, digital, plataforma. Siempre (lo pediste tú).
+    try {
+        items.push(...await subscribedMovieSignals(platforms));
+    } catch (error) {
+        console.error('[notifications] subs:', (error as Error).message);
+    }
+
+    // Películas de Ver pronto y Pendientes (N3): estrenos con el interruptor de estrenos, «ya en
+    // plataforma» con el de plataformas.
+    try {
+        for (const { always, ...it } of await watchlistMovieSignals(platforms)) {
+            if (always || enabled(it.type)) items.push(it);
+        }
+    } catch (error) {
+        console.error('[notifications] watchlist:', (error as Error).message);
+    }
+
+    try {
+        const radar = await getRadar(platforms);
+        for (const g of radar.groups) {
+            for (const it of g.items) {
+                // NB: ni 'episodes' (ahora en `seriesSignals`, el día que salen) ni 'platforms'
+                // (sin diff volcaría toda la watchlist; lo cubre platformChangeItems()) se
+                // materializan desde el radar: solo el anuncio de los estrenos de quien sigues.
+                if (g.key === 'people' && enabled('person_release')) {
+                    items.push({
+                        id: safeId(`release:${it.media_type}:${it.tmdb_id}`),
+                        type: 'person_release', title: it.title, subtitle: it.meta,
+                        href: it.href, poster_path: it.poster_path,
+                    });
+                }
+            }
+        }
+    } catch (error) {
+        console.error('[notifications] radar:', (error as Error).message);
+    }
+
+    // Estrenos de quien sigues, EL DÍA del estreno (el anuncio de arriba llega hasta 90 días antes).
+    if (enabled('premiere')) {
+        try {
+            const todayNum = appDateParts(Date.now()).dayNum;
+            for (const u of await getUpcomingFromFollowedPeople()) {
+                const diff = appDateParts(new Date(u.release_date + 'T12:00:00').getTime()).dayNum - todayNum;
+                if (diff > 0 || diff < -2) continue;
+                const names = u.person_names?.length ? u.person_names : [u.person_name];
+                const who = names.length > 1 ? `${names[0]} y ${names.length - 1} más` : names[0];
+                const when = diff === 0 ? 'hoy' : diff === -1 ? 'ayer' : 'hace 2 días';
+                items.push({
+                    id: safeId(`premiere:${u.media_type}:${u.tmdb_id}`),
+                    type: 'premiere', title: u.title,
+                    subtitle: u.media_type === 'movie' ? `${who} · en cines desde ${when}` : `${who} · se estrenó ${when}`,
+                    href: u.media_type === 'movie' ? `/movie/${u.tmdb_id}` : `/serie/${u.tmdb_id}`,
+                    poster_path: u.poster_path,
+                });
+            }
+        } catch (error) {
+            console.error('[notifications] premiere:', (error as Error).message);
+        }
+    }
+
+    if (enabled('anniversary')) {
+        try {
+            const a = await anniversarySignal();
+            if (a) {
+                const year = appDateParts(Date.now()).key.slice(0, 4);
+                const hrefKey = a.href.replace(/^\//, '').replace(/\//g, ':'); // "movie:789"
+                items.push({
+                    id: safeId(`anniv:${hrefKey}:${year}`),
+                    type: 'anniversary', title: a.title, subtitle: a.subtitle,
+                    href: a.href, poster_path: a.poster_path ?? null,
+                });
+            }
+        } catch (error) {
+            console.error('[notifications] anniversary:', (error as Error).message);
+        }
+    }
+
+    // Cambió de plataforma (entró/salió) — diff contra el snapshot del usuario.
+    if (enabled('platform_change')) {
+        try {
+            items.push(...await platformChangeItems(platforms, day));
+        } catch (error) {
+            console.error('[notifications] platform_change:', (error as Error).message);
+        }
+    }
+
+    // Racha en peligro (§6 detalles con alma) — OFF por defecto (solo si el usuario lo
+    // activa). Si la racha sigue viva pero la última actividad fue AYER (nada hoy),
+    // avisamos para que no se rompa. Id determinista por día → como mucho 1 aviso/día.
+    if (prefs?.streak === true) {
+        try {
+            const st = await getWatchStreak();
+            if (st.current > 0 && st.lastDay) {
+                const lastNum = appDateParts(new Date(st.lastDay).getTime()).dayNum;
+                if (lastNum === appDateParts(Date.now()).dayNum - 1) {
+                    items.push({
+                        id: safeId(`streak:${day}`),
+                        type: 'streak',
+                        title: `Tu racha de ${st.current} ${st.current === 1 ? 'día' : 'días'} está en peligro`,
+                        subtitle: 'Mira algo hoy para no romperla',
+                        href: '/mislistas/siguiendo',
+                        poster_path: null,
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('[notifications] streak:', (error as Error).message);
+        }
+    }
+
+    try {
+        await upsertMany(items);
+        syncedDay.set(uid, day);
+        try { await writeUserState('notif_sync', { day }); } catch { /* meta best-effort */ }
+    } catch (error) {
+        console.error('[notifications] upsert:', (error as Error).message);
+    }
+}
+
+/**
+ * Versión del CONJUNTO de listas vigiladas por "cambió de plataforma". Súbela cada vez
+ * que amplíes/cambies qué listas entran en el diff. Al detectar que el snapshot guardado
+ * tiene otra versión, se re-siembra en SILENCIO (evita floodear con "entró" toda la lista
+ * nueva, que es lo que pasa si comparas contra una memoria que no la conocía).
+ *   v1: Pendientes + Ver pronto.
+ *   v2: + Favoritos + Me gusta.
+ *   v3: mismo conjunto; cambia la forma (`pending`) y los ids pasan a llevar el mes.
+ */
+const PROVIDER_STATE_VERSION = 3;
+
+// Copy según de qué lista viene el título (fav/like/watchlist).
+function enteredSubtitle(provider: string, origin: LibraryOrigin | undefined): string {
+    if (origin === 'fav') return `Ya en ${provider} · tu favorito`;
+    if (origin === 'like') return `Ya en ${provider} · te gustó`;
+    return `Ya en ${provider} · de tu lista`;
+}
+function leftSubtitle(provider: string, origin: LibraryOrigin | undefined): string {
+    if (origin === 'fav') return `Salió de ${provider} · tu favorito`;
+    if (origin === 'like') return `Salió de ${provider} · te gustó`;
+    return `Salió de ${provider} · aún en tu lista`;
+}
+
+/**
+ * "Cambió de plataforma" (entró/salió), sin cron. Compara tu biblioteca disponible en
+ * plataformas HOY — Pendientes + Ver pronto + Favoritos + Me gusta — contra el último
+ * snapshot guardado y emite solo los cambios; luego reescribe el snapshot.
+ *
+ * · 1ª sincronización (sin snapshot) → SIEMBRA en silencio (nada de volcar la biblioteca).
+ * · Ya procesado hoy (snapshot.day === day) → no re-diffea (idempotente entre instancias).
+ * · "Salió" solo se emite si el título SIGUE en tu biblioteca (Pendientes/Ver pronto/Favs/
+ *   Me gusta). Si ya no está en ninguna, lo quitaste tú → no es "salió".
+ * · Bandazos (N4): los datos de plataformas de TMDB van y vienen de un día a otro. «Salió» solo se
+ *   avisa si el título falta DOS comparaciones seguidas (`pending`); si vuelve entre medias, nada.
+ *   Y los ids llevan el mes (`platform:in:movie:123:2026-10`): como mucho un aviso al mes por
+ *   título y sentido, en vez de uno nuevo cada día que oscile.
+ * · El copy distingue "tu favorito" / "te gustó" / "de tu lista" según el origin.
+ * · Sin plataformas seleccionadas → función desactivada (no toca el snapshot).
+ */
+async function platformChangeItems(platforms: number[], day: string): Promise<NotifInput[]> {
+    if (!platforms.length) return [];
+
+    const onPlatform = await getLibraryOnMyPlatforms(platforms);
+    const hoy: Record<string, ProviderSnapEntry> = {};
+    for (const p of onPlatform) {
+        hoy[`${p.media_type}:${p.id}`] = {
+            name: p.provider_name, title: p.title, poster: p.poster_path,
+            media_type: p.media_type, origin: p.origin,
+        };
+    }
+
+    const prev = await readProviderState();
+
+    // Primera vez, O cambió el conjunto de listas vigiladas (version) → sembrar sin
+    // notificar. Ya diffeado hoy → nada que hacer.
+    if (!prev || prev.version !== PROVIDER_STATE_VERSION) {
+        await writeProviderState({ version: PROVIDER_STATE_VERSION, day, map: hoy });
+        return [];
+    }
+    if (prev.day === day) return [];
+
+    const items: NotifInput[] = [];
+    const hrefFor = (e: ProviderSnapEntry, id: string) =>
+        e.media_type === 'movie' ? `/movie/${id}` : `/serie/${id}`;
+    const month = day.slice(0, 7);
+    const prevPending = prev.pending ?? {};
+    const pending: Record<string, string> = {};
+
+    // ENTRÓ: está en hoy y no estaba en el snapshot previo (si estaba a la espera de confirmar su
+    // salida, es un bandazo: vuelve sin aviso).
+    for (const [key, e] of Object.entries(hoy)) {
+        if (key in prev.map) continue;
+        const id = key.split(':')[1];
+        items.push({
+            id: safeId(`platform:in:${key}:${month}`),
+            type: 'platform_change',
+            title: e.title,
+            subtitle: enteredSubtitle(e.name, e.origin),
+            href: hrefFor(e, id),
+            poster_path: e.poster,
+        });
+    }
+
+    // SALIÓ: estaba en el snapshot previo, ya no está en hoy, PERO sigue en tu biblioteca
+    // (Pendientes/Ver pronto/Favoritos/Me gusta). Si ya no está, lo quitaste tú → no es "salió".
+    // La primera vez que falta solo se anota (`pending`) y se conserva en el mapa; se avisa a la segunda.
+    const missing = Object.keys(prev.map).filter((k) => !(k in hoy));
+    const leftKeys = missing.filter((k) => k in prevPending);
+    for (const k of missing) {
+        if (k in prevPending) continue;
+        pending[k] = day;
+        hoy[k] = prev.map[k];
+    }
+    if (leftKeys.length) {
+        let stillMine: Set<string>;
+        try {
+            const snap = await getLibrarySnapshot();
+            stillMine = new Set<string>();
+            for (const m of [...((snap as any).movPend || []), ...((snap as any).movVerPronto || []), ...((snap as any).movFavs || []), ...((snap as any).movLike || [])]) stillMine.add(`movie:${m.id}`);
+            for (const s of [...((snap as any).tvPend || []), ...((snap as any).tvVerPronto || []), ...((snap as any).tvFavs || []), ...((snap as any).tvLike || [])]) stillMine.add(`tv:${s.id}`);
+        } catch {
+            stillMine = new Set(leftKeys); // si falla la lectura, no filtramos (conservador)
+        }
+        for (const key of leftKeys) {
+            if (!stillMine.has(key)) continue; // ya no está en tu biblioteca → no es "salió"
+            const e = prev.map[key];
+            const id = key.split(':')[1];
+            items.push({
+                id: safeId(`platform:out:${key}:${month}`),
+                type: 'platform_change',
+                title: e.title,
+                subtitle: leftSubtitle(e.name, e.origin),
+                href: hrefFor(e, id),
+                poster_path: e.poster,
+            });
+        }
+    }
+
+    await writeProviderState({ version: PROVIDER_STATE_VERSION, day, map: hoy, pending });
+    return items;
+}
+
+export function invalidateNotifSync(uid?: string) {
+    if (uid) syncedDay.delete(uid); else syncedDay.clear();
+}

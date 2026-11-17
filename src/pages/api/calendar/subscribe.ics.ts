@@ -6,7 +6,7 @@
  * Como es igual para todos, se puede guardar en el CDN.
  */
 import type { APIRoute } from 'astro';
-import { legacyFeed } from '../../../services/API/Calendar/icsFeed';
+import { legacyFeed } from '../../../services/calendar/icsFeed';
 
 export const prerender = false;
 

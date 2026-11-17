@@ -41,7 +41,7 @@ interface SessionUser {
 declare namespace App {
     interface Locals {
         /** Cliente de Supabase de ESTA petición (con sus cookies): la RLS ve a su usuario. */
-        supabase: import('./lib/supabase/server').SupabaseServer;
+        supabase: import('./services/db/server').SupabaseServer;
         /** Usuario de la sesión verificada por el middleware; null si es invitado. */
         user: SessionUser | null;
         /**

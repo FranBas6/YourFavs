@@ -20,9 +20,9 @@ import {
     getActorCrewCredits,
     fetchActorImages,
     fetchTaggedImages,
-} from '../../../services/API/Actors/InfoActor';
-import { posterUrl } from '../../../services/API/shared/tmdbClient';
-import { toItem } from '../summary';
+} from '../../../services/people/InfoActor';
+import { posterUrl } from '../../../services/tmdb/tmdbClient';
+import { toItem } from '../../../services/tmdb/summaryItem';
 import { safeFetch } from '../../../utils/safeFetch';
 
 export const prerender = false;

@@ -13,8 +13,8 @@
  * Patrón de endpoint como avatar-options.ts: prerender=false, guard locals.user.
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch, posterUrl } from '../../../services/API/shared/tmdbClient';
-import { getTrending, getTrendingPeople } from '../../../services/API/shared/tmdbDiscoverService';
+import { tmdbFetch, posterUrl } from '../../../services/tmdb/tmdbClient';
+import { getTrending, getTrendingPeople } from '../../../services/catalog/tmdbDiscoverService';
 
 export const prerender = false;
 

@@ -3,7 +3,7 @@
  * en una cookie y manda al usuario a trakt.tv a aprobar el permiso; Trakt vuelve a `/callback`.
  */
 import type { APIRoute } from 'astro';
-import { authorizeUrl, newPkce, traktEnabled } from '../../../../services/API/shared/traktAccount';
+import { authorizeUrl, newPkce, traktEnabled } from '../../../../services/import/traktAccount';
 import { setPkce } from './_session';
 
 export const prerender = false;

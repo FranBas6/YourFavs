@@ -3,7 +3,7 @@
  * como lo dejó: ver `import_undo` en la migración `20261105090000_import_jobs`.
  */
 import type { APIRoute } from 'astro';
-import { undoImport } from '../../../services/BD/import/importLibrary';
+import { undoImport } from '../../../services/import/importLibrary';
 import { json, isUuid } from './_shared';
 
 export const prerender = false;

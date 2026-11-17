@@ -10,10 +10,10 @@
  * M4c: `spoiler: { mediaType, tmdbId, title, season?, episode? }` marca el texto como spoiler.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../../lib/http';
+import { jsonNoStore } from '../../../../../../services/http/http';
 import { badRequest, isUuid, posInt, serverError, unauthorized } from '../../../../../../lib/social/http';
-import { MSG_MAX, SEND_STATUS, sendMessage } from '../../../../../../services/BD/social/messages';
-import { readSpoiler, readTitleCard } from '../../../../../../services/BD/social/chatCards';
+import { MSG_MAX, SEND_STATUS, sendMessage } from '../../../../../../services/social/messages';
+import { readSpoiler, readTitleCard } from '../../../../../../services/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../../../utils/constants/social';
 
 export const prerender = false;

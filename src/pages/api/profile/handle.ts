@@ -8,8 +8,8 @@
  * Responde 200 en los dos casos: «ocupado» no es un error de la petición, es la respuesta.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
-import { checkOwnHandle } from '../../../services/BD/social/publicSettings';
+import { jsonNoStore } from '../../../services/http/http';
+import { checkOwnHandle } from '../../../services/social/publicSettings';
 
 export const prerender = false;
 

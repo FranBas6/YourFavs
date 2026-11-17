@@ -6,9 +6,9 @@
  * Solo vienen los planes que puedes ver. Como mucho 30.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../../lib/http';
+import { jsonNoStore } from '../../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../../lib/social/http';
-import { planViews } from '../../../../../services/BD/social/chatCards';
+import { planViews } from '../../../../../services/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../../utils/constants/social';
 
 export const prerender = false;

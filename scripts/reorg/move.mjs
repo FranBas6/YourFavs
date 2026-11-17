@@ -86,7 +86,8 @@ function mentionRules(pairs, allRel) {
     // Primero las más largas: `src/a/b/c.ts` antes que `b/c.ts`.
     return rules.sort((x, y) => y.find.length - x.find.length).map((r) => ({
         ...r,
-        re: new RegExp(`(?<![\\w\\-./])${esc(r.find)}${r.noExt ? '(?=$|[^\\w\\-/.]|\\.(?:\\s|$))' : '(?![\\w\\-])'}`, 'g'),
+        // Delante no puede haber otro trozo de ruta… salvo una `/` antes de `src/` (`'/src/x.ts'`).
+        re: new RegExp(`${r.find.startsWith('src/') ? '(?<![\\w\\-.])' : '(?<![\\w\\-./])'}${esc(r.find)}${r.noExt ? '(?=$|[^\\w\\-/.]|\\.(?:\\s|$))' : '(?![\\w\\-])'}`, 'g'),
     }));
 }
 function applyMentions(text, rules) {

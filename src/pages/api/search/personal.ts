@@ -7,8 +7,8 @@
  * para que el palette lo renderice sin código nuevo.
  */
 import type { APIRoute } from 'astro';
-import { posterUrl } from '../../../services/API/shared/tmdbClient';
-import { buildPersonalIndex, foldText } from '../../../services/BD/shared/personalIndex';
+import { posterUrl } from '../../../services/tmdb/tmdbClient';
+import { buildPersonalIndex, foldText } from '../../../services/library/personalIndex';
 import { formatScore } from '../../../utils/constants/helpers/media-helpers';
 
 export const prerender = false;

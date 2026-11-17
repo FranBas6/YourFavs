@@ -6,9 +6,9 @@
  * caracteres devuelve una lista vacía. Nadie sabe a quién buscas: no se guarda nada.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
+import { jsonNoStore } from '../../../services/http/http';
 import { serverError, tooMany, unauthorized } from '../../../lib/social/http';
-import { allowSocialWrite, searchPeople } from '../../../services/BD/social/graph';
+import { allowSocialWrite, searchPeople } from '../../../services/social/graph';
 
 export const prerender = false;
 

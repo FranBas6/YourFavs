@@ -7,7 +7,7 @@
  * Público, igual que el resto de datos de TMDB. Los `logo_path` van en RUTA CRUDA.
  */
 import type { APIRoute } from 'astro';
-import { getSeasonWatchProviders } from '../../../../services/API/Series/InfoSeries';
+import { getSeasonWatchProviders } from '../../../../services/series/InfoSeries';
 
 export const prerender = false;
 

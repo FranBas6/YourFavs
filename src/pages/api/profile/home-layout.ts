@@ -9,7 +9,7 @@
  * desconocidas y duplicados, o la portada intentaría pintar un bloque que no existe.
  */
 import type { APIRoute } from 'astro';
-import { setUserProfile } from '../../../services/BD/profile/userProfile';
+import { setUserProfile } from '../../../services/profile/userProfile';
 import { HOME_SECTIONS } from '../../../utils/constants/homeSections';
 
 export const prerender = false;

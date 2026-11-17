@@ -5,9 +5,9 @@
  * (`social_restore_friend`): no sirve para crear una amistad sin que la otra persona acepte.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, readUserId, serverError, tooMany, unauthorized } from '../../../../lib/social/http';
-import { allowSocialWrite, getRelation, restoreFriend } from '../../../../services/BD/social/graph';
+import { allowSocialWrite, getRelation, restoreFriend } from '../../../../services/social/graph';
 
 export const prerender = false;
 

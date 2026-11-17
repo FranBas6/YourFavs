@@ -5,7 +5,7 @@
  * `/auth/callback`). También vale para quien entra con Google y quiere añadir contraseña.
  */
 import type { APIRoute } from 'astro';
-import { json, mapAuthError } from '../../../lib/supabase/authHttp';
+import { json, mapAuthError } from '../../../services/db/authHttp';
 
 export const prerender = false;
 

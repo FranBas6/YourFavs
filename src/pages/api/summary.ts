@@ -16,8 +16,8 @@
  *   language = es-ES (opc.)  se pasa a TMDB tal cual si viene
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch } from '../../services/API/shared/tmdbClient';
-import { toItem } from '../../services/API/shared/summaryItem';
+import { tmdbFetch } from '../../services/tmdb/tmdbClient';
+import { toItem } from '../../services/tmdb/summaryItem';
 
 export const prerender = false;
 
@@ -30,9 +30,6 @@ function json(data: unknown, status = 200): Response {
     });
 }
 
-// `SummaryItem` y `toItem` viven en `services/API/shared/summaryItem.ts` (también los usa el perfil
-// público). Se re-exportan aquí para que las rutas que ya los importaban de './summary' no cambien.
-export { toItem, type SummaryItem } from '../../services/API/shared/summaryItem';
 
 export const GET: APIRoute = async ({ url }) => {
     const type = url.searchParams.get('type');

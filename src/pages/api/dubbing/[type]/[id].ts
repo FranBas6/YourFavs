@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
-import { tmdbFetch } from '../../../../services/API/shared/tmdbClient';
-import { getCached, setCached, invalidateCached } from '../../../../utils/recsBlobCache';
+import { tmdbFetch } from '../../../../services/tmdb/tmdbClient';
+import { getCached, setCached, invalidateCached } from '../../../../services/cache/recsBlobCache';
 import { processBatch } from '../../../../utils/processBatch';
 import {
     searchEldoblaje,
@@ -12,7 +12,7 @@ import {
     ELDOBLAJE_BASE,
     type DubbingEntry,
     type SeasonFicha,
-} from '../../../../services/scraping/eldoblaje';
+} from '../../../../services/dubbing/eldoblaje';
 
 export const prerender = false;
 

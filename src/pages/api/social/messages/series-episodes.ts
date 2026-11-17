@@ -5,9 +5,9 @@
  * temporada (TMDB) y el último que has visto tú, para dejar marcado el siguiente.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, posInt, serverError, unauthorized } from '../../../../lib/social/http';
-import { seriesEpisodes } from '../../../../services/BD/social/chatCards';
+import { seriesEpisodes } from '../../../../services/social/chatCards';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 
 export const prerender = false;

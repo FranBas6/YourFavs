@@ -11,11 +11,11 @@
  * Privado (depende de tu sesión): sin caché compartida.
  */
 import type { APIRoute } from 'astro';
-import { tmdbFetch, backdropUrl, IMAGE_BASE } from '../../../../services/API/shared/tmdbClient';
-import { pickBestTrailerKey, videoLanguages, mapAndDeduplicateProviders } from '../../../../services/API/shared/tmdbInfoService';
-import { getCurrentRegion } from '../../../../services/BD/shared/userScope';
-import { checkMediaExistence } from '../../../../services/BD/shared/checkExistence';
-import { getNextEpisode } from '../../../../services/API/Series/nextEpisode';
+import { tmdbFetch, backdropUrl, IMAGE_BASE } from '../../../../services/tmdb/tmdbClient';
+import { pickBestTrailerKey, videoLanguages, mapAndDeduplicateProviders } from '../../../../services/tmdb/tmdbInfoService';
+import { getCurrentRegion } from '../../../../services/db/userScope';
+import { checkMediaExistence } from '../../../../services/titles/checkExistence';
+import { getNextEpisode } from '../../../../services/series/nextEpisode';
 
 export const prerender = false;
 

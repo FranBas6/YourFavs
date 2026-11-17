@@ -3,7 +3,7 @@
  * borra la cookie (lote F2). Siempre responde ok: si Trakt falla, la cookie se borra igual.
  */
 import type { APIRoute } from 'astro';
-import { revokeToken } from '../../../../services/API/shared/traktAccount';
+import { revokeToken } from '../../../../services/import/traktAccount';
 import { json } from '../_shared';
 import { clearAccess, getAccess } from './_session';
 

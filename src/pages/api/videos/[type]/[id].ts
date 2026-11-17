@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
-import { tmdbFetch } from '../../../../services/API/shared/tmdbClient';
-import { pickBestTrailerKey, videoLanguages } from '../../../../services/API/shared/tmdbInfoService';
-import { getCurrentLanguage } from '../../../../services/BD/shared/userScope';
+import { tmdbFetch } from '../../../../services/tmdb/tmdbClient';
+import { pickBestTrailerKey, videoLanguages } from '../../../../services/tmdb/tmdbInfoService';
+import { getCurrentLanguage } from '../../../../services/db/userScope';
 
 export const prerender = false;
 

@@ -6,25 +6,25 @@ import {
     formatDate, formatTrailerUrl, providerLinks
 } from "../../utils/constants/helpers/media-helpers";
 import {formatCurrency} from "../../utils/constants/helpers/movie-helpers";
-import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/BD/movies/yourfavsMovie";
+import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/movies/yourfavsMovie";
 import SagaProgress from "../../components/detail/SagaProgress.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/movie/movie.css';
 import {
     getMovieBundle, getMovieCollectionInfo, getMovieRecommendationsOrSimilar, type MovieBundle
-} from "../../services/API/Movies/InfoMovies";
+} from "../../services/movies/InfoMovies";
 import { peekTopActors } from "../../utils/topActorsLibrary";
-import { posterUrl, backdropUrl, originalUrl } from "../../services/API/shared/tmdbClient";
-import { SUPPORTED_COUNTRIES } from "../../services/API/shared/tmdbInfoService";
-import { getCurrentRegion } from "../../services/BD/shared/userScope";
-import { checkMediaExistence } from "../../services/BD/shared/checkExistence";
-import { getMediaTags, handleMediaTagsAction } from "../../services/BD/shared/mediaTags";
+import { posterUrl, backdropUrl, originalUrl } from "../../services/tmdb/tmdbClient";
+import { SUPPORTED_COUNTRIES } from "../../services/tmdb/tmdbInfoService";
+import { getCurrentRegion } from "../../services/db/userScope";
+import { checkMediaExistence } from "../../services/titles/checkExistence";
+import { getMediaTags, handleMediaTagsAction } from "../../services/titles/mediaTags";
 import HideFromProfileToggle from "../../components/social/HideFromProfileToggle.astro";
 import { SOCIAL_PHASE } from "../../utils/constants/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/detail/FriendsSeen.astro";
-import { countMoviePasses } from "../../services/BD/lists/watchLog";
-import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/BD/notifications/yourfavsNotifications";
+import { countMoviePasses } from "../../services/library/watchLog";
+import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/yourfavsNotifications";
 import FichaActions from "../../components/detail/FichaActions.astro";
 import FichaSections from "../../components/detail/FichaSections.astro";
 import CastGrid from "../../components/detail/CastGrid.astro";
@@ -36,7 +36,7 @@ import LightboxGallery from "../../components/detail/LightboxGallery.astro";
 import VideoSection from "../../components/detail/VideoSection.astro";
 import RecommendationsCarousel from "../../components/detail/RecommendationsCarousel.astro";
 import CrossMediaSection from "../../components/detail/CrossMediaSection.astro";
-import { getCrossMediaRelated } from "../../services/API/shared/crossMediaRelated";
+import { getCrossMediaRelated } from "../../services/titles/crossMediaRelated";
 import StreamingProviders from "../../components/detail/StreamingProviders.astro";
 import StarRating from "../../components/detail/StarRating.astro";
 import {safeFetch} from "../../utils/safeFetch";
@@ -163,7 +163,7 @@ const isUnreleased = item?.release_date ? new Date(item.release_date) > new Date
 const notifSub = isUnreleased ? await getNotificationSub('movie', id) : null;
 const isNotifSubscribed = !!notifSub;
 
-import type {PosterImage} from '../../services/API/Movies/InfoMovies';
+import type {PosterImage} from '../../services/movies/InfoMovies';
 
 // Segundo bloque de datos (dependen de item pero no entre sí) — todo en paralelo
 const tmdbId = item?.id;

@@ -3,8 +3,8 @@
  * (Mensajes M5c; handoff M5 §3.8). La anterior deja de funcionar al momento.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
-import { icsPath, rotateIcsToken } from '../../../../services/BD/profile/icsToken';
+import { jsonNoStore } from '../../../../services/http/http';
+import { icsPath, rotateIcsToken } from '../../../../services/calendar/icsToken';
 
 export const prerender = false;
 

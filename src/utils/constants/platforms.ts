@@ -1,7 +1,7 @@
 import type {Movie} from "../../types/ApiMovie";
 import type {Serie} from "../../types/ApiSerie";
-import {fetchByProvider, PROVIDERS} from "../../services/API/shared/tmdbDiscoverService";
-import {getCached, setCached} from "../recsBlobCache";
+import {fetchByProvider, PROVIDERS} from "../../services/catalog/tmdbDiscoverService";
+import {getCached, setCached} from "../../services/cache/recsBlobCache";
 import {appDateParts} from "../appTime";
 
 export interface PlatformInfo {

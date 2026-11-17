@@ -8,9 +8,9 @@
  * (mismo patrón que `api/home/hooks-refresh`): el visitante solo lee el resultado.
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../lib/http';
-import { getOwnPublicSettings, saveOwnArchetype } from '../../../services/BD/social/publicSettings';
-import { invalidatePublicProfileCache } from '../../../services/BD/social/publicProfile';
+import { jsonNoStore } from '../../../services/http/http';
+import { getOwnPublicSettings, saveOwnArchetype } from '../../../services/social/publicSettings';
+import { invalidatePublicProfileCache } from '../../../services/social/publicProfile';
 
 export const prerender = false;
 
@@ -26,7 +26,7 @@ export const POST: APIRoute = async ({ locals, url }) => {
 
         const [{ calculateLifetimeStats }, { getMaxWatchStreak }, { deriveArchetype }] = await Promise.all([
             import('../../../utils/yearStats'),
-            import('../../../services/BD/series/yourfavsSerie'),
+            import('../../../services/series/yourfavsSerie'),
             import('../../../utils/cinemaIdentity'),
         ]);
         const [stats, streak] = await Promise.all([calculateLifetimeStats(), getMaxWatchStreak()]);

@@ -7,8 +7,8 @@
  * cuelga de la FK.
  */
 import type { APIRoute } from 'astro';
-import { supabaseAdmin } from '../../../lib/supabase/admin';
-import { clearSessionFlag, json } from '../../../lib/supabase/authHttp';
+import { supabaseAdmin } from '../../../services/db/admin';
+import { clearSessionFlag, json } from '../../../services/db/authHttp';
 
 export const prerender = false;
 

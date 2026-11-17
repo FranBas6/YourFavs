@@ -6,10 +6,10 @@
  * `403 not_friends` (nada que permita adivinar un bloqueo).
  */
 import type { APIRoute } from 'astro';
-import { jsonNoStore } from '../../../../lib/http';
+import { jsonNoStore } from '../../../../services/http/http';
 import { badRequest, isUuid, serverError, unauthorized } from '../../../../lib/social/http';
-import { normalizeHandle } from '../../../../services/BD/social/handles';
-import { idByHandle, openDirect } from '../../../../services/BD/social/messages';
+import { normalizeHandle } from '../../../../services/social/handles';
+import { idByHandle, openDirect } from '../../../../services/social/messages';
 import { SOCIAL_PHASE } from '../../../../utils/constants/social';
 
 export const prerender = false;
