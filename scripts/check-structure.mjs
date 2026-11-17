@@ -103,7 +103,8 @@ for (const file of files) {
 const dirs = new Set(files.map((f) => path.dirname(rel(f))));
 for (const d of dirs) {
     if (!d.startsWith('pages') && d !== '.' && d.split('/').some((seg) => seg !== seg.toLowerCase())) add('R9', `src/${d}/`, 'carpeta con mayúsculas');
-    const names = fs.readdirSync(path.join(SRC, d));
+    // Solo archivos: `amigos.astro` junto a la carpeta `amigos/` es como Astro anida rutas.
+    const names = fs.readdirSync(path.join(SRC, d), { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name);
     const lower = new Map();
     for (const n of names) {
         const k = n.toLowerCase().replace(/\.[^.]+$/, '');
