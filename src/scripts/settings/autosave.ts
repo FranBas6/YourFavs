@@ -31,7 +31,7 @@
  * corre, los botones "Guardar cambios" no se esconden y el guardado va por recarga.
  */
 // Sin ningún import/export, TypeScript trata el fichero como script GLOBAL y sus funciones
-// chocan con las de otros scripts (aquí, el `init` de home-reorder.ts). Esto lo hace módulo.
+// chocan con las de otros scripts (aquí, el `init` de homeReorder.ts). Esto lo hace módulo.
 export {};
 
 const PREFS_URL = '/api/profile/preferences';

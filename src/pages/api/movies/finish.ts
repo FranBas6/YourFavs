@@ -5,7 +5,7 @@
  * re-visionado → pase en el diario. Reutiliza finishViewingMovie. Invitado → 401.
  */
 import type { APIRoute } from 'astro';
-import { finishViewingMovie } from '../../../services/movies/yourfavsMovie';
+import { finishViewingMovie } from '../../../services/movies/movieLibrary';
 
 export const prerender = false;
 

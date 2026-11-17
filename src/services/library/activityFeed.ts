@@ -2,14 +2,14 @@ import { getCurrentUid } from "../db/userScope";
 import { onLibraryChange } from './libraryChanges';
 import type { LiveProgress, WatchLogRow } from "./episodeWatches";
 import { getLibrarySnapshot, type LibrarySnapshot } from "./librarySnapshot";
-import { toTimestamp, formatScore } from "../../utils/titles/media-helpers";
+import { toTimestamp, formatScore } from "../../utils/titles/mediaHelpers";
 import { listRatings } from "./ratings";
-import { getAllFollowedPeople } from "../people/yourfavsPeople";
-import { getActorsFav } from "../people/yourfavsActor";
+import { getAllFollowedPeople } from "../people/followedPeople";
+import { getActorsFav } from "../people/favoriteActors";
 import { tmdbFetch } from "../tmdb/tmdbClient";
 import { processBatch } from "../../utils/core/processBatch";
 import { listActivity } from "./activityLog";
-import { getAllWatchedProgress } from "../series/yourfavsSerie";
+import { getAllWatchedProgress } from "../series/serieLibrary";
 import { getAllWatchLog } from "./watchLog";
 
 export interface ActivityEvent {

@@ -1,10 +1,10 @@
 import { tmdbFetch, tmdbFetchList } from "../tmdb/tmdbClient";
 import { processBatch } from "../../utils/core/processBatch";
-import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/InfoMovies";
+import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/movieDetail";
 import { getLibrarySnapshot } from "../library/librarySnapshot";
 import { getCurrentUid } from "../db/userScope";
 import { onLibraryChange } from '../library/libraryChanges';
-import { toTimestamp } from "../../utils/titles/media-helpers";
+import { toTimestamp } from "../../utils/titles/mediaHelpers";
 import { SEED_COLLECTION_IDS } from "../../utils/catalog/featuredCollections";
 
 interface CacheEntry<T> { data: T; expires: number }

@@ -6,7 +6,7 @@ import {
 import { getTransition } from "../library/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../library/watchLog";
 import { libraryChanged } from "../library/libraryChanges";
-import { normalizeScore } from "../../utils/titles/media-helpers";
+import { normalizeScore } from "../../utils/titles/mediaHelpers";
 import { appDateParts } from "../../utils/core/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../types/DbSerie";
 import { setRating, deleteRating } from "../library/ratings";

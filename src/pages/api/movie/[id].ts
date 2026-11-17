@@ -3,7 +3,7 @@
  *
  * Ficha de película en JSON para la app móvil. Reúne EXACTAMENTE el mismo dato
  * TMDB público que la página `pages/movie/[id].astro` (mismos servicios de
- * `InfoMovies.ts` / `tmdbInfoService.ts`, sin duplicar lógica).
+ * `services/movies/movieDetail.ts` / `services/tmdb/tmdbInfoService.ts`, sin duplicar lógica).
  *
  * NO incluye el estado personal (en qué listas está, rating, tags, veces vista,
  * notificaciones): eso vive en Supabase y se sirve por las rutas con sesión, no
@@ -20,7 +20,7 @@ import {
     getMovieCollectionInfo,
     getMovieRecommendationsOrSimilar,
     type MovieBundle,
-} from '../../../services/movies/InfoMovies';
+} from '../../../services/movies/movieDetail';
 import { safeFetch } from '../../../utils/core/safeFetch';
 
 export const prerender = false;

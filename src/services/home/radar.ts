@@ -11,8 +11,8 @@
  * 1 fetch por serie en seguimiento. Cacheado por **uid + día** (L1 + L2 Blobs).
  * `count` (badge) = nº total de novedades.
  */
-import { fetchSerieDetails } from '../series/tmdbSeries';
-import { getSeriesSiguiendo } from '../series/yourfavsSerie';
+import { fetchSerieDetails } from '../series/serieCatalog';
+import { getSeriesSiguiendo } from '../series/serieLibrary';
 import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
 import { getPendientesOnMyPlatforms } from './dailyBrief';
 import { getCurrentUid } from '../db/userScope';

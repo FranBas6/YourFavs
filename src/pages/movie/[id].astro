@@ -4,15 +4,15 @@ import type { CastMember, ProductionCompany } from "../../types/Media";
 import {
     getLanguageDisplayName, getContentRating, distinctOriginalTitle,
     formatDate, formatTrailerUrl, providerLinks
-} from "../../utils/titles/media-helpers";
-import {formatCurrency} from "../../utils/titles/movie-helpers";
-import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/movies/yourfavsMovie";
+} from "../../utils/titles/mediaHelpers";
+import {formatCurrency} from "../../utils/titles/movieHelpers";
+import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/movies/movieLibrary";
 import SagaProgress from "../../components/title/SagaProgress.astro";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/movie/movie.css';
 import {
     getMovieBundle, getMovieCollectionInfo, getMovieRecommendationsOrSimilar, type MovieBundle
-} from "../../services/movies/InfoMovies";
+} from "../../services/movies/movieDetail";
 import { peekTopActors } from "../../services/stats/topActorsLibrary";
 import { posterUrl, backdropUrl, originalUrl } from "../../services/tmdb/tmdbClient";
 import { SUPPORTED_COUNTRIES } from "../../services/tmdb/tmdbInfoService";
@@ -24,7 +24,7 @@ import { SOCIAL_PHASE } from "../../utils/social/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/title/FriendsSeen.astro";
 import { countMoviePasses } from "../../services/library/watchLog";
-import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/yourfavsNotifications";
+import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/notificationSubs";
 import FichaActions from "../../components/title/FichaActions.astro";
 import FichaSections from "../../components/title/FichaSections.astro";
 import CastGrid from "../../components/title/CastGrid.astro";
@@ -163,7 +163,7 @@ const isUnreleased = item?.release_date ? new Date(item.release_date) > new Date
 const notifSub = isUnreleased ? await getNotificationSub('movie', id) : null;
 const isNotifSubscribed = !!notifSub;
 
-import type {PosterImage} from '../../services/movies/InfoMovies';
+import type {PosterImage} from '../../services/movies/movieDetail';
 
 // Segundo bloque de datos (dependen de item pero no entre sí) — todo en paralelo
 const tmdbId = item?.id;

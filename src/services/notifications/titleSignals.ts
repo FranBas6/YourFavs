@@ -23,7 +23,7 @@ import { appDateParts } from '../../utils/core/appTime';
 import { episodeTypeLabel } from '../../utils/titles/episodeType';
 import { episodeHref, seasonHref } from '../../utils/titles/episodeView';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
-import { getAllNotificationSubs } from './yourfavsNotifications';
+import { getAllNotificationSubs } from './notificationSubs';
 import { getCurrentRegion } from '../db/userScope';
 import { mapAndDeduplicateProviders } from '../tmdb/tmdbInfoService';
 import type { NotifInput } from './notifications';

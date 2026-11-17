@@ -1,8 +1,8 @@
 import type { APIRoute } from 'astro';
 import { tmdbFetch } from '../../../services/tmdb/tmdbClient';
 import { mapAndDeduplicateProviders } from '../../../services/tmdb/tmdbInfoService';
-import { getMoviesPendientes } from '../../../services/movies/yourfavsMovie';
-import { getSeriesPendientes } from '../../../services/series/yourfavsSerie';
+import { getMoviesPendientes } from '../../../services/movies/movieLibrary';
+import { getSeriesPendientes } from '../../../services/series/serieLibrary';
 import { processBatch } from '../../../utils/core/processBatch';
 import { getCurrentRegion } from '../../../services/db/userScope';
 import { pendingCommon } from '../../../services/social/inCommon';

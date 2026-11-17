@@ -6,7 +6,7 @@
  * que va por POST de formulario).
  */
 import type { APIRoute } from 'astro';
-import { addNotificationSub, removeNotificationSub } from '../../../services/notifications/yourfavsNotifications';
+import { addNotificationSub, removeNotificationSub } from '../../../services/notifications/notificationSubs';
 
 export const prerender = false;
 

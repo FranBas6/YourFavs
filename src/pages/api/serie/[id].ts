@@ -2,7 +2,7 @@
  * GET /api/serie/[id]
  *
  * Ficha de SERIE en JSON para la app móvil. Reúne el mismo dato TMDB público que
- * `pages/serie/[id].astro` (servicios de `InfoSeries.ts`), sin duplicar lógica.
+ * `pages/serie/[id].astro` (servicios de `services/series/serieDetail.ts`), sin duplicar lógica.
  * Espejo de `/api/movie/[id]` con los campos propios de serie (temporadas,
  * número de temporadas/episodios, cadenas, creadores, próximo/último episodio).
  *
@@ -21,7 +21,7 @@ import {
     getSeriesBundle,
     getSerieRecommendationsOrSimilar,
     type SeriesBundle,
-} from '../../../services/series/InfoSeries';
+} from '../../../services/series/serieDetail';
 import { safeFetch } from '../../../utils/core/safeFetch';
 
 export const prerender = false;

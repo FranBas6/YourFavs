@@ -1,6 +1,6 @@
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { processBatch } from '../../utils/core/processBatch';
-import { getAllFollowedPeople } from './yourfavsPeople';
+import { getAllFollowedPeople } from './followedPeople';
 import { getCurrentUid } from '../db/userScope';
 import { onLibraryChange } from '../library/libraryChanges';
 

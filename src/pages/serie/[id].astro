@@ -3,19 +3,19 @@ import Layout from "../../layouts/Layout.astro";
 import {
     getLanguageDisplayName, getContentRating, distinctOriginalTitle,
     formatDate, formatTrailerUrl, providerLinks
-} from "../../utils/titles/media-helpers";
-import {formatRuntime, getSeasonStats} from "../../utils/titles/serie-helpers";
+} from "../../utils/titles/mediaHelpers";
+import {formatRuntime, getSeasonStats} from "../../utils/titles/serieHelpers";
 import type { GuestStar } from "../../types/Media";
-import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/series/yourfavsSerie";
+import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/series/serieLibrary";
 import { countSeriesPasses } from "../../services/library/watchLog";
-import type {WatchedProgress} from "../../services/series/yourfavsSerie";
+import type {WatchedProgress} from "../../services/series/serieLibrary";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/serie/serie.css';
 import '../../styles/shared/spoil.css'; // modo sin spoilers, compartido con la ficha de episodio (TMDB D4)
 import { episodeHref, seasonHref } from '../../utils/titles/episodeView';
 import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
-} from "../../services/series/InfoSeries";
+} from "../../services/series/serieDetail";
 import { getAllSeasonProviders, buildProviderCoverage } from "../../services/series/seasonProviders";
 import { posterUrl, originalUrl } from "../../services/tmdb/tmdbClient";
 import { peekTopActors } from "../../services/stats/topActorsLibrary";
@@ -25,7 +25,7 @@ import HideFromProfileToggle from "../../components/social/HideFromProfileToggle
 import { SOCIAL_PHASE } from "../../utils/social/social";
 import RecommendedBlock from "../../components/social/RecommendedBlock.astro";
 import FriendsSeen from "../../components/title/FriendsSeen.astro";
-import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/yourfavsNotifications";
+import { getNotificationSub, addNotificationSub, removeNotificationSub } from "../../services/notifications/notificationSubs";
 import FichaActions from "../../components/title/FichaActions.astro";
 import FichaSections from "../../components/title/FichaSections.astro";
 import CastGrid from "../../components/title/CastGrid.astro";
@@ -434,7 +434,7 @@ const hasSpecialSeasons = specialSeasons.length > 0;
 const regularSeasonsCount = regularSeasons.length;
 const specialSeasonsCount = specialSeasons.length;
 
-import type {PosterImage} from '../../services/series/InfoSeries';
+import type {PosterImage} from '../../services/series/serieDetail';
 
 // Segundo bloque de datos — todo en paralelo
 const tmdbId = item?.id;

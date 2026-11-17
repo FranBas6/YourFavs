@@ -12,7 +12,7 @@ import { avatarHtml, btn, esc, firstName, icon, relTime } from './ui';
 import { DELETED_ACCOUNT, DELETED_TEXT, FOLDED_TEXT, sysParts, type TextPart } from './messagesText';
 import { APP_TZ, appDateParts } from '../core/appTime';
 import { episodeHref } from '../titles/episodeView';
-import { formatScore } from '../titles/media-helpers';
+import { formatScore } from '../titles/mediaHelpers';
 import type { CardPerson, ChatCard, ChatMessage, ChatView, ConvSummary, PersonCard, PlanView, RecCard, SpoilerRef, SysType, TitleCard, TitleCardRef, WtwCard } from './types';
 import { recHref, recLeadHtml } from './recUi';
 

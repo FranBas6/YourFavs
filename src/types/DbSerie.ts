@@ -1,5 +1,5 @@
 // Tipos de las filas de series de la biblioteca (antes, documentos de Firestore).
-// Antes vivían dentro de src/services/series/yourfavsSerie.ts (R12).
+// Antes vivían dentro de src/services/series/serieLibrary.ts (R12).
 
 interface TmdbSeasonRef {
     air_date: string;

@@ -1,7 +1,7 @@
 import { processBatch } from '../../utils/core/processBatch';
 import { tmdbFetch } from '../tmdb/tmdbClient';
 import { getTitleDetails } from '../tmdb/tmdbTitleCache';
-import { toTimestamp } from '../../utils/titles/media-helpers';
+import { toTimestamp } from '../../utils/titles/mediaHelpers';
 import { appDateParts } from '../../utils/core/appTime';
 import { getCurrentUid } from '../db/userScope';
 import { onLibraryChange } from '../library/libraryChanges';
@@ -10,7 +10,7 @@ import {
     unionEpisodeWatches, watchLogInstant,
     type EpisodeWatch, type WatchLogRow,
 } from '../library/episodeWatches';
-import { getAllWatchedProgress } from '../series/yourfavsSerie';
+import { getAllWatchedProgress } from '../series/serieLibrary';
 import { getAllWatchLog } from '../library/watchLog';
 
 const TTL_MS = 60 * 60 * 1000;

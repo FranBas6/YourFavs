@@ -3,7 +3,7 @@ import {
     clearCollection, patchTitle,
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
-import { normalizeScore } from "../../utils/titles/media-helpers";
+import { normalizeScore } from "../../utils/titles/mediaHelpers";
 import { setRating, deleteRating } from "../library/ratings";
 import { appendWatchLog } from "../library/watchLog";
 import { appendActivity } from "../library/activityLog";
