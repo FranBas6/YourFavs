@@ -10,7 +10,7 @@ const server = await createServer({
     server: { middlewareMode: true }, appType: 'custom', logLevel: 'error',
     define: Object.fromEntries(Object.entries(env).map(([k, v]) => [`import.meta.env.${k}`, JSON.stringify(v)])),
 });
-const M = await server.ssrLoadModule('/src/services/API/shared/crossMediaRelated.ts');
+const M = await server.ssrLoadModule('/src/services/titles/crossMediaRelated.ts');
 
 const SEEDS = [
     { label: 'SERIE Ataque a los Titanes', type: 'tv', id: 1429, title: 'Ataque a los Titanes', originalTitle: '進撃の巨人' },

@@ -124,7 +124,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
     }
 
     // Envolvemos el resto del request en el store de usuario: cualquier llamada a
-    // services/BD/** durante este render leerá el uid de aquí (AsyncLocalStorage).
+    // services/ que lea la base de datos durante este render leerá el uid de aquí (AsyncLocalStorage).
     return runWithUser(context.locals.user?.uid ?? null, async () => {
         // Solo `astro dev` (C0): cuenta las llamadas a TMDB de esta petición y las resume en consola.
         const tmdbT0 = Date.now();

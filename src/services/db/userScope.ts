@@ -2,7 +2,7 @@
  * Scope de usuario para la capa BD (Fase C) — AsyncLocalStorage.
  *
  * El middleware mete en un store por petición (`runWithUser`) el usuario de la sesión
- * verificada y el cliente de Supabase con sus cookies. Las funciones de `services/BD/**`
+ * verificada y el cliente de Supabase con sus cookies. Las funciones de `services/` que leen la base de datos
  * leen ambos de aquí sin cambiar sus firmas.
  *
  * Regla de oro: el usuario SIEMPRE viene de la sesión (cookie verificada), NUNCA del
@@ -36,7 +36,7 @@ export function runWithUser<T>(
 }
 
 // ---------------------------------------------------------------------------------------
-// Supabase (Fase 4). Las funciones de services/BD/** ya migradas usan esto en vez de
+// Supabase (Fase 4). Las funciones de services/ que leen la base de datos usan esto en vez de
 // userCol/userDoc. La RLS de Postgres ya limita cada consulta a las filas del usuario de la
 // sesión; aun así se filtra por `user_id` explícitamente, para que la consulta diga lo que hace.
 // ---------------------------------------------------------------------------------------

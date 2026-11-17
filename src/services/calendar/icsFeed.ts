@@ -5,7 +5,7 @@
  * `/api/calendar/u/{token}.ics` (ver `services/calendar/icsToken.ts`). Las apps de calendario no
  * mandan la cookie de sesión, así que el feed se genera EN NOMBRE del dueño de la dirección:
  * `userFeed` abre el mismo contexto de usuario que el middleware (`runWithUser`) con el cliente
- * del servidor, y las funciones de `services/BD/**` leen sus filas como siempre (todas filtran por
+ * del servidor, y las funciones de `services/` que leen la base de datos lo hacen como siempre (todas filtran por
  * `user_id`).
  *
  * Lleva:
