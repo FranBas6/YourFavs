@@ -167,6 +167,10 @@ Spanish; it is the one I use every day.
   one-off script, without losing user data.
 - **Dates done right.** The server runs in UTC, while days, months and years are counted in the
   user's time zone, so a film watched at 00:30 counts for the right day.
+- **Caches that clear themselves.** Every cache that reads the user's library (stats,
+  recommendations, search, activity) declares what it depends on, and every write announces what it
+  changed, so nothing can go stale because a handler forgot to clear it, including the copies shared
+  across server instances.
 
 ## How I work
 
@@ -187,7 +191,7 @@ Spanish; it is the one I use every day.
 
 | Commits | Pages | API routes | Migrations | Database tests |
 | :-----: | :---: | :--------: | :--------: | :------------: |
-|   422   |  48   |    118     |     27     |      344       |
+|   471   |  49   |    118     |     27     |      344       |
 
 ## Tech stack
 
@@ -198,7 +202,7 @@ Spanish; it is the one I use every day.
 | Data      | Supabase: PostgreSQL with RLS, Auth, Realtime and Storage                            |
 | Content   | TMDB API (films, series, people, availability by JustWatch)                          |
 | App       | PWA with its own service worker, web manifest and private `.ics` calendar feed      |
-| Quality   | pgTAP, TypeScript type checking, browser checks with headless Chrome (Puppeteer)    |
+| Quality   | pgTAP, TypeScript type checking, folder-boundary and import-cycle checks, browser checks with headless Chrome (Puppeteer) |
 
 ## Code structure
 
