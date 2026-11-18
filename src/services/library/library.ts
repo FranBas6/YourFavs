@@ -168,6 +168,43 @@ export async function shiftPositions(collection: string, from: number, to: numbe
     libraryChanged('lists');
 }
 
+/**
+ * Listas que se ordenan a mano desde su página (Ver pronto, 2026-11-18). Solo estas: en las demás el orden
+ * lo da la fecha (o, en Favoritos de series, su propia numeración con `setPosition`).
+ */
+export const MANUAL_ORDER_COLLECTIONS = ['MoviesVerPronto', 'SeriesVerPronto'] as const;
+export type ManualOrderCollection = typeof MANUAL_ORDER_COLLECTIONS[number];
+export function isManualOrderCollection(c: string): c is ManualOrderCollection {
+    return (MANUAL_ORDER_COLLECTIONS as readonly string[]).includes(c);
+}
+
+/**
+ * Una lista ordenable, en su orden:
+ *   · si nunca la has ordenado (ninguna fila con posición), como siempre: lo último guardado primero;
+ *   · si ya la ordenaste, tu orden, y DETRÁS lo que añadiste después, de más antiguo a más reciente
+ *     (como una cola: lo nuevo no se cuela delante de lo que ya habías priorizado).
+ * Así da igual por dónde entre lo nuevo (ficha, ⌘K, un plan, una importación): no hay que tocar las altas.
+ */
+export async function listManualOrder(collection: ManualOrderCollection): Promise<ListDoc[]> {
+    const docs = await listCollection(collection, 'added_at', 'desc');
+    if (!docs.some((d) => d.position != null)) return docs;
+    const placed = docs.filter((d) => d.position != null).sort((x, y) => (x.position as number) - (y.position as number));
+    const added = docs.filter((d) => d.position == null).reverse();
+    return [...placed, ...added];
+}
+
+/**
+ * Guarda el orden de una lista ordenable: `tmdbIds` son los títulos que enseña la página, en su orden. Los
+ * que no vengan (los que tienen plan no salen en la rejilla) quedan detrás en el orden que tenían
+ * (función `reorder_library_items`, migración 20261118090000_library_order.sql).
+ */
+export async function reorderCollection(collection: ManualOrderCollection, tmdbIds: number[]): Promise<void> {
+    requireAuthId();
+    const { error } = await db().rpc('reorder_library_items', { p_collection: collection, p_ids: tmdbIds });
+    if (error) throw new Error(error.message);
+    libraryChanged('lists');
+}
+
 /** Renumera 1..n respetando el orden actual. */
 export async function renumberPositions(collection: string): Promise<void> {
     const { error } = await db().rpc('renumber_list_positions', { p_collection: collection });
