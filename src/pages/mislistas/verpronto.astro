@@ -17,6 +17,7 @@ import type {Serie} from "../../types/ApiSerie";
 import type {Movie} from "../../types/ApiMovie";
 import type {SeriesInterface} from "../../types/DbSerie";
 import PlansBlock from "../../components/social/PlansBlock.astro";
+import OrderList from "../../components/library/OrderList.astro";
 import {myPlans, type MyPlan} from "../../services/social/plans";
 import {appDateParts} from "../../utils/core/appTime";
 import {SOCIAL_PHASE} from "../../utils/social/social";
@@ -90,6 +91,11 @@ const clearedMessage = clearedType || Astro.url.searchParams.get("cleared");
 const hasSeries = seriesVerPronto.length > 0;
 const hasMovies = peliculasVerPronto.length > 0;
 const hasContent = hasSeries || hasMovies;
+
+// Ordenar a mano (2026-11-18): los títulos de cada sección, en el orden en que se pintan.
+const yearOf = (d?: string | null) => (d ? String(d).slice(0, 4) : '');
+const seriesOrder = seriesVerPronto.map((s) => ({ id: String(s.id), title: s.name, year: yearOf(s.first_air_date), poster: posterUrl(s.poster_path, 'w92') || '/placeholder.jpg' }));
+const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.title, year: yearOf(m.release_date), poster: posterUrl(m.poster_path, 'w92') || '/placeholder.jpg' }));
 ---
 <Layout title="Ver Pronto">
     <ListsNav slot="aside" />
@@ -154,18 +160,21 @@ const hasContent = hasSeries || hasMovies;
         <div class="space-y-10">
             {/* Series */}
             {(showSeries || showAll) && (
-                <section id="series-section" class="scroll-mt-20">
-                    <div class="lg-h"><h2>Series</h2><span class="n">{seriesVerPronto.length}</span></div>
+                <section id="series-section" class="scroll-mt-20 vpo-section" data-vpo-section>
+                    <div class="lg-h"><h2>Series</h2><span class="n">{seriesVerPronto.length}</span>
+                        {seriesVerPronto.length > 1 && <button type="button" class="btn btn--sm vpo-toggle" data-vpo-toggle aria-expanded="false">Ordenar</button>}
+                    </div>
 
                     {seriesVerPronto.length === 0 && (
                         <EmptyState size="sm" title="No tienes series para ver pronto">
                             <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
+                    {seriesVerPronto.length > 1 && <OrderList collection="SeriesVerPronto" noun="series" items={seriesOrder} />}
                     {seriesVerPronto.length > 0 && (
-                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full" data-vpo-grid>
                             {seriesVerPronto.map((item) => (
-                                <div class="flex flex-col h-full">
+                                <div class="flex flex-col h-full" data-id={item.id}>
                                     <CardSerie
                                         id={item.id.toString()}
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -198,18 +207,21 @@ const hasContent = hasSeries || hasMovies;
 
             {/* Películas */}
             {(showMovies || showAll) && (
-                <section id="movies-section" class="scroll-mt-20">
-                    <div class="lg-h"><h2>Películas</h2><span class="n">{peliculasVerPronto.length}</span></div>
+                <section id="movies-section" class="scroll-mt-20 vpo-section" data-vpo-section>
+                    <div class="lg-h"><h2>Películas</h2><span class="n">{peliculasVerPronto.length}</span>
+                        {peliculasVerPronto.length > 1 && <button type="button" class="btn btn--sm vpo-toggle" data-vpo-toggle aria-expanded="false">Ordenar</button>}
+                    </div>
 
                     {peliculasVerPronto.length === 0 && (
                         <EmptyState size="sm" title="No tienes películas para ver pronto">
                             <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
+                    {peliculasVerPronto.length > 1 && <OrderList collection="MoviesVerPronto" noun="películas" items={moviesOrder} />}
                     {peliculasVerPronto.length > 0 && (
-                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full">
+                        <div class="grid gap-6 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 w-full" data-vpo-grid>
                             {peliculasVerPronto.map((item) => (
-                                <div class="flex flex-col h-full">
+                                <div class="flex flex-col h-full" data-id={item.id}>
                                     <CardMovie
                                         id={item.id.toString()}
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
@@ -236,4 +248,7 @@ const hasContent = hasSeries || hasMovies;
             )}
         </div>
     </section>
+    <script>
+        import '../../scripts/library/verProntoOrder';
+    </script>
 </Layout>

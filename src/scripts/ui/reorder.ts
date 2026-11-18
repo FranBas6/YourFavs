@@ -1,6 +1,7 @@
 /**
- * Motor de «reordenar arrastrando» de Ajustes, compartido por la lista de la portada
- * (`homeReorder.ts`) y las secciones del perfil público (`publico.ts`, F6 social).
+ * Motor de «reordenar arrastrando» en vertical, compartido por la lista de la portada y las secciones
+ * del perfil público en Ajustes (`scripts/settings/homeReorder.ts`, `sectionsReorder.ts`) y por el orden
+ * de Ver pronto (`scripts/library/verProntoOrder.ts`).
  *
  * POINTER EVENTS, no HTML5 drag & drop. `public/js/reorder.js` (el de las colecciones) usa
  * `dragstart`, que **no se dispara con el dedo**: en móvil ese reordenado simplemente no existe.

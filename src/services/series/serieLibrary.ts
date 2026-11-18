@@ -1,7 +1,7 @@
 import { db, fetchAll, getAuthId, requireAuthId } from "../db/userScope";
 import {
     titleMembership, listCollection, addToCollections, removeFromCollections, clearCollection,
-    patchTitle, setPosition, shiftPositions, renumberPositions,
+    patchTitle, setPosition, shiftPositions, renumberPositions, listManualOrder,
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
 import { appendWatchLog, appendEpisodes, removeEpisodeFromLog } from "../library/watchLog";
@@ -229,7 +229,15 @@ export const getSeriesPendientes = () => getSeriesCollection<SeriesInterface>("S
 export const getSeriesVistas = () => getSeriesCollection<SeriesInterface>("SeriesVistas");
 export const getSeriesSiguiendo = () => getSeriesCollection<SeriesInterface>("SeriesSiguiendo");
 export const getLikedSeries = () => getSeriesCollection<SeriesInterface>("LikedSeries");
-export const getSeriesVerPronto = () => getSeriesCollection<SeriesInterface>("SeriesVerPronto");
+/** Ver pronto en el orden que le hayas dado (lo nuevo, detrás). Ver `listManualOrder`. */
+export const getSeriesVerPronto = async (): Promise<SeriesInterface[]> => {
+    try {
+        return (await listManualOrder('SeriesVerPronto')) as unknown as SeriesInterface[];
+    } catch (error) {
+        console.error('Error al obtener SeriesVerPronto:', error);
+        return [];
+    }
+};
 export const getSeriesAbandonadas = () => getSeriesCollection<SeriesInterface>("SeriesAbandonadas");
 
 /**

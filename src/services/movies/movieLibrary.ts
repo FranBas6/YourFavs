@@ -1,6 +1,6 @@
 import {
     titleMembership, listCollection, inCollection, addToCollections, removeFromCollections,
-    clearCollection, patchTitle,
+    clearCollection, patchTitle, listManualOrder,
 } from "../library/library";
 import { getTransition } from "../library/stateTransitions";
 import { normalizeScore } from "../../utils/titles/mediaHelpers";
@@ -163,7 +163,15 @@ export const getMovieFav = () => getMovieCollection("MovieFavs");
 export const getMoviesPendientes = () => getMovieCollection("MoviesPendientes");
 export const getMoviesVistas = () => getMovieCollection("MoviesVistas");
 export const getLikedMovies = () => getMovieCollection("LikedMovies");
-export const getMoviesVerPronto = () => getMovieCollection("MoviesVerPronto");
+/** Ver pronto en el orden que le hayas dado (lo nuevo, detrás). Ver `listManualOrder`. */
+export const getMoviesVerPronto = async (): Promise<MovieInterface[]> => {
+    try {
+        return (await listManualOrder('MoviesVerPronto')) as unknown as MovieInterface[];
+    } catch (error) {
+        console.error('Error al obtener MoviesVerPronto:', error);
+        return [];
+    }
+};
 // "Viendo" (Bloque 2): pelis que estás viendo ahora mismo. Alimenta la franja
 // "Estás viendo" del Home. Solo pelis (las series ya tienen progreso por episodios).
 export const getMoviesViendo = () => getMovieCollection("MoviesViendo");

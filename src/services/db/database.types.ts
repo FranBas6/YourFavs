@@ -719,6 +719,9 @@ isOneToOne: true
 "reorder_custom_lists":
 { Args: { "p_ids": (string)[] }; Returns: undefined
                            },
+"reorder_library_items":
+{ Args: { "p_collection": string,"p_ids": (number)[] }; Returns: undefined
+                           },
 "rt_ping":
 { Args: { "p_payload": Json,"p_users": (string)[] }; Returns: undefined
                            },

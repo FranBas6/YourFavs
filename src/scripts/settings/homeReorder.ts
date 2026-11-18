@@ -16,11 +16,11 @@
  * Guardado: no se toca la red desde aquí. Se emite `yf:home-order` y `autosave.ts` lee el orden
  * del DOM y lo manda — un único sitio que sabe hablar con el servidor.
  *
- * El arrastre en sí (puntero, teclado y FLIP) vive en `reorder.ts`, que comparte con las secciones
+ * El arrastre en sí (puntero, teclado y FLIP) vive en `scripts/ui/reorder.ts`, que comparte con las secciones
  * del perfil público (F6 social); aquí queda lo propio de la portada: el separador, los contadores,
  * el interruptor y «Restablecer orden».
  */
-import { initReorder } from './reorder';
+import { initReorder } from '../ui/reorder';
 
 const list = document.getElementById('home-layout');
 if (list) init(list);
@@ -72,7 +72,7 @@ function init(list: HTMLElement) {
         document.dispatchEvent(new CustomEvent('yf:home-order'));
     }
 
-    // ---- Arrastre, teclado y FLIP: el motor común (reorder.ts) ----------------
+    // ---- Arrastre, teclado y FLIP: el motor común (scripts/ui/reorder.ts) ----------------
     // Cruzar el separador «Ocultos» enciende o apaga: se toca el checkbox, que es la fuente de
     // verdad, y así el interruptor y el arrastre no pueden discrepar.
     const { flip } = initReorder(list, {
