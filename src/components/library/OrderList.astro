@@ -1,0 +1,50 @@
+---
+/**
+ * Lista compacta para ordenar a mano una sección de Ver pronto (2026-11-18). Se enseña en lugar de la
+ * rejilla cuando la sección está en modo «Ordenar» (`.vpo-section.is-ordering`); la mueve y la guarda
+ * `scripts/library/verProntoOrder.ts`. Estilos: `.vpo-*` en `styles/pages/personal/personal.css`.
+ */
+interface Props {
+    /** Lista de la base de datos que se ordena: 'MoviesVerPronto' | 'SeriesVerPronto'. */
+    collection: string;
+    /** «series» / «películas», para los textos. */
+    noun: string;
+    items: { id: string; title: string; year: string; poster: string }[];
+}
+const { collection, noun, items } = Astro.props;
+const ICON_UP = '<path d="m18 15-6-6-6 6"/>';
+const ICON_DOWN = '<path d="m6 9 6 6 6-6"/>';
+const ICON_TOP = '<path d="M5 4h14"/><path d="m18 14-6-6-6 6"/><path d="M12 8v12"/>';
+---
+<div class="vpo-panel">
+    <p class="vpo-hint">
+        <span>Arrastra por <b aria-hidden="true">⠿</b> o usa las flechas para ordenar tus {noun}. Se guarda solo.</span>
+        <span class="vpo-status" data-vpo-status aria-live="polite"></span>
+    </p>
+    <span class="sr-only" data-vpo-live aria-live="polite"></span>
+    <ol class="vpo-order" data-vpo-order={collection} aria-label={`Orden de tus ${noun} para ver pronto`}>
+        {items.map((it) => (
+            <li class="vpo-row" data-id={it.id} data-title={it.title}>
+                <button type="button" class="vpo-handle" aria-label={`Mover «${it.title}» (flechas arriba y abajo)`}><span></span></button>
+                <span class="vpo-index" data-vpo-index aria-hidden="true"></span>
+                <img class="vpo-poster" src={it.poster} alt="" width="34" height="51" loading="lazy" decoding="async" />
+                <span class="vpo-text">
+                    <span class="vpo-title">{it.title}</span>
+                    {it.year && <span class="vpo-year">{it.year}</span>}
+                </span>
+                <span class="vpo-moves">
+                    <button type="button" class="vpo-move" data-vpo-move="up" aria-label={`Subir «${it.title}»`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICON_UP} />
+                    </button>
+                    <button type="button" class="vpo-move" data-vpo-move="down" aria-label={`Bajar «${it.title}»`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICON_DOWN} />
+                    </button>
+                    <button type="button" class="vpo-move" data-vpo-move="top" aria-label={`Llevar «${it.title}» al principio`}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={ICON_TOP} />
+                        <span class="vpo-move-label">Al principio</span>
+                    </button>
+                </span>
+            </li>
+        ))}
+    </ol>
+</div>

@@ -1,14 +1,14 @@
 /**
  * Reordenar las secciones del perfil público arrastrando (F6 social, Ajustes → «Perfil público»).
  *
- * El arrastre es el de «Tu Home» (`reorder.ts`): ratón, dedo con pulsación mantenida y ↑/↓ en el
+ * El arrastre es el de «Tu Home» (`scripts/ui/reorder.ts`): ratón, dedo con pulsación mantenida y ↑/↓ en el
  * asa. Aquí no hay separador de ocultas: una sección apagada se queda en su sitio, y el orden vale
  * para cuando la vuelvas a encender.
  *
  * Guardado: no se toca la red desde aquí. Se emite `yf:reorder` y `autosave.ts` lee las filas en su
  * orden (`data-save-order`) y las manda, con su mismo indicador «Guardando… / Guardado».
  */
-import { initReorder } from './reorder';
+import { initReorder } from '../ui/reorder';
 
 const list = document.querySelector<HTMLElement>('[data-save-group="sections"]');
 if (list) init(list);

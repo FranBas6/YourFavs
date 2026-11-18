@@ -38,7 +38,8 @@ src/
 │   ├─ settings/   Ajustes (/perfil/…)
 │   └─ social/     amigos, perfil público, planes, recomendar; messages/ = Mensajes
 ├─ scripts/      código del NAVEGADOR (se importa desde <script> de los .astro), por tema:
-│                auth/ home/ notifications/ series/ settings/ social/ (+ messages/) ui/
+│                auth/ home/ library/ notifications/ series/ settings/ social/ (+ messages/) ui/
+│                (ui/reorder.ts = arrastrar para ordenar en vertical, con dedo y teclado: Ajustes y Ver pronto)
 ├─ services/     SOLO SERVIDOR (Supabase, TMDB, secretos)
 │   ├─ db/         infraestructura de Supabase: clientes (server, admin), env, tipos generados
 │   │              (database.types.ts), userScope (usuario de la petición), userState, appState
@@ -104,6 +105,10 @@ Los `import type` valen de cualquier sitio (se borran al compilar), salvo de una
     colecciones propias no vaciaban los gustos; «Apuntar visionado» no vaciaba Tu año). No vuelvas a ese patrón.
   - Si editas `libraryChanges.ts` con el dev levantado, **reinicia el dev**: la recarga en caliente vacía la lista
     de cachés apuntadas y las que no se recarguen dejan de enterarse (solo pasa en desarrollo).
+- **Listas que se ordenan a mano** (hoy, Ver pronto): `MANUAL_ORDER_COLLECTIONS` en `services/library/library.ts`.
+  Se leen con `listManualOrder` (tu orden y, detrás, lo nuevo de más antiguo a más reciente; sin ordenar, lo último
+  primero) y se guardan con `reorderCollection` → función `reorder_library_items`. Para otra lista, añádela ahí:
+  las altas no cambian.
 - **Ciclo conocido:** `utils/social/ui.ts` ↔ `utils/social/recUi.ts` (permitido en R10). Funciona porque al cargar
   solo se usan funciones, no constantes; no metas constantes compartidas entre ellos.
 - **Sin índices («barrels»).** Un `index.ts` obliga a cargar el tema entero y es la forma típica de crear ciclos

@@ -106,3 +106,69 @@
 .ym-car { width: 18px; height: 18px; margin-left: auto; color: var(--text-3); transition: transform .15s ease; }
 .ym[open] .ym-car { transform: rotate(180deg); }
 .ym-b { padding: 4px 16px 16px; }
+
+/* ── Ver pronto · ordenar a mano (2026-11-18). Rejilla ⇄ lista compacta con asa, ↑ ↓ y «Al principio».
+   El arrastre es el motor común (scripts/ui/reorder.ts): .is-dragging / .is-shifting. Solo tokens. ── */
+.vpo-toggle { margin-left: auto; align-self: center; }
+.vpo-toggle:not(.is-ready) { display: none; }   /* sin JavaScript no hay modo ordenar */
+.vpo-panel { display: none; }
+.vpo-section.is-ordering .vpo-panel { display: block; }
+.vpo-section.is-ordering [data-vpo-grid] { display: none; }
+.vpo-hint { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: -4px 0 10px; font-size: var(--fs-meta); color: var(--text-3); }
+.vpo-status { font: 500 var(--fs-micro) var(--font-mono); color: var(--ok-ink); }
+.vpo-status.is-bad { color: var(--accent); }
+.vpo-order {
+    list-style: none; margin: 0; padding: 0;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg);
+    /* Sin overflow: hidden: la fila levantada tiene que poder salirse. */
+}
+.vpo-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 12px 8px 6px;
+    background: var(--bg-elev);
+    border-top: 1px solid var(--border);
+    position: relative;   /* para que el z-index de la fila levantada aplique */
+}
+.vpo-order > .vpo-row:first-child { border-top: 0; border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.vpo-order > .vpo-row:last-child { border-radius: 0 0 var(--r-lg) var(--r-lg); }
+.vpo-order > .vpo-row:only-child { border-radius: var(--r-lg); }
+.vpo-handle {
+    width: 30px; height: 40px; flex-shrink: 0;
+    border: 0; background: none; border-radius: var(--r-sm);
+    cursor: grab; touch-action: none;   /* imprescindible: si no, el navegador se queda el gesto */
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-4);
+}
+.vpo-handle:hover { background: var(--bg-tint); color: var(--text-3); }
+.vpo-handle:active { cursor: grabbing; }
+.vpo-handle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.vpo-handle span { display: block; width: 12px; height: 2px; border-radius: 1px; background: currentColor; box-shadow: 0 5px 0 currentColor, 0 -5px 0 currentColor; }
+.vpo-index { width: 20px; flex-shrink: 0; text-align: right; font: 500 var(--fs-micro) var(--font-mono); color: var(--text-4); }
+.vpo-poster { width: 34px; height: 51px; flex-shrink: 0; border-radius: var(--r-sm); object-fit: cover; background: var(--bg-tint); border: 1px solid var(--border); }
+.vpo-text { flex: 1; min-width: 0; }
+.vpo-title { display: block; font: 600 var(--fs-body) var(--font); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vpo-year { font-size: var(--fs-meta); color: var(--text-3); }
+.vpo-moves { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.vpo-move {
+    min-width: 34px; height: 34px; padding: 0 8px;
+    border: 1px solid var(--border); border-radius: var(--r-md); background: var(--bg-elev);
+    font: 600 var(--fs-micro) var(--font); color: var(--text-2);
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer;
+}
+.vpo-move svg { width: 15px; height: 15px; }
+.vpo-move:hover:not(:disabled) { background: var(--bg-tint); color: var(--text); }
+.vpo-move:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.vpo-move:disabled { opacity: .35; cursor: default; }
+.vpo-row.is-dragging {
+    z-index: 5; border-radius: var(--r-md); border: 1px solid var(--accent);
+    box-shadow: var(--sh-lg); cursor: grabbing;
+}
+.vpo-row.is-dragging .vpo-handle { color: var(--accent); background: var(--accent-soft); }
+.vpo-row.is-shifting { transition: transform 160ms ease; }
+@media (max-width: 560px) {
+    .vpo-row { gap: 8px; padding-right: 8px; }
+    .vpo-handle { width: 36px; height: 44px; }   /* objetivo táctil ≥ 44 px */
+    .vpo-index { display: none; }
+    .vpo-move { min-width: 40px; height: 40px; padding: 0; }
+    .vpo-move-label { display: none; }           /* «Al principio» se queda en su icono */
+}
