@@ -26,13 +26,17 @@ const validYears = partsSorted.map(p => p.release_date ? new Date(p.release_date
 const firstYear = validYears[0];
 const lastYear = validYears[validYears.length - 1];
 
-const avgRating = partsSorted.length > 0
-    ? Number((partsSorted.reduce((a, p) => a + (p.vote_average || 0), 0) / partsSorted.length).toFixed(1))
-    : 0;
-
 // Progreso del usuario en la saga ("vista" = Vistas ∪ Liked ∪ Favs, con nivel)
 const watchedMovieTiers = await getWatchedMovieTiers().catch(() => new Map<number, WatchedTier>());
 const isReleased = (p: { release_date: string | null }) => !!p.release_date && new Date(p.release_date) <= new Date();
+
+// Nota media: solo de las estrenadas con votos (antes contaba las anunciadas como 0: Dune salía con 5,3).
+const rated = partsSorted.filter((p) => isReleased(p) && (p.vote_count ?? 0) > 0);
+const avgRating = rated.length > 0
+    ? Number((rated.reduce((a, p) => a + (p.vote_average || 0), 0) / rated.length).toFixed(1))
+    : 0;
+const releasedCount = partsSorted.filter(isReleased).length;
+const upcomingCount = partsSorted.length - releasedCount;
 
 // Badge por nivel — mismo lenguaje de color que el feed de actividad
 const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
@@ -68,6 +72,11 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
                         <span class="bg-red-500 text-white px-2.5 py-1 rounded-full font-semibold">
                             {partsSorted.length} {partsSorted.length === 1 ? 'película' : 'películas'}
                         </span>
+                        {upcomingCount > 0 && (
+                            <span class="bg-white/20 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">
+                                {upcomingCount} {upcomingCount === 1 ? 'próxima' : 'próximas'}
+                            </span>
+                        )}
                         {firstYear && lastYear && (
                             <span class="bg-white/20 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">
                                 {firstYear === lastYear ? firstYear : `${firstYear}–${lastYear}`}
@@ -76,7 +85,7 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
                         {avgRating > 0 && (
                             <span class="bg-yellow-500/90 text-white px-2.5 py-1 rounded-full font-medium inline-flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                {avgRating}
+                                {avgRating.toFixed(1).replace('.', ',')}
                             </span>
                         )}
                     </div>

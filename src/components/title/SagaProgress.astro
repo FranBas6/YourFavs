@@ -30,9 +30,11 @@ interface Props {
     /** Película actual (ficha): se marca con anillo + "Actual". */
     currentId?: number;
     showParts?: boolean;
+    /** Id de la saga: en la ficha, enlace «Ver la saga completa →» a su página (2026-11-23). */
+    collectionId?: number;
 }
 
-const { name, overview = null, parts, watchedTiers, currentId, showParts = true } = Astro.props;
+const { name, overview = null, parts, watchedTiers, currentId, showParts = true, collectionId } = Astro.props;
 
 // Mismo lenguaje de color que el feed de actividad: visto verde, like rosa, fav ámbar
 const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
@@ -54,9 +56,23 @@ const seenCount = released.filter((p) => watchedTiers.has(p.id)).length;
 const totalReleased = released.length;
 const pct = totalReleased > 0 ? Math.round((seenCount / totalReleased) * 100) : 0;
 
+// «Has visto 1 de 2 estrenadas · 2 próximas» (antes «de 2 películas» con 4 tarjetas a la vista).
+const upcoming = sorted.length - totalReleased;
+const upcomingText = upcoming > 0 ? ` · ${upcoming} ${upcoming === 1 ? 'próxima' : 'próximas'}` : '';
 const summaryText = totalReleased > 0
-    ? `Has visto ${seenCount} de ${totalReleased} película${totalReleased === 1 ? '' : 's'}`
-    : 'Aún sin estrenos';
+    ? (upcoming > 0
+        ? `Has visto ${seenCount} de ${totalReleased} estrenada${totalReleased === 1 ? '' : 's'}${upcomingText}`
+        : `Has visto ${seenCount} de ${totalReleased} película${totalReleased === 1 ? '' : 's'}`)
+    : `Aún sin estrenos${upcomingText}`;
+
+// Bajo el título: el año si ya salió; la fecha si está anunciada; «Por anunciar» si no hay (antes «?»).
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const whenText = (p: Part): string => {
+    if (!p.release_date) return 'Por anunciar';
+    const d = new Date(p.release_date + 'T12:00:00');
+    if (isReleased(p)) return String(d.getFullYear());
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+};
 ---
 {showParts ? (
     <details class="cdet cdet--rich group">
@@ -77,6 +93,15 @@ const summaryText = totalReleased > 0
         </div>
 
         {overview && <p class="text-sm text-gray-500 px-5 pt-2 pb-1">{overview}</p>}
+
+        {collectionId && (
+            <div class="px-5 pt-3 flex justify-end">
+                <a href={`/catalogo/colecciones/${collectionId}`} class="saga-link">
+                    Ver la saga completa
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </a>
+            </div>
+        )}
 
         <div class="px-5 pb-5 pt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
             {sorted.map((part) => {
@@ -109,7 +134,7 @@ const summaryText = totalReleased > 0
                         </div>
                         <div class="p-2">
                             <p class="text-sm font-medium text-gray-800 line-clamp-2">{part.title}</p>
-                            <p class="text-xs text-gray-400 font-mono">{part.release_date ? new Date(part.release_date).getFullYear() : '?'}</p>
+                            <p class="text-xs text-gray-400 font-mono">{whenText(part)}</p>
                             {part.id === currentId && <span class="text-xs font-bold text-red-500">Actual</span>}
                         </div>
                     </a>
