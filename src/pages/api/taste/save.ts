@@ -2,15 +2,20 @@
  * POST /api/taste/save — guarda los gustos del onboarding (Fase F.7).
  *
  * Body JSON: { genres:number[] (IDs de cine), titles:TasteTitle[], people:TastePerson[] }.
- * Los géneros se parten en cine/TV con `splitGenreIds`. Valida mín/máx en
- * servidor (red de seguridad; el wizard ya lo aplica):
- *   géneros ≥3 · pelis 0 ó 3..10 · series 0 ó 3..10 · personas 0 ó 3..10.
- * Persiste en users/{uid}/taste/current y marca onboarding='done' en el perfil.
+ * Los géneros se parten en cine/TV con `splitGenreIds`. Valida en servidor (red de seguridad; el wizard
+ * ya lo aplica): géneros 1..10 · pelis, series y personas 0..10.
+ * Persiste en `user_state` ('taste') y marca onboarding='done' en el perfil.
+ *
+ * Las personas del paso 4 («Sigue a quienes te interesan») se SIGUEN de verdad (QA 2.3, H16): pasan a
+ * `followed_people`, como el botón «Seguir» de su ficha, y sus estrenos llegan al Radar, al Calendario
+ * y a la campana. Antes solo quedaban en los gustos, que no las usaba nadie. Solo se añaden las que
+ * aún no sigues (así no cambia la fecha de las de antes); quitar a alguien aquí no le deja de seguir.
  */
 import type { APIRoute } from 'astro';
 import { setUserTaste, type TasteTitle, type TastePerson } from '../../../services/profile/userTaste';
 import { setUserProfile } from '../../../services/profile/userProfile';
 import { splitGenreIds } from '../../../utils/titles/tasteGenres';
+import { addFollowedPerson, getAllFollowedPeople } from '../../../services/people/followedPeople';
 
 export const prerender = false;
 
@@ -68,6 +73,17 @@ export const POST: APIRoute = async ({ request, locals }) => {
 
         await setUserTaste({ movieGenres, tvGenres, titles, people });
         await setUserProfile({ onboarding: 'done' });
+
+        // Seguir a las personas elegidas. Si algo falla, los gustos ya están guardados: no se bloquea el final.
+        if (people.length) {
+            try {
+                const already = new Set((await getAllFollowedPeople()).map((p) => Number(p.id)));
+                await Promise.all(people.filter((p) => !already.has(p.id))
+                    .map((p) => addFollowedPerson(String(p.id), p.name, p.profile_path ?? null)));
+            } catch (e) {
+                console.error('[api/taste/save] seguir personas:', (e as Error).message);
+            }
+        }
 
         // Los gustos alimentan «Para ti»: setUserTaste ya avisa a sus cachés (libraryChanges.ts).
 
