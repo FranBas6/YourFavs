@@ -30,8 +30,10 @@ interface Props {
     guest?: boolean;
     /** Película de la ficha desde la que vienes. */
     current?: boolean;
+    /** Ya está en Pendientes (la siguiente puede estarlo): el botón sale marcado. */
+    inPending?: boolean;
 }
-const { part, position = null, state, myRating = null, guest = false, current = false } = Astro.props;
+const { part, position = null, state, myRating = null, guest = false, current = false, inPending = false } = Astro.props;
 const up = state === 'up';
 const year = part.release_date ? part.release_date.slice(0, 4) : '';
 const dur = runtimeLabel(part.runtime);
@@ -99,7 +101,7 @@ const showPend = !guest && (state === 'next' || state === 'miss');
         )}
         {!guest && state === 'miss' && <span class="sg-miss">Te falta</span>}
         {showPend && (
-            <button type="button" class="btn btn--sm" data-tone="pend" aria-pressed="false" data-saga-pend={part.id} data-title={part.title}>
+            <button type="button" class="btn btn--sm" data-tone="pend" aria-pressed={inPending ? 'true' : 'false'} data-saga-pend={part.id} data-title={part.title}>
                 <Fragment set:html={svg('clock')} />Pendiente
             </button>
         )}

@@ -21,15 +21,17 @@ interface Props {
 }
 const { collectionId, following, name, compact = false } = Astro.props;
 const back = Astro.url.pathname + Astro.url.search;
+// Diseño (handoff sagas): tono «seguir», el de Siguiendo; siguiendo, campana con ondas.
 const BELL = '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>';
+const RING = BELL + '<path d="M4 2C2.8 3.7 2 5.7 2 8M22 8a10 10 0 0 0-2-6" data-ring/>';
 ---
 <form method="POST" action="/api/lists/sagas" class="saga-follow" data-saga-follow data-no-optimistic data-name={name}>
     <input type="hidden" name="collection_id" value={collectionId} />
     <input type="hidden" name="op" value={following ? 'unfollow' : 'follow'} />
     <input type="hidden" name="back" value={back} />
-    <button type="submit" class:list={['btn', 'btn--sm', { 'saga-follow--c': compact }]} data-tone="ep" aria-pressed={following ? 'true' : 'false'}
+    <button type="submit" class:list={['btn', { 'btn--sm': compact, 'saga-follow--c': compact }]} data-tone="seguir" aria-pressed={following ? 'true' : 'false'}
         title={following ? 'Sigues esta saga: está en Mis listas › Sagas y te avisamos de películas nuevas. Pulsa para dejar de seguirla' : 'Te avisamos de películas nuevas, fechas y estrenos, y la tienes en Mis listas › Sagas'}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={BELL} />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={RING} />
         <span data-saga-follow-label>{following ? 'Siguiendo' : (compact ? 'Seguir' : 'Seguir saga')}</span>
     </button>
 </form>
@@ -37,4 +39,6 @@ const BELL = '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.
 <style>
     .saga-follow { display: inline-flex; margin: 0; }
     .saga-follow svg { width: 16px; height: 16px; }
+    /* Las ondas de la campana solo cuando la sigues. */
+    .saga-follow button[aria-pressed="false"] :global(path[data-ring]) { display: none; }
 </style>
