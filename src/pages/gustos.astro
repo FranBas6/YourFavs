@@ -84,6 +84,7 @@ const prefill = {
                     <span class="tw-count" data-count="movies">0 / 10</span>
                 </div>
                 <p class="tw-sub">Da igual si ya las viste — nos dicen qué recomendarte. Opcional, pero ayuda.</p>
+                <div class="tw-tray" data-tray="movies" aria-label="Lo que has elegido" hidden></div>
                 <input type="search" class="tw-search" data-search="movies" placeholder="Buscar una película…" autocomplete="off" />
                 <div class="tw-grid tw-grid-titles" data-grid="movies"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
@@ -95,6 +96,7 @@ const prefill = {
                     <span class="tw-count" data-count="series">0 / 10</span>
                 </div>
                 <p class="tw-sub">Tus series favoritas. Opcional, pero afina mucho tus recomendaciones de TV.</p>
+                <div class="tw-tray" data-tray="series" aria-label="Lo que has elegido" hidden></div>
                 <input type="search" class="tw-search" data-search="series" placeholder="Buscar una serie…" autocomplete="off" />
                 <div class="tw-grid tw-grid-titles" data-grid="series"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
@@ -106,6 +108,7 @@ const prefill = {
                     <span class="tw-count" data-count="people">0 / 10</span>
                 </div>
                 <p class="tw-sub">Opcional. Sigue a quienes te interesan y afinamos tus recomendaciones. Puedes saltar este paso.</p>
+                <div class="tw-tray" data-tray="people" aria-label="Lo que has elegido" hidden></div>
                 <input type="search" class="tw-search" data-search="people" placeholder="Buscar una persona…" autocomplete="off" />
                 <div class="tw-grid tw-grid-people" data-grid="people"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
@@ -147,7 +150,8 @@ const prefill = {
     .tw-card {
         background: var(--bg-elev); border: 1px solid var(--border);
         border-radius: var(--r-lg); box-shadow: var(--sh-lg);
-        display: flex; flex-direction: column; min-height: 60vh; overflow: hidden;
+        /* clip y no hidden: hidden la convierte en contenedor de scroll y el pie fijo dejaría de pegarse. */
+        display: flex; flex-direction: column; min-height: 60vh; overflow: clip;
     }
 
     /* Cabecera */
@@ -163,7 +167,8 @@ const prefill = {
     .tw-step { padding: 24px 26px; flex: 1; }
     .tw-step-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
     .tw-h2 { font-size: 23px; font-weight: 700; letter-spacing: -.01em; color: var(--text); margin: 0; }
-    .tw-count { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--accent); flex-shrink: 0; }
+    /* Neutro (QA 2.2, H17): en rojo parecía un error en pasos opcionales. */
+    .tw-count { font-family: var(--font-mono); font-size: 12px; font-weight: 500; color: var(--text-3); flex-shrink: 0; }
     .tw-sub { font-size: 14px; color: var(--text-3); margin: 0 0 18px; max-width: 560px; }
     .tw-search {
         width: 100%; padding: 10px 14px; border-radius: var(--r-full);
@@ -188,6 +193,7 @@ const prefill = {
     /* Grids (títulos / personas) */
     .tw-grid { display: grid; gap: 14px; }
     .tw-grid-titles { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+    .tw-grid > * { min-width: 0; }
     .tw-grid-people { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
     .tw-state { grid-column: 1/-1; text-align: center; color: var(--text-3); font-size: 13px; padding: 24px 0; }
 
@@ -244,7 +250,13 @@ const prefill = {
     .tw-person .tw-label { text-align: center; }
 
     /* Pie */
-    .tw-foot { display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--border); }
+    /* Fijo abajo (QA 2.2, H17): tras buscar, «Continuar» quedaba fuera de la pantalla. */
+    .tw-foot { position: sticky; bottom: 0; z-index: 5; background: var(--bg-elev); display: flex; align-items: center; gap: 12px; padding: 14px 22px; border-top: 1px solid var(--border); border-radius: 0 0 var(--r-lg) var(--r-lg); }
+    .tw-year { display: block; font: 500 11px var(--font-mono); color: var(--text-3); margin-top: 1px; }
+    .tw-tray { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+    .tw-pill { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 4px 0 10px; border-radius: var(--r-full); background: var(--accent-soft); color: var(--text); font-size: 12px; font-weight: 600; }
+    .tw-pill button { width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: var(--text-2); font-size: 15px; line-height: 1; cursor: pointer; }
+    .tw-pill button:hover { background: var(--bg-tint); color: var(--text); }
     .tw-minnote { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); margin-right: auto; transition: color .16s ease; }
     .tw-minnote.is-ok { color: var(--rating-high); }
     .tw-link { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text-3); }
@@ -266,8 +278,9 @@ const prefill = {
         .tw-shell { max-width: 100%; }
         .tw-card { min-height: calc(100vh - 120px); border-radius: 0; border-left: none; border-right: none; box-shadow: none; }
         .tw-h2 { font-size: 20px; }
-        .tw-grid-titles { grid-template-columns: repeat(3, 1fr); }
-        .tw-grid-people { grid-template-columns: repeat(3, 1fr); }
+        /* minmax(0, 1fr): sin él, un póster o un título largo ensanchaba su columna y la cuadrícula se salía. */
+        .tw-grid-titles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .tw-grid-people { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
 </style>
 
@@ -326,7 +339,8 @@ const prefill = {
         return '<button type="button" class="tw-poster' + (on ? ' is-on' : '') + '" data-tkey="' + tkey(t) + '">'
             + '<span class="tw-poster-img"><img src="' + src + '" alt="" loading="lazy"></span>'
             + '<span class="tw-check">✓</span>'
-            + '<span class="tw-label">' + escapeHtml(t.title || '') + '</span></button>';
+            + '<span class="tw-label">' + escapeHtml(t.title || '') + '</span>'
+            + (t.year ? '<span class="tw-year">' + escapeHtml(t.year) + '</span>' : '') + '</button>';
     }
     function personCard(p) {
         const on = selPeople.has(p.id);
@@ -361,15 +375,45 @@ const prefill = {
     }
 
     // ── Carga de opciones (tendencias + búsqueda) ─────────────────────────
+    // Sin búsqueda: lo más visto de los géneros del paso 1 (QA 2.2, H13). Se vuelve a pedir si cambian.
     async function fetchOptions(q) {
-        const res = await fetch('/api/taste/options' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+        const qs = q ? ('?q=' + encodeURIComponent(q)) : ('?genres=' + [...selGenres].join(','));
+        const res = await fetch('/api/taste/options' + qs);
         if (!res.ok) return { movieTitles: [], tvTitles: [], people: [] };
         return res.json();
     }
+    let trendKey = '';
     async function loadTrend() {
-        if (!trend) trend = await fetchOptions('');
+        const key = [...selGenres].sort((a, b) => a - b).join(',');
+        if (!trend || trendKey !== key) { trend = await fetchOptions(''); trendKey = key; }
         return trend;
     }
+
+    // Bandeja de lo elegido en cada paso (QA 2.2, H14): sigue a la vista al buscar; «×» lo quita.
+    function renderTray(kind) {
+        const tray = card.querySelector('[data-tray="' + kind + '"]');
+        if (!tray) return;
+        const items = kind === 'people'
+            ? [...selPeople.values()].map((p) => ({ key: String(p.id), label: p.name }))
+            : [...selOf(kind).entries()].map(([k, t]) => ({ key: k, label: (t.title || '') + (t.year ? ' (' + t.year + ')' : '') }));
+        tray.hidden = items.length === 0;
+        tray.innerHTML = items.map((it) => '<span class="tw-pill">' + escapeHtml(it.label)
+            + '<button type="button" data-untray="' + escapeHtml(it.key) + '" aria-label="Quitar ' + escapeHtml(it.label) + '">×</button></span>').join('');
+    }
+    ['movies', 'series', 'people'].forEach((kind) => {
+        card.querySelector('[data-tray="' + kind + '"]')?.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-untray]'); if (!b) return;
+            const k = b.dataset.untray;
+            if (kind === 'people') {
+                selPeople.delete(Number(k));
+                card.querySelector('[data-grid="people"] [data-pid="' + k + '"]')?.classList.remove('is-on');
+            } else {
+                selOf(kind).delete(k);
+                card.querySelector('[data-grid="' + kind + '"] [data-tkey="' + k + '"]')?.classList.remove('is-on');
+            }
+            updateCounts();
+        });
+    });
     // Pinta el grid de un paso desde las tendencias cacheadas.
     async function showTrend(kind) {
         const d = await loadTrend();
@@ -411,6 +455,7 @@ const prefill = {
         card.querySelector('[data-count="movies"]').textContent = selMovies.size + ' / ' + MAX;
         card.querySelector('[data-count="series"]').textContent = selSeries.size + ' / ' + MAX;
         card.querySelector('[data-count="people"]').textContent = selPeople.size + ' / ' + MAX;
+        renderTray('movies'); renderTray('series'); renderTray('people');
         if (step >= 1 && step <= LAST) {
             const c = countFor(step);
             // Géneros (paso 1): al menos uno. El resto: cualquier número, también 1 o 2 (antes 0 o ≥3).
@@ -430,7 +475,7 @@ const prefill = {
         else if (optional && c === 0) txt = 'Opcional · puedes saltar este paso';
         else if (!optional && c < MIN_GENRES) txt = 'Elige al menos un ' + nouns[n];
         // Con 1 o 2 se puede seguir; solo se sugiere añadir más.
-        else if (c < MIN) txt = '✓ ' + (n === LAST ? 'Puedes finalizar' : 'Puedes continuar') + ' · con ' + MIN + ' o más ' + plurals[n] + ' acertamos mejor';
+        else if (c < MIN) txt = '✓ ' + (n === LAST ? 'Puedes finalizar' : 'Puedes seguir') + ' (mejor con ' + MIN + ')';
         else txt = '✓ ' + (n === LAST ? 'Puedes finalizar' : 'Puedes continuar');
         minnote.textContent = txt;
         minnote.classList.toggle('is-ok', optional ? true : c >= MIN_GENRES);
@@ -462,7 +507,7 @@ const prefill = {
                 if (sel.size >= MAX) { flash('Máximo ' + MAX + ' ' + nounPlural); return; }
                 const d = titleData.get(k);
                 if (!d) return;
-                sel.set(k, { id: d.id, media_type: d.media_type, title: d.title || '', poster_path: d.poster_path ?? null });
+                sel.set(k, { id: d.id, media_type: d.media_type, title: d.title || '', poster_path: d.poster_path ?? null, year: d.year ?? null });
                 btn.classList.add('is-on');
             }
             updateCounts();
