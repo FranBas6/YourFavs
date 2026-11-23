@@ -71,6 +71,11 @@ export interface MovieCollectionPart {
     vote_count?: number;
     overview?: string;
     genre_ids?: number[];
+    /** Título original (para enseñarlo bajo un título provisional). */
+    original_title?: string;
+    /** Sin título en tu idioma: el que se enseña es el inglés o el original (2026-11-23). */
+    provisional?: boolean;
+    backdrop_path?: string | null;
 }
 
 /**
@@ -115,7 +120,10 @@ export const getMovieCollectionInfo = async (
             parts: data.parts?.map((part: any) => ({
                 id: part.id,
                 title: (untranslated(part) && enTitles.get(part.id)) || part.title,
+                original_title: part.original_title || part.title,
+                provisional: untranslated(part),
                 poster_path: posterUrl(part.poster_path, 'w500') || null,
+                backdrop_path: backdropUrl(part.backdrop_path) || null,
                 release_date: part.release_date || null,
                 vote_average: part.vote_average || 0,
                 vote_count: part.vote_count || 0,
