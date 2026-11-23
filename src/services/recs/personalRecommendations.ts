@@ -357,6 +357,8 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
     // «Porque te gustó X»: el título de la semilla viene resuelto con sus géneros (0 peticiones).
     const movieSeedTitles = new Map(Object.entries(prefs.titlesById.movies));
     const tvSeedTitles = new Map(Object.entries(prefs.titlesById.tv));
+    // Y de dónde sale (QA 1.3): «Porque te gusta X» si viene del asistente, «Porque viste X» si lo viste…
+    const seedWhyById = new Map([...prefs.seeds.movies, ...prefs.seeds.tv].map((x) => [x.id, x.why]));
 
     // I: score híbrido. sources×1.5 + score×0.5 + (rating/10)×2, más el desempate del día.
     const hybridScore = (a: Agg) =>
@@ -384,6 +386,7 @@ export async function getPersonalRecommendations(): Promise<PersonalRecResult> {
             _recScore: r.score,
             _recSources: r.sources,
             _recSeedTitle: r.seedId ? titles.get(r.seedId) : undefined,
+            _recSeedWhy: r.seedId ? seedWhyById.get(r.seedId) : undefined,
         })))
         .slice(0, RESULT_LIMIT);
 

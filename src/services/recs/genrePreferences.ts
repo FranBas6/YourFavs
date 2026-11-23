@@ -54,8 +54,9 @@ async function collectLibraryIds(): Promise<{ movies: Set<string>; tv: Set<strin
  * cómputo en L1 (memoria) y L2 (Netlify Blobs); sin esto el taste de uno se
  * filtraría a las recos de otro al compartir Lambda.
  */
-/** De dónde sale una semilla (para «porque te gustó X» y el panel de depuración). */
-export type SeedWhy = 'fav' | 'like' | 'taste' | 'rated' | 'seen';
+/** De dónde sale una semilla (para «porque te gustó X» y el panel de depuración). Vive en utils: lo pinta la tarjeta. */
+import type { SeedWhy } from '../../utils/recs/seedWhy';
+export type { SeedWhy };
 
 export interface Seed {
     id: string;

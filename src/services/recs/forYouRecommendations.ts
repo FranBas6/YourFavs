@@ -10,6 +10,8 @@ export interface ForYouItem {
     date?: string;
     /** 4.4 · semilla que generó la reco ("porque viste X"); undefined si vino de géneros/tendencias. */
     seedTitle?: string;
+    /** De dónde sale esa semilla (fav, like, rated, seen, taste): cambia el texto («Porque te gusta…»). */
+    seedWhy?: string;
 }
 
 export async function getForYouRecommendations(limit: number = 12): Promise<ForYouItem[]> {
@@ -24,6 +26,7 @@ export async function getForYouRecommendations(limit: number = 12): Promise<ForY
         overview: m.overview,
         date: m.release_date,
         seedTitle: m._recSeedTitle,
+        seedWhy: m._recSeedWhy,
     }));
 
     const series: ForYouItem[] = recs.tv.map((s: any): ForYouItem => ({
@@ -35,6 +38,7 @@ export async function getForYouRecommendations(limit: number = 12): Promise<ForY
         overview: s.overview,
         date: s.first_air_date,
         seedTitle: s._recSeedTitle,
+        seedWhy: s._recSeedWhy,
     }));
 
     // Interleave movies/series para variedad visual en home
