@@ -14,7 +14,9 @@ import { splitGenreIds } from '../../../utils/titles/tasteGenres';
 
 export const prerender = false;
 
-const MIN = 3, MAX = 10;
+// Géneros: al menos 1 (QA 2.1, H12: antes 3, y pelis/series/personas 0 o ≥3, lo que atascaba el asistente
+// con 1 o 2 elegidos). El «3» queda como sugerencia en la página.
+const MIN_GENRES = 1, MAX = 10;
 
 function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -61,11 +63,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
             .filter((p: TastePerson) => { if (seenP.has(p.id)) return false; seenP.add(p.id); return true; })
             .slice(0, MAX);
 
-        // Validación: géneros requeridos (≥3); pelis/series/personas opcionales (0 ó ≥3).
-        if (movieGenres.length < MIN) return json({ ok: false, error: 'Elige al menos 3 géneros' }, 400);
-        if (movieTitles.length > 0 && movieTitles.length < MIN) return json({ ok: false, error: 'Si añades películas, elige al menos 3 (o ninguna)' }, 400);
-        if (tvTitles.length > 0 && tvTitles.length < MIN) return json({ ok: false, error: 'Si añades series, elige al menos 3 (o ninguna)' }, 400);
-        if (people.length > 0 && people.length < MIN) return json({ ok: false, error: 'Si añades actores, elige al menos 3 (o ninguno)' }, 400);
+        // Validación: algún género; películas, series y personas, las que sean (también 1 o 2).
+        if (movieGenres.length < MIN_GENRES) return json({ ok: false, error: 'Elige al menos un género' }, 400);
 
         await setUserTaste({ movieGenres, tvGenres, titles, people });
         await setUserProfile({ onboarding: 'done' });

@@ -67,7 +67,7 @@ const prefill = {
                     <h2 class="tw-h2">¿Qué géneros te gustan?</h2>
                     <span class="tw-count" data-count="genres">0 / 10</span>
                 </div>
-                <p class="tw-sub">Elige al menos 3. Nos ayuda a entender por dónde empezar con tus recomendaciones.</p>
+                <p class="tw-sub">Elige los que más te gusten (con 3 o más acertamos mejor). Nos ayuda a entender por dónde empezar con tus recomendaciones.</p>
                 <div class="tw-chips" data-tw-genres>
                     {TASTE_GENRES.map((g) => (
                         <button type="button" class:list={["tw-chip", selectedGenres.has(g.movie) && "is-on"]} data-genre-id={g.movie}>
@@ -123,7 +123,7 @@ const prefill = {
             <!-- Pie: navegación -->
             <div class="tw-foot" data-tw-foot hidden={welcome}>
                 <button type="button" class="btn" data-tw-back hidden>← Atrás</button>
-                <span class="tw-minnote" data-minnote>Mínimo 3 · máximo 10</span>
+                <span class="tw-minnote" data-minnote>Máximo 10</span>
                 <button type="button" class="tw-link" data-tw-skipstep hidden>Saltar y finalizar</button>
                 <button type="button" class="btn btn--pri" data-tw-next disabled>Continuar →</button>
             </div>
@@ -275,7 +275,8 @@ const prefill = {
 (function () {
     const IMG = (p) => (p ? 'https://image.tmdb.org/t/p/w342' + p : '');
     const tkey = (t) => t.media_type + ':' + t.id;
-    const MIN = 3, MAX = 10;
+    // QA 2.1 (H12): géneros, al menos 1; el resto, los que quieras. MIN = 3 solo se sugiere.
+    const MIN = 3, MIN_GENRES = 1, MAX = 10;
     // Paso → tipo de contenido (2 pelis · 3 series · 4 personas).
     const LAST = 4;
 
@@ -412,8 +413,8 @@ const prefill = {
         card.querySelector('[data-count="people"]').textContent = selPeople.size + ' / ' + MAX;
         if (step >= 1 && step <= LAST) {
             const c = countFor(step);
-            // Géneros (paso 1) requerido; el resto opcional: válido con 0 o >=MIN.
-            const ok = step === 1 ? (c >= MIN) : (c === 0 || c >= MIN);
+            // Géneros (paso 1): al menos uno. El resto: cualquier número, también 1 o 2 (antes 0 o ≥3).
+            const ok = step === 1 ? (c >= MIN_GENRES) : true;
             nextBtn.disabled = !ok;
             updateMinnote(step, c);
         }
@@ -427,10 +428,12 @@ const prefill = {
         let txt;
         if (c >= MAX) txt = 'Máximo ' + MAX + ' alcanzado';
         else if (optional && c === 0) txt = 'Opcional · puedes saltar este paso';
-        else if (c < MIN) { const k = MIN - c; txt = 'Elige ' + k + ' ' + (k === 1 ? nouns[n] : plurals[n]) + ' más' + (optional ? ' (o ninguna)' : ''); }
+        else if (!optional && c < MIN_GENRES) txt = 'Elige al menos un ' + nouns[n];
+        // Con 1 o 2 se puede seguir; solo se sugiere añadir más.
+        else if (c < MIN) txt = '✓ ' + (n === LAST ? 'Puedes finalizar' : 'Puedes continuar') + ' · con ' + MIN + ' o más ' + plurals[n] + ' acertamos mejor';
         else txt = '✓ ' + (n === LAST ? 'Puedes finalizar' : 'Puedes continuar');
         minnote.textContent = txt;
-        minnote.classList.toggle('is-ok', c >= MIN || (optional && c === 0));
+        minnote.classList.toggle('is-ok', optional ? true : c >= MIN_GENRES);
     }
 
     function flash(text) { msg.textContent = text; msg.hidden = false; setTimeout(() => { msg.hidden = true; }, 2600); }
@@ -510,16 +513,17 @@ const prefill = {
         if (step < LAST) showStep(step + 1);
         else save();
     });
-    skipStep.addEventListener('click', () => save());   // último paso saltable → finaliza igual
+    // «Saltar y finalizar»: sin las personas de este paso (lo que dice el botón) y siempre avanza.
+    skipStep.addEventListener('click', () => save({ skipPeople: true }));
     card.querySelector('[data-tw-begin]')?.addEventListener('click', () => showStep(1));
     card.querySelectorAll('[data-tw-skip]').forEach((b) => b.addEventListener('click', skip));
 
-    async function save() {
+    async function save(opts = {}) {
         nextBtn.disabled = true;
         const payload = {
             genres: [...selGenres],
             titles: [...selMovies.values(), ...selSeries.values()],
-            people: [...selPeople.values()],
+            people: opts.skipPeople ? [] : [...selPeople.values()],
         };
         try {
             const res = await fetch('/api/taste/save', {
