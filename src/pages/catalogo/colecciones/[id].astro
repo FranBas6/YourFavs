@@ -4,6 +4,8 @@ import CardMovie from "../../../components/cards/CardMovie.astro";
 import { getMovieCollectionInfo } from "../../../services/movies/movieDetail";
 import { getWatchedMovieTiers, type WatchedTier } from "../../../services/movies/movieLibrary";
 import SagaProgress from "../../../components/title/SagaProgress.astro";
+import SagaFollowButton from "../../../components/title/SagaFollowButton.astro";
+import { isFollowingCollection } from "../../../services/titles/followedCollections";
 import { getGenreName } from "../../../utils/titles/genres";
 import EmptyState from "../../../components/ui/EmptyState.astro";
 import '../../../styles/pages/catalogo/shared.css';
@@ -26,8 +28,11 @@ const validYears = partsSorted.map(p => p.release_date ? new Date(p.release_date
 const firstYear = validYears[0];
 const lastYear = validYears[validYears.length - 1];
 
-// Progreso del usuario en la saga ("vista" = Vistas ∪ Liked ∪ Favs, con nivel)
-const watchedMovieTiers = await getWatchedMovieTiers().catch(() => new Map<number, WatchedTier>());
+// Progreso del usuario en la saga ("vista" = Vistas ∪ Liked ∪ Favs, con nivel) y si la sigue.
+const [watchedMovieTiers, following] = await Promise.all([
+    getWatchedMovieTiers().catch(() => new Map<number, WatchedTier>()),
+    isFollowingCollection(collectionId).catch(() => false),
+]);
 const isReleased = (p: { release_date: string | null }) => !!p.release_date && new Date(p.release_date) <= new Date();
 
 // Nota media: solo de las estrenadas con votos (antes contaba las anunciadas como 0: Dune salía con 5,3).
@@ -88,6 +93,9 @@ const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
                                 {avgRating.toFixed(1).replace('.', ',')}
                             </span>
                         )}
+                    </div>
+                    <div class="mt-4">
+                        <SagaFollowButton collectionId={collectionId} following={following} name={collection.name} />
                     </div>
                 </div>
             </div>

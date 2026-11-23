@@ -11,6 +11,8 @@
  * Las partes SIN estrenar no cuentan en el % (ni ✓ ni TE FALTA: badge PRÓX.).
  */
 import Stamp from "../ui/Stamp.astro";
+import SagaFollowButton from "./SagaFollowButton.astro";
+import { isFollowingCollection } from "../../services/titles/followedCollections";
 import type { WatchedTier } from "../../services/movies/movieLibrary";
 
 interface Part {
@@ -35,6 +37,8 @@ interface Props {
 }
 
 const { name, overview = null, parts, watchedTiers, currentId, showParts = true, collectionId } = Astro.props;
+// En la ficha (con id de saga), «Seguir saga» junto al enlace. Se consulta aquí para no tocar la ficha.
+const following = collectionId && showParts ? await isFollowingCollection(collectionId).catch(() => false) : false;
 
 // Mismo lenguaje de color que el feed de actividad: visto verde, like rosa, fav ámbar
 const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
@@ -95,7 +99,8 @@ const whenText = (p: Part): string => {
         {overview && <p class="text-sm text-gray-500 px-5 pt-2 pb-1">{overview}</p>}
 
         {collectionId && (
-            <div class="px-5 pt-3 flex justify-end">
+            <div class="px-5 pt-3 flex items-center justify-between gap-3 flex-wrap">
+                <SagaFollowButton collectionId={collectionId} following={following} name={name} />
                 <a href={`/catalogo/colecciones/${collectionId}`} class="saga-link">
                     Ver la saga completa
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>

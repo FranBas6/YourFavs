@@ -1,0 +1,40 @@
+/* Mis listas › Sagas (2026-11-23, C2). Solo tokens: el modo oscuro va solo. */
+.sg-grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.sg-sec { margin-top: 36px; }
+
+.sg-card {
+    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-sm);
+}
+.sg-cover {
+    position: relative; display: block; aspect-ratio: 16 / 7; overflow: hidden;
+    background: var(--bg-tint); text-decoration: none;
+}
+.sg-card--s .sg-cover { aspect-ratio: 16 / 6; }
+.sg-cover img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; }
+.sg-cover img.sg-cover--p { object-position: top; filter: blur(2px); transform: scale(1.1); }
+.sg-cover::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgb(0 0 0 / .75), rgb(0 0 0 / .05) 65%); }
+.sg-cover:hover img { transform: scale(1.03); }
+.sg-cover h2 {
+    position: absolute; left: 14px; right: 14px; bottom: 10px; z-index: 1; margin: 0;
+    font: 700 var(--fs-sub) var(--font); color: #fff; line-height: 1.2;
+    text-shadow: 0 1px 3px rgb(0 0 0 / .5);
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+
+.sg-body { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 14px; flex: 1; }
+.sg-prog { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font: 600 var(--fs-ui) var(--font); color: var(--text); }
+.sg-pct { font: 700 var(--fs-ui) var(--font-mono); color: var(--text-2); }
+.sg-bar { height: 6px; border-radius: var(--r-full); background: var(--bg-tint); overflow: hidden; }
+.sg-bar i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+
+.sg-facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.sg-facts li { display: flex; align-items: baseline; gap: 8px; min-width: 0; font: 500 var(--fs-ui) var(--font); color: var(--text-2); }
+.sg-facts a { color: var(--text); text-decoration: none; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sg-facts a:hover { text-decoration: underline; }
+.sg-k { flex-shrink: 0; font: 600 var(--fs-micro) var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--text-3); }
+.sg-d { flex-shrink: 0; font: 500 var(--fs-meta) var(--font-mono); color: var(--text-3); }
+
+.sg-act { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.sg-link { display: inline-flex; align-items: center; min-height: 36px; font: 600 var(--fs-ui) var(--font); color: var(--primary); text-decoration: none; }
+.sg-link:hover { text-decoration: underline; }

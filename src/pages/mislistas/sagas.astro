@@ -1,0 +1,109 @@
+---
+/**
+ * Mis listas › Sagas (2026-11-23, rama feat/avisos-finalizadas · C2).
+ *
+ * Arriba, las sagas que sigues («Seguir saga» en su página o en la ficha de una película suya): con el
+ * progreso, la siguiente que te toca y lo próximo que llega. Debajo, «Para seguir»: las sagas que tocan
+ * tus listas y aún no sigues, para que la sección no nazca vacía. Datos: `services/titles/sagaShelf.ts`.
+ */
+import Layout from "../../layouts/Layout.astro";
+import ListsNav from "../../components/library/ListsNav.astro";
+import ListTitle from "../../components/library/ListTitle.astro";
+import EmptyState from "../../components/ui/EmptyState.astro";
+import SagaFollowButton from "../../components/title/SagaFollowButton.astro";
+import { getSagaShelf, type SagaCard } from "../../services/titles/sagaShelf";
+import '../../styles/pages/personal/sagas.css';
+
+if (!Astro.locals.user) return Astro.redirect('/');
+
+let following: SagaCard[] = [];
+let suggested: SagaCard[] = [];
+try {
+    ({ following, suggested } = await getSagaShelf());
+} catch (error) {
+    console.error('[mislistas/sagas]', (error as Error).message);
+}
+
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const dateLabel = (iso: string | null) => {
+    if (!iso) return 'por anunciar';
+    const d = new Date(iso + 'T12:00:00');
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+};
+const progressText = (s: SagaCard) => {
+    if (s.released === 0) return 'Aún sin estrenos';
+    if (s.seen === s.released) return s.released === 1 ? 'La has visto' : `Las has visto todas (${s.released})`;
+    return `Has visto ${s.seen} de ${s.released}`;
+};
+const pct = (s: SagaCard) => (s.released ? Math.round((s.seen / s.released) * 100) : 0);
+---
+<Layout title="Sagas" description="Las sagas que sigues: lo que te falta y lo que viene">
+    <ListsNav slot="aside" />
+    <section class="px-1 sm:py-8">
+        <ListTitle title="Sagas" count={following.length} subtitle="Las sagas que sigues: lo que te falta y lo que viene. Te avisamos de sus películas nuevas." />
+
+        {following.length === 0 && suggested.length === 0 && (
+            <EmptyState size="md" title="Aún no sigues ninguna saga"
+                description="Sigue una saga desde su página o desde la ficha de cualquier película suya y la tendrás aquí, con lo que te falta y lo que viene.">
+                <a slot="cta" href="/catalogo/colecciones" class="btn btn--sm">Ver sagas</a>
+            </EmptyState>
+        )}
+
+        {following.length > 0 && (
+            <div class="sg-grid">
+                {following.map((s) => (
+                    <article class="sg-card">
+                        <a href={`/catalogo/colecciones/${s.id}`} class="sg-cover">
+                            {s.backdrop ? <img src={s.backdrop} alt="" loading="lazy" decoding="async" /> : s.poster ? <img src={s.poster} alt="" loading="lazy" decoding="async" class="sg-cover--p" /> : null}
+                            <h2>{s.name}</h2>
+                        </a>
+                        <div class="sg-body">
+                            <div class="sg-prog">
+                                <span>{progressText(s)}</span>
+                                {s.released > 0 && <span class="sg-pct">{pct(s)} %</span>}
+                            </div>
+                            {s.released > 0 && <div class="sg-bar" role="presentation"><i style={`width:${pct(s)}%`}></i></div>}
+                            <ul class="sg-facts">
+                                {s.next && (
+                                    <li><span class="sg-k">Siguiente</span><a href={`/movie/${s.next.id}`}>{s.next.title}</a></li>
+                                )}
+                                {s.upcoming && (
+                                    <li><span class="sg-k">Próxima</span><a href={`/movie/${s.upcoming.id}`}>{s.upcoming.title}</a><span class="sg-d">· {dateLabel(s.upcoming.date)}</span></li>
+                                )}
+                            </ul>
+                            <div class="sg-act">
+                                <SagaFollowButton collectionId={s.id} following={true} name={s.name} compact />
+                                <a href={`/catalogo/colecciones/${s.id}`} class="sg-link">Ver la saga</a>
+                            </div>
+                        </div>
+                    </article>
+                ))}
+            </div>
+        )}
+
+        {suggested.length > 0 && (
+            <section class="sg-sec">
+                <div class="lg-h"><h2>Para seguir</h2><span class="n">sagas de tus listas que aún no sigues</span></div>
+                <div class="sg-grid">
+                    {suggested.map((s) => (
+                        <article class="sg-card sg-card--s">
+                            <a href={`/catalogo/colecciones/${s.id}`} class="sg-cover">
+                                {s.backdrop ? <img src={s.backdrop} alt="" loading="lazy" decoding="async" /> : s.poster ? <img src={s.poster} alt="" loading="lazy" decoding="async" class="sg-cover--p" /> : null}
+                                <h2>{s.name}</h2>
+                            </a>
+                            <div class="sg-body">
+                                <div class="sg-prog">
+                                    <span>{progressText(s)}</span>
+                                    {s.upcoming && <span class="sg-d">Próxima · {dateLabel(s.upcoming.date)}</span>}
+                                </div>
+                                <div class="sg-act">
+                                    <SagaFollowButton collectionId={s.id} following={false} name={s.name} compact />
+                                </div>
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </section>
+        )}
+    </section>
+</Layout>

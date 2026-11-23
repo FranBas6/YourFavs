@@ -1,0 +1,40 @@
+---
+/**
+ * «Seguir saga» / «Siguiendo» (2026-11-23, C2). Una sola acción: la saga sale en Mis listas › Sagas y
+ * la campana avisa de sus películas nuevas. Va en la cabecera de la página de saga, en el bloque de
+ * saga de la ficha y en las tarjetas de «Para seguir».
+ *
+ * Es un formulario POST de verdad a /api/lists/sagas: sin sesión, el AuthModal lo intercepta, guarda la
+ * intención y la repite al entrar; sin JavaScript, funciona con recarga. Con sesión,
+ * `scripts/library/sagaFollow.ts` lo manda sin recargar (con aviso y «Deshacer»).
+ *
+ * `data-no-optimistic`: en las fichas, `public/js/optimistic-actions.js` se engancha a todos los
+ * formularios POST; sin esta marca le aplicaba el manejador genérico de listas («Quitado de null»).
+ */
+interface Props {
+    collectionId: number;
+    following: boolean;
+    /** Nombre de la saga, para el aviso («Sigues Dune»). */
+    name: string;
+    /** Botón pequeño (tarjetas). */
+    compact?: boolean;
+}
+const { collectionId, following, name, compact = false } = Astro.props;
+const back = Astro.url.pathname + Astro.url.search;
+const BELL = '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>';
+---
+<form method="POST" action="/api/lists/sagas" class="saga-follow" data-saga-follow data-no-optimistic data-name={name}>
+    <input type="hidden" name="collection_id" value={collectionId} />
+    <input type="hidden" name="op" value={following ? 'unfollow' : 'follow'} />
+    <input type="hidden" name="back" value={back} />
+    <button type="submit" class:list={['btn', 'btn--sm', { 'saga-follow--c': compact }]} data-tone="ep" aria-pressed={following ? 'true' : 'false'}
+        title={following ? 'Sigues esta saga: está en Mis listas › Sagas y te avisamos de películas nuevas. Pulsa para dejar de seguirla' : 'Te avisamos de películas nuevas, fechas y estrenos, y la tienes en Mis listas › Sagas'}>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={BELL} />
+        <span data-saga-follow-label>{following ? 'Siguiendo' : (compact ? 'Seguir' : 'Seguir saga')}</span>
+    </button>
+</form>
+<script>import '../../scripts/library/sagaFollow';</script>
+<style>
+    .saga-follow { display: inline-flex; margin: 0; }
+    .saga-follow svg { width: 16px; height: 16px; }
+</style>
