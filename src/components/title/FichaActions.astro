@@ -10,7 +10,8 @@
  *   Serie sin estado → Seguir · siguiendo → ninguno (el rojo es «Marcar visto» del episodio) ·
  *   abandonada → Retomar. Una serie ya vista no lleva rojo: «Seguir» pasa a secundario.
  * Después, el Nivel (LevelControl: Favorita · Vista ▾ · ♥), Pendiente y Ver pronto (con su
- * tono al activarse) y, en series, Siguiendo ▾ (Abandonar, Dejar de seguir) y Nuevas temporadas.
+ * tono al activarse) y, en series, Siguiendo ▾ (Abandonar, Dejar de seguir) y Nuevas temporadas
+ * («Avisarme si vuelve» si está finalizada o cancelada).
  * A la derecha, fantasmas: Colección, Recomendar, Enviar a…, «···» (IMDb) y «Ver en {plataforma}».
  * En móvil: principal a lo ancho, el Nivel a lo ancho y los secundarios con «···», que recoge
  * Colección, Recomendar, Enviar a…, Ver en… e IMDb.
@@ -56,8 +57,9 @@ interface Props {
     releaseLabel?: string;
     /** Aviso de estreno (película) o de nuevas temporadas (serie) activo. */
     notif?: boolean;
-    /** Serie finalizada o cancelada: no tendrá temporadas nuevas, así que no se ofrece el aviso
-     *  (salvo que ya estuviera puesto, para poder quitarlo). */
+    /** Serie finalizada o cancelada. El aviso se ofrece igual (2026-11-23): el «Ended» de TMDB no es
+     *  fiable (en anime suele marcar solo el fin de una tanda de capítulos) y a veces vuelven. Solo
+     *  cambia el texto: «Avisarme si vuelve». */
     seriesOver?: boolean;
     /** Serie en Favoritos: posición y total. */
     favPos?: number | null;
@@ -209,13 +211,17 @@ const mid = `fa-${mediaType}-${id}`;
                     </form>
                 </>
             )}
-            {!isMovie && (!seriesOver || notif) && (
+            {!isMovie && (
                 <form method="POST" class="fa-sec" data-reload>
                     <input type="hidden" name="actionType" value="notification" /><input type="hidden" name="media_type" value="tv" />
                     <input type="hidden" name="tmdb_id" value={id} /><input type="hidden" name="action" value={notif ? 'remove' : 'add'} />
-                    <button type="submit" class="btn btn--sm" data-tone="ep" aria-pressed={notif ? 'true' : 'false'} title={notif ? 'Te avisamos de temporadas y episodios nuevos. Pulsa para quitarlo' : 'Avisarme de temporadas y episodios nuevos'}>
+                    <button type="submit" class="btn btn--sm" data-tone="ep" aria-pressed={notif ? 'true' : 'false'} title={
+                        seriesOver
+                            ? (notif ? 'Te avisamos si vuelve: temporadas o capítulos nuevos. Pulsa para quitarlo' : 'Está finalizada, pero a veces vuelven (sobre todo el anime). Te avisamos si salen temporadas o capítulos nuevos')
+                            : (notif ? 'Te avisamos de temporadas y episodios nuevos. Pulsa para quitarlo' : 'Avisarme de temporadas y episodios nuevos')
+                    }>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.bell} />
-                        <span class="fa-d-only">Nuevas temporadas</span><span class="fa-m-only">Avisos</span>
+                        <span class="fa-d-only">{seriesOver ? 'Avisarme si vuelve' : 'Nuevas temporadas'}</span><span class="fa-m-only">Avisos</span>
                     </button>
                 </form>
             )}

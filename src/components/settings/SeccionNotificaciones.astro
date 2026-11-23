@@ -2,7 +2,7 @@
 /**
  * Qué te avisa la campana.
  *
- * Seis avisos con motor real (`new_episode` + `new_season`, `person_release` + `premiere`, `platform_change`,
+ * Ocho avisos con motor real (`new_episode` + `new_season`, `series_return` y `saga_update` (2026-11-23), `person_release` + `premiere`, `platform_change`,
  * `anniversary`, `streak` en `services/notifications/generator.ts`, y `social`: los avisos
  * entre personas de la capa social, que crea la BD al pasar, ver `social_follow`) y cuatro que el
  * diseño pide pero que **no tienen backend**: resumen semanal y correo necesitarían una
@@ -10,7 +10,7 @@
  * guardan nada — un toggle que no hace nada es peor que no tenerlo.
  *
  * Semántica del POST de reserva: un checkbox ausente significa DESACTIVADO, así que las
- * seis filas reales tienen que estar todas en el formulario.
+ * siete filas reales tienen que estar todas en el formulario.
  */
 import type { UserProfile } from "../../services/profile/userProfile";
 import FilaAjuste from "./FilaAjuste.astro";
@@ -29,6 +29,18 @@ const np = profile.notifPrefs ?? {};
             title="Estrenos de mis series"
             desc="El día que sale un episodio de algo que sigues, y cuando una serie de tus listas tiene temporada nueva."
             name="notif_episodes" fieldKey="episodes" checked={np.episodes !== false}
+        />
+        <FilaAjuste
+            icon="returning" tone="ep"
+            title="Cuando vuelve una serie"
+            desc="Una serie de tus listas que estaba parada o «finalizada» tiene capítulos nuevos: el anime que alarga la temporada, la segunda parte tras un parón… Lo que marcas con «Avisarme» en una ficha llega siempre."
+            name="notif_returns" fieldKey="returns" checked={np.returns !== false}
+        />
+        <FilaAjuste
+            icon="layers" tone="fav"
+            title="Sagas que sigues"
+            desc="Cuando una saga que sigues suma una película, cuando una próxima ya tiene fecha y el día que se estrena en tu país."
+            name="notif_sagas" fieldKey="sagas" checked={np.sagas !== false}
         />
         <FilaAjuste
             icon="userPlus" tone="person"

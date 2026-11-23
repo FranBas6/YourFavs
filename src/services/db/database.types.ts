@@ -139,6 +139,19 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"followed_collections": {
+                  Row: {
+                    "added_at": string,"backdrop_path": string | null,"collection_id": number,"name": string | null,"poster_path": string | null,"user_id": string
+                  }
+                  Insert: {
+                    "added_at"?: string,"backdrop_path"?: string | null,"collection_id": number,"name"?: string | null,"poster_path"?: string | null,"user_id"?: string
+                  }
+                  Update: {
+                    "added_at"?: string,"backdrop_path"?: string | null,"collection_id"?: number,"name"?: string | null,"poster_path"?: string | null,"user_id"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"followed_people": {
                   Row: {
                     "added_at": string,"name": string | null,"person_id": number,"profile_path": string | null,"user_id": string

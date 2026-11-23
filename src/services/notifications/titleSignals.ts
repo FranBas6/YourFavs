@@ -7,8 +7,13 @@
  *     repetirse y nunca decía «ya está». Series en Siguiendo y las suscritas con la campana.
  *   · Temporada nueva: un aviso por temporada, para cualquier serie de tus listas (Favoritos, Me
  *     gusta, Vistas, Siguiendo) y las suscritas, cuando TMDB le pone fecha al primer episodio (hasta
- *     45 días antes) o ya salió (hasta 6 días después). Para no disparar 150 consultas al día, cada
+ *     45 días antes) o ya salió (hasta 8 días después). Para no disparar 150 consultas al día, cada
  *     serie se mira UNA vez a la semana (ronda por id); las de Siguiendo y las suscritas, a diario.
+ *   · Con memoria (B, 2026-11-23, `notif_series_state`): se guarda el último episodio emitido y el
+ *     próximo anunciado de cada serie mirada. En Siguiendo y suscritas, cada episodio emitido desde la
+ *     última vez avisa aunque TMDB lo añadiera tarde. Y una serie «dormida» (sin próximo episodio) que
+ *     reaparece con uno que no es el E1 de una temporada avisa «Vuelve · T1·E29 …» (`series_return`):
+ *     el anime que alarga la temporada, la segunda parte tras un parón, la «finalizada» que no lo era.
  *   · Película suscrita («Avisarme» en la ficha): el día del estreno en cines, cuando sale en
  *     digital (alquiler/compra) y cuando llega a una de tus plataformas (o a cualquiera, si no has
  *     marcado ninguna). Hasta ahora la suscripción solo salía en el calendario: el aviso no llegaba.
@@ -24,6 +29,7 @@ import { episodeTypeLabel } from '../../utils/titles/episodeType';
 import { episodeHref, seasonHref } from '../../utils/titles/episodeView';
 import { getLibrarySnapshot } from '../library/librarySnapshot';
 import { getAllNotificationSubs } from './notificationSubs';
+import { readUserState, writeUserState } from '../db/userState';
 import { getCurrentRegion } from '../db/userScope';
 import { mapAndDeduplicateProviders } from '../tmdb/tmdbInfoService';
 import type { NotifInput } from './notifications';
@@ -35,8 +41,11 @@ export type TitleSignal = NotifInput & { always?: boolean };
 const GRACE_DAYS = 2;
 /** Una temporada se anuncia hasta estos días antes de su primer episodio… */
 const SEASON_AHEAD_DAYS = 45;
-/** …y se da por «ya disponible» hasta estos días después (la ronda semanal puede llegar tarde). */
-const SEASON_BEHIND_DAYS = 6;
+/** …y se da por «ya disponible» hasta estos días después. Más de una ronda semanal (7): con 6 había un
+ *  día en que la temporada ya no entraba en la ventana y la ronda aún no había pasado (2026-11-23). */
+const SEASON_BEHIND_DAYS = 8;
+/** Como mucho, estos episodios sueltos por serie y día (si TMDB añade una tanda entera de golpe). */
+const MAX_NEW_EPISODES = 10;
 /** Series de la ronda semanal por día (las de Siguiendo y suscritas van a diario, aparte). */
 const ROUND_DAYS = 7;
 /** Suscripciones de película que se comprueban al día. */
@@ -68,6 +77,11 @@ function sinceLabel(dateISO: string): string {
     return `desde el ${WEEKDAYS[t.weekday]}`;
 }
 
+/** Como `sinceLabel`, pero para lo que TMDB añade tarde: pasada una semana, solo «ya disponible». */
+function airedLabel(dateISO: string): string {
+    return daysFromToday(dateISO) < -6 ? 'ya disponible' : sinceLabel(dateISO);
+}
+
 /** Hash estable de un id para repartir la ronda semanal. */
 function bucketOf(id: string): number {
     let h = 0;
@@ -75,9 +89,48 @@ function bucketOf(id: string): number {
     return h % ROUND_DAYS;
 }
 
+// -------------------------------------------------------------------------------------------------
+// Memoria por serie (B, 2026-11-23): qué episodio era el último emitido y cuál el próximo anunciado la
+// última vez que se miró. Mirar solo «el E1 de una temporada dentro de una ventana de fechas» se dejaba
+// fuera el anime que alarga la temporada (E25, E26… en la misma) y lo que TMDB añade tarde, ya emitido.
+// Comparar con lo que había no depende de fechas ni de qué día toque la ronda.
+// -------------------------------------------------------------------------------------------------
+const SERIES_STATE_KEY = 'notif_series_state';
+/** «T:E» de un episodio de TMDB (null si no hay o es de especiales, temporada 0). */
+type EpRef = { s: number; e: number };
+interface SeriesStateEntry { last: EpRef | null; next: EpRef | null }
+interface SeriesState { version: 1; map: Record<string, SeriesStateEntry> }
+
+const epRef = (ep: any): EpRef | null => (ep && ep.season_number > 0 && ep.episode_number > 0 ? { s: ep.season_number, e: ep.episode_number } : null);
+/** Especial de TMDB (temporada 0): no avisa nunca. */
+const isSpecial = (ep: any): boolean => !!ep && ep.season_number === 0;
+/** a < b, en orden de emisión. */
+const before = (a: EpRef, b: EpRef) => a.s < b.s || (a.s === b.s && a.e < b.e);
+
+async function readSeriesState(): Promise<SeriesState | null> {
+    try {
+        const d = await readUserState<SeriesState>(SERIES_STATE_KEY);
+        return d?.version === 1 && d.map ? d : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Episodios emitidos desde `prev` hasta `cur` (ambos incluidos en el rango (prev, cur]). Si cambia de
+ * temporada, solo se cuentan los de la temporada nueva hasta `cur` (los que faltaran de la anterior ya
+ * habrían avisado). Como mucho MAX_NEW_EPISODES, los más recientes.
+ */
+function airedSince(prev: EpRef | null, cur: EpRef): EpRef[] {
+    const from = prev && prev.s === cur.s ? prev.e + 1 : 1;
+    const out: EpRef[] = [];
+    for (let e = Math.max(from, cur.e - MAX_NEW_EPISODES + 1); e <= cur.e; e++) out.push({ s: cur.s, e });
+    return out;
+}
+
 /** Episodios y temporadas (ver cabecera). */
 export async function seriesSignals(): Promise<TitleSignal[]> {
-    const [snap, subs] = await Promise.all([getLibrarySnapshot(), getAllNotificationSubs().catch(() => [])]);
+    const [snap, subs, prevState] = await Promise.all([getLibrarySnapshot(), getAllNotificationSubs().catch(() => []), readSeriesState()]);
     const subbed = new Set(subs.filter((s) => s.media_type === 'tv').map((s) => s.tmdb_id));
     // A diario: Siguiendo y suscritas. Semanal: el resto de tus listas, por turnos.
     const daily = new Set<string>([...snap.tvSig.map((s: any) => String(s.id)), ...subbed]);
@@ -92,6 +145,7 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
 
     const details = await processBatch(ids, (id: string) => tmdbFetch<any>(`/tv/${id}`).catch(() => null), 10);
     const items: TitleSignal[] = [];
+    const nextState: Record<string, SeriesStateEntry> = {};
     for (let i = 0; i < ids.length; i++) {
         const d = details[i];
         const id = ids[i];
@@ -129,6 +183,75 @@ export async function seriesSignals(): Promise<TitleSignal[]> {
                 href: seasonHref(id, n), poster_path: d.poster_path ?? null, always, // a la ficha de la temporada
             });
         }
+
+        // B: lo que cambió desde la última vez que se miró esta serie. La primera vez solo se apunta.
+        // Los especiales (temporada 0) NO cuentan: ni avisan ni cambian lo recordado. Si lo último
+        // emitido o lo próximo es un especial, se queda lo que había (si no, al volver un episodio normal
+        // se compararía contra «nada» y avisaría de la temporada entera).
+        const prev = prevState?.map[id];
+        const cur: SeriesStateEntry = {
+            last: epRef(d.last_episode_to_air) ?? (isSpecial(d.last_episode_to_air) ? prev?.last ?? null : null),
+            next: epRef(d.next_episode_to_air) ?? (isSpecial(d.next_episode_to_air) ? prev?.next ?? null : null),
+        };
+        nextState[id] = cur;
+        if (!prev) continue;
+
+        // Siguiendo y suscritas: un aviso por episodio emitido desde la última vez, aunque TMDB lo haya
+        // añadido tarde (el aviso «del día» de arriba solo mira 2 días atrás). Mismo id que ese aviso:
+        // si ya estaba, solo se refresca y no vuelve a salir como nuevo.
+        if (daily.has(id) && cur.last && (!prev.last || before(prev.last, cur.last))) {
+            const lastAir: string | undefined = d.last_episode_to_air?.air_date;
+            for (const ep of airedSince(prev.last, cur.last)) {
+                const isLast = ep.s === cur.last.s && ep.e === cur.last.e;
+                const tag = `T${ep.s}·E${ep.e}`;
+                const kind = isLast ? episodeTypeLabel(d.last_episode_to_air?.episode_type) : null;
+                items.push({
+                    id: `episode:${id}:${tag}`, type: 'new_episode', title: d.name,
+                    subtitle: `${tag}${kind ? ` · ${kind}` : ''} · ${isLast && lastAir ? airedLabel(lastAir) : 'ya disponible'}`,
+                    href: episodeHref(id, ep.s, ep.e), poster_path: d.poster_path ?? null, always,
+                });
+            }
+        }
+
+        // Vuelve: la serie estaba «dormida» (sin próximo episodio) y ahora tiene uno anunciado o emitido
+        // que NO es el E1 de una temporada (eso ya es «Temporada nueva», arriba): el anime que alarga la
+        // temporada, la segunda parte tras un parón, una «finalizada» que no lo estaba. Para todas las
+        // series de tus listas y las suscritas. En las de a diario, lo ya emitido lo cuentan los avisos
+        // de episodio de arriba: aquí solo el anuncio.
+        if (!prev.next) {
+            const newlyAired = !daily.has(id) && cur.last && prev.last && before(prev.last, cur.last)
+                ? airedSince(prev.last, cur.last) : [];
+            const announced = cur.next && cur.next.e > 1 ? cur.next : null;
+            const first = (newlyAired[0]?.e ?? 0) > 1 ? newlyAired[0] : announced;
+            if (first) {
+                const tag = `T${first.s}·E${first.e}`;
+                let what: string;
+                if (first === announced) {
+                    const date: string | undefined = d.next_episode_to_air?.air_date;
+                    what = `${tag} ${date ? whenLabel(date) : '· fecha por anunciar'}`;
+                } else {
+                    const n = newlyAired.length;
+                    what = n > 1 ? `${n} episodios nuevos (${tag}–E${newlyAired[n - 1].e}) · ya disponibles` : `${tag} · ya disponible`;
+                }
+                items.push({
+                    id: `return:tv:${id}:${tag}`, type: 'series_return', title: d.name,
+                    subtitle: `Vuelve · ${what}`,
+                    href: episodeHref(id, first.s, first.e), poster_path: d.poster_path ?? null, always,
+                });
+            }
+        }
+    }
+
+    // Guardar la memoria: lo mirado hoy y, de lo anterior, solo lo que sigue en tus listas o suscrito
+    // (así no crece con series que ya quitaste). Si falla, mañana se compara con lo de antes: no se pierde nada.
+    const keep = new Set<string>([...daily, ...[...snap.tvFavs, ...snap.tvLike, ...snap.tvVistos].map((s: any) => String(s.id))]);
+    const map: Record<string, SeriesStateEntry> = {};
+    for (const [k, v] of Object.entries(prevState?.map ?? {})) if (keep.has(k)) map[k] = v;
+    Object.assign(map, nextState);
+    try {
+        await writeUserState(SERIES_STATE_KEY, { version: 1, map } satisfies SeriesState);
+    } catch (error) {
+        console.error('[notifications] series state:', (error as Error).message);
     }
     return items;
 }

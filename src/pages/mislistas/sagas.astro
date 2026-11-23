@@ -1,0 +1,136 @@
+---
+/**
+ * Mis listas › Sagas (2026-11-23, C3.6; handoff docs/Sagas/design_handoff_sagas, S5).
+ *
+ *  - «Sagas que sigues» («Seguir saga» en su página o en la ficha de una película suya): tarjeta
+ *    horizontal con el fondo de la saga (sin fondo, un mosaico de pósters), nombre, «4 películas ·
+ *    2020–», barra por película y hasta dos líneas: la siguiente que te toca (con su duración), la
+ *    próxima (con fecha y «en 25 días», o su estado si no la tiene) o «La has visto entera».
+ *  - «Para seguir»: las sagas que tocan tus listas y no sigues (máx. 6), con «Te faltan N».
+ *  - Vacío: invitación a seguir una saga y enlace a Descubrir › Sagas.
+ * Datos y orden: `services/titles/sagaShelf.ts`.
+ */
+import Layout from "../../layouts/Layout.astro";
+import ListsNav from "../../components/library/ListsNav.astro";
+import ListTitle from "../../components/library/ListTitle.astro";
+import Stamp from "../../components/ui/Stamp.astro";
+import SagaBar from "../../components/title/SagaBar.astro";
+import SagaFollowButton from "../../components/title/SagaFollowButton.astro";
+import { getSagaShelf, type SagaFollowCard, type SagaSuggestCard } from "../../services/titles/sagaShelf";
+import { runtimeLabel } from "../../utils/titles/episodeView";
+import { daysUntil, titleInitials } from "../../utils/titles/sagaView";
+import '../../styles/components/saga.css';
+import '../../styles/pages/personal/sagas.css';
+
+if (!Astro.locals.user) return Astro.redirect('/');
+
+let following: SagaFollowCard[] = [];
+let suggested: SagaSuggestCard[] = [];
+try {
+    ({ following, suggested } = await getSagaShelf());
+} catch (error) {
+    console.error('[mislistas/sagas]', (error as Error).message);
+}
+
+const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+/** «18 dic · en 25 días» (sin año si es este; con él, si no). */
+const whenChip = (iso: string) => {
+    const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+    const sameYear = y === new Date().getFullYear();
+    const left = daysUntil(iso);
+    return `${d} ${MONTHS[m - 1]}${sameYear ? '' : ` ${y}`}${left ? ` · ${left}` : ''}`;
+};
+const progress = (s: { seen: number; released: number }) => `${s.seen} de ${s.released}`;
+const suggestText = (s: SagaSuggestCard) => {
+    const up = s.upcomingCount ? `${s.upcomingCount} ${s.upcomingCount === 1 ? 'próxima' : 'próximas'}` : '';
+    const main = s.released === 0 ? '' : s.missing === 0 ? 'La has visto entera' : `Te faltan ${s.missing}`;
+    return [main, up].filter(Boolean).join(' · ');
+};
+
+const I = {
+    play: '<path d="m6 3 14 9-14 9z"/>',
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    hour: '<path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2"/>',
+    chk: '<path d="M20 6 9 17l-5-5"/>',
+    arr: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+};
+const svg = (k: keyof typeof I) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
+const empty = following.length === 0 && suggested.length === 0;
+---
+<Layout title="Sagas" description="Las sagas que sigues y las que tocan tus listas">
+    <ListsNav slot="aside" />
+    <section class="px-1 sm:py-8 sgl">
+        <ListTitle title="Sagas" count={following.length} subtitle="Las sagas que sigues y las que tocan tus listas." />
+
+        {empty && (
+            <div class="sgl-empty">
+                <Stamp color="amber" icon="layers" size={48} />
+                <b>Aún no sigues ninguna saga</b>
+                <p>Sigue una saga desde su página o desde la ficha de cualquier película suya.</p>
+                <a class="sg-lk" href="/catalogo/colecciones">Descubrir sagas<Fragment set:html={svg('arr')} /></a>
+            </div>
+        )}
+
+        {following.length > 0 && (
+            <section class="sgl-sec" aria-labelledby="sgl-f">
+                <div class="sgl-sh"><h2 id="sgl-f">Sagas que sigues</h2><span class="n">{following.length}</span></div>
+                {following.map((s) => (
+                    <article class="sg-fc">
+                        <a class="sg-th" href={`/catalogo/colecciones/${s.id}`} tabindex="-1" aria-hidden="true">
+                            {s.backdrop
+                                ? <img src={s.backdrop.replace(/\/t\/p\/w\d+\//, '/t/p/w780/')} alt="" loading="lazy" decoding="async" />
+                                : s.posters.map((p) => <span class="sg-po"><b>{titleInitials(s.name)}</b><img src={p.replace('/w500/', '/w185/')} alt="" loading="lazy" decoding="async" /></span>)}
+                        </a>
+                        <div class="tx">
+                            <a class="nm" href={`/catalogo/colecciones/${s.id}`}>{s.name}</a>
+                            {s.meta && <small>{s.meta}</small>}
+                            {s.bar.length > 0 && (
+                                <div class="sg-pb"><SagaBar items={s.bar} />{s.released > 0 && <span>{progress(s)}</span>}</div>
+                            )}
+                            {s.next && (
+                                <span class="sg-li"><Fragment set:html={svg('play')} />Siguiente: <a href={`/movie/${s.next.id}`}><b>{s.next.title}{s.next.runtime ? ` · ${runtimeLabel(s.next.runtime)}` : ''}</b></a></span>
+                            )}
+                            {s.upcoming && (s.upcoming.date ? (
+                                <span class="sg-li hot"><Fragment set:html={svg('cal')} />Próximo: <a href={`/movie/${s.upcoming.id}`}><b>{s.upcoming.title}</b></a><span class="sg-chip">{whenChip(s.upcoming.date)}</span></span>
+                            ) : (
+                                <span class="sg-li"><Fragment set:html={svg('hour')} />Próximo: <a href={`/movie/${s.upcoming.id}`}><b>{s.upcoming.title}{s.upcoming.statusLabel ? ` · ${s.upcoming.statusLabel}` : ''}</b></a></span>
+                            ))}
+                            {s.complete && (s.upcoming ? (
+                                <span class="sg-li"><Fragment set:html={svg('chk')} />Estás al día</span>
+                            ) : (
+                                <span class="sg-li"><Fragment set:html={svg('chk')} /><b>La has visto entera</b>{s.marathonMin ? ` · ${runtimeLabel(s.marathonMin)}` : ''}</span>
+                            ))}
+                        </div>
+                        <div class="act"><SagaFollowButton collectionId={s.id} following={true} name={s.name} small /></div>
+                    </article>
+                ))}
+            </section>
+        )}
+
+        {suggested.length > 0 && (
+            <section class="sgl-sec" aria-labelledby="sgl-s">
+                <div class="sgl-sh"><h2 id="sgl-s">Para seguir</h2><span class="n">{suggested.length} · tocan tus listas</span></div>
+                <div class="sgl-grid">
+                    {suggested.map((s) => (
+                        <article class="sg-sc">
+                            <a class="sg-th" href={`/catalogo/colecciones/${s.id}`} tabindex="-1" aria-hidden="true">
+                                {s.backdrop
+                                    ? <img src={s.backdrop.replace(/\/t\/p\/w\d+\//, '/t/p/w780/')} alt="" loading="lazy" decoding="async" />
+                                    : s.posters.map((p) => <span class="sg-po"><b>{titleInitials(s.name)}</b><img src={p.replace('/w500/', '/w185/')} alt="" loading="lazy" decoding="async" /></span>)}
+                            </a>
+                            <div class="tx">
+                                <a class="nm" href={`/catalogo/colecciones/${s.id}`}>{s.name}</a>
+                                <div class="sg-pb"><SagaBar items={s.bar} />{s.released > 0 && <span>{progress(s)}</span>}</div>
+                            </div>
+                            <div class="ft">
+                                <small>{suggestText(s)}</small>
+                                <SagaFollowButton collectionId={s.id} following={false} name={s.name} small />
+                            </div>
+                        </article>
+                    ))}
+                </div>
+            </section>
+        )}
+    </section>
+</Layout>

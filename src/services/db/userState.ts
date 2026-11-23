@@ -5,7 +5,7 @@
  */
 import { db, getAuthId, requireAuthId } from './userScope';
 
-export type UserStateKey = 'taste' | 'notif_provider_state' | 'notif_sync';
+export type UserStateKey = 'taste' | 'notif_provider_state' | 'notif_sync' | 'notif_series_state' | 'notif_saga_state';
 
 export async function readUserState<T>(key: UserStateKey): Promise<T | null> {
     const userId = getAuthId();

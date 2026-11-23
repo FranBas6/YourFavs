@@ -13,6 +13,11 @@ export type NotifType = 'new_episode' | 'on_platform' | 'person_release' | 'anni
     // (`season:tv:{id}:S{n}`) y estreno en cines o en digital (`premiere:…`, `digital:…`) de una
     // película suscrita o de quien sigues. Ver `services/notifications/titleSignals.ts`.
     | 'new_season' | 'premiere'
+    // Una serie de tus listas o suscrita que vuelve sin ser una temporada nueva: «Vuelve · T1·E29 …»
+    // (`return:tv:{id}:T{s}·E{e}`, 2026-11-23). Ver `seriesSignals`.
+    | 'series_return'
+    // Sagas que sigues (C3.7): película nueva, ya tiene fecha, se estrena en tu país.
+    | 'saga_update'
     // Entre personas (capa social). No los crea el generador: los escribe el servidor en el buzón de
     // quien los recibe al pasar (`social_follow`, migración 20261020090000).
     | 'follow' | 'friend_request' | 'friend_accepted'
@@ -51,7 +56,7 @@ export interface NotifInput {
 // cambios volcaba toda la watchlist) y sigue ignorado para que los docs antiguos
 // desaparezcan solos; su relevo es 'platform_change', que SOLO se materializa cuando un
 // pendiente ENTRA o SALE de tus plataformas (diff contra snapshot, ver el generador).
-const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'new_season', 'premiere', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched', 'plan_changed', 'plan_cancelled', 'plan_today']);
+const ACTIVE_TYPES = new Set<NotifType>(['new_episode', 'new_season', 'series_return', 'saga_update', 'premiere', 'person_release', 'anniversary', 'platform_change', 'streak', 'follow', 'friend_request', 'friend_accepted', 'recommendation', 'rec_reply', 'rec_watched', 'plan_changed', 'plan_cancelled', 'plan_today']);
 
 function toMs(v: any): number {
     if (!v) return 0;

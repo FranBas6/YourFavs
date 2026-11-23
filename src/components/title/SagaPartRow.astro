@@ -1,0 +1,108 @@
+---
+/**
+ * Una película en «La saga, en orden» (2026-11-23, C3; handoff docs/Sagas/design_handoff_sagas, «Fila
+ * de la saga»). Número (las próximas, «–»), póster, título que enlaza a la ficha (si es provisional, el
+ * original debajo), meta (año · duración · nota TMDB; en las próximas, cuándo sale) y su estado:
+ *
+ *   Vista / Me gusta / Favorita   indicador de la lista + tu nota («★ 8,5 tú»)
+ *   Te toca (la siguiente)        chip azul «▶ Te toca», fila destacada + botón «Pendiente»
+ *   Te falta                      «TE FALTA» + botón «Pendiente»
+ *   Pendiente                     botón «Pendiente» marcado (hace de indicador y la quita al pulsarlo)
+ *   Próxima                       chip gris con el estado (En producción, Anunciada…)
+ *
+ * El botón «Pendiente» (`data-saga-pend`, `aria-pressed`) lo maneja la página de saga
+ * (`scripts/library/sagaPage.ts`): marca y desmarca sin recargar; al marcarlo, «Te falta» se oculta.
+ * Sin sesión no hay estado tuyo ni botón: solo el estado de las próximas.
+ */
+import type { SagaPart } from "../../services/titles/sagaDetail";
+import { runtimeLabel, decimal } from "../../utils/titles/episodeView";
+import { titleInitials, upcomingWhen } from "../../utils/titles/sagaView";
+import '../../styles/components/saga.css';
+
+export type SagaPartState = 'visto' | 'like' | 'fav' | 'pend' | 'next' | 'miss' | 'up';
+
+interface Props {
+    part: SagaPart;
+    /** Puesto entre las estrenadas (1, 2…); las próximas no llevan. */
+    position?: number | null;
+    state: SagaPartState;
+    /** Tu nota (0,5–10), si la has puesto. */
+    myRating?: number | null;
+    guest?: boolean;
+    /** Película de la ficha desde la que vienes. */
+    current?: boolean;
+    /** Ya está en Pendientes (la siguiente puede estarlo): el botón sale marcado. */
+    inPending?: boolean;
+}
+const { part, position = null, state, myRating = null, guest = false, current = false, inPending = false } = Astro.props;
+const up = state === 'up';
+const year = part.release_date ? part.release_date.slice(0, 4) : '';
+const dur = runtimeLabel(part.runtime);
+
+const I = {
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/>',
+    crown: '<path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    play: '<path d="m6 3 14 9-14 9z"/>',
+    star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8-6.2-3.2-6.2 3.2L7 14.2 2 9.3l6.9-1z"/>',
+    cal: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    hour: '<path d="M5 22h14M5 2h14M17 22v-4.2a2 2 0 0 0-.6-1.4L12 12l-4.4 4.4a2 2 0 0 0-.6 1.4V22M7 2v4.2a2 2 0 0 0 .6 1.4L12 12l4.4-4.4a2 2 0 0 0 .6-1.4V2"/>',
+};
+const svg = (k: keyof typeof I, fill = false) =>
+    `<svg viewBox="0 0 24 24" fill="${fill ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
+const TIER: Record<string, [string, keyof typeof I, string, boolean]> = {
+    visto: ['visto', 'check', 'Vista', false],
+    like: ['like', 'heart', 'Me gusta', true],
+    fav: ['fav', 'crown', 'Favorita', true],
+};
+const tier = TIER[state];
+// En Pendientes, el mismo botón marcado hace de indicador y deja quitarla desde aquí.
+const showPend = !guest && (state === 'next' || state === 'miss' || state === 'pend');
+---
+<li class:list={['sg-r', { next: state === 'next' && !guest, cur: current }]} data-part={part.id}>
+    <span class="no">{up ? '–' : position}</span>
+    <span class:list={['sg-po', { up }]}>
+        <b>{titleInitials(part.title)}</b>
+        {part.poster_path && <img src={part.poster_path.replace('/w500/', '/w185/')} alt="" loading="lazy" decoding="async" />}
+    </span>
+    <div style="min-width:0">
+        <a class="t" href={`/movie/${part.id}`}>{part.title}</a>
+        {part.provisional && part.original_title && part.original_title !== part.title && (
+            <span class="o">{part.original_title} · título provisional</span>
+        )}
+        <div class="m">
+            {up ? (
+                <span class="sg-when"><Fragment set:html={svg('cal')} />{upcomingWhen(part.release_date, part.localRelease)}</span>
+            ) : (
+                <>
+                    {year && <span>{year}</span>}
+                    {dur && <span>{dur}</span>}
+                    {part.vote_average > 0 && <span class="rt"><Fragment set:html={svg('star')} />{decimal(part.vote_average)}</span>}
+                </>
+            )}
+        </div>
+    </div>
+    <div class="s">
+        {up && part.statusLabel && (
+            <span class="chip-state"><Fragment set:html={svg('hour')} />{part.statusLabel}</span>
+        )}
+        {!guest && tier && (
+            <>
+                <span class:list={['sg-ind', { f: tier[3] }]} style={`--c:var(--a-${tier[0]})`}><Fragment set:html={svg(tier[1])} />{tier[2]}</span>
+                {myRating != null && myRating > 0 && (
+                    <span class="sg-me" aria-label={`Tu nota: ${decimal(myRating)}`}><Fragment set:html={svg('star', true)} />{decimal(myRating)}<em>tú</em></span>
+                )}
+            </>
+        )}
+        {!guest && state === 'next' && (
+            <span class="chip-state" data-tone="blue"><Fragment set:html={svg('play')} />Te toca</span>
+        )}
+        {!guest && state === 'miss' && <span class="sg-miss">Te falta</span>}
+        {showPend && (
+            <button type="button" class="btn btn--sm" data-tone="pend" aria-pressed={inPending ? 'true' : 'false'} data-saga-pend={part.id} data-title={part.title}>
+                <Fragment set:html={svg('clock')} />Pendiente
+            </button>
+        )}
+    </div>
+</li>

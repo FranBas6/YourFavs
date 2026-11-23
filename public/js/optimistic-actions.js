@@ -288,6 +288,10 @@ function handleGenericFavAction(form) {
 function initOptimisticActions() {
     document.querySelectorAll('form[method="POST"]').forEach(function (form) {
         if (form.dataset.optimistic) return;
+        // Formularios con su propio script (p. ej. «Seguir saga», `scripts/library/sagaFollow.ts`): aquí
+        // no se tocan. Sin esto les caía el manejador genérico de listas («Quitado de null») y mandaba
+        // los datos a la propia ficha a la vez que su script (2026-11-23).
+        if (form.hasAttribute('data-no-optimistic')) return;
         form.dataset.optimistic = 'true';
 
         var actionType = form.querySelector('input[name="actionType"]');

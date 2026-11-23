@@ -6,8 +6,9 @@ import {
     formatDate, formatTrailerUrl, providerLinks
 } from "../../utils/titles/mediaHelpers";
 import {formatCurrency} from "../../utils/titles/movieHelpers";
-import {handleMovieFavAction, getWatchedMovieTiers, type WatchedTier} from "../../services/movies/movieLibrary";
+import {handleMovieFavAction} from "../../services/movies/movieLibrary";
 import SagaProgress from "../../components/title/SagaProgress.astro";
+import { getSagaDetail } from "../../services/titles/sagaDetail";
 import '../../styles/shared/detail-common.css';
 import '../../styles/pages/movie/movie.css';
 import {
@@ -183,10 +184,14 @@ const collectionPromise = item?.belongs_to_collection ? getMovieCollectionInfo(i
 
 const [
     collectionInfo,
+    sagaDetail,
     moviesRecommendationsData,
     crossMediaSeries,
 ] = await Promise.all([
     collectionPromise,
+    // Bloque de saga (C3.5): duración y estado de cada película, sobre la misma saga de arriba.
+    // Caché de 1 h por saga: la comparten todas sus fichas y su página.
+    item?.belongs_to_collection ? getSagaDetail(item.belongs_to_collection.id, collectionPromise).catch(() => null) : Promise.resolve(null),
     tmdbId
         ? getMovieRecommendationsOrSimilar(tmdbId, item?.belongs_to_collection ? collectionPromise.then((c) => c?.parts?.map((p) => p.id)) : null)
         : Promise.resolve({ success: false, recommendations: [], type: 'recommendations' as const }),
@@ -198,14 +203,6 @@ const [
             .catch(() => [])
         : Promise.resolve([]),
 ]);
-
-// Saga con progreso: solo si la película pertenece a colección (evita la
-// consulta en el resto de fichas). "Vista" = Vistas ∪ Liked ∪ Favs,
-// con nivel (✓/♥/★) para indicar en qué lista está cada parte.
-let watchedMovieTiers = new Map<number, WatchedTier>();
-if (collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1) {
-    watchedMovieTiers = await getWatchedMovieTiers().catch(() => new Map<number, WatchedTier>());
-}
 
 const posters: PosterImage[] = allPosters.slice(0, 40);
 const moviesRecommendations = moviesRecommendationsData.success ? moviesRecommendationsData.recommendations : [];
@@ -579,14 +576,8 @@ const jsonLd = item ? {
 
                     <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), justo tras los vídeos (Fran) -->
                     <div class="mo mo-4">
-                    {collectionInfo && collectionInfo.parts && collectionInfo.parts.length > 1 && (
-                        <SagaProgress
-                            name={collectionInfo.name}
-                            overview={collectionInfo.overview}
-                            parts={collectionInfo.parts}
-                            watchedTiers={watchedMovieTiers}
-                            currentId={item?.id}
-                        />
+                    {sagaDetail && sagaDetail.parts.length > 1 && (
+                        <SagaProgress saga={sagaDetail} currentId={item?.id} />
                     )}
                     </div>
 

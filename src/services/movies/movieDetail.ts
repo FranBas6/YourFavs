@@ -1,6 +1,7 @@
 import { type Movie } from "../../types/ApiMovie.ts";
 import { getCurrentLanguage, getCurrentRegion } from "../db/userScope";
 import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../tmdb/tmdbClient';
+import { cleanCollectionName } from '../../utils/titles/collectionName';
 import {
     mapAndDeduplicateProviders,
     buildProvidersByCountry,
@@ -70,24 +71,60 @@ export interface MovieCollectionPart {
     vote_count?: number;
     overview?: string;
     genre_ids?: number[];
+    /** Título original (para enseñarlo bajo un título provisional). */
+    original_title?: string;
+    /** Sin título en tu idioma: el que se enseña es el inglés o el original (2026-11-23). */
+    provisional?: boolean;
+    backdrop_path?: string | null;
 }
+
+/**
+ * Nombre y descripción de la saga en tu idioma (2026-11-23). TMDB a veces no la tiene traducida en
+ * `es-ES` y devuelve el inglés («Demon Slayer: Kimetsu no Yaiba Collection»), pero sí en otra variante
+ * del idioma (`es-MX`). Orden: idioma y país exactos → mismo idioma, otro país → lo que vino. El nombre
+ * se limpia de «Colección/Collection» (`cleanCollectionName`).
+ */
+function pickCollectionText(data: any): { name: string; overview: string | null } {
+    const [lang, country] = getCurrentLanguage().split('-');
+    const tr: any[] = data?.translations?.translations ?? [];
+    const exact = tr.find((t) => t.iso_639_1 === lang && t.iso_3166_1 === country)?.data;
+    const sameLang = tr.filter((t) => t.iso_639_1 === lang).map((t) => t.data);
+    const name = exact?.title || sameLang.find((d) => d?.title)?.title || data?.name || '';
+    const overview = data?.overview || exact?.overview || sameLang.find((d) => d?.overview)?.overview || null;
+    return { name: cleanCollectionName(name), overview };
+}
+
+/** Título sin traducir: TMDB devuelve el original (p. ej. «劇場版「鬼滅の刃」無限城編 2») en otro idioma. */
+const untranslated = (part: any): boolean =>
+    !!part?.title && part.title === part.original_title && !['es', 'en'].includes(part.original_language);
 
 export const getMovieCollectionInfo = async (
     collectionId: number
 ): Promise<MovieCollectionInfo | null> => {
     try {
-        const data = await tmdbFetch<any>(`/collection/${collectionId}`);
+        const data = await tmdbFetch<any>(`/collection/${collectionId}`, { append_to_response: 'translations' });
+        // Las películas que solo vienen con el título original (anime anunciado…): su título en inglés,
+        // que se entiende mejor que el japonés. Una llamada más, solo si hace falta.
+        let enTitles = new Map<number, string>();
+        if ((data.parts ?? []).some(untranslated)) {
+            const en = await tmdbFetch<any>(`/collection/${collectionId}`, { language: 'en-US' }).catch(() => null);
+            enTitles = new Map((en?.parts ?? []).map((p: any) => [p.id, p.title]));
+        }
+        const { name, overview } = pickCollectionText(data);
         return {
             id: data.id,
-            name: data.name,
+            name,
             poster_path: posterUrl(data.poster_path) || null,
             backdrop_path: backdropUrl(data.backdrop_path) || null,
-            overview: data.overview || null,
+            overview,
             parts: data.parts?.map((part: any) => ({
                 id: part.id,
-                title: part.title,
+                title: (untranslated(part) && enTitles.get(part.id)) || part.title,
+                original_title: part.original_title || part.title,
+                provisional: untranslated(part),
                 poster_path: posterUrl(part.poster_path, 'w500') || null,
-                release_date: part.release_date,
+                backdrop_path: backdropUrl(part.backdrop_path) || null,
+                release_date: part.release_date || null,
                 vote_average: part.vote_average || 0,
                 vote_count: part.vote_count || 0,
                 overview: part.overview || '',
@@ -126,7 +163,7 @@ export const searchCollections = async (query: string, page: number = 1): Promis
         return {
             results: (data.results || []).map(r => ({
                 id: r.id,
-                name: r.name,
+                name: cleanCollectionName(r.name),
                 poster_path: posterUrl(r.poster_path, 'w342') || null,
                 backdrop_path: backdropUrl(r.backdrop_path) || null,
             })),
