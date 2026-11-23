@@ -29,6 +29,7 @@ import { readProviderState, writeProviderState, type ProviderSnapEntry } from '.
 import { appDateParts } from '../../utils/core/appTime';
 import { seriesSignals, subscribedMovieSignals, watchlistMovieSignals } from './titleSignals';
 import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
+import { sagaSignals } from './sagaSignals';
 
 // type de notificación → clave del toggle en el perfil (UserProfile.notifPrefs)
 const TYPE_TO_PREF: Record<NotifType, string> = {
@@ -36,6 +37,8 @@ const TYPE_TO_PREF: Record<NotifType, string> = {
     new_season: 'episodes',
     // Vuelve una serie de tus listas (también finalizadas): interruptor propio, encendido por defecto.
     series_return: 'returns',
+    // Sagas que sigues (C3.7): su propio interruptor, encendido por defecto.
+    saga_update: 'sagas',
     premiere: 'releases',
     on_platform: 'platform',
     person_release: 'releases',
@@ -119,6 +122,16 @@ export async function syncNotifications(platforms: number[] = [], force = false)
         }
     } catch (error) {
         console.error('[notifications] watchlist:', (error as Error).message);
+    }
+
+    // Sagas que sigues (C3.7): película nueva, ya tiene fecha, se estrena en tu país. Como «Cuando
+    // vuelve una serie»: con el interruptor apagado no llega nada, pero la memoria sigue al día para no
+    // soltar de golpe lo acumulado al volver a encenderlo.
+    try {
+        const sagaItems = await sagaSignals();
+        if (enabled('saga_update')) items.push(...sagaItems);
+    } catch (error) {
+        console.error('[notifications] sagas:', (error as Error).message);
     }
 
     try {

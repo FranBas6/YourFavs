@@ -270,6 +270,7 @@ const NOTIF_STAMP: Record<string, [StampColor, string]> = {
     new_episode: ['blue', 'tv'],
     new_season: ['blue', 'tv'],
     series_return: ['blue', 'tv'],
+    saga_update: ['amber', 'layers'],
     premiere: ['red', 'ticket'],
     person_release: ['red', 'clapperboard'],
     anniversary: ['purple', 'calendar-days'],
@@ -397,7 +398,7 @@ export function notifCat(type: string): NotifCat {
     if (type === 'new_episode' || type === 'new_season' || type === 'series_return') return 'episodios';
     if (type === 'platform_change' || type === 'on_platform') return 'plataformas';
     if (type === 'person_release') return 'personas';
-    if (type === 'premiere' || type === 'anniversary') return 'estrenos';
+    if (type === 'premiere' || type === 'anniversary' || type === 'saga_update') return 'estrenos';
     if (SOCIAL_NOTIF_TYPES.has(type) || PLAN_NOTIF_TYPES.has(type)) return 'amigos';
     return 'otros';
 }
@@ -407,7 +408,7 @@ export const NOTIF_CATS: [NotifCat, string, string][] = [
 ];
 
 /** Solo se juntan los avisos de títulos; los sociales y los planes van siempre sueltos (tienen botones). */
-const GROUPABLE = new Set(['new_episode', 'new_season', 'series_return', 'platform_change', 'person_release', 'premiere']);
+const GROUPABLE = new Set(['new_episode', 'new_season', 'series_return', 'saga_update', 'platform_change', 'person_release', 'premiere']);
 const PLATFORM_RE = /^(Ya en|Salió de) (.+?) · (.+)$/;
 
 export interface NotifBundle { bundle: true; key: string; type: string; items: NotifView[]; created_at: number; read: boolean }
@@ -471,6 +472,7 @@ function bundleText(b: NotifBundle): { html: string; plain: string; more: string
         return { html: `<b>Nuevos episodios</b> en ${series.length} series`, plain: `Nuevos episodios en ${series.length} series`, more: listNames(series) };
     }
     if (b.type === 'new_season') return { html: `<b>Temporadas nuevas</b> en ${n} series`, plain: `Temporadas nuevas en ${n} series`, more: listNames(titles) };
+    if (b.type === 'saga_update') return { html: `<b>Novedades</b> en las sagas que sigues`, plain: 'Novedades en las sagas que sigues', more: listNames(titles) };
     if (b.type === 'series_return') return { html: `<b>Vuelven ${n} series</b> de tus listas`, plain: `Vuelven ${n} series de tus listas`, more: listNames(titles) };
     if (b.type === 'person_release') {
         const people = b.items.map((i) => (i.subtitle || '').split(' · ')[0].replace(/ y \d+ más$/, ''));
