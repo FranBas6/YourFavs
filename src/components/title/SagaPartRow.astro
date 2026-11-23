@@ -7,10 +7,11 @@
  *   Vista / Me gusta / Favorita   indicador de la lista + tu nota («★ 8,5 tú»)
  *   Te toca (la siguiente)        chip azul «▶ Te toca», fila destacada + botón «Pendiente»
  *   Te falta                      «TE FALTA» + botón «Pendiente»
- *   Pendiente                     indicador «Pendiente»
+ *   Pendiente                     botón «Pendiente» marcado (hace de indicador y la quita al pulsarlo)
  *   Próxima                       chip gris con el estado (En producción, Anunciada…)
  *
- * El botón «Pendiente» lleva `data-saga-pend`: lo maneja la página de saga (`scripts/library/sagaPage.ts`).
+ * El botón «Pendiente» (`data-saga-pend`, `aria-pressed`) lo maneja la página de saga
+ * (`scripts/library/sagaPage.ts`): marca y desmarca sin recargar; al marcarlo, «Te falta» se oculta.
  * Sin sesión no hay estado tuyo ni botón: solo el estado de las próximas.
  */
 import type { SagaPart } from "../../services/titles/sagaDetail";
@@ -56,7 +57,8 @@ const TIER: Record<string, [string, keyof typeof I, string, boolean]> = {
     fav: ['fav', 'crown', 'Favorita', true],
 };
 const tier = TIER[state];
-const showPend = !guest && (state === 'next' || state === 'miss');
+// En Pendientes, el mismo botón marcado hace de indicador y deja quitarla desde aquí.
+const showPend = !guest && (state === 'next' || state === 'miss' || state === 'pend');
 ---
 <li class:list={['sg-r', { next: state === 'next' && !guest, cur: current }]} data-part={part.id}>
     <span class="no">{up ? '–' : position}</span>
@@ -92,9 +94,6 @@ const showPend = !guest && (state === 'next' || state === 'miss');
                     <span class="sg-me" aria-label={`Tu nota: ${decimal(myRating)}`}><Fragment set:html={svg('star', true)} />{decimal(myRating)}<em>tú</em></span>
                 )}
             </>
-        )}
-        {!guest && state === 'pend' && (
-            <span class="sg-ind" style="--c:var(--a-pend)"><Fragment set:html={svg('clock')} />Pendiente</span>
         )}
         {!guest && state === 'next' && (
             <span class="chip-state" data-tone="blue"><Fragment set:html={svg('play')} />Te toca</span>

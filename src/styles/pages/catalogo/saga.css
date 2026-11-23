@@ -36,6 +36,8 @@
 .sg-act form { margin: 0; display: inline-flex; }
 .sg-act .sp { flex: 1; }
 .sg-act .btn svg { width: 16px; height: 16px; }
+.sg-act .btn[hidden] { display: none; }
+.sg-act [data-saga-pend-all][aria-busy="true"] { opacity: .6; pointer-events: none; }
 
 /* Cuerpo */
 .sg-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 32px; padding: 28px 48px 48px; align-items: start; }
@@ -142,6 +144,8 @@ a.sg-p:hover b { text-decoration: underline; }
     .sg-act { padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .sg-act .btn, .sg-act form, .sg-act form .btn { width: 100%; justify-content: center; }
     .sg-act .wide { grid-column: 1 / -1; }
+    /* Seguir y Compartir en la misma fila; el bloque de Pendientes, debajo a todo el ancho. */
+    .sg-act [data-saga-pend-all] { order: 1; }
     .sg-act .sp { display: none; }
     .sg-act .lbl-d { display: none; }
     .sg-body { grid-template-columns: minmax(0, 1fr); padding: 20px 16px 32px; gap: 24px; }

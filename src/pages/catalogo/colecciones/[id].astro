@@ -64,6 +64,10 @@ const seen = released.filter((p) => tiers.has(p.id)).length;
 const pct = released.length ? Math.round((seen / released.length) * 100) : 0;
 const leftMin = released.filter((p) => !tiers.has(p.id)).reduce((a, p) => a + (p.runtime ?? 0), 0);
 const favCount = released.filter((p) => tiers.get(p.id) === 'fav').length;
+// «Añadir las que me faltan a Pendientes (N)»: estrenadas sin ver que no están ya en Pendientes (las
+// próximas no: todavía no se pueden ver). Con 0, el botón no sale; el navegador lo recuenta al
+// marcar o desmarcar filas.
+const missingCount = released.filter((p) => !tiers.has(p.id) && !pendIds.has(p.id)).length;
 const complete = released.length > 0 && seen === released.length;
 
 const summary = upcoming.length
@@ -175,6 +179,12 @@ const svg = (k: keyof typeof I) => `<svg viewBox="0 0 24 24" fill="none" stroke=
                 </form>
             )}
             <SagaFollowButton collectionId={collectionId} following={following} name={info.name} />
+            {user && released.length > 0 && (
+                <button type="button" class="btn wide" data-tone="pend" data-saga-pend-all hidden={missingCount === 0}>
+                    <Fragment set:html={svg('clock')} />
+                    <span>Añadir las que me faltan a Pendientes (<span data-n>{missingCount}</span>)</span>
+                </button>
+            )}
             <span class="sp"></span>
             <button type="button" class="btn" data-saga-share data-title={info.name} aria-label="Compartir esta saga" title="Compartir">
                 <Fragment set:html={svg('share')} /><span class="lbl-m">Compartir</span>

@@ -53,6 +53,26 @@ export async function saveFixed(
     list: FixedList,
     action: 'add' | 'remove'
 ): Promise<{ count: number }> {
+    await applyFixed(mediaType, tmdbId, list, action);
+    return { count: await countOf(mediaType, list) };
+}
+
+/**
+ * Lo mismo para varios títulos a la vez (página de saga, C3: «Añadir las que me faltan a Pendientes»
+ * y su «Deshacer»). Uno detrás de otro con el mismo handler de la ficha, así cada uno aplica sus
+ * transiciones y avisa a las cachés igual que si lo hubieras hecho a mano; el contador, una vez.
+ */
+export async function saveFixedMany(
+    mediaType: 'movie' | 'tv',
+    tmdbIds: number[],
+    list: FixedList,
+    action: 'add' | 'remove'
+): Promise<{ count: number }> {
+    for (const id of tmdbIds) await applyFixed(mediaType, id, list, action);
+    return { count: await countOf(mediaType, list) };
+}
+
+async function applyFixed(mediaType: 'movie' | 'tv', tmdbId: number | string, list: FixedList, action: 'add' | 'remove'): Promise<void> {
     const fd = new FormData();
     fd.set('id', String(tmdbId));
     fd.set('action', action);
@@ -63,10 +83,13 @@ export async function saveFixed(
         fd.set('actionType', SERIE_ACTION_TYPE[list]);
         await handleSerieFavAction(fd);
     }
-    // Contador agregado (no lee los docs). Es decorativo: si falla, devolvemos 0.
-    let count = 0;
+}
+
+// Contador agregado (no lee los docs). Es decorativo: si falla, devolvemos 0.
+async function countOf(mediaType: 'movie' | 'tv', list: FixedList): Promise<number> {
     try {
-        count = await countCollection(COLLECTION_BY_MEDIA[mediaType][list]);
-    } catch { /* el toast simplemente no mostrará el #N */ }
-    return { count };
+        return await countCollection(COLLECTION_BY_MEDIA[mediaType][list]);
+    } catch {
+        return 0; // el toast simplemente no mostrará el #N
+    }
 }
