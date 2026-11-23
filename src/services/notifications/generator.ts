@@ -34,6 +34,8 @@ import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
 const TYPE_TO_PREF: Record<NotifType, string> = {
     new_episode: 'episodes',
     new_season: 'episodes',
+    // Vuelve una serie de tus listas (también finalizadas): interruptor propio, encendido por defecto.
+    series_return: 'returns',
     premiere: 'releases',
     on_platform: 'platform',
     person_release: 'releases',
