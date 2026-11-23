@@ -68,3 +68,13 @@ export async function getFollowedCollections(): Promise<FollowedCollection[]> {
         .eq('user_id', userId).order('added_at', { ascending: false }).range(from, to));
     return rows.map(toItem);
 }
+
+/** Cuántas sagas sigues (contador «Sagas» de Mis listas, /api/lists/counts). Sin leer las filas. */
+export async function countFollowedCollections(): Promise<number> {
+    const userId = getAuthId();
+    if (!userId) return 0;
+    const { count, error } = await db().from('followed_collections')
+        .select('collection_id', { count: 'exact', head: true }).eq('user_id', userId);
+    if (error) throw error;
+    return count ?? 0;
+}

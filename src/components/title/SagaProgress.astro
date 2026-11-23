@@ -86,7 +86,8 @@ const stateOf = (p: SagaPart): RowState => {
 };
 const metaOf = (p: SagaPart) => p.released
     ? [p.release_date?.slice(0, 4), runtimeLabel(p.runtime)].filter(Boolean).join(' · ')
-    : [p.statusLabel, p.release_date ? shortDate(p.release_date) : 'Por anunciar'].filter(Boolean).join(' · ');
+    // Próximas: la fecha en tu país si la hay (la misma que Mis listas › Sagas); si no, la mundial.
+    : [p.statusLabel, (p.localRelease.cinema || p.localRelease.digital || p.release_date) ? shortDate(p.localRelease.cinema || p.localRelease.digital || p.release_date) : 'Por anunciar'].filter(Boolean).join(' · ');
 
 const I = {
     check: '<path d="M20 6 9 17l-5-5"/>',

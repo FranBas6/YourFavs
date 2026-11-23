@@ -31,7 +31,7 @@ export const LISTS_NAV: ListsNavGroup[] = [
             { href: '/mislistas/siguiendo', label: 'Siguiendo', icon: 'eye', tone: 'seguir', countKey: 'siguiendo' },
             { href: '/mislistas/colecciones', label: 'Colecciones', icon: 'folder', tone: 'tint', countKey: 'colecciones' },
             // Sagas que sigues y «Para seguir» (2026-11-23).
-            { href: '/mislistas/sagas', label: 'Sagas', icon: 'layers', tone: 'tint' },
+            { href: '/mislistas/sagas', label: 'Sagas', icon: 'layers', tone: 'tint', countKey: 'sagas' },
             { href: '/mislistas/actores', label: 'Actores', icon: 'user', tone: 'person' },
             { href: '/mislistas/calendario', label: 'Calendario', icon: 'calday', tone: 'ep' },
         ],
