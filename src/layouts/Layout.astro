@@ -38,6 +38,8 @@ interface Props {
     robots?: string;
     /** URL canónica absoluta para `og:url` (el perfil público usa la de producción). */
     ogUrl?: string;
+    /** `false` en las páginas de error: sin `<link rel="canonical">` (QA 1.4, H75). */
+    canonical?: boolean;
 }
 
 const {
@@ -47,6 +49,7 @@ const {
     ogType = "website",
     robots,
     ogUrl,
+    canonical = true,
 } = Astro.props;
 
 // Imagen al compartir (QA 1.2, H73/H04): WhatsApp, X, Telegram o Slack necesitan una URL ABSOLUTA. Sin
@@ -82,7 +85,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <meta name="generator" content={Astro.generator}/>
     <meta name="description" content={description}/>
     <meta name="theme-color" content="#2B63D9"/>
-    <link rel="canonical" href={Astro.url.href}/>
+    {canonical && <link rel="canonical" href={Astro.url.href}/>}
     <!-- App instalable. El `apple-touch-icon` de aquí abajo ya se enlazaba, pero el archivo
          NO existía: era un 404, y por eso iOS ponía una captura de la página en la pantalla
          de inicio en vez del logo. Lo genera `scripts/build-pwa-icons.mjs`. -->

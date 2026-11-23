@@ -1,5 +1,7 @@
 import { type Movie } from "../../types/ApiMovie.ts";
-import { tmdbFetch, posterUrl, backdropUrl } from '../tmdb/tmdbClient';
+import { tmdbFetch, posterUrl, backdropUrl, isTmdbNotFound } from '../tmdb/tmdbClient';
+
+const NOT_FOUND = Symbol('notFound');
 
 export async function getMoviesAndSeriesByCompanyName(
     companyName: string,
@@ -8,6 +10,8 @@ export async function getMoviesAndSeriesByCompanyName(
     knownCompanyId?: number
 ): Promise<{
     success: boolean;
+    /** TMDB no la encuentra: la página responde 404 (QA 1.4). */
+    notFound?: boolean;
     companyInfo?: any;
     movies: Movie[];
     series: any[];
@@ -23,7 +27,7 @@ export async function getMoviesAndSeriesByCompanyName(
             });
 
             if (!searchData.results.length) {
-                return { success: false, movies: [], series: [], error: `No se encontró la productora "${companyName}"` };
+                return { success: false, notFound: true, movies: [], series: [], error: `No se encontró la productora "${companyName}"` };
             }
 
             companyId = searchData.results[0].id;
@@ -32,10 +36,15 @@ export async function getMoviesAndSeriesByCompanyName(
         // 2. Info de la productora + películas + series en paralelo
         const resolvedId = companyId as number;
         const [companyInfo, moviesData, seriesData] = await Promise.all([
-            tmdbFetch<any>(`/company/${resolvedId}`).catch(() => null),
+            // Un id que no existe (`?companyId=` a mano o un enlace viejo) es un 404, no una página vacía.
+            tmdbFetch<any>(`/company/${resolvedId}`).catch((e) => (isTmdbNotFound(e) ? NOT_FOUND : null)),
             fetchAllPages(resolvedId, 'movie', 10),
             fetchAllPages(resolvedId, 'tv', 10),
         ]);
+
+        if (companyInfo === NOT_FOUND) {
+            return { success: false, notFound: true, movies: [], series: [], error: `No existe la productora ${resolvedId}` };
+        }
 
         const calculateScore = (item: any, type: "movie" | "tv"): number => {
             if (sortBy === "popularity") return item.popularity || 0;
@@ -88,7 +97,7 @@ export async function getMoviesAndSeriesByCompanyName(
         return { success: true, companyInfo, movies, series };
     } catch (error) {
         console.error("Error al obtener información de la productora:", error);
-        return { success: false, movies: [], series: [], error: error instanceof Error ? error.message : "Error desconocido" };
+        return { success: false, notFound: isTmdbNotFound(error), movies: [], series: [], error: error instanceof Error ? error.message : "Error desconocido" };
     }
 }
 

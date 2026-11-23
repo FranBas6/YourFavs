@@ -1,6 +1,6 @@
 import { type Serie } from "../../types/ApiSerie.ts";
 import { type Movie } from "../../types/ApiMovie.ts";
-import { tmdbFetch, originalUrl } from '../tmdb/tmdbClient';
+import { tmdbFetch, originalUrl, isTmdbNotFound } from '../tmdb/tmdbClient';
 import { getCurrentLanguage } from "../db/userScope";
 
 const sortByPopularityAndRating = (a: any, b: any) => {
@@ -123,6 +123,8 @@ export const getActorDetailsById = async ({ id }: { id: string }) => {
             },
         };
     } catch (error) {
+        // No existe en TMDB: la página responde 404 (QA 1.4; antes, 200 con el id de título).
+        if (isTmdbNotFound(error)) return { notFound: true as const };
         console.error('Error al obtener los detalles del actor:', error);
         return null;
     }
