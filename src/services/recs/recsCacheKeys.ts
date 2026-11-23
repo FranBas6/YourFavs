@@ -12,10 +12,10 @@ import type { LibraryTopic } from '../library/libraryChanges';
 // v7: cupo de semillas por señal; v6: semillas = favs + me gusta + onboarding + notas ≥ 8 + vistas
 // recientes, con recencia; v5 exclusión = todas las listas
 const GENRE_PREFS_BLOB = 'genrePrefs_v7';
-// v13: `rows` para las filas por motivo; v12: 2 huecos principales para señales que no sean favorito y
+// v14: `_recSeedWhy` en cada reco (QA 1.3: «Porque te gusta X» frente a «Porque viste X»); v13: `rows` para las filas por motivo; v12: 2 huecos principales para señales que no sean favorito y
 // peso mínimo en variedad; v11: variedad al 70 % y tope por semilla en el resultado; v10: más señales,
 // cuota de variedad y rotación diaria; v9 _recSeedTitle
-const PERSONAL_RECS_BLOB = 'personalRecs_v13';
+const PERSONAL_RECS_BLOB = 'personalRecs_v14';
 
 /** Lo que leen los gustos (y, a través de ellos, «Para ti»): tus listas, tus notas, tus colecciones y el onboarding. */
 export const RECS_TOPICS: LibraryTopic[] = ['lists', 'ratings', 'customLists', 'taste'];

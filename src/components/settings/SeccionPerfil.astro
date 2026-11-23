@@ -10,7 +10,7 @@ import AvatarDialog from "./AvatarDialog.astro";
 
 interface Props {
     profile: UserProfile;
-    user: { email?: string | null; name?: string | null; picture?: string | null; providerPicture?: string | null };
+    user: { email?: string | null; name?: string | null; picture?: string | null; providerPicture?: string | null; provider?: string | null };
 }
 const { profile, user } = Astro.props;
 
@@ -62,7 +62,7 @@ const initial = (() => {
                     <input
                         type="text" name="display_name" value={displayName} maxlength={NAME_MAX}
                         placeholder="Tu nombre" data-save="display_name" data-save-debounce="600" />
-                    <span class="aj-field-help">Vacío = se usa el nombre de tu cuenta de Google.</span>
+                    <span class="aj-field-help">{user.provider === 'google' ? 'Vacío = se usa el nombre de tu cuenta de Google.' : 'Vacío = se usa la primera parte de tu correo.'}</span>
                 </label>
                 <div class="aj-field">
                     <span class="aj-field-label">Correo de la cuenta</span>

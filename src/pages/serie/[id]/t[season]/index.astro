@@ -352,7 +352,7 @@ const side = tp ? seasonSide(tp) : '';
 
 const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
 ---
-<Layout title={pageTitle} description={overview && !hideOverview ? overview : undefined} ogImage={s?.poster_path || d?.series.backdrop_path || undefined}>
+<Layout title={pageTitle} description={overview && !hideOverview ? overview : undefined} ogImage={backdropUrl(d?.series.backdrop_path ?? null) || posterUrl(s?.poster_path ?? null) || undefined}>
     {missing ? (
         <section class="ep-404">
             <p class="ep-404-k">Error 404 · Temporada</p>
@@ -631,7 +631,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                                             {r.aired ? (
                                                 <button type="button" class="tvb" aria-pressed={r.seen ? 'true' : 'false'} data-tp-row-btn
                                                     aria-label={r.seen ? `E${r.e} visto. Pulsa para desmarcar` : `Marcar el E${r.e} como visto`}>
-                                                    <Icon class="on" name="lucide:check-check" aria-hidden="true" /><Icon class="off" name="lucide:eye" aria-hidden="true" /><span>Visto</span>
+                                                    <Icon class="on" name="lucide:check-check" aria-hidden="true" /><Icon class="off" name="lucide:eye" aria-hidden="true" /><span class="off">Marcar</span><span class="on">Visto</span>
                                                 </button>
                                             ) : (
                                                 <button type="button" class="tvb dis" disabled aria-label={`E${r.e}: aún no se ha emitido`}><Icon name="lucide:calendar-clock" aria-hidden="true" /><span>Sin emitir</span></button>

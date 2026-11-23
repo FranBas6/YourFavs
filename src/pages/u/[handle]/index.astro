@@ -54,7 +54,8 @@ const publicUrl = `https://yourfavs.app/u/${view.handle}`;
 const description = view.bio
     ? (view.bio.length > 155 ? `${view.bio.slice(0, 154).trimEnd()}…` : view.bio)
     : `Las películas y series de ${view.name} en YourFavs.`;
-const ogImage = avatarSrc ? new URL(avatarSrc, Astro.url.origin).toString() : '/logo_yourfavs.png';
+// Sin avatar, la imagen de la marca de Layout (antes el logo cuadrado de 1024 px, que se recortaba).
+const ogImage = avatarSrc ? new URL(avatarSrc, Astro.url.origin).toString() : undefined;
 const robots = view.indexable ? undefined : 'noindex, nofollow';
 
 // «Solo amigos» visto por quien no es su amigo (F3, D4): solo identidad y el candado.

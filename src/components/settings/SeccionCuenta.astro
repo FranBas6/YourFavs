@@ -11,7 +11,7 @@
  * `docs/TODO.md` con el guard que necesitaría.
  */
 interface Props {
-    user: { email?: string | null };
+    user: { email?: string | null; provider?: string | null };
 }
 const { user } = Astro.props;
 ---
@@ -21,7 +21,7 @@ const { user } = Astro.props;
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0"/></svg>
         </span>
         <span class="aj-row-text">
-            <span class="aj-row-title">Sesión iniciada con Google</span>
+            <span class="aj-row-title">{user.provider === 'google' ? 'Sesión iniciada con Google' : 'Sesión iniciada con tu correo'}</span>
             <p class="aj-row-desc">{user.email}</p>
         </span>
         <button type="button" class="btn btn--sm aj-btn" data-auth-logout>Cerrar sesión</button>

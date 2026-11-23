@@ -57,6 +57,11 @@ const [actorDetails, credits, crewCredits, profileImages, taggedImages, actorsFa
     safeFetch(getFollowedPerson(actor), `actor/${actor}/followed`, null),
 ]);
 const isFollowingPerson = !!followedPerson;
+// No existe en TMDB: nuestra 404 (QA 1.4; antes, 200 con el id como título, H81).
+if (actorDetails && 'notFound' in actorDetails) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
 
 // Próximos estrenos de ESTA persona: derivados de los créditos ya cargados
 // (cast movies/series + crew), sin fetch extra. Dedup por título.
@@ -202,7 +207,7 @@ const jsonLd = {
 <Layout
     title={`${actorInfo.nombre}`}
     description={actorInfo.biografia ? String(actorInfo.biografia).slice(0, 200) : undefined}
-    ogImage={actorInfo.imagen || undefined}
+    ogImage={posterUrl(actorInfo.imagen ?? null, 'h632') || undefined}
     ogType="profile"
 >
     <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

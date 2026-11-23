@@ -8,6 +8,8 @@ interface SessionUser {
     email: string | null;
     name: string | null;
     picture: string | null;
+    /** Con qué inició sesión: 'google', 'email'… (de `app_metadata.provider`). */
+    provider?: string | null;
     /** Foto del proveedor (Google), antes de que `avatar_url` del perfil la sustituya. */
     providerPicture?: string | null;
     region?: string;   // preferencia del perfil (para el menú de cuenta)

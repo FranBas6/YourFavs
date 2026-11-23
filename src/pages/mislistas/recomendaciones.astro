@@ -11,6 +11,7 @@ import ListTitle from "../../components/library/ListTitle.astro";
 import EmptyState from "../../components/ui/EmptyState.astro";
 import RecoRow, { type RecoRowItem } from "../../components/library/RecoRow.astro";
 import type { SeedInfo } from "../../services/recs/personalRecommendations";
+import { SEED_WHY } from "../../utils/recs/seedWhy";
 import '../../styles/pages/personal/personal.css';
 
 const debug = Astro.url.searchParams.get("debug") === "1";
@@ -96,13 +97,6 @@ const forYouToday = claim(interleave(tag('movie', peliculasRecomendadas), tag('t
 
 // «Porque te gustó X»: las semillas principales (sin las de variedad), alternando tipo. Con el filtro en
 // «Todo», 2 de cada; con un solo tipo, 4.
-const SEED_WHY: Record<string, { lead: string; chip: string }> = {
-    fav: { lead: 'Porque te encantó', chip: 'en tus favoritas' },
-    like: { lead: 'Porque te gustó', chip: 'en Me gusta' },
-    rated: { lead: 'Por tu buena nota a', chip: 'tu nota' },
-    seen: { lead: 'Porque has visto', chip: 'vista hace poco' },
-    taste: { lead: 'Porque elegiste', chip: 'en tus gustos' },
-};
 const perKind = showMovies && showSeries ? 2 : 4;
 const seedRowsOf = (kind: Kind) => (shownKind(kind) ? (kind === 'movie' ? rowsData?.movies.seeds : rowsData?.tv.seeds) ?? [] : [])
     .filter((r) => !r.seed.explore && r.seed.title);
@@ -126,10 +120,10 @@ const seedRows: { seed: SeedInfo; kind: Kind; items: RecoRowItem[] }[] = [];
     }
 }
 
-// «Fuera de tu zona»: lo que dieron las semillas de variedad, con su «Porque viste X» en cada card.
+// «Fuera de tu zona»: lo que dieron las semillas de variedad, con su motivo en cada card («Porque viste X»…).
 const exploreOf = (kind: Kind) => tag(kind, ((kind === 'movie' ? rowsData?.movies.seeds : rowsData?.tv.seeds) ?? [])
     .filter((r) => r.seed.explore)
-    .flatMap((r) => r.items.slice(0, 5).map((it: any) => ({ ...it, _recSeedTitle: r.seed.title }))));
+    .flatMap((r) => r.items.slice(0, 5).map((it: any) => ({ ...it, _recSeedTitle: r.seed.title, _recSeedWhy: r.seed.why }))));
 const outsideZone = claim(interleave(exploreOf('movie'), exploreOf('tv')), 12);
 
 const moreGenres = claim(interleave(tag('movie', rowsData?.movies.genres), tag('tv', rowsData?.tv.genres)), 14);
@@ -356,8 +350,8 @@ const anyRow = forYouToday.length + seedRows.length + outsideZone.length + moreG
                 {seedRows.map((r, i) => (
                     <RecoRow
                         headingId={`rr-seed-${i}`}
-                        title={`${SEED_WHY[r.seed.why ?? 'fav']?.lead ?? 'Porque te gustó'} ${r.seed.title}`}
-                        why={SEED_WHY[r.seed.why ?? 'fav']?.chip}
+                        title={`${SEED_WHY[(r.seed.why ?? 'fav') as keyof typeof SEED_WHY]?.lead ?? 'Porque te gustó'} ${r.seed.title}`}
+                        why={SEED_WHY[(r.seed.why ?? 'fav') as keyof typeof SEED_WHY]?.chip}
                         icon={r.kind === 'movie' ? 'clapperboard' : 'tv'}
                         color={r.kind === 'movie' ? 'red' : 'blue'}
                         items={r.items}

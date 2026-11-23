@@ -131,9 +131,13 @@ async function tmdbRequest(path: string, params: Record<string, string>): Promis
         const errorBody = await res.text();
         // Trunca: un 504 de CloudFront vuelca una página HTML entera que ensucia la consola.
         console.error(`❌ TMDB error [${res.status}] ${path}:`, errorBody.slice(0, 200));
-        throw new Error(`Error en la solicitud: ${res.statusText}`);
+        // Con el código HTTP: así se distingue «no existe» (404) de un fallo de TMDB (QA 1.4).
+        throw Object.assign(new Error(`Error en la solicitud: ${res.statusText}`), { status: res.status });
     }
 }
+
+/** ¿TMDB ha dicho que eso no existe? (persona, productora o título con un id que no está). */
+export const isTmdbNotFound = (error: unknown): boolean => (error as { status?: number } | null)?.status === 404;
 
 /**
  * Fetch que devuelve directamente el array .results de la respuesta paginada de TMDB.

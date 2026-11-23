@@ -1,7 +1,8 @@
 ---
 import Layout from '../layouts/Layout.astro';
 ---
-<Layout title="404: Página no encontrada">
+{/* Sin canonical y fuera de buscadores (QA 1.4, H75). */}
+<Layout title="404: Página no encontrada" robots="noindex" canonical={false}>
     <section class="flex flex-col items-center justify-center text-center py-16 px-4 min-h-[60vh]">
         <!-- Kicker mono -->
         <p class="mb-3" style="font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent);">
@@ -23,17 +24,11 @@ import Layout from '../layouts/Layout.astro';
         </h2>
 
         <p class="text-gray-500 text-lg max-w-md mb-8 leading-relaxed">
-            Parece que esta ruta no lleva a ninguna película ni serie. Pero tranquilo, hay mucho más por descubrir.
+            Parece que esta ruta no lleva a ninguna película ni serie, pero hay mucho más por descubrir.
         </p>
 
-        <div class="w-[280px] sm:w-[360px] rounded-2xl overflow-hidden shadow-xl border border-gray-100 mb-10">
-            <img
-                src="https://midu.dev/images/this-is-fine-404.gif"
-                alt="This is fine meme"
-                loading="lazy"
-                class="w-full h-auto object-contain"
-            />
-        </div>
+        {/* La claqueta de la marca (QA 1.4, H80): antes un gif enlazado de midu.dev, con derechos y bloqueado por Chrome. */}
+        <div class="nf-ic" aria-hidden="true"><img src="/favicon.svg" alt="" width="120" height="120" /></div>
 
         <div class="flex flex-col sm:flex-row gap-3">
             <a href="/"
@@ -47,3 +42,9 @@ import Layout from '../layouts/Layout.astro';
         </div>
     </section>
 </Layout>
+
+<style>
+    .nf-ic { width: 168px; height: 168px; margin-bottom: 40px; border-radius: 40px; display: grid; place-items: center;
+        background: #0B1220; box-shadow: var(--sh-lg); transform: rotate(-4deg); }
+    .nf-ic img { width: 120px; height: 120px; }
+</style>

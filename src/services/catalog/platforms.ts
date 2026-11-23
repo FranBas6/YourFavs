@@ -19,13 +19,13 @@ export interface PlatformData extends PlatformInfo {
 // (`getNetflixMovies`, `getNetflixSeries`, …) que solo se usaban aquí y que fijaban la región a ES
 // por dentro, así que no había forma de respetar la del perfil sin tocarlos uno a uno.
 const platformConfig = [
-    {name: "NETFLIX", slug: "netflix", logo: "/logos/plataformas/netflix.svg", providerId: PROVIDERS.NETFLIX},
-    {name: "AMAZON PRIME", slug: "amazon", logo: "/logos/plataformas/amazon.svg", providerId: PROVIDERS.AMAZON},
-    {name: "DISNEY+", slug: "disney", logo: "/logos/plataformas/disney.svg", providerId: PROVIDERS.DISNEY},
-    {name: "HBO MAX", slug: "hbo", logo: "/logos/plataformas/hbo.svg", providerId: PROVIDERS.HBO},
-    {name: "APPLE TV+", slug: "apple", logo: "/logos/plataformas/apple.svg", providerId: PROVIDERS.APPLE},
-    {name: "MOVISTAR+", slug: "movistar", logo: "/logos/plataformas/movistar.svg", providerId: PROVIDERS.MOVISTAR},
-    {name: "FILMIN", slug: "filmin", logo: "/logos/plataformas/filmin.svg", providerId: PROVIDERS.FILMIN},
+    {name: "Netflix", slug: "netflix", logo: "/logos/plataformas/netflix.svg", providerId: PROVIDERS.NETFLIX},
+    {name: "Amazon Prime", slug: "amazon", logo: "/logos/plataformas/amazon.svg", providerId: PROVIDERS.AMAZON},
+    {name: "Disney+", slug: "disney", logo: "/logos/plataformas/disney.svg", providerId: PROVIDERS.DISNEY},
+    {name: "HBO Max", slug: "hbo", logo: "/logos/plataformas/hbo.svg", providerId: PROVIDERS.HBO},
+    {name: "Apple TV+", slug: "apple", logo: "/logos/plataformas/apple.svg", providerId: PROVIDERS.APPLE},
+    {name: "Movistar+", slug: "movistar", logo: "/logos/plataformas/movistar.svg", providerId: PROVIDERS.MOVISTAR},
+    {name: "Filmin", slug: "filmin", logo: "/logos/plataformas/filmin.svg", providerId: PROVIDERS.FILMIN},
 ];
 
 export const platformList: PlatformInfo[] = platformConfig.map(({slug, name, logo}) => ({slug, name, logo}));

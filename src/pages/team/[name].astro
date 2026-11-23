@@ -25,7 +25,12 @@ const OLD_SORT: Record<string, string> = { quality: 'nota', popularity: 'peso', 
 const rawSort = Astro.url.searchParams.get('sort') || 'peso';
 const filmSort = OLD_SORT[rawSort] || rawSort;
 
-const { success, memberInfo, socialLinks, movies, series, error } = await getMoviesAndSeriesByMemberName(name, 'quality');
+const { success, notFound, memberInfo, socialLinks, movies, series, error } = await getMoviesAndSeriesByMemberName(name, 'quality');
+// No existe en TMDB: nuestra 404 (QA 1.4; antes, un 500 «Error»).
+if (notFound) {
+    Astro.response.status = 404;
+    return Astro.rewrite('/404');
+}
 if (!success) {
     throw new Error(error || "Error al obtener información del miembro");
 }

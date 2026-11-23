@@ -248,6 +248,8 @@ const reviews = (reviewsData.results || [])
 
 // Países de producción
 const productionCountries = item?.production_countries || [];
+// País en español con su código («Estados Unidos», no «United States of America»; QA 1.6, H34).
+const countryEs = (() => { try { const dn = new Intl.DisplayNames(['es'], { type: 'region' }); return (c: any) => (c?.iso_3166_1 && dn.of(c.iso_3166_1)) || c?.name; } catch { return (c: any) => c?.name; } })();
 
 // Año en contexto
 const releaseYear = item?.release_date ? new Date(item.release_date).getFullYear() : null;
@@ -291,7 +293,7 @@ const jsonLd = item ? {
 <Layout
     title={`${title}`}
     description={item?.overview || undefined}
-    ogImage={item?.poster_path || item?.backdrop_path || undefined}
+    ogImage={backdropUrl(item?.backdrop_path ?? null) || posterUrl(item?.poster_path ?? null) || undefined}
     ogType="video.movie"
 >
     {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
@@ -418,7 +420,7 @@ const jsonLd = item ? {
                             {additionalInfo.revenue && additionalInfo.revenue > 0 && (
                                 <><dt>Recaudación</dt><dd>{formatCurrency(additionalInfo.revenue)}{additionalInfo.budget && additionalInfo.budget > 0 && <> <small>·</small> <b class="fdl-ok">beneficio ×{(additionalInfo.revenue / additionalInfo.budget).toFixed(1).replace('.', ',')}</b></>}</dd></>
                             )}
-                            {productionCountries.length > 0 && (<><dt>País</dt><dd>{productionCountries.map((c: any) => c.name).join(', ')}</dd></>)}
+                            {productionCountries.length > 0 && (<><dt>País</dt><dd>{productionCountries.map(countryEs).join(', ')}</dd></>)}
                             {yearsAgo && yearsAgo > 0 && (<><dt>Antigüedad</dt><dd>Hace {yearsAgo} {yearsAgo === 1 ? 'año' : 'años'}</dd></>)}
                             {ratingPercentile !== null && (<><dt>Comparativa</dt><dd>Mejor que el {ratingPercentile} %{mainGenre ? ` de ${mainGenre}` : ''}</dd></>)}
                         </dl>

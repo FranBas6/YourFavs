@@ -1,5 +1,5 @@
 import { type Movie } from "../../types/ApiMovie.ts";
-import { tmdbFetch, posterUrl, backdropUrl } from '../tmdb/tmdbClient';
+import { tmdbFetch, posterUrl, backdropUrl, isTmdbNotFound } from '../tmdb/tmdbClient';
 
 export async function getMoviesAndSeriesByMemberName(
     memberName: string,
@@ -7,6 +7,8 @@ export async function getMoviesAndSeriesByMemberName(
     excludeId?: number
 ): Promise<{
     success: boolean;
+    /** TMDB no la encuentra: la página responde 404 (QA 1.4). */
+    notFound?: boolean;
     memberInfo?: any;
     socialLinks?: any;
     movies: (Movie & { role?: string; jobs?: string[]; departments?: string[] })[];
@@ -20,7 +22,7 @@ export async function getMoviesAndSeriesByMemberName(
         });
 
         if (!searchData.results.length) {
-            return { success: false, movies: [], series: [], error: `No se encontró la persona "${memberName}"` };
+            return { success: false, notFound: true, movies: [], series: [], error: `No se encontró la persona "${memberName}"` };
         }
 
         const memberId = searchData.results[0].id;
@@ -125,6 +127,6 @@ export async function getMoviesAndSeriesByMemberName(
         return { success: true, memberInfo, socialLinks: formattedSocial, movies, series };
     } catch (error) {
         console.error("Error al obtener información del miembro:", error);
-        return { success: false, movies: [], series: [], error: error instanceof Error ? error.message : "Error desconocido" };
+        return { success: false, notFound: isTmdbNotFound(error), movies: [], series: [], error: error instanceof Error ? error.message : "Error desconocido" };
     }
 }
