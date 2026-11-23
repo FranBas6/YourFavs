@@ -1,164 +1,157 @@
 ---
 /**
- * "Tu progreso en la saga" — cruza las partes de una colección TMDB con las
- * películas vistas del usuario (unión Vistas/Liked/Favs → getWatchedMovieIds).
+ * Bloque de saga de la ficha de película (2026-11-23, C3.5; handoff docs/Sagas/design_handoff_sagas, S4).
+ * Tarjeta siempre visible (antes un <details> con una rejilla de pósters):
  *
- * Dos variantes:
- * - showParts=true (ficha de película): <details> colapsable con el progreso
- *   visible en el summary + barra + grid de pósters con badges ✓ / TE FALTA.
- * - showParts=false (página de colección): solo cabecera + barra, en panel.
+ *   cabecera   Stamp ámbar, nombre de la saga, «Saga · 8 películas · 2001–2011» y «Seguir saga» (en
+ *              móvil, al pie y a todo el ancho)
+ *   progreso   barra por película (SagaBar) y «Has visto 1 de 2 estrenadas · 2 próximas · Te quedan …»;
+ *              sin sesión, solo las cifras de la saga
+ *   lista      compacta: póster, título, «año · duración» o «estado · fecha»; la de la ficha en
+ *              --bg-tint con «Estás aquí». Con más de 6, las 2 de antes y las 3 de después de la actual
+ *   pie        «Ver la saga completa →» (con cuántas más hay, si no caben)
  *
- * Las partes SIN estrenar no cuentan en el % (ni ✓ ni TE FALTA: badge PRÓX.).
+ * Los datos (duraciones, estado de las próximas) vienen de `getSagaDetail`, que la ficha pide en
+ * paralelo con lo demás. Lo tuyo (vistas, Pendientes, si la sigues) se consulta aquí.
  */
 import Stamp from "../ui/Stamp.astro";
+import SagaBar from "./SagaBar.astro";
 import SagaFollowButton from "./SagaFollowButton.astro";
+import type { SagaDetail, SagaPart } from "../../services/titles/sagaDetail";
+import { getWatchedMovieTiers, type WatchedTier } from "../../services/movies/movieLibrary";
 import { isFollowingCollection } from "../../services/titles/followedCollections";
-import type { WatchedTier } from "../../services/movies/movieLibrary";
-
-interface Part {
-    id: number;
-    title: string;
-    /** URL completa del póster (getMovieCollectionInfo ya la mapea) o null. */
-    poster_path: string | null;
-    release_date: string | null;
-}
+import { getLibrarySnapshot } from "../../services/library/librarySnapshot";
+import { runtimeLabel } from "../../utils/titles/episodeView";
+import { shortDate, titleInitials } from "../../utils/titles/sagaView";
+import '../../styles/components/saga.css';
 
 interface Props {
-    name: string;
-    overview?: string | null;
-    parts: Part[];
-    /** id → nivel (visto/like/fav). Vista = está en el mapa. */
-    watchedTiers: Map<number, WatchedTier>;
-    /** Película actual (ficha): se marca con anillo + "Actual". */
+    saga: SagaDetail;
+    /** Película de la ficha: «Estás aquí». */
     currentId?: number;
-    showParts?: boolean;
-    /** Id de la saga: en la ficha, enlace «Ver la saga completa →» a su página (2026-11-23). */
-    collectionId?: number;
 }
+const { saga, currentId } = Astro.props;
+const { info, parts } = saga;
+const user = Astro.locals.user;
 
-const { name, overview = null, parts, watchedTiers, currentId, showParts = true, collectionId } = Astro.props;
-// En la ficha (con id de saga), «Seguir saga» junto al enlace. Se consulta aquí para no tocar la ficha.
-const following = collectionId && showParts ? await isFollowingCollection(collectionId).catch(() => false) : false;
+const [tiers, following, snap] = await Promise.all([
+    user ? getWatchedMovieTiers().catch(() => new Map<number, WatchedTier>()) : Promise.resolve(new Map<number, WatchedTier>()),
+    user ? isFollowingCollection(info.id).catch(() => false) : Promise.resolve(false),
+    user ? getLibrarySnapshot().catch(() => null) : Promise.resolve(null),
+]);
+const pendIds = new Set<number>((snap?.movPend ?? []).map((m: any) => Number(m.id)));
 
-// Mismo lenguaje de color que el feed de actividad: visto verde, like rosa, fav ámbar
-const TIER_BADGE: Record<WatchedTier, { bg: string; label: string }> = {
-    visto: { bg: 'bg-emerald-500', label: 'Vista' },
-    like:  { bg: 'bg-pink-500',    label: 'Me gusta' },
-    fav:   { bg: 'bg-amber-400',   label: 'En favoritos' },
+const released = parts.filter((p) => p.released);
+const upcoming = parts.filter((p) => !p.released);
+const next = released.find((p) => !tiers.has(p.id)) ?? null;
+const seen = released.filter((p) => tiers.has(p.id)).length;
+const leftMin = released.filter((p) => !tiers.has(p.id)).reduce((a, p) => a + (p.runtime ?? 0), 0);
+
+// Cabecera: «Saga · 8 películas · 2001–2011» (con próximas, «2020–»).
+const years = saga.firstYear
+    ? (upcoming.length ? `${saga.firstYear}–` : saga.lastYear && saga.lastYear !== saga.firstYear ? `${saga.firstYear}–${saga.lastYear}` : String(saga.firstYear))
+    : '';
+const kicker = ['Saga', `${parts.length} ${parts.length === 1 ? 'película' : 'películas'}`, years].filter(Boolean).join(' · ');
+
+// Línea de progreso.
+const upText = upcoming.length ? `${upcoming.length} ${upcoming.length === 1 ? 'próxima' : 'próximas'}` : '';
+const relText = upcoming.length ? `${released.length} estrenada${released.length === 1 ? '' : 's'}` : `${released.length}`;
+const lead = user
+    ? (released.length ? `Has visto ${seen} de ${relText}` : 'Aún sin estrenos')
+    : (released.length ? `${released.length} ${released.length === 1 ? 'estrenada' : 'estrenadas'}` : 'Aún sin estrenos');
+const rest = [
+    upText,
+    user && leftMin > 0 && seen > 0 ? `Te quedan ${runtimeLabel(leftMin)}` : '',
+    user && released.length > 0 && seen === released.length ? 'La has visto entera' : '',
+    !user && saga.marathonMin ? `Maratón ${runtimeLabel(saga.marathonMin)}` : '',
+].filter(Boolean);
+
+// Lista: como mucho 6; con más, la ventana alrededor de la actual (2 antes, 3 después), corrida si
+// la actual está cerca de un extremo.
+const MAX = 6;
+const curIdx = Math.max(0, parts.findIndex((p) => p.id === currentId));
+const start = parts.length <= MAX ? 0 : Math.min(Math.max(0, curIdx - 2), parts.length - MAX);
+const shown = parts.slice(start, start + MAX);
+const hidden = parts.length - shown.length;
+
+type RowState = 'cur' | WatchedTier | 'pend' | 'next' | 'miss' | 'up';
+const stateOf = (p: SagaPart): RowState => {
+    if (p.id === currentId) return 'cur';
+    if (!p.released) return 'up';
+    if (!user) return 'up';
+    const t = tiers.get(p.id);
+    if (t) return t;
+    if (next && p.id === next.id) return 'next';
+    return pendIds.has(p.id) ? 'pend' : 'miss';
 };
+const metaOf = (p: SagaPart) => p.released
+    ? [p.release_date?.slice(0, 4), runtimeLabel(p.runtime)].filter(Boolean).join(' · ')
+    : [p.statusLabel, p.release_date ? shortDate(p.release_date) : 'Por anunciar'].filter(Boolean).join(' · ');
 
-const today = new Date();
-const sorted = [...parts].sort((a, b) => {
-    if (!a.release_date) return 1;
-    if (!b.release_date) return -1;
-    return new Date(a.release_date).getTime() - new Date(b.release_date).getTime();
-});
-
-const isReleased = (p: Part) => !!p.release_date && new Date(p.release_date) <= today;
-const released = sorted.filter(isReleased);
-const seenCount = released.filter((p) => watchedTiers.has(p.id)).length;
-const totalReleased = released.length;
-const pct = totalReleased > 0 ? Math.round((seenCount / totalReleased) * 100) : 0;
-
-// «Has visto 1 de 2 estrenadas · 2 próximas» (antes «de 2 películas» con 4 tarjetas a la vista).
-const upcoming = sorted.length - totalReleased;
-const upcomingText = upcoming > 0 ? ` · ${upcoming} ${upcoming === 1 ? 'próxima' : 'próximas'}` : '';
-const summaryText = totalReleased > 0
-    ? (upcoming > 0
-        ? `Has visto ${seenCount} de ${totalReleased} estrenada${totalReleased === 1 ? '' : 's'}${upcomingText}`
-        : `Has visto ${seenCount} de ${totalReleased} película${totalReleased === 1 ? '' : 's'}`)
-    : `Aún sin estrenos${upcomingText}`;
-
-// Bajo el título: el año si ya salió; la fecha si está anunciada; «Por anunciar» si no hay (antes «?»).
-const MONTHS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-const whenText = (p: Part): string => {
-    if (!p.release_date) return 'Por anunciar';
-    const d = new Date(p.release_date + 'T12:00:00');
-    if (isReleased(p)) return String(d.getFullYear());
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+const I = {
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21.2l8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/>',
+    crown: '<path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zM5 20h14"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    play: '<path d="m6 3 14 9-14 9z"/>',
+    arr: '<path d="M5 12h14M13 6l6 6-6 6"/>',
 };
+const svg = (k: keyof typeof I) =>
+    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[k]}</svg>`;
+const TIER: Record<WatchedTier, [keyof typeof I, string, boolean]> = {
+    visto: ['check', 'Vista', false],
+    like: ['heart', 'Me gusta', true],
+    fav: ['crown', 'Favorita', true],
+};
+const href = `/catalogo/colecciones/${info.id}`;
 ---
-{showParts ? (
-    <details class="cdet cdet--rich group">
-        <summary>
-            <Stamp color="amber" icon="layers" size={38} />
-            <div class="flex-1 min-w-0">
-                <h2 class="text-lg font-semibold text-gray-800 truncate">{name}</h2>
-                <p class="text-sm text-gray-500">{summaryText}</p>
-            </div>
-            <span class="cdet-pct">{pct}%</span>
-            <svg class="w-5 h-5 text-gray-400 flex-shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-        </summary>
-
-        <div class="px-5 pb-2">
-            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div class="h-full rounded-full" style={`width:${pct}%;background:linear-gradient(90deg,var(--accent),#F59E0B)`}></div>
-            </div>
+<section class="sg-fk" aria-labelledby="sg-fk-t">
+    <div class="hd">
+        <Stamp color="amber" icon="layers" size={38} />
+        <div>
+            <h2 id="sg-fk-t"><a href={href}>{info.name}</a></h2>
+            <span>{kicker}</span>
         </div>
-
-        {overview && <p class="text-sm text-gray-500 px-5 pt-2 pb-1">{overview}</p>}
-
-        {collectionId && (
-            <div class="px-5 pt-3 flex items-center justify-between gap-3 flex-wrap">
-                <SagaFollowButton collectionId={collectionId} following={following} name={name} />
-                <a href={`/catalogo/colecciones/${collectionId}`} class="saga-link">
-                    Ver la saga completa
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-                </a>
-            </div>
-        )}
-
-        <div class="px-5 pb-5 pt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {sorted.map((part) => {
-                const tier = watchedTiers.get(part.id);
-                const released = isReleased(part);
-                return (
-                    <a href={`/movie/${part.id}`} class={`text-center group/part rounded-xl overflow-hidden ${part.id === currentId ? 'ring-2 ring-red-500 bg-red-50' : 'hover:bg-gray-50'} transition-colors`}>
-                        <div class="relative">
-                            <img
-                                src={part.poster_path || '/placeholder.jpg'}
-                                alt={part.title}
-                                class={`w-full aspect-[2/3] object-cover group-hover/part:scale-[1.02] transition-transform ${released && !tier ? 'opacity-60' : !released ? 'opacity-50' : ''}`}
-                                loading="lazy"
-                            />
-                            {tier ? (
-                                <span class={`absolute top-2 right-2 w-6 h-6 rounded-full ${TIER_BADGE[tier].bg} text-white flex items-center justify-center shadow-md`} aria-label={TIER_BADGE[tier].label} title={TIER_BADGE[tier].label}>
-                                    {tier === 'fav' ? (
-                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                                    ) : tier === 'like' ? (
-                                        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                                    ) : (
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
-                                    )}
-                                </span>
-                            ) : released ? (
-                                <span class="absolute top-2 right-2 font-mono text-[9px] font-bold text-white px-2 py-0.5 rounded-full shadow-md" style="background:var(--accent)">TE FALTA</span>
-                            ) : (
-                                <span class="absolute top-2 right-2 font-mono text-[9px] font-bold text-white bg-gray-600/90 px-2 py-0.5 rounded-full shadow-md">PRÓX.</span>
-                            )}
-                        </div>
-                        <div class="p-2">
-                            <p class="text-sm font-medium text-gray-800 line-clamp-2">{part.title}</p>
-                            <p class="text-xs text-gray-400 font-mono">{whenText(part)}</p>
-                            {part.id === currentId && <span class="text-xs font-bold text-red-500">Actual</span>}
-                        </div>
-                    </a>
-                );
-            })}
-        </div>
-    </details>
-) : (
-    <div class="bg-white rounded-xl border border-gray-200 p-5">
-        <div class="flex items-center gap-3 mb-3">
-            <Stamp color="amber" icon="layers" size={38} />
-            <div class="flex-1 min-w-0">
-                <h2 class="text-lg font-semibold text-gray-800">Tu progreso en la saga</h2>
-                <p class="text-sm text-gray-500">{summaryText}</p>
-            </div>
-            <span class="font-mono text-xl font-bold text-[#E63946]">{pct}%</span>
-        </div>
-        <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div class="h-full rounded-full" style={`width:${pct}%;background:linear-gradient(90deg,var(--accent),#F59E0B)`}></div>
-        </div>
+        <div class="fol-d"><SagaFollowButton collectionId={info.id} following={following} name={info.name} small /></div>
     </div>
-)}
+
+    <SagaBar items={parts.map((p) => ({ tier: tiers.get(p.id) ?? null, upcoming: !p.released }))} />
+    <p class="ln"><b>{lead}</b>{rest.map((t) => <span>{t}</span>)}</p>
+
+    <ol class="sg-ml">
+        {shown.map((p) => {
+            const st = stateOf(p);
+            return (
+                <li class:list={['sg-m', { cur: st === 'cur' }]}>
+                    <span class:list={['sg-po', { up: !p.released }]}>
+                        <b>{titleInitials(p.title)}</b>
+                        {p.poster_path && <img src={p.poster_path.replace('/w500/', '/w92/')} alt="" loading="lazy" decoding="async" />}
+                    </span>
+                    <div style="min-width:0">
+                        {st === 'cur'
+                            ? <span class="t" aria-current="page">{p.title}</span>
+                            : <a class="t" href={`/movie/${p.id}`}>{p.title}</a>}
+                        <span class="w">{metaOf(p)}</span>
+                    </div>
+                    <span class="s">
+                        {st === 'cur' && <span class="sg-here">Estás aquí</span>}
+                        {(st === 'visto' || st === 'like' || st === 'fav') && (
+                            <span class:list={['sg-ind', { f: TIER[st][2] }]} style={`--c:var(--a-${st})`}><Fragment set:html={svg(TIER[st][0])} />{TIER[st][1]}</span>
+                        )}
+                        {st === 'pend' && <span class="sg-ind" style="--c:var(--a-pend)"><Fragment set:html={svg('clock')} />Pendiente</span>}
+                        {st === 'next' && <span class="chip-state" data-tone="blue"><Fragment set:html={svg('play')} />Te toca</span>}
+                        {st === 'miss' && <span class="sg-miss">Te falta</span>}
+                    </span>
+                </li>
+            );
+        })}
+    </ol>
+
+    <div class="sg-go">
+        <a class="sg-lk" href={href}>
+            {hidden > 0 ? `Ver la saga completa · ${hidden} más` : 'Ver la saga completa'}
+            <Fragment set:html={svg('arr')} />
+        </a>
+        <div class="fol-m"><SagaFollowButton collectionId={info.id} following={following} name={info.name} /></div>
+    </div>
+</section>

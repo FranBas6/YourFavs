@@ -99,14 +99,21 @@ function localDate(detail: any, region: string, types: number[]): string | null 
     return dates[0] ?? null;
 }
 
-export async function getSagaDetail(collectionId: number): Promise<SagaDetail | null> {
+/**
+ * `infoPromise`: la ficha de película ya pide la saga (`getMovieCollectionInfo`) para no recomendarse
+ * a sí misma; se le pasa esa misma promesa para no repetir la llamada (bloque de saga, C3.5).
+ */
+export async function getSagaDetail(
+    collectionId: number,
+    infoPromise?: Promise<MovieCollectionInfo | null>,
+): Promise<SagaDetail | null> {
     const lang = getCurrentLanguage();
     const region = getCurrentRegion();
     const key = `${collectionId}:${lang}:${region}`;
     const hit = cache.get(key);
     if (hit && hit.expires > Date.now()) return hit.data;
 
-    const info = await getMovieCollectionInfo(collectionId);
+    const info = await (infoPromise ?? getMovieCollectionInfo(collectionId));
     if (!info) return null;
 
     const sorted = [...info.parts].sort((a, b) => {
