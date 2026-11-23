@@ -1,0 +1,36 @@
+---
+/**
+ * Barra por película de una saga (2026-11-23, C3; handoff docs/Sagas/design_handoff_sagas, «Barra por
+ * película»). Un tramo por película en orden de estreno: vista, Me gusta y Favorita con el color de su
+ * lista; sin ver, gris con borde; próxima, transparente con borde a trazos. Sustituye al degradado de
+ * color fijo. La usan la página de saga, el bloque de la ficha y Mis listas › Sagas.
+ *
+ * Es una imagen para los lectores de pantalla (`role="img"`) con su frase: «Has visto 1 de 2
+ * estrenadas; 2 próximas».
+ */
+import type { WatchedTier } from "../../services/movies/movieLibrary";
+import '../../styles/components/saga.css';
+
+export interface SagaBarItem {
+    /** Nivel si la has visto (Vista, Me gusta, Favorita); null si no. */
+    tier: WatchedTier | null;
+    /** Sin estrenar. */
+    upcoming: boolean;
+}
+interface Props {
+    items: SagaBarItem[];
+    /** Más alta (10 px), para «Tu progreso». */
+    large?: boolean;
+}
+const { items, large = false } = Astro.props;
+const released = items.filter((i) => !i.upcoming);
+const seen = released.filter((i) => i.tier).length;
+const up = items.length - released.length;
+const label = up > 0
+    ? `Has visto ${seen} de ${released.length} estrenada${released.length === 1 ? '' : 's'}; ${up} ${up === 1 ? 'próxima' : 'próximas'}`
+    : `Has visto ${seen} de ${released.length}`;
+const cls = (i: SagaBarItem) => i.upcoming ? 't-u' : i.tier === 'fav' ? 't-fav' : i.tier === 'like' ? 't-like' : i.tier ? 't-v' : '';
+---
+<span class:list={['sg-bar', { lg: large }]} role="img" aria-label={label}>
+    {items.map((i) => <i class={cls(i)}></i>)}
+</span>
