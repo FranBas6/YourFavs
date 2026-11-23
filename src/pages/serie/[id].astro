@@ -17,7 +17,7 @@ import {
     getSeriesBundle, getSerieRecommendationsOrSimilar, type SeriesBundle
 } from "../../services/series/serieDetail";
 import { getAllSeasonProviders, buildProviderCoverage } from "../../services/series/seasonProviders";
-import { posterUrl, originalUrl } from "../../services/tmdb/tmdbClient";
+import { posterUrl, originalUrl, backdropUrl } from "../../services/tmdb/tmdbClient";
 import { peekTopActors } from "../../services/stats/topActorsLibrary";
 import { checkMediaExistence } from "../../services/titles/checkExistence";
 import { getMediaTags, handleMediaTagsAction } from "../../services/titles/mediaTags";
@@ -518,7 +518,7 @@ const jsonLd = item ? {
 <Layout
     title={`${title}`}
     description={item?.overview || undefined}
-    ogImage={item?.poster_path || item?.backdrop_path || undefined}
+    ogImage={backdropUrl(item?.backdrop_path ?? null) || posterUrl(item?.poster_path ?? null) || undefined}
     ogType="video.tv_show"
 >
     {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}

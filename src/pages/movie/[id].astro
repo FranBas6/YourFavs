@@ -291,7 +291,7 @@ const jsonLd = item ? {
 <Layout
     title={`${title}`}
     description={item?.overview || undefined}
-    ogImage={item?.poster_path || item?.backdrop_path || undefined}
+    ogImage={backdropUrl(item?.backdrop_path ?? null) || posterUrl(item?.poster_path ?? null) || undefined}
     ogType="video.movie"
 >
     {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}

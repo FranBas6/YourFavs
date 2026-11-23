@@ -352,7 +352,7 @@ const side = tp ? seasonSide(tp) : '';
 
 const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(season!)})` : title}` : 'Temporada no encontrada';
 ---
-<Layout title={pageTitle} description={overview && !hideOverview ? overview : undefined} ogImage={s?.poster_path || d?.series.backdrop_path || undefined}>
+<Layout title={pageTitle} description={overview && !hideOverview ? overview : undefined} ogImage={backdropUrl(d?.series.backdrop_path ?? null) || posterUrl(s?.poster_path ?? null) || undefined}>
     {missing ? (
         <section class="ep-404">
             <p class="ep-404-k">Error 404 · Temporada</p>

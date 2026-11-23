@@ -43,11 +43,17 @@ interface Props {
 const {
     title,
     description = "Tu plataforma favorita para descubrir películas y series",
-    ogImage = "/og-image.png",
+    ogImage,
     ogType = "website",
     robots,
     ogUrl,
 } = Astro.props;
+
+// Imagen al compartir (QA 1.2, H73/H04): WhatsApp, X, Telegram o Slack necesitan una URL ABSOLUTA. Sin
+// imagen propia de la página, la de la marca (public/og-image.png, 1200×630; antes apuntaba a un archivo
+// que no existía). Las de TMDB ya llegan absolutas y `new URL` las deja igual.
+const shareImage = new URL(ogImage || '/og-image.png', Astro.url.origin).href;
+const shareUrl = ogUrl || new URL(Astro.url.pathname, Astro.url.origin).href;
 
 // Pista post-guardado (Fase F · Acceso C): elegible si hay sesión y el usuario
 // NO ha completado el onboarding (undefined o 'skipped' → se le puede invitar;
@@ -89,11 +95,16 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
          lo tiene abajo). Con `default`, la cabecera azul empieza donde debe. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
     <meta name="apple-mobile-web-app-title" content="YourFavs"/>
-    <meta property="og:image" content={ogImage}/>
+    <meta property="og:site_name" content="YourFavs"/>
+    <meta property="og:locale" content="es_ES"/>
+    <meta property="og:image" content={shareImage}/>
+    {!ogImage && <meta property="og:image:width" content="1200"/>}
+    {!ogImage && <meta property="og:image:height" content="630"/>}
+    {!ogImage && <meta property="og:image:alt" content="YourFavs · Lleva todo lo que ves, episodio a episodio"/>}
     <meta name="twitter:card" content="summary_large_image"/>
     <meta name="twitter:title" content={title}/>
     <meta name="twitter:description" content={description}/>
-    <meta name="twitter:image" content={ogImage}/>
+    <meta name="twitter:image" content={shareImage}/>
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#F3F4F6"/>
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0B1220"/>
     <script is:inline>
@@ -116,7 +127,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <meta property="og:title" content={title}/>
     <meta property="og:description" content={description}/>
     <meta property="og:type" content={ogType}/>
-    {ogUrl && <meta property="og:url" content={ogUrl}/>}
+    <meta property="og:url" content={shareUrl}/>
     {robots && <meta name="robots" content={robots}/>}
     <title>{title}</title>
 </head>
