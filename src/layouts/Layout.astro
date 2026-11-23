@@ -70,7 +70,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     || /^\/mislistas\/amigos\/mensajes\/\d+\/?$/.test(_tbPath);
 ---
 <!DOCTYPE html>
-<html lang="es" data-strip={Astro.locals.user?.stripPalette || undefined}>
+<html lang="es" data-strip={Astro.locals.user?.stripPalette || undefined} data-theme-choice={Astro.locals.user?.theme || undefined}>
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -118,8 +118,11 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
                 //   theme       = lo que se APLICA ('light'|'dark')
                 // Antes solo existía `theme`, así que quien viene de una versión anterior
                 // no tiene `themeChoice`: se usa su `theme` como elección. Sin nada previo,
-                // claro — el default de siempre, que NO sigue al SO salvo que se pida.
-                var choice = localStorage.getItem('themeChoice') || localStorage.getItem('theme') || 'light';
+                // según el sistema (QA 1.5, H43: Ajustes ya lo decía, pero aquí se aplicaba claro).
+                // Con sesión y nada en este navegador, lo guardado en tu perfil (`data-theme-choice`); antes
+                // un móvil nuevo no sabía que habías elegido oscuro.
+                var choice = localStorage.getItem('themeChoice') || localStorage.getItem('theme')
+                    || document.documentElement.getAttribute('data-theme-choice') || 'system';
                 var theme = choice === 'system'
                     ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
                     : choice;
