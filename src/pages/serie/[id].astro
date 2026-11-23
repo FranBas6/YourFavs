@@ -320,7 +320,7 @@ const yearsActiveCalc = (() => {
         const lastAirDate = item?.last_episode_to_air?.air_date;
         endYear = lastAirDate ? String(new Date(lastAirDate).getFullYear()) : "desconocido";
     }
-    return `${startYear} - ${endYear}`;
+    return String(startYear) === endYear ? endYear : `${startYear}–${endYear}`;
 })();
 
 const statusMap = {
@@ -487,7 +487,9 @@ const kickerYears: string = (() => {
     return ended ? (end && end !== start ? `${start}–${end}` : start) : `${start}–hoy`;
 })();
 const reviews = (reviewsData.results || []).filter((r: any) => r.content && r.content.length > 50).slice(0, 5);
-const productionCountries: string[] = item?.origin_country || [];
+// País en español («Estados Unidos», no «US»; QA 1.6, H34).
+const countryName = (() => { try { const dn = new Intl.DisplayNames(['es'], { type: 'region' }); return (c: string) => dn.of(c) ?? c; } catch { return (c: string) => c; } })();
+const productionCountries: string[] = (item?.origin_country || []).map(countryName);
 
 // Categorizar videos (el tráiler principal ya va en `trailerUrl`)
 const clips = allVideos.filter((v: any) => v.type === 'Clip');
@@ -559,7 +561,7 @@ const jsonLd = item ? {
                             <span class:list={['fh-st', { 'is-on': status === 'Returning Series', 'is-off': status === 'Canceled' }]}>{status ? ((statusMap as any)[status] || status) : ''}</span>
                             {seriesTypeLabel && <span class="fh-st">{seriesTypeLabel}</span>}
                             <span>{yearsActive}</span>
-                            <span>{regularSeasonsCount} temporadas · {totalRegularEpisodes} episodios</span>
+                            <span>{regularSeasonsCount} {regularSeasonsCount === 1 ? 'temporada' : 'temporadas'} · {totalRegularEpisodes} {totalRegularEpisodes === 1 ? 'episodio' : 'episodios'}</span>
                             {(() => { const r = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null; return r ? <span class="fh-age" title={r.text}>{r.rating}</span> : null; })()}
                             <span class="fh-lang" title="Idioma original">{(item?.original_language || '').toUpperCase()} · {getLanguageDisplayName(item?.original_language).toLowerCase()}</span>
                             {item?.availableInSpain && <span title="Disponible en España"><svg viewBox="0 0 750 500" class="fh-flag" aria-hidden="true"><rect width="750" height="500" fill="#AA151B"/><rect width="750" height="250" y="125" fill="#F1BF00"/></svg></span>}
@@ -1038,10 +1040,12 @@ const jsonLd = item ? {
                                                                 <input type="hidden" name="season" value={season.season_number} />
                                                                 <input type="hidden" name="episode" value={episode.episode_number} />
                                                                 <button type="submit" class="btn btn--sm ep-btn" data-tone="visto" aria-pressed={isWatched ? 'true' : 'false'} aria-label={`${episode.name}: ${isWatched ? 'visto' : 'marcar como visto'}`}>
-                                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                                    <svg class="w-3.5 h-3.5 ep-off" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" aria-hidden="true">
                                                                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                                     </svg>
-                                                                    <span class="hidden sm:inline">{isWatched ? 'Visto' : 'Visto'}</span>
+                                                                    <svg class="w-3.5 h-3.5 ep-on" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.4" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M20 6 9 17l-5-5"/></svg>
+                                                                    {/* «Marcar» sin ver, «Visto» visto (QA 1.6, H35): lo decide aria-pressed en CSS, también al cambiarlo sin recargar. */}
+                                                                    <span class="hidden sm:inline"><span class="ep-off">Marcar</span><span class="ep-on">Visto</span></span>
                                                                 </button>
                                                             </form>
                                                         </summary>

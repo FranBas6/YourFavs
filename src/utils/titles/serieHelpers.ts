@@ -2,7 +2,7 @@ export function formatRuntime(minutes: number): string {
     if (!minutes) return "Duración no disponible";
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    return hours > 0 ? `${hours} hr ${remainingMinutes} min` : `${minutes} min`;
+    return hours > 0 ? (remainingMinutes ? `${hours} h ${remainingMinutes} min` : `${hours} h`) : `${minutes} min`;
 }
 
 export function getSeasonStats(seasonEpisodes: any[]) {

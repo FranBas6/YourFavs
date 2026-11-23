@@ -30,6 +30,7 @@ import WhatToWatch from "../components/library/WhatToWatch.astro";
 import SectionHeader from "../components/ui/SectionHeader.astro";
 import { Icon } from 'astro-icon/components';
 import {fetchPlatformOfTheDay} from "../services/catalog/platforms";
+import { decimal } from "../utils/titles/episodeView";
 import {getGenreName} from "../utils/titles/genres";
 import {allCategories} from "../utils/catalog/categories";
 import {posterUrl, backdropUrl} from "../services/tmdb/tmdbClient";
@@ -283,7 +284,7 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                                     <span class="hero-trending-badge"><Icon name="lucide:trending-up" />En tendencia esta semana</span>
                                     <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
                                     <div class="hero-backdrop-meta">
-                                        <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average?.toFixed(1)}</span>
+                                        <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average != null ? decimal(heroMovie.vote_average) : ""}</span>
                                         <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
                                     </div>
                                     <p class="hero-backdrop-overview">{heroMovie.overview}</p>

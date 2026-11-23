@@ -112,7 +112,7 @@ function nextCard(s: TpState, x: TpEp): string {
     const meta = [runtimeLabel(x.runtime), x.air ? shortDate(x.air).replace(/^\S+ /, '') : null].filter(Boolean).join(' · ');
     return `<div class="tnx" role="group" aria-label="Te toca el E${x.e}: ${name}">${thumb}`
         + `<a class="tx" href="${href}"><span class="k">${I.play}Te toca · E${x.e}</span><b>${name}</b>${meta ? `<small>${esc(meta)}</small>` : ''}</a>`
-        + `<button type="button" class="tvb" aria-pressed="false" data-tp-ep="${x.e}" aria-label="Marcar el E${x.e} como visto">${I.eye}<span>Visto</span></button></div>`;
+        + `<button type="button" class="tvb" aria-pressed="false" data-tp-ep="${x.e}" aria-label="Marcar el E${x.e} como visto">${I.eye}<span>Marcar</span></button></div>`;
 }
 
 /**

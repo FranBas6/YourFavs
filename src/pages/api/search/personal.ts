@@ -9,7 +9,6 @@
 import type { APIRoute } from 'astro';
 import { posterUrl } from '../../../services/tmdb/tmdbClient';
 import { buildPersonalIndex, foldText } from '../../../services/library/personalIndex';
-import { formatScore } from '../../../utils/titles/mediaHelpers';
 
 export const prerender = false;
 
@@ -42,7 +41,8 @@ export const GET: APIRoute = async ({ url, locals }) => {
             id: Number(i.id),
             media_type: i.media_type,
             title: i.title,
-            subtitle: [i.lists.join(' · '), i.rating ? `★ ${formatScore(i.rating)}` : ''].filter(Boolean).join('  ·  '),
+            // La nota va una vez, a la derecha (`rating`); antes también aquí (QA 1.6, H78).
+            subtitle: i.lists.join(' · '),
             image: i.poster_path ? posterUrl(i.poster_path, 'w92') : null,
             poster_path: i.poster_path,
             rating: i.rating,
