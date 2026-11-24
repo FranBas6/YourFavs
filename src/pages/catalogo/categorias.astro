@@ -11,6 +11,7 @@ import {MOVIE_GENRE_SLUGS, SERIE_GENRE_SLUGS} from "../../utils/titles/genreSlug
 import {getGenreName} from "../../utils/titles/genres";
 import {posterUrl} from "../../services/tmdb/tmdbClient";
 import {allCategories} from "../../utils/catalog/categories";
+import { getUserTaste } from '../../services/profile/userTaste';
 import CatalogModes from "../../components/catalog/CatalogModes.astro";
 import { catalogUrls, resolveCatalogMode } from "../../utils/catalog/catalogUrl";
 import AdvancedFilters from "../../components/catalog/AdvancedFilters.astro";
@@ -27,7 +28,14 @@ const url = new URL(Astro.request.url);
 const urlParams = url.searchParams;
 const page = Number(urlParams.get('page') || 1);
 const pageStr = page.toString();
-const category = urlParams.get('categoria') || 'proximamente';
+// QA 8.5 (H69): sin categoría en la URL se abría «Próximo» (estrenos), no un género. Ahora, el primer género
+// de tus gustos que tenga página; sin gustos o sin sesión, Acción.
+let category = urlParams.get('categoria') || '';
+if (!category) {
+    const taste = Astro.locals.user ? await getUserTaste().catch(() => null) : null;
+    const ids = taste?.movieGenres?.length ? taste.movieGenres : (taste?.genres ?? []);
+    category = ids.map((id) => allCategories.find((c) => MOVIE_GENRE_SLUGS[c.slug] === id)?.slug).find(Boolean) || 'accion';
+}
 const type = resolveCatalogMode(urlParams, Astro.locals.catalogMode);
 
 const filters = parseAdvancedFilters(urlParams);

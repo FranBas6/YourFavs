@@ -47,6 +47,8 @@ const publicUrl = settings.handle ? `https://yourfavs.app/u/${settings.handle}` 
 // activo, la solicitud sale sola (scripts/social/relations.ts). Solo rutas propias.
 const nextRaw = Astro.url.searchParams.get('next') ?? '';
 const backTo = nextRaw.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : null;
+// QA 8.5 (H77): vienes de abrir tu propia dirección con el perfil desactivado.
+const fromOwnDisabled = Astro.url.searchParams.get('aviso') === 'desactivado' && settings.visibility === 'off';
 const sectionDefs = settings.sections.map((s) => ({ ...s, def: PUBLIC_SECTIONS.find((d) => d.id === s.id)! }));
 const bioLen = [...settings.bio].length;
 const slots = [0, 1, 2, 3];
@@ -68,6 +70,13 @@ const boot = {
         <p class="aj-back-note" role="note">
             <Icon name="lucide:handshake" />
             <span>Elige tu dirección y ponlo en Público o Solo amigos. Después, <a href={backTo}>vuelve a donde estabas</a> y tu solicitud de amistad saldrá sola.</span>
+        </p>
+    )}
+
+    {fromOwnDisabled && (
+        <p class="aj-back-note" role="note">
+            <Icon name="lucide:eye-off" />
+            <span><b>Tu perfil está desactivado:</b> nadie más lo ve y tu dirección da «no existe». Ponlo en Público o Solo amigos aquí abajo para activarlo.</span>
         </p>
     )}
 

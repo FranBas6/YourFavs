@@ -55,14 +55,15 @@ const {
             series={filteredSeries.length}
         />
 
-        <div class="space-y-10">
+        {/* QA 8.5 (H36): con «Todo», si no hay series pero sí películas, las películas van primero. */}
+        <div class="flex flex-col gap-10">
             {/* Series */}
             {(showSeries || showAll) && (
                 <section id="series-section" class="scroll-mt-20">
                     <div class="lg-h"><h2>Series</h2><span class="n">{filteredSeries.length}</span></div>
 
                     {seriesPaginadas.length === 0 && (
-                        <EmptyState size="sm" title="Aún no tienes series en esta colección">
+                        <EmptyState size="sm" title="Aún no tienes series en esta lista">
                             <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
@@ -103,11 +104,11 @@ const {
 
             {/* Películas */}
             {(showMovies || showAll) && (
-                <section id="movies-section" class="scroll-mt-20">
+                <section id="movies-section" class:list={["scroll-mt-20", { "order-first": showAll && filteredSeries.length === 0 && filteredMovies.length > 0 }]}>
                     <div class="lg-h"><h2>Películas</h2><span class="n">{filteredMovies.length}</span></div>
 
                     {peliculasPaginadas.length === 0 && (
-                        <EmptyState size="sm" title="Aún no tienes películas en esta colección">
+                        <EmptyState size="sm" title="Aún no tienes películas en esta lista">
                             <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}

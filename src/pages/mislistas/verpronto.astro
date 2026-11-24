@@ -157,7 +157,8 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
             </div>
         )}
 
-        <div class="space-y-10">
+        {/* QA 8.5 (H36): con «Todo», si no hay series pero sí películas, las películas van primero. */}
+        <div class="flex flex-col gap-10">
             {/* Series */}
             {(showSeries || showAll) && (
                 <section id="series-section" class="scroll-mt-20 vpo-section" data-vpo-section>
@@ -208,7 +209,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
 
             {/* Películas */}
             {(showMovies || showAll) && (
-                <section id="movies-section" class="scroll-mt-20 vpo-section" data-vpo-section>
+                <section id="movies-section" class:list={["scroll-mt-20 vpo-section", { "order-first": showAll && seriesVerPronto.length === 0 && peliculasVerPronto.length > 0 }]} data-vpo-section>
                     <div class="lg-h"><h2>Películas</h2><span class="n">{peliculasVerPronto.length}</span>
                         {peliculasVerPronto.length > 1 && <button type="button" class="btn btn--sm vpo-toggle" data-vpo-toggle aria-expanded="false">Ordenar</button>}
                     </div>
