@@ -47,6 +47,7 @@ const ICON: Record<string, string> = {
     chart: '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
     spark: '<path d="M12 3l1.9 5.8L20 10l-5 3.6L16.5 20 12 16.3 7.5 20 9 13.6 4 10l6.1-1.2z"/>',
     chev: '<path d="m6 9 6 6 6-6"/>',
+    msg: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>',
 };
 const svg = (k: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k] ?? ''}</svg>`;
 const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
@@ -74,6 +75,7 @@ const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
                     <span class="ln-l">{it.label}</span>
                     {it.badge === 'pending' && <span class="ln-b js-pending-badge" hidden></span>}
                     {it.badge === 'notif' && <span class="ln-n js-notif-badge" hidden></span>}
+                    {it.badge === 'msg' && <span class="ln-n js-msg-badge" hidden><span class="js-msg-n"></span></span>}
                     {it.countKey && <span class="ln-c" data-ln-count={it.countKey}></span>}
                 </a>
             ))}
@@ -92,6 +94,7 @@ const isActive = (it: ListsNavItem) => !!active && active.href === it.href;
                         <span class="ln-l">{it.label}</span>
                         {it.badge === 'pending' && <span class="ln-b js-pending-badge" hidden></span>}
                         {it.badge === 'notif' && <span class="ln-n js-notif-badge" hidden></span>}
+                        {it.badge === 'msg' && <span class="ln-n js-msg-badge" hidden><span class="js-msg-n"></span></span>}
                         {it.countKey && <span class="ln-c" data-ln-count={it.countKey}></span>}
                     </a>
                 ))}

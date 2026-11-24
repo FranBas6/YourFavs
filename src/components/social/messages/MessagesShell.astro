@@ -36,19 +36,18 @@ const enabled = SOCIAL_PHASE.messages;
 const groups = enabled && SOCIAL_PHASE.groups;
 ---
 {enabled ? (
-    <div class:list={['ms-shell', { noinfo: noInfo }]} data-ms-shell data-on={on} data-active={active ?? ''} data-empty={empty ? '' : undefined}>
-        <aside class="ms-rail" aria-label="Amigos y mensajes">
-            <a class="ms-home" href="/mislistas/amigos" aria-current={on === 'home' ? 'page' : undefined}>
-                <Icon name="lucide:users" /><span>Amigos</span>
-                <span class="rn js-pending-badge" hidden></span>
-            </a>
+    <div class:list={['ms-shell', { noinfo: noInfo, norail: on === 'home' }]} data-ms-shell data-on={on} data-active={active ?? ''} data-empty={empty ? '' : undefined}>
+        {/* QA 8.4 (H48): Amigos y Mensajes llevan el lateral de Mis listas (con «Mensajes» en Social), así que
+            aquí sobran el enlace «Amigos» y, en la página de Amigos, la columna de conversaciones: con las dos
+            columnas laterales no cabía el contenido. */}
+        {on !== 'home' && <aside class="ms-rail" aria-label="Conversaciones">
             <div class="ms-sec"><span id="ms-sec-l">Mensajes</span>
                 {groups && canGroup && (
                     <button type="button" class="pf-btn sm" data-ms-newgroup aria-haspopup="dialog"><Icon name="lucide:plus" />Nuevo grupo</button>
                 )}
             </div>
             <ul class="ms-l" aria-labelledby="ms-sec-l" data-ms-list set:html={railListHtml(convs, { active })}></ul>
-        </aside>
+        </aside>}
         <slot name="main" />
         <slot name="info" />
     </div>
@@ -59,10 +58,11 @@ const groups = enabled && SOCIAL_PHASE.groups;
     </div>
 )}
 
-{/* La columna de información recordada (yf:chat-info) antes de pintar, sin salto. */}
+{/* La columna de información, antes de pintar y sin salto: plegada salvo que la dejaras abierta con ⓘ
+    (yf:chat-info = '1'). QA 8.4: con el lateral de Mis listas, abierta dejaba el chat en ~400 px. */}
 {enabled && on === 'chat' && (
     <script is:inline>
-        try { if (localStorage.getItem('yf:chat-info') === '0') document.querySelector('[data-ms-shell]')?.classList.add('noinfo'); } catch (e) {}
+        try { if (localStorage.getItem('yf:chat-info') !== '1') document.querySelector('[data-ms-shell]')?.classList.add('noinfo'); } catch (e) { document.querySelector('[data-ms-shell]')?.classList.add('noinfo'); }
     </script>
 )}
 
