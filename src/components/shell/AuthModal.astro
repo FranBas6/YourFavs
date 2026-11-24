@@ -437,6 +437,16 @@ const I = {
         let pendingEmail = '';
         let resendTimer: number | undefined;
         let gating = false;
+        // Página privada a la que ibas sin sesión (`/?login=1&next=…`, QA 2.6): tras entrar, se vuelve ahí.
+        let nextTarget: string | null = null;
+        let whyTitle: string | null = null;
+        const safeNext = (raw: string | null) => (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/\\') ? raw : null);
+        const titleFor = (next: string) =>
+            next.startsWith('/mislistas/amigos/mensajes') ? 'Entra para ver tus mensajes'
+            : next.startsWith('/mislistas/amigos') ? 'Entra para ver a tus amigos'
+            : next.startsWith('/mislistas/notificaciones') ? 'Entra para ver tus avisos'
+            : next.startsWith('/perfil') ? 'Entra para ver tus ajustes'
+            : 'Entra para ver tus listas';
 
         // ---- Invitaciones (F2 social) ----
         // Quién invita sale de la cookie `yf_ref` que dejó el perfil público visitado. Se pregunta
@@ -618,9 +628,13 @@ const I = {
             tabReg.setAttribute('aria-selected', String(!isLogin));
             tabLogin.tabIndex = isLogin ? 0 : -1;
             tabReg.tabIndex = isLogin ? -1 : 0;
-            if (isLogin && gating) {
-                titleEl.textContent = 'Entra para guardar';
+            if (gating) {
+                // Guardar sin sesión (QA 2.6, H42): se abre en «Crear cuenta», que es lo que suele hacer falta.
+                titleEl.textContent = isLogin ? 'Entra para guardar' : 'Crea tu cuenta para guardarlo';
                 subEl.textContent = 'Lo guardamos en tus listas en cuanto entres.';
+            } else if (isLogin && whyTitle) {
+                titleEl.textContent = whyTitle;
+                subEl.textContent = 'En cuanto entres, te llevamos a donde ibas.';
             } else {
                 titleEl.textContent = isLogin ? 'Hola de nuevo' : 'Crea tu cuenta';
                 subEl.textContent = isLogin
@@ -706,7 +720,7 @@ const I = {
             overlay!.classList.add('is-open');
             document.body.style.overflow = 'hidden';
             gating = isGating;
-            setMode('login');
+            setMode(isGating ? 'register' : 'login');
             focusFirstEmpty();
             fitKeyboard();
         }
@@ -716,6 +730,13 @@ const I = {
             document.body.style.overflow = '';
             form.reset();
             gating = false;
+            // Cerrar sin entrar: fuera el destino y los parámetros de la URL.
+            if (nextTarget) {
+                nextTarget = null; whyTitle = null;
+                const u = new URL(location.href);
+                u.searchParams.delete('login'); u.searchParams.delete('next');
+                history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+            }
             fitKeyboard();
             // Si cierra sin loguearse, descarta la intención pendiente (no la
             // queremos disparar en un login posterior no relacionado).
@@ -747,6 +768,7 @@ const I = {
                     return;
                 } catch { /* cae a reload */ }
             }
+            if (nextTarget) { location.href = nextTarget; return; }
             location.reload();
         }
 
@@ -756,7 +778,8 @@ const I = {
         function afterAuth(res: { isNewUser?: boolean }) {
             let pending: string | null = null;
             try { pending = sessionStorage.getItem('yf_pending_action'); } catch { /* noop */ }
-            if (res.isNewUser && !pending) { location.href = '/gustos?welcome=1'; return; }
+            // Cuenta nueva: el asistente de gustos, salvo que venía a una página concreta (va ahí).
+            if (res.isNewUser && !pending && !nextTarget) { location.href = '/gustos?welcome=1'; return; }
             completeOrReload();
         }
 
@@ -803,6 +826,18 @@ const I = {
 
         // Acciones que no son form (fetch) piden login disparando este evento (p.ej. 401).
         document.addEventListener('yf:require-auth', () => open(true));
+
+        // ---- página privada sin sesión: /?login=1&next=/mislistas/… (QA 2.6, H67) ----
+        {
+            const params = new URLSearchParams(location.search);
+            const next = safeNext(params.get('next'));
+            const hasSession = document.cookie.split('; ').some((c) => c.startsWith('has_session='));
+            if (params.get('login') === '1' && next) {
+                // Ya con sesión (p. ej. al volver de Google con esta misma URL): directo al destino.
+                if (hasSession) location.replace(next);
+                else { nextTarget = next; whyTitle = titleFor(next); open(); }
+            }
+        }
 
         // ---- cierre ----
         overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });

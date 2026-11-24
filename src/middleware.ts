@@ -119,10 +119,12 @@ export const onRequest = defineMiddleware(async (context, next) => {
         context.locals.catalogMode = isCatalogMode(remembered) ? remembered : 'all';
     }
 
-    // Guard de invitado: las páginas /mislistas/* requieren sesión. Sin ella,
-    // de vuelta a inicio (la UX fina del gating — modal "regístrate" — es Fase D).
+    // Guard de invitado: /mislistas/* y /perfil/* requieren sesión. Sin ella, a la portada con el modal
+    // de entrar abierto y la página de destino (QA 2.6, H67: antes, a la portada en silencio y, tras
+    // entrar, sin volver a donde ibas). AuthModal valida `next` (ruta interna) y la usa tras entrar.
     if (!context.locals.user && (path.startsWith('/mislistas') || path.startsWith('/perfil'))) {
-        return context.redirect('/');
+        const next = path + context.url.search;
+        return context.redirect('/?login=1&next=' + encodeURIComponent(next));
     }
 
     // Envolvemos el resto del request en el store de usuario: cualquier llamada a
