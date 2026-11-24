@@ -10,13 +10,20 @@
  */
 import type { APIRoute } from 'astro';
 import { json, mapAuthError } from '../../../services/db/authHttp';
+import { THROTTLE, TOO_MANY, clientIp, isBlocked, hit, clear, keys } from '../../../services/db/authThrottle';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, locals, url }) => {
+export const POST: APIRoute = async ({ request, locals, url, clientAddress }) => {
     const body = await request.json().catch(() => null);
     const email = typeof body?.email === 'string' ? body.email.trim() : '';
     if (!email) return json({ ok: false, error: 'Falta el email.' }, 400);
+    // Límite de intentos (QA 5.2): por IP y por email (cada uno manda un correo).
+    const [ipOver, mailOver] = await Promise.all([
+        hit(keys.ip('resend', clientIp(request, () => clientAddress)), THROTTLE.resendIp),
+        hit(keys.email('resend', email), THROTTLE.resendEmail),
+    ]);
+    if (ipOver || mailOver) return json({ ok: false, code: 'too_many', error: TOO_MANY }, 429);
 
     const redirectTo = new URL('/auth/callback', url.origin); // ver register.ts: solo para la plantilla por defecto
     const { error } = await locals.supabase.auth.resend({

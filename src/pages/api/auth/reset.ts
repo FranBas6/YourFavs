@@ -12,13 +12,20 @@
  */
 import type { APIRoute } from 'astro';
 import { json, mapAuthError } from '../../../services/db/authHttp';
+import { THROTTLE, TOO_MANY, clientIp, isBlocked, hit, clear, keys } from '../../../services/db/authThrottle';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, locals, url }) => {
+export const POST: APIRoute = async ({ request, locals, url, clientAddress }) => {
     const body = await request.json().catch(() => null);
     const email = typeof body?.email === 'string' ? body.email.trim() : '';
     if (!email) return json({ ok: false, error: 'Escribe tu email arriba y vuelve a pulsar.' }, 400);
+    // Límite de intentos (QA 5.2): por IP y por email (cada uno manda un correo).
+    const [ipOver, mailOver] = await Promise.all([
+        hit(keys.ip('reset', clientIp(request, () => clientAddress)), THROTTLE.resetIp),
+        hit(keys.email('reset', email), THROTTLE.resetEmail),
+    ]);
+    if (ipOver || mailOver) return json({ ok: false, code: 'too_many', error: TOO_MANY }, 429);
 
     const redirectTo = new URL('/auth/callback', url.origin);
     redirectTo.searchParams.set('next', '/auth/nueva-contrasena');
