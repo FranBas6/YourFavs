@@ -7,6 +7,7 @@ import { normalizeScore } from "../../utils/titles/mediaHelpers";
 import { setRating, deleteRating } from "../library/ratings";
 import { appendWatchLog } from "../library/watchLog";
 import { appendActivity } from "../library/activityLog";
+import { OPINION_MAX, cleanText } from "../../utils/core/textLimits";
 
 const MOVIE_COLLECTIONS = ['MovieFavs', 'MoviesPendientes', 'MoviesVistas', 'MoviesVerPronto', 'LikedMovies', 'MoviesViendo'];
 
@@ -45,7 +46,7 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         if (existingRating === undefined && row.rating !== null) existingRating = Number(row.rating);
     }
 
-    const opinionTextForCreate = String(formData.get('opinion') || '').trim() || existingOpinion;
+    const opinionTextForCreate = cleanText(formData.get('opinion'), OPINION_MAX) || existingOpinion;
     const movieData: { opinion?: string; rating?: number } = {};
     if (opinionTextForCreate) movieData.opinion = opinionTextForCreate;
     if (existingRating !== undefined) movieData.rating = existingRating;
@@ -55,7 +56,8 @@ export async function handleMovieFavAction(formData: FormData): Promise<string> 
         patchTitle('movie', movieId, patch);
 
     if (action === 'save_opinion') {
-        const opinionText = String(formData.get('opinion') || '').trim();
+        // Con límite (QA 3.4): antes la opinión no tenía ninguno, ni en la interfaz ni aquí.
+        const opinionText = cleanText(formData.get('opinion'), OPINION_MAX);
         await updateExisting({ opinion: opinionText });
         return `/movie/${movieId}`;
     }

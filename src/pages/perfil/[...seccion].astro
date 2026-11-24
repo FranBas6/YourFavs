@@ -13,6 +13,7 @@
  * que no llevaba dentro. Ahora el campo oculto `section` decide qué se escribe y nada más.
  * A2 lo sustituye por autoguardado con PATCH y deja este POST como reserva sin JS.
  */
+import { DISPLAY_NAME_MAX, cleanLine } from "../../utils/core/textLimits";
 import Layout from "../../layouts/Layout.astro";
 import "../../styles/pages/ajustes.css";
 
@@ -84,7 +85,8 @@ if (Astro.request.method === 'POST') {
                 // Vacío = volver al nombre de Google (el middleware solo lo usa si hay valor).
                 // Ojo: cadena vacía, NO `undefined`: un campo `undefined` no viaja en el UPDATE
                 // y el nombre no se podría vaciar (con Firestore, además, daba un 500).
-                patch.display_name = String(fd.get('display_name') || '').trim().slice(0, 60);
+                // El mismo límite que la interfaz y la API (QA 3.4).
+                patch.display_name = cleanLine(fd.get('display_name'), DISPLAY_NAME_MAX);
                 break;
 
             case 'plataformas':

@@ -15,6 +15,7 @@ import { setUserProfile, STRIP_PALETTES, type UserProfile, type StripPalette } f
 import { sanitizePlatformIds } from '../../../services/tmdb/watchProviders';
 import { CONTENT_LANGUAGE_CODES } from '../../../utils/titles/languages';
 import { SUPPORTED_COUNTRIES } from '../../../services/tmdb/tmdbInfoService';
+import { DISPLAY_NAME_MAX, cleanLine, lineLength } from '../../../utils/core/textLimits';
 
 export const prerender = false;
 
@@ -39,7 +40,9 @@ function buildPatch(body: Record<string, unknown>): { patch: Partial<UserProfile
     if (typeof body.display_name === 'string') {
         // Vacío es válido: significa "vuelve al nombre de Google" (el middleware solo usa
         // display_name si tiene valor). Nunca `undefined`: no viajaría en el UPDATE y no se vaciaría.
-        patch.display_name = body.display_name.trim().slice(0, 60);
+        // El mismo límite que la interfaz (QA 3.4, H41: antes se recortaba a 60 y se guardó uno de 55).
+        // Más largo, lo rechaza el handler con un 400; aquí solo se limpia.
+        patch.display_name = cleanLine(body.display_name, DISPLAY_NAME_MAX);
     }
 
     if (typeof body.region === 'string' && SUPPORTED_COUNTRIES.some((c) => c.code === body.region)) {
@@ -114,7 +117,11 @@ const handler: APIRoute = async ({ request, locals }) => {
     if (!locals.user) return json({ ok: false, error: 'No autorizado' }, 401);
     try {
         const body = await request.json().catch(() => ({}));
-        const { patch, touchedNotifs } = buildPatch(body as Record<string, unknown>);
+        const b = body as Record<string, unknown>;
+        if (typeof b.display_name === 'string' && lineLength(b.display_name) > DISPLAY_NAME_MAX) {
+            return json({ ok: false, error: `El nombre no puede pasar de ${DISPLAY_NAME_MAX} caracteres` }, 400);
+        }
+        const { patch, touchedNotifs } = buildPatch(b);
 
         if (Object.keys(patch).length === 0) return json({ ok: false, error: 'Nada que guardar' }, 400);
         await setUserProfile(patch);
