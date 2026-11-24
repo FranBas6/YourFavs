@@ -29,12 +29,15 @@ import { LEGAL } from '../../../utils/legal/legalInfo';
 import { obviousPasswordReason } from '../../../utils/core/passwordCheck';
 import { isPwnedPassword } from '../../../services/db/pwnedPasswords';
 import { json, mapAuthError, safeNext, setSessionFlag } from '../../../services/db/authHttp';
+import { THROTTLE, TOO_MANY, clientIp, isBlocked, hit, clear, keys } from '../../../services/db/authThrottle';
 import { signupMode } from '../../../services/social/signupMode';
 import { REF_COOKIE, applyReferral, findInviter } from '../../../services/social/referral';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ request, locals, cookies, url }) => {
+export const POST: APIRoute = async ({ request, locals, cookies, url, clientAddress }) => {
+    // Límite de intentos (QA 5.2): registros por IP.
+    if (await hit(keys.ip('register', clientIp(request, () => clientAddress)), THROTTLE.registerIp)) return json({ ok: false, code: 'too_many', error: TOO_MANY }, 429);
     const body = await request.json().catch(() => null);
     const email = typeof body?.email === 'string' ? body.email.trim() : '';
     const password = typeof body?.password === 'string' ? body.password : '';

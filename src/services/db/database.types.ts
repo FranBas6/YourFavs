@@ -62,6 +62,19 @@ export type Database = {
                   Relationships: [
                     
                   ]
+                },"auth_throttle": {
+                  Row: {
+                    "hits": number,"key": string,"window_start": string
+                  }
+                  Insert: {
+                    "hits"?: number,"key": string,"window_start"?: string
+                  }
+                  Update: {
+                    "hits"?: number,"key"?: string,"window_start"?: string
+                  }
+                  Relationships: [
+                    
+                  ]
                 },"blocks": {
                   Row: {
                     "blocked_id": string,"blocker_id": string,"created_at": string
@@ -512,7 +525,16 @@ isOneToOne: true
             [_ in never]: never
           }
           Functions: {
-            "claim_app_state":
+            "auth_throttle_blocked":
+{ Args: { "p_key": string,"p_max": number,"p_window_seconds": number }; Returns: boolean
+                           },
+"auth_throttle_clear":
+{ Args: { "p_key": string }; Returns: undefined
+                           },
+"auth_throttle_hit":
+{ Args: { "p_key": string,"p_window_seconds": number }; Returns: number
+                           },
+"claim_app_state":
 { Args: { "p_key": string,"p_ttl_ms": number }; Returns: Json
                            },
 "ics_new_token":

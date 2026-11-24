@@ -55,7 +55,32 @@ function applyCacheHeaders(res: Response, path: string, hasSession: boolean): vo
     }
 }
 
+/**
+ * Envíos desde otra web (CSRF, QA 5.1, H39). La cookie de sesión es `SameSite=Lax` y los navegadores no la
+ * mandan en un POST entre sitios: esa es la primera defensa. Esta es la segunda: cualquier envío
+ * (POST/PUT/PATCH/DELETE) cuyo `Origin` (o, sin él, `Referer`) sea de otra web se rechaza. Sin ninguna de
+ * las dos (curl, servidores) no hay navegador al que engañar, así que pasa. La app móvil va con
+ * `Authorization: Bearer` (no usa cookies, no se le puede falsificar) y queda fuera.
+ */
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+function crossSiteWrite(request: Request, selfOrigin: string): boolean {
+    if (!UNSAFE_METHODS.has(request.method)) return false;
+    if (/^Bearer\s/i.test(request.headers.get('authorization') ?? '')) return false;
+    let from = request.headers.get('origin');
+    if (!from) {
+        const ref = request.headers.get('referer');
+        if (!ref) return false;
+        try { from = new URL(ref).origin; } catch { return true; }
+    }
+    return from !== selfOrigin;
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
+    if (crossSiteWrite(context.request, context.url.origin)) {
+        return new Response(JSON.stringify({ ok: false, error: 'Envío desde otra web no permitido' }), {
+            status: 403, headers: { 'Content-Type': 'application/json' },
+        });
+    }
     context.locals.user = null;
     let supabase = createSupabaseServerClient(context);
 
