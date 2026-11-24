@@ -6,9 +6,8 @@
  * toman color al pasar por encima. Antes «Eliminar cuenta» era un botón rojo permanente
  * compitiendo por la atención con todo lo demás.
  *
- * «Descargar tus datos» se pinta pero va deshabilitada: volcar listas + notas + valoraciones
- * es la operación más caro-en-lecturas de la app y venimos de ponerla a dieta. Anotada en
- * `docs/TODO.md` con el guard que necesitaría.
+ * «Descargar tus datos» (QA 4.3): un JSON con todo lo tuyo desde `/api/profile/export` (como mucho una
+ * vez por minuto). Es también lo que se recomienda hacer antes de eliminar la cuenta.
  */
 interface Props {
     user: { email?: string | null; provider?: string | null };
@@ -37,10 +36,10 @@ const { user } = Astro.props;
     <div class="aj-adv-list">
         <div class="aj-adv-row">
             <span class="aj-adv-row-text">
-                <span class="aj-row-title">Descargar tus datos <span class="aj-soon">Pronto</span></span>
-                <p class="aj-row-desc">Un JSON con tus listas, notas y valoraciones.</p>
+                <span class="aj-row-title">Descargar tus datos</span>
+                <p class="aj-row-desc">Un archivo con todo lo tuyo: perfil, listas, notas, diario, episodios, colecciones, gustos, lo que sigues y tus mensajes.</p>
             </span>
-            <button type="button" class="aj-adv-btn" disabled>Descargar</button>
+            <a class="aj-adv-btn" href="/api/profile/export" download data-export>Descargar</a>
         </div>
 
         <div class="aj-adv-row">
@@ -54,7 +53,7 @@ const { user } = Astro.props;
         <div class="aj-adv-row">
             <span class="aj-adv-row-text">
                 <span class="aj-row-title">Eliminar la cuenta</span>
-                <p class="aj-row-desc">Se borra todo, sin vuelta atrás.</p>
+                <p class="aj-row-desc">Se borra todo, sin vuelta atrás. Si quieres conservar algo, descarga antes tus datos.</p>
             </span>
             <button type="button" class="aj-adv-btn" id="account-delete">Eliminar</button>
         </div>
