@@ -78,6 +78,7 @@ const fmt1 = (n: number) => (Math.round(n * 10) / 10).toLocaleString('es-ES', { 
 function showcaseHref(s: ItemShowcase): string {
     return s.kind === 'movie' ? `/movie/${s.id}` : `/serie/${s.id}`;
 }
+import { posterSrcset, POSTER_SIZES } from '../../../utils/titles/posterSrcset';
 ---
 <Layout title="De siempre">
     <ListsNav slot="aside" />
@@ -303,7 +304,7 @@ function showcaseHref(s: ItemShowcase): string {
                                 <a href={showcaseHref(item!)} class="group block">
                                     <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
                                         {item!.poster_path ? (
-                                            <img src={posterUrl(item!.poster_path) || ''} alt={item!.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                            <img src={posterUrl(item!.poster_path) || ''} srcset={posterSrcset(item!.poster_path)} sizes={POSTER_SIZES} alt={item!.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
                                         ) : (
                                             <div class="w-full h-full flex items-center justify-center text-gray-400"><Icon name="lucide:film" class="w-10 h-10" /></div>
                                         )}
@@ -329,7 +330,7 @@ function showcaseHref(s: ItemShowcase): string {
                                 <a href={`/serie/${s.id}`} class="group block">
                                     <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
                                         {s.poster_path ? (
-                                            <img src={posterUrl(s.poster_path) || ''} alt={s.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                            <img src={posterUrl(s.poster_path) || ''} srcset={posterSrcset(s.poster_path)} sizes={POSTER_SIZES} alt={s.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
                                         ) : (
                                             <div class="w-full h-full flex items-center justify-center text-gray-400"><Icon name="lucide:tv" class="w-10 h-10" /></div>
                                         )}

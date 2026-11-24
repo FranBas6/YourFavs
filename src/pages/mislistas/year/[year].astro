@@ -144,6 +144,7 @@ const YEAR_STATS: StatItem[] = [
     { value: stats.activeMonth ? MONTH_NAMES[stats.activeMonth.month] : '—', label: 'Mes más visto', icon: 'calendar', tone: 'seguir', sub: activeMonthSub },
     { value: stats.rewatches, label: 'Re-visionados', icon: 'repeat', tone: 'like' },
 ];
+import { posterSrcset, POSTER_SIZES } from '../../../utils/titles/posterSrcset';
 ---
 <Layout title={`Tu ${yearNum}`}>
     <ListsNav slot="aside" />
@@ -209,7 +210,7 @@ const YEAR_STATS: StatItem[] = [
                                 <a href={showcaseHref(item!)} class="group block">
                                     <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
                                         {item!.poster_path ? (
-                                            <img src={posterUrl(item!.poster_path) || ''} alt={item!.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                            <img src={posterUrl(item!.poster_path) || ''} srcset={posterSrcset(item!.poster_path)} sizes={POSTER_SIZES} alt={item!.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
                                         ) : (
                                             <div class="w-full h-full flex items-center justify-center text-gray-400"><Icon name="lucide:film" class="w-10 h-10" /></div>
                                         )}
@@ -235,7 +236,7 @@ const YEAR_STATS: StatItem[] = [
                                 <a href={`/serie/${s.id}`} class="group block">
                                     <div class="relative aspect-[2/3] rounded-xl overflow-hidden shadow-md group-hover:shadow-xl transition bg-gray-200">
                                         {s.poster_path ? (
-                                            <img src={posterUrl(s.poster_path) || ''} alt={s.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                            <img src={posterUrl(s.poster_path) || ''} srcset={posterSrcset(s.poster_path)} sizes={POSTER_SIZES} alt={s.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
                                         ) : (
                                             <div class="w-full h-full flex items-center justify-center text-gray-400"><Icon name="lucide:tv" class="w-10 h-10" /></div>
                                         )}
@@ -280,7 +281,7 @@ const YEAR_STATS: StatItem[] = [
                                             <a href={e.kind === 'movie' ? `/movie/${e.id}` : `/serie/${e.id}`} class="group block">
                                                 <div class="relative aspect-[2/3] rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition bg-gray-200">
                                                     {e.poster_path ? (
-                                                        <img src={posterUrl(e.poster_path) || ''} alt={e.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
+                                                        <img src={posterUrl(e.poster_path) || ''} srcset={posterSrcset(e.poster_path)} sizes={POSTER_SIZES} alt={e.title} loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"/>
                                                     ) : (
                                                         <div class="w-full h-full flex items-center justify-center text-gray-400">
                                                             <Icon name={e.kind === 'movie' ? 'lucide:film' : 'lucide:tv'} class="w-7 h-7" />
