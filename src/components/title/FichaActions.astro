@@ -24,6 +24,7 @@
  */
 import LevelControl from './LevelControl.astro';
 import { FI } from './fichaIcons';
+import StarRating from './StarRating.astro';
 import { fichaField, type FichaList } from './fichaForms';
 import { SOCIAL_PHASE } from '../../utils/social/social';
 import { providerLinks } from '../../utils/titles/mediaHelpers';
@@ -73,12 +74,15 @@ interface Props {
     myPlatformIds?: number[];
     homepage?: string | null;
     trailerUrl?: string | null;
+    /** Tu nota (null = sin nota). Vista y sin nota: «¿Qué te ha parecido?» bajo la barra (QA 3.3). */
+    myRating?: number | null;
 }
 
 const {
     mediaType, id, title, poster = null, state: s, watched, times, lastPretty = '', efemeride = '', undated = false,
     unreleased = false, releaseLabel = '', notif = false, seriesOver = false, favPos = null, favTotal = 0, progress = null,
     imdbId = null, providersByCountry = {}, linkByCountry = {}, myPlatformIds = [], homepage = null, trailerUrl = null,
+    myRating,
 } = Astro.props;
 
 const isMovie = mediaType === 'movie';
@@ -378,6 +382,11 @@ const mid = `fa-${mediaType}-${id}`;
                     </span>
                 )}
             </div>
+        )}
+        {/* Recién vista y sin nota: las estrellas aquí, no 2.000 px más abajo (QA 3.3, H26). Al poner la
+            nota se guarda y, al recargar, desaparece. Solo si la ficha pasa `myRating` (null = sin nota). */}
+        {watched && myRating === null && (
+            <StarRating compact currentRating={null} tmdbRating={0} itemId={String(id)} mediaType={isMovie ? 'movie' : 'serie'} />
         )}
     </div>
 

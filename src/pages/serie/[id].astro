@@ -41,6 +41,7 @@ import { getCrossMediaRelated } from "../../services/titles/crossMediaRelated";
 import StreamingProviders from "../../components/title/StreamingProviders.astro";
 import SeasonHeatmap from "../../components/title/SeasonHeatmap.astro";
 import StarRating from "../../components/title/StarRating.astro";
+import { OPINION_MAX } from "../../utils/core/textLimits";
 import {safeFetch} from "../../utils/core/safeFetch";
 import { getSpoilerPref, setSpoilerPref, clearSpoilerPref } from "../../services/titles/spoilerPrefs";
 
@@ -126,7 +127,8 @@ if (Astro.request.method === 'POST') {
         return Astro.redirect(redirectUrl);
     } catch (error) {
         console.error('Error al gestionar la serie:', error);
-        return Astro.redirect(`/serie/${id}`);
+        // Con la marca de error: el navegador no lo da por guardado y lo deshace (QA 3.1).
+        return Astro.redirect(`/serie/${id}?guardado=error`);
     }
 }
 
@@ -606,6 +608,7 @@ const jsonLd = item ? {
             favTotal={totalFavorites}
             progress={serieProgress}
             imdbId={imdbId}
+            myRating={ratingFromAny ?? null}
             providersByCountry={(item as any)?.providersByCountry || {}}
             linkByCountry={(item as any)?.providerLinksByCountry || {}}
             myPlatformIds={myPlatformIds}
@@ -721,7 +724,7 @@ const jsonLd = item ? {
                                                 <input type="hidden" name="id" value={item?.id} />
                                                 <input type="hidden" name="action" value="save_opinion" />
                                                 <input type="hidden" name="actionType" value="opinion" />
-                                                <textarea name="opinion" rows="4" class="cop" aria-label="Tu opinión">{opinionFromAny}</textarea>
+                                                <textarea name="opinion" maxlength={OPINION_MAX} rows="4" class="cop" aria-label="Tu opinión">{opinionFromAny}</textarea>
                                                 <button type="submit" class="btn btn--sm">Guardar opinión</button>
                                             </form>
                                         </details>
@@ -738,7 +741,7 @@ const jsonLd = item ? {
                                     <input type="hidden" name="id" value={item?.id} />
                                     <input type="hidden" name="action" value="save_opinion" />
                                     <input type="hidden" name="actionType" value="opinion" />
-                                    <textarea name="opinion" rows="3" class="cop" aria-label="Tu opinión" placeholder="Escribe tu opinión…"></textarea>
+                                    <textarea name="opinion" maxlength={OPINION_MAX} rows="3" class="cop" aria-label="Tu opinión" placeholder="Escribe tu opinión…"></textarea>
                                     <div class="crow crow--end"><button type="submit" class="btn btn--sm">Guardar opinión</button></div>
                                 </form>
                             )}

@@ -7,6 +7,7 @@
  */
 import type { UserProfile } from "../../services/profile/userProfile";
 import AvatarDialog from "./AvatarDialog.astro";
+import { DISPLAY_NAME_MAX } from "../../utils/core/textLimits";
 
 interface Props {
     profile: UserProfile;
@@ -15,7 +16,7 @@ interface Props {
 const { profile, user } = Astro.props;
 
 const displayName = profile.display_name || user.name || (user.email ? user.email.split('@')[0] : 'Tú');
-const NAME_MAX = 32;
+const NAME_MAX = DISPLAY_NAME_MAX; // el mismo que el servidor (utils/core/textLimits.ts)
 
 const initial = (() => {
     const base = (profile.display_name || user.name || user.email || '?').trim();

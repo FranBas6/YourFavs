@@ -1,0 +1,35 @@
+---
+/**
+ * Error del servidor (QA 3.2, H79). Antes no existía: en producción se veía el error genérico. Mismo
+ * estilo que la 404, fuera de buscadores y con «Reintentar» (la misma dirección) y «Volver al inicio».
+ * Astro la pinta cuando una página lanza un error que nadie captura.
+ */
+import Layout from '../layouts/Layout.astro';
+
+interface Props { error?: unknown }
+const { error } = Astro.props;
+if (error) console.error('[500]', Astro.url.pathname, error instanceof Error ? error.message : error);
+const again = Astro.url.pathname + Astro.url.search;
+---
+<Layout title="Algo ha fallado" robots="noindex" canonical={false}>
+    <section class="flex flex-col items-center justify-center text-center py-16 px-4 min-h-[60vh]">
+        <p class="mb-3" style="font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent);">
+            Error 500 · Corte de luz en la sala
+        </p>
+        <div class="nf-ic" aria-hidden="true"><img src="/favicon.svg" alt="" width="120" height="120" /></div>
+        <h1 class="text-2xl sm:text-3xl font-bold mb-3" style="color: var(--text);">Algo ha fallado</h1>
+        <p class="text-lg max-w-md mb-8 leading-relaxed" style="color: var(--text-2);">
+            No hemos podido cargar esta página. Suele ser algo momentáneo: prueba otra vez en unos segundos.
+        </p>
+        <div class="flex flex-col sm:flex-row gap-3">
+            <a href={again} class="btn btn--pri">Reintentar</a>
+            <a href="/" class="btn">Volver al inicio</a>
+        </div>
+    </section>
+</Layout>
+
+<style>
+    .nf-ic { width: 168px; height: 168px; margin-bottom: 32px; border-radius: 40px; display: grid; place-items: center;
+        background: #0B1220; box-shadow: var(--sh-lg); transform: rotate(-4deg); filter: grayscale(.6); }
+    .nf-ic img { width: 120px; height: 120px; }
+</style>

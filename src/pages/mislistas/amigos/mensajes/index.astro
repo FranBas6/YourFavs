@@ -29,15 +29,28 @@ if (!SOCIAL_PHASE.messages) return Astro.redirect('/mislistas/amigos');
 const user = Astro.locals.user;
 let convs: ConvSummary[] = [];
 let friends = 0;
+// Un fallo puntual de Supabase («invalid response from the upstream server», 1 de cada 20 cargas en el
+// testeo) tumbaba la página con un 500 (QA 3.2, H79). Se reintenta una vez y, si sigue, se avisa.
+let loadError = false;
 if (user) {
-    const [list, counts] = await Promise.all([listConversations(user.uid), tabCounts(user.uid)]);
-    convs = list;
-    friends = counts.amigos ?? 0;
+    const load = () => Promise.all([listConversations(user.uid), tabCounts(user.uid)]);
+    try {
+        let res;
+        try { res = await load(); } catch { res = await load(); }
+        convs = res[0];
+        friends = res[1].amigos ?? 0;
+    } catch (err) {
+        console.error('[mensajes]', (err as Error).message);
+        loadError = true;
+        Astro.response.status = 503;
+    }
 }
 const first = convs[0] ? chatHref(convs[0].id) : '';
 
-// Vacíos de D17: sin amigos, o con amigos pero sin conversaciones.
-const empty = friends === 0
+// Vacíos de D17: sin amigos, o con amigos pero sin conversaciones. Con error, el mismo aviso que una conversación.
+const empty = loadError
+    ? emptyHtml({ color: 'red', icon: 'wifi-off', title: 'No hemos podido cargar tus mensajes', text: 'Suele ser algo momentáneo. Lo que escribiste antes está a salvo.', actions: `<a class="pf-btn pri sm" href="${Astro.url.pathname}">${icon('refresh-cw')}Reintentar</a>` })
+    : friends === 0
     ? emptyHtml({
         color: 'pink', icon: 'handshake', title: 'Los mensajes son entre amigos',
         text: 'Cuando aceptes una solicitud o te acepten la tuya, podréis escribiros aquí.',

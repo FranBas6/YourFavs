@@ -11,6 +11,7 @@ import { appDateParts } from "../../utils/core/appTime";
 import type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress } from "../../types/DbSerie";
 import { setRating, deleteRating } from "../library/ratings";
 import { appendActivity } from "../library/activityLog";
+import { OPINION_MAX, cleanText } from "../../utils/core/textLimits";
 export type { SeriesFavs, SeriesInterface, RecommendedSeries, WatchedEpisode, WatchedProgress };
 
 // Diario (L5): registrar lo que se marca como visto, SIN acoplar al progreso y
@@ -47,7 +48,8 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
 
     // Guardar opinión en todas las colecciones
     if (action === 'save_opinion' || actionType === 'opinion') {
-        const opinionText = String(formData.get('opinion') || '').trim();
+        // Con límite (QA 3.4): antes la opinión no tenía ninguno, ni en la interfaz ni aquí.
+        const opinionText = cleanText(formData.get('opinion'), OPINION_MAX);
         await patchTitle('tv', serieId, { opinion: opinionText });
         return `/serie/${serieId}`;
     }
@@ -99,7 +101,7 @@ export async function handleSerieFavAction(formData: FormData): Promise<string> 
             if (existingRating === undefined && row.rating !== null) existingRating = Number(row.rating);
         }
 
-        const opinionForSeries = String(formData.get('opinion') || '').trim() || existingOpinion;
+        const opinionForSeries = cleanText(formData.get('opinion'), OPINION_MAX) || existingOpinion;
         // Entrada "limpia" (sin position) para la cascada a SeriesVistas.
         const castedEntry: { opinion?: string; rating?: number } = {};
         if (opinionForSeries) castedEntry.opinion = opinionForSeries;
