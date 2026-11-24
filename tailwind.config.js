@@ -9,6 +9,12 @@ export default {
         micro: 'var(--fs-micro)', meta: 'var(--fs-meta)', ui: 'var(--fs-ui)', body: 'var(--fs-body)',
         sub: 'var(--fs-sub)', sec: 'var(--fs-sec)', page: 'var(--fs-page)',
       },
+      // QA 6.1 (H55): los grises de Tailwind como TEXTO no llegaban a 4,5:1 sobre el fondo claro.
+      // Solo textColor: border-gray-400 y bg-gray-* siguen con su tono. El modo oscuro los
+      // remapea aparte en styles/dark-mode.css.
+      textColor: {
+        gray: { 400: '#666D7A', 500: '#5F6673' },
+      },
     },
   },
   plugins: [],
