@@ -24,6 +24,9 @@
  * esa cookie no se crea la cuenta (`invite_only`).
  */
 import type { APIRoute } from 'astro';
+import { PASSWORD_MIN } from '../../../utils/core/textLimits';
+import { obviousPasswordReason } from '../../../utils/core/passwordCheck';
+import { isPwnedPassword } from '../../../services/db/pwnedPasswords';
 import { json, mapAuthError, safeNext, setSessionFlag } from '../../../services/db/authHttp';
 import { signupMode } from '../../../services/social/signupMode';
 import { REF_COOKIE, applyReferral, findInviter } from '../../../services/social/referral';
@@ -35,7 +38,13 @@ export const POST: APIRoute = async ({ request, locals, cookies, url }) => {
     const email = typeof body?.email === 'string' ? body.email.trim() : '';
     const password = typeof body?.password === 'string' ? body.password : '';
     if (!email || !password) return json({ ok: false, error: 'Rellena email y contraseña.' }, 400);
-    if (password.length < 6) return json({ ok: false, error: mapAuthError('weak_password') }, 400);
+    if (password.length < PASSWORD_MIN) return json({ ok: false, error: mapAuthError('weak_password') }, 400);
+    // Obvia (repetición, secuencia, tu email) o filtrada en alguna brecha de datos (QA 4.5).
+    const obvious = obviousPasswordReason(password, email);
+    if (obvious) return json({ ok: false, code: 'weak_password', error: obvious }, 400);
+    if (await isPwnedPassword(password)) {
+        return json({ ok: false, code: 'pwned_password', error: 'Esta contraseña ha aparecido en filtraciones de datos de otras webs. Elige otra (una frase larga funciona muy bien).' }, 400);
+    }
 
     // Solo lo usa la plantilla POR DEFECTO de Supabase (enlace con `?code=`, que exige el mismo
     // navegador). Las nuestras (`supabase/templates/`) llevan `token_hash` y no dependen de esto;

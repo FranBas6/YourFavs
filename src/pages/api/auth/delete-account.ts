@@ -9,12 +9,18 @@
 import type { APIRoute } from 'astro';
 import { supabaseAdmin } from '../../../services/db/admin';
 import { clearSessionFlag, json } from '../../../services/db/authHttp';
+import { DELETE_WORD } from '../../../utils/core/textLimits';
 
 export const prerender = false;
 
-export const POST: APIRoute = async ({ locals, cookies }) => {
+export const POST: APIRoute = async ({ locals, cookies, request }) => {
     const user = locals.user;
     if (!user) return json({ ok: false, error: 'No autorizado' }, 401);
+    // Hay que escribir la palabra (QA 4.5, H72): antes bastaba un confirm() o una petición suelta.
+    const body = await request.json().catch(() => null);
+    if (String(body?.confirm ?? '').trim().toUpperCase() !== DELETE_WORD) {
+        return json({ ok: false, error: `Escribe ${DELETE_WORD} para confirmar` }, 400);
+    }
 
     try {
         const admin = supabaseAdmin();

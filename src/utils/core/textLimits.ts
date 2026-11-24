@@ -7,6 +7,10 @@
  */
 export const DISPLAY_NAME_MAX = 32;
 export const OPINION_MAX = 2000;
+/** Contraseña mínima al crearla o cambiarla (QA 4.5, H08: antes 6). Quien ya tiene una más corta sigue entrando. */
+export const PASSWORD_MIN = 8;
+/** Lo que hay que escribir para eliminar la cuenta (QA 4.5, H72). */
+export const DELETE_WORD = 'ELIMINAR';
 
 /** Caracteres de control (y los invisibles de dirección de texto, que pueden desordenar lo que se pinta). */
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F‎‏‪-‮⁦-⁩]/g;
