@@ -144,7 +144,7 @@ function footHtml(s: State): string {
     const label = `${planLong(s.date, s.today)}${s.date === s.today || s.date === add(s.today, 1) ? `, ${planShort(s.date).split(' ').slice(0, 2).join(' ')}` : ''} · ${s.time ?? 'sin hora'}`;
     const sum = s.o.edit
         ? `<div class="sp-sum">${icon('calendar-check')}<span><b>${esc(label)}.</b> Se avisará a quien dijo «Voy». Sus respuestas se mantienen.</span></div>`
-        : `<div class="sp-sum">${icon('calendar-check')}<span><b>${esc(label)}.</b> Quien diga «Voy» la tendrá en Ver pronto con esta fecha.</span></div>`;
+        : `<div class="sp-sum">${icon('calendar-check')}<span><b>${esc(label)}.</b> Quien diga «Voy» la tendrá en Lo próximo con esta fecha.</span></div>`;
     const err = s.error ? `<div class="rk-err" role="alert">${icon('circle-alert')}<span>${esc(s.error)}</span></div>` : '';
     return `${err}${sum}<button type="button" class="pf-btn pri" data-pk-send${s.sending ? ' disabled' : ''}>${icon('calendar-check')}${s.o.edit ? 'Guardar cambio' : 'Proponer plan'}</button>`;
 }

@@ -357,7 +357,7 @@ function planCardHtml(v: PlanView, people: Record<string, PersonCard>, me: strin
     let zone = '';
     if (off) {
         zone = `<div class="tc-z nt">${icon('calendar-x')}<span>Plan cancelado por ${esc(owner ? 'ti' : by)}${v.cancelledAt ? ` · ${esc(relTime(v.cancelledAt, now))}` : ''}</span>`
-            + `<small>${v.me === 'yes' || owner ? 'Ya no sale con fecha en tu Ver pronto. El título se queda.' : 'No hace falta hacer nada.'}</small></div>`;
+            + `<small>${v.me === 'yes' || owner ? 'Ya no sale con fecha en Lo próximo. El título se queda.' : 'No hace falta hacer nada.'}</small></div>`;
     } else if (v.changed && v.prevDate && !past) {
         zone = `<div class="tc-z nt pl-prev">${icon('calendar-clock')}<span>Antes: <s>${esc(planWhen(v.prevDate, v.prevTime, v.today))}</s></span>`
             + `<small>Las respuestas «Voy» se mantienen.</small></div>`;
@@ -381,7 +381,7 @@ function planCardHtml(v: PlanView, people: Record<string, PersonCard>, me: strin
                 + `<button type="button" class="pf-btn sm" aria-pressed="${yes}" data-plan-rsvp="yes" data-plan-id="${v.id}">${icon('check')}Voy</button>`
                 + `<button type="button" class="pf-btn sm" aria-pressed="${no}" data-plan-rsvp="no" data-plan-id="${v.id}">${icon('x')}No puedo</button>`
                 + ficha
-                + (yes ? `<span class="pl-vp">${icon('calendar-check')}En tu Ver pronto con esta fecha</span>` : '') + `</div>`;
+                + (yes ? `<span class="pl-vp">${icon('calendar-check')}En Lo próximo con esta fecha</span>` : '') + `</div>`;
         }
     } else if (past) {
         const went = owner || v.me === 'yes';
@@ -552,7 +552,7 @@ export function plusMenuHtml(conv: { id: number; group: boolean; title: string; 
         'De una película o de un episodio');
     // Plan para verla (M5): un título y un día; quien diga «Voy» la tendrá en Ver pronto con la fecha.
     html += item(`data-plan-title data-conv="${conv.id}" data-conv-title="${esc(conv.title)}" data-anchor="[data-ms-plus]"`, 'green', 'calendar-check',
-        'Plan para verla', 'Un título y un día. Quien vaya, la tendrá en Ver pronto');
+        'Plan para verla', 'Un título y un día. Quien vaya, la tendrá en Lo próximo');
     return html;
 }
 

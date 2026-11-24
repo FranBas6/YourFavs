@@ -6,7 +6,7 @@ import {
 } from "../../utils/titles/mediaHelpers";
 import {formatRuntime, getSeasonStats} from "../../utils/titles/serieHelpers";
 import type { GuestStar } from "../../types/Media";
-import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched} from "../../services/series/serieLibrary";
+import {handleSerieFavAction, getSerieFav, getWatchedProgress, toggleWatchedEpisode, markSeasonWatched, unmarkSeasonWatched, markAllWatched, unmarkAllWatched, followIfUnlisted} from "../../services/series/serieLibrary";
 import { countSeriesPasses } from "../../services/library/watchLog";
 import type {WatchedProgress} from "../../services/series/serieLibrary";
 import '../../styles/shared/detail-common.css';
@@ -59,8 +59,10 @@ if (Astro.request.method === 'POST') {
         if (actionType === 'watched_episode') {
             const season = Number(formData.get('season'));
             const episode = Number(formData.get('episode'));
-            await toggleWatchedEpisode(id, season, episode);
-            return Astro.redirect(`/serie/${id}`);
+            const marked = await toggleWatchedEpisode(id, season, episode);
+            // Serie que no estaba en ninguna lista: pasa a Siguiendo y la página lo cuenta (QA 2.4).
+            const followed = marked && await followIfUnlisted(id);
+            return Astro.redirect(`/serie/${id}${followed ? '?seguida=1' : ''}`);
         }
         if (actionType === 'watched_all') {
             const allEpisodesStr = String(formData.get('allEpisodes'));
@@ -80,12 +82,14 @@ if (Astro.request.method === 'POST') {
             const season = Number(formData.get('season'));
             const episodeNumbers = String(formData.get('episodes')).split(',').map(Number);
             const action = String(formData.get('action'));
+            let followed = false;
             if (action === 'mark') {
                 await markSeasonWatched(id, season, episodeNumbers);
+                followed = await followIfUnlisted(id);
             } else {
                 await unmarkSeasonWatched(id, season);
             }
-            return Astro.redirect(`/serie/${id}`);
+            return Astro.redirect(`/serie/${id}${followed ? '?seguida=1' : ''}`);
         }
 
         if (actionType === 'notification') {
@@ -1168,7 +1172,10 @@ const jsonLd = item ? {
     </article>
 </Layout>
 
+{/* «Ahora sigues X · Deshacer» al marcar un episodio de una serie que no está en ninguna lista (QA 2.4). */}
+<div hidden data-auto-follow data-id={id} data-name={title}></div>
 <script>
+    import '../../scripts/series/autoFollow';
     // Modo sin spoilers (§2): «Mostrar» revela el episodio difuminado. El blur es SELECTIVO (A3b):
     // solo lo marcado con `.yf-blur`. CSS y script compartidos con la ficha de episodio (TMDB D4):
     // `styles/shared/spoil.css` y `scripts/ui/spoil.ts`.

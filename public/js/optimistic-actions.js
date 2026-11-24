@@ -1,14 +1,14 @@
 var LIST_NAMES = {
     favorites: 'Favoritos', pendientes: 'Pendientes', vistas: 'Vistas',
-    verPronto: 'Ver Pronto', liked: 'Me gusta', siguiendo: 'Siguiendo',
-    favs: 'Favoritos', verpronto: 'Ver Pronto', viendo: 'Viendo', abandonada: 'Abandonadas'
+    verPronto: 'Lo próximo', liked: 'Me gusta', siguiendo: 'Siguiendo',
+    favs: 'Favoritos', verpronto: 'Lo próximo', viendo: 'Viendo', abandonada: 'Abandonadas'
 };
 
 var TEXT_TOGGLES = {
     'Añadir a Favoritos': 'Quitar de Favoritos',
     'Quitar de Favoritos': 'Añadir a Favoritos',
-    'Ver Pronto': 'Quitar de Ver Pronto',
-    'Quitar de Ver Pronto': 'Ver Pronto',
+    'Lo próximo': 'Quitar de Lo próximo',
+    'Quitar de Lo próximo': 'Lo próximo',
     'Marcar Pendiente': 'Quitar de Pendientes',
     'Quitar de Pendientes': 'Marcar Pendiente',
     'Marcar como Vista': 'Quitar de Vistas',
@@ -58,6 +58,9 @@ function submitOptimistic(form, options) {
         fetch(window.location.pathname, { method: 'POST', body: formData })
             .then(function (res) {
                 if (!res.ok && !res.redirected) throw new Error();
+                // La ficha redirige a ?seguida=1 si marcar un episodio pasó la serie a Siguiendo (QA 2.4):
+                // lo cuenta scripts/series/autoFollow.ts, con «Deshacer».
+                if (res.redirected && /[?&]seguida=1\b/.test(res.url)) document.dispatchEvent(new CustomEvent('yf:auto-follow'));
                 var msg = typeof options.successMsg === 'function' ? options.successMsg(formData) : options.successMsg;
                 if (msg) showToast(msg, 'success');
                 if (options.onSuccess) options.onSuccess(formData);

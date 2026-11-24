@@ -2,19 +2,26 @@
  * POST /api/taste/save — guarda los gustos del onboarding (Fase F.7).
  *
  * Body JSON: { genres:number[] (IDs de cine), titles:TasteTitle[], people:TastePerson[] }.
- * Los géneros se parten en cine/TV con `splitGenreIds`. Valida mín/máx en
- * servidor (red de seguridad; el wizard ya lo aplica):
- *   géneros ≥3 · pelis 0 ó 3..10 · series 0 ó 3..10 · personas 0 ó 3..10.
- * Persiste en users/{uid}/taste/current y marca onboarding='done' en el perfil.
+ * Los géneros se parten en cine/TV con `splitGenreIds`. Valida en servidor (red de seguridad; el wizard
+ * ya lo aplica): géneros 1..10 · pelis, series y personas 0..10.
+ * Persiste en `user_state` ('taste') y marca onboarding='done' en el perfil.
+ *
+ * Las personas del paso 4 («Sigue a quienes te interesan») se SIGUEN de verdad (QA 2.3, H16): pasan a
+ * `followed_people`, como el botón «Seguir» de su ficha, y sus estrenos llegan al Radar, al Calendario
+ * y a la campana. Antes solo quedaban en los gustos, que no las usaba nadie. Solo se añaden las que
+ * aún no sigues (así no cambia la fecha de las de antes); quitar a alguien aquí no le deja de seguir.
  */
 import type { APIRoute } from 'astro';
 import { setUserTaste, type TasteTitle, type TastePerson } from '../../../services/profile/userTaste';
 import { setUserProfile } from '../../../services/profile/userProfile';
 import { splitGenreIds } from '../../../utils/titles/tasteGenres';
+import { addFollowedPerson, getAllFollowedPeople } from '../../../services/people/followedPeople';
 
 export const prerender = false;
 
-const MIN = 3, MAX = 10;
+// Géneros: al menos 1 (QA 2.1, H12: antes 3, y pelis/series/personas 0 o ≥3, lo que atascaba el asistente
+// con 1 o 2 elegidos). El «3» queda como sugerencia en la página.
+const MIN_GENRES = 1, MAX = 10;
 
 function json(data: unknown, status = 200): Response {
     return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
@@ -61,14 +68,22 @@ export const POST: APIRoute = async ({ request, locals }) => {
             .filter((p: TastePerson) => { if (seenP.has(p.id)) return false; seenP.add(p.id); return true; })
             .slice(0, MAX);
 
-        // Validación: géneros requeridos (≥3); pelis/series/personas opcionales (0 ó ≥3).
-        if (movieGenres.length < MIN) return json({ ok: false, error: 'Elige al menos 3 géneros' }, 400);
-        if (movieTitles.length > 0 && movieTitles.length < MIN) return json({ ok: false, error: 'Si añades películas, elige al menos 3 (o ninguna)' }, 400);
-        if (tvTitles.length > 0 && tvTitles.length < MIN) return json({ ok: false, error: 'Si añades series, elige al menos 3 (o ninguna)' }, 400);
-        if (people.length > 0 && people.length < MIN) return json({ ok: false, error: 'Si añades actores, elige al menos 3 (o ninguno)' }, 400);
+        // Validación: algún género; películas, series y personas, las que sean (también 1 o 2).
+        if (movieGenres.length < MIN_GENRES) return json({ ok: false, error: 'Elige al menos un género' }, 400);
 
         await setUserTaste({ movieGenres, tvGenres, titles, people });
         await setUserProfile({ onboarding: 'done' });
+
+        // Seguir a las personas elegidas. Si algo falla, los gustos ya están guardados: no se bloquea el final.
+        if (people.length) {
+            try {
+                const already = new Set((await getAllFollowedPeople()).map((p) => Number(p.id)));
+                await Promise.all(people.filter((p) => !already.has(p.id))
+                    .map((p) => addFollowedPerson(String(p.id), p.name, p.profile_path ?? null)));
+            } catch (e) {
+                console.error('[api/taste/save] seguir personas:', (e as Error).message);
+            }
+        }
 
         // Los gustos alimentan «Para ti»: setUserTaste ya avisa a sus cachés (libraryChanges.ts).
 
