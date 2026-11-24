@@ -17,10 +17,12 @@
  *   · `restore: [{ episode, watched_at }]` → «Deshacer» de lo anterior: los vuelve a marcar con su fecha
  *     (`relog: true` los devuelve también al diario, si al desmarcar salieron de él).
  * Sin `action` hace lo de siempre. Devuelve `watchedAt` (el instante guardado) al marcar uno.
+ * Al marcar, `autoFollowed: true` si la serie no estaba en ninguna lista y ha pasado a Siguiendo (QA 2.4).
  */
 import type { APIRoute } from 'astro';
 import {
     markWatchedEpisode, markWatchedEpisodes, unmarkWatchedEpisode, unmarkWatchedEpisodes, restoreWatchedEpisodes, getWatchedProgress,
+    followIfUnlisted,
 } from '../../../services/series/serieLibrary';
 
 export const prerender = false;
@@ -62,7 +64,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
                 return json({ ok: true, removed }, 200);
             }
             const marked = await markWatchedEpisodes(serieId, season, eps);
-            return json({ ok: true, marked }, 200);
+            const autoFollowed = marked > 0 ? await followIfUnlisted(serieId) : false;
+            return json({ ok: true, marked, autoFollowed }, 200);
         }
 
         if (!Number.isInteger(episode) || episode < 1) return json({ ok: false, error: 'Parámetros inválidos' }, 400);
@@ -72,9 +75,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
             return json({ ok: true }, 200);
         }
         await markWatchedEpisode(serieId, season, episode);
-        const progress = await getWatchedProgress(serieId);
+        const [progress, autoFollowed] = await Promise.all([getWatchedProgress(serieId), followIfUnlisted(serieId)]);
         const row = progress?.watched_episodes.find((w) => w.season === season && w.episode === episode) as { watched_at?: string } | undefined;
-        return json({ ok: true, watchedAt: row?.watched_at ?? null }, 200);
+        return json({ ok: true, watchedAt: row?.watched_at ?? null, autoFollowed }, 200);
     } catch (err) {
         console.error('[api/episodes/watched] error:', (err as Error).message);
         return json({ ok: false, error: 'Error al guardar' }, 500);

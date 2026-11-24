@@ -336,16 +336,38 @@ export async function getAllWatchedProgress(): Promise<WatchedProgress[]> {
     return Array.from(bySerie, ([id, rows]) => rowsToProgress(String(id), rows)!);
 }
 
-export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<void> {
+/** Devuelve `true` si lo ha marcado (no estaba visto) y `false` si lo ha desmarcado. */
+export async function toggleWatchedEpisode(serieId: string, season: number, episode: number): Promise<boolean> {
     const inserted = await insertEpisodes(serieId, [{ season, episode }], new Date().toISOString());
     if (inserted.length) {
         // No estaba visto — añadido
         await logEpisode(serieId, season, episode);
+        return true;
     } else {
         // Ya visto — quitar. Corrección de un error: también quitamos su última
         // entrada del diario, para que deje de aparecer en Actividad.
         await deleteEpisodes(serieId, { season, episode });
         await unlogEpisode(serieId, season, episode);
+        return false;
+    }
+}
+
+/**
+ * Marcar episodios de una serie que no está en NINGUNA de tus listas la pasa a Siguiendo (QA 2.4, H31):
+ * antes el progreso se guardaba pero la serie no salía en Siguiendo, ni en «Estás viendo», ni en tu
+ * perfil, y quien no sabía que existe «Seguir» creía que no se había guardado. Si ya está en alguna
+ * lista (Pendientes, Vistas, Favoritos…), no se toca. Devuelve `true` si la ha añadido, para que la
+ * página lo cuente con «Deshacer» (`scripts/series/autoFollow.ts`). Best-effort: nunca rompe el marcado.
+ */
+export async function followIfUnlisted(serieId: string): Promise<boolean> {
+    try {
+        const membership = await titleMembership('tv', serieId);
+        if (membership.size > 0) return false;
+        await addToCollections(serieId, [{ collection: 'SeriesSiguiendo' }]);
+        return true;
+    } catch (e) {
+        console.error('[followIfUnlisted]', (e as Error).message);
+        return false;
     }
 }
 

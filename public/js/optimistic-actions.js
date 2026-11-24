@@ -58,6 +58,9 @@ function submitOptimistic(form, options) {
         fetch(window.location.pathname, { method: 'POST', body: formData })
             .then(function (res) {
                 if (!res.ok && !res.redirected) throw new Error();
+                // La ficha redirige a ?seguida=1 si marcar un episodio pasó la serie a Siguiendo (QA 2.4):
+                // lo cuenta scripts/series/autoFollow.ts, con «Deshacer».
+                if (res.redirected && /[?&]seguida=1\b/.test(res.url)) document.dispatchEvent(new CustomEvent('yf:auto-follow'));
                 var msg = typeof options.successMsg === 'function' ? options.successMsg(formData) : options.successMsg;
                 if (msg) showToast(msg, 'success');
                 if (options.onSuccess) options.onSuccess(formData);

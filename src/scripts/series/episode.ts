@@ -59,6 +59,8 @@ function init(d: Data) {
         });
         const j = await r.json().catch(() => null);
         if (!r.ok || !j?.ok) throw new Error(String(r.status));
+        // La serie no estaba en ninguna lista y ha pasado a Siguiendo: «Ahora sigues X · Deshacer» (QA 2.4).
+        if (j.autoFollowed) document.dispatchEvent(new CustomEvent('yf:auto-follow'));
         return j;
     }
 
