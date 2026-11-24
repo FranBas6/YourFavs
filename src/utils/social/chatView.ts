@@ -742,7 +742,7 @@ export function infoDirectHtml(chat: ChatView): string {
     return `<div class="ms-id">${avatarHtml(o, 72)}<b>${esc(o.name)}</b>`
         + (o.handle ? `<span class="h">@${esc(o.handle)}</span>` : '')
         + arch + (since ? `<span class="s">${esc(since)}</span>` : '') + acts + `</div>`
-        + `<div class="ms-blk"><h5>Esta conversación</h5>${muteSwitchHtml(chat.me.muted)}</div>`
+        + `<div class="ms-blk"><h2>Esta conversación</h2>${muteSwitchHtml(chat.me.muted)}</div>`
         + `<p class="ms-priv">${icon('lock')}Solo la veis ${esc(firstName(o.name))} y tú.</p>`;
 }
 
@@ -835,7 +835,7 @@ export function infoGroupHtml(chat: ChatView): string {
             + `${icon('user-plus')}Añadir personas</button></div>`
         : '';
     return `<div class="ms-id">${gavHtml(groupFaces(chat), 64)}${name}<span class="s">${chat.members.length} de ${GROUP_MAX} personas${full ? ' · completo' : ''}</span>${add}</div>`
-        + `<div class="ms-blk"><h5>Personas<span>${admin ? 'Eres admin' : admins === 1 ? '1 admin' : `${admins} admins`}</span></h5><div class="mbl">${rows}</div></div>`
+        + `<div class="ms-blk"><h2>Personas<span>${admin ? 'Eres admin' : admins === 1 ? '1 admin' : `${admins} admins`}</span></h2><div class="mbl">${rows}</div></div>`
         + `<div class="ms-blk">${muteSwitchHtml(chat.me.muted)}`
         + `<button type="button" class="ms-dgr" data-gm="leave">${icon('log-out')}Salir del grupo</button></div>`;
 }

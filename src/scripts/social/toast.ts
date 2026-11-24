@@ -8,7 +8,7 @@ export function showToast(message: string, type: 'success' | 'error' = 'success'
     if (!box) return;
     const el = document.createElement('div');
     el.className = `toast toast-${type}${undo ? ' so-undo-toast' : ''}`;
-    el.setAttribute('role', 'status');
+    // Sin role propio: #toast-container ya es la región viva (aria-live). Dos regiones = aviso leído dos veces (QA 6.2, H38).
     const text = document.createElement('span');
     text.textContent = message;
     el.appendChild(text);

@@ -253,9 +253,11 @@ const savedOrder = (Astro.locals.user?.homeLayout || []).map((x) => x.key).filte
 const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.includes(k))].filter((k) => !isHidden(k));
 ---
 <Layout title="YourFavs">     
-    <main class="main-container">
+    <div class="main-container">
         {/* 7.1 · Sin sesión: bienvenida (handoff P2) con Tendencias y la banda de Importar. Con sesión, la portada de siempre. */}
         {Astro.locals.user ? (<Fragment>
+        {/* QA 6.2 (H86): con sesión la portada no tenía H1 (el del hero solo sale con «Tendencias»). */}
+        <h1 class="sr-only">Tu inicio en YourFavs</h1>
         <!-- Hero: Brief diario "Hoy en tu cine" (con sesión y señales) + Trending; con
              ambos disponibles, un toggle deja elegir cuál ver (preferencia recordada). -->
         {(brief.signals.length > 0 || heroMovie) ? (
@@ -282,7 +284,7 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                             <div class="hero-backdrop-overlay">
                                 <div class="hero-backdrop-content">
                                     <span class="hero-trending-badge"><Icon name="lucide:trending-up" />En tendencia esta semana</span>
-                                    <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
+                                    <h2 class="hero-backdrop-title">{heroMovie.title}</h2>
                                     <div class="hero-backdrop-meta">
                                         <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average != null ? decimal(heroMovie.vote_average) : ""}</span>
                                         <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
@@ -303,10 +305,10 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
         ) : (
             <div class="hero-section">
                 <div class="hero-content">
-                    <h1 class="hero-title text-coral-red">
+                    <h2 class="hero-title text-coral-red">
                         <span class="hero-icon"><Icon name="lucide:clapperboard" /></span>
                         CATÁLOGO PRINCIPAL
-                    </h1>
+                    </h2>
                     <div class="hero-divider"></div>
                     <p class="hero-description">
                         Descubre miles de películas y series de las mejores plataformas.
@@ -418,5 +420,5 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 )}
             </Welcome>
         )}
-    </main>
+    </div>
 </Layout>

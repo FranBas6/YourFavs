@@ -122,8 +122,8 @@ function init(d: Data) {
             btn.setAttribute('aria-pressed', String(to));
             renderState({ just: to, seenAt: r.watchedAt });
             if (to) document.querySelectorAll<HTMLElement>('.yf-spoil:not(.revealed)').forEach(revealSpoiler);
-            announce(to ? 'Marcado como visto' : 'Desmarcado');
             if (undoable) showToast(to ? 'Marcado como visto' : 'Desmarcado', 'success', () => { void toggle(!to, false); });
+            else announce(to ? 'Marcado como visto' : 'Desmarcado'); // con toast, lo anuncia #toast-container (H38)
         } catch {
             btn.setAttribute('aria-pressed', String(was));
             err.hidden = false;
@@ -154,8 +154,7 @@ function init(d: Data) {
             eps.forEach((x) => setWatched(x, true));
             renderState();
             const msg = `${eps.length} ${eps.length === 1 ? 'episodio marcado' : 'episodios marcados'} como vistos`;
-            announce(msg);
-            showToast(msg);
+            showToast(msg); // se anuncia por #toast-container (H38)
         } catch {
             b.disabled = false;
             err.hidden = false;
@@ -177,7 +176,6 @@ function init(d: Data) {
             if (!r.ok) throw new Error(String(r.status));
             bell.setAttribute('aria-pressed', String(on));
             bell.querySelector('span')!.textContent = on ? 'Aviso de estreno activado' : 'Avisarme del estreno';
-            announce(on ? 'Te avisaremos del estreno' : 'Aviso de estreno quitado');
             showToast(on ? 'Te avisaremos cuando se estrene' : 'Ya no te avisaremos del estreno');
         } catch {
             err.hidden = false;
