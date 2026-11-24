@@ -522,7 +522,7 @@ export function mountChat(root: HTMLElement, chat: ChatView, opts: MountOpts = {
         const ok = await ask({
             icon: 'calendar-x', title: '¿Cancelar el plan?', ok: 'Cancelar plan',
             text: others
-                ? `Se avisará a ${others === 1 ? 'la persona que dijo' : `las ${others} personas que dijeron`} «Voy». La fecha dejará de salir en su Ver pronto; el título se queda.`
+                ? `Se avisará a ${others === 1 ? 'la persona que dijo' : `las ${others} personas que dijeron`} «Voy». La fecha dejará de salir en su lista Lo próximo; el título se queda.`
                 : 'La tarjeta quedará como cancelada en el chat.',
         });
         if (!ok) return;

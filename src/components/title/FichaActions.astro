@@ -206,10 +206,34 @@ const mid = `fa-${mediaType}-${id}`;
                         <input type="hidden" name="id" value={id} /><input type="hidden" name="action" value={s.pronto ? 'remove' : 'add'} /><input type="hidden" name={f('pronto').name} value={f('pronto').value} />
                         <button type="submit" class="btn btn--sm" data-tone="pronto" aria-pressed={s.pronto ? 'true' : 'false'}>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.cal} />
-                            Ver pronto
+                            Lo próximo
                         </button>
                     </form>
                 </>
+            )}
+            {(showLevel || showQueue) && (
+                <div class="fa-mw fa-help">
+                    {/* «¿Qué es cada cosa?» (QA 2.5, H25): seis estados en la barra sin explicar en qué se diferencian. */}
+                    <button type="button" class="btn btn--ghost btn--sm btn--icon" aria-label="¿Qué es cada cosa?" title="¿Qué es cada cosa?" aria-haspopup="dialog" aria-expanded="false" aria-controls={`${mid}-help`} data-fa-menu>
+                        <span class="fa-q" aria-hidden="true">?</span>
+                    </button>
+                    <div class="fa-menu fa-help-pop" id={`${mid}-help`} role="dialog" aria-label="Qué es cada cosa" hidden>
+                        <p class="fa-help-h">¿Qué es cada cosa?</p>
+                        <ul>
+                            {isMovie ? (
+                                <li style="--tone: var(--accent)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.play}</svg>`} /><span><b>Empezar a ver</b>La estás viendo ahora: sale en «Estás viendo» de tu portada hasta que la termines.</span></li>
+                            ) : (
+                                <li style="--tone: var(--a-seguir)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.eye}</svg>`} /><span><b>Seguir</b>La estás viendo: llevamos la cuenta de los episodios y te decimos cuál te toca.</span></li>
+                            )}
+                            <li style="--tone: var(--a-visto)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.check}</svg>`} /><span><b>Vista</b>Ya la has visto.</span></li>
+                            <li style="--tone: var(--a-like)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.heart}</svg>`} /><span><b>Me gusta</b>La has visto y te gustó.</span></li>
+                            <li style="--tone: var(--a-fav)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.crown}</svg>`} /><span><b>Favorita</b>De las que más te gustan; en Favoritos las ordenas en tu ranking.</span></li>
+                            {showQueue && <li style="--tone: var(--a-pend)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.clock}</svg>`} /><span><b>Pendiente</b>Quieres verla algún día, sin prisa.</span></li>}
+                            {showQueue && <li style="--tone: var(--a-pronto)"><Fragment set:html={`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${FI.cal}</svg>`} /><span><b>Lo próximo</b>De lo siguiente que vas a ver; en su lista la ordenas tú.</span></li>}
+                        </ul>
+                        <p class="fa-help-f">Me gusta y Favorita ya cuentan como vista. Al verla, sale sola de Pendientes y de Lo próximo.</p>
+                    </div>
+                </div>
             )}
             {!isMovie && (
                 <form method="POST" class="fa-sec" data-reload>
@@ -245,6 +269,12 @@ const mid = `fa-${mediaType}-${id}`;
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.more} />
                 </button>
                 <div class="fa-menu is-right" id={`${mid}-more`} role="menu" aria-label="Más acciones" hidden>
+                    {(showLevel || showQueue) && (
+                        <button type="button" class="fa-mi fa-m-only" role="menuitem" data-fa-help-open={`${mid}-help`}>
+                            <span class="fa-q fa-q-mi" aria-hidden="true">?</span>
+                            <span>¿Qué es cada cosa?</span>
+                        </button>
+                    )}
                     <button type="button" class="fa-mi js-saveto fa-m-only" role="menuitem" data-mt={mediaType} data-id={id} data-title={title} data-poster={poster} data-collections-only="1">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={FI.folder} />
                         <span>Guardar en una colección</span>
@@ -383,6 +413,16 @@ const mid = `fa-${mediaType}-${id}`;
                 }
                 // Una opción del menú: se cierra DESPUÉS, para que los selectores que se colocan
                 // junto a ella (diario, colecciones) lean su posición antes de que se oculte.
+                // «¿Qué es cada cosa?» desde «···» (móvil): se abre después de cerrar el menú.
+                var help = t.closest && t.closest('[data-fa-help-open]');
+                if (help) {
+                    setTimeout(function () {
+                        closeAll();
+                        var hb = document.querySelector('[aria-controls="' + help.getAttribute('data-fa-help-open') + '"]');
+                        if (hb) open(hb);
+                    }, 0);
+                    return;
+                }
                 if (t.closest && t.closest('.fa-menu [role="menuitem"]')) { setTimeout(closeAll, 0); return; }
                 if (!(t.closest && t.closest('.fa-menu'))) closeAll();
             });
@@ -463,6 +503,16 @@ const mid = `fa-${mediaType}-${id}`;
     .fa-mi.is-dgr svg { color: currentColor; }
     [data-theme="dark"] .fa-mi.is-dgr { color: var(--stamp-red-ink); }
 
+    /* «¿Qué es cada cosa?» (QA 2.5) */
+    .fa-q { font: 700 15px/1 var(--font); }
+    .fa-q-mi { width: 16px; text-align: center; color: var(--text-3); }
+    .fa-help-pop { min-width: 300px; padding: 12px 14px; }
+    .fa-help-h { margin: 0 0 8px; font: 600 var(--fs-ui) var(--font); color: var(--text); }
+    .fa-help-pop ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+    .fa-help-pop li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 9px; align-items: start; font-size: var(--fs-meta); line-height: 1.45; color: var(--text-2); }
+    .fa-help-pop li svg { width: 16px; height: 16px; margin-top: 1px; color: var(--tone); }
+    .fa-help-pop li b { display: block; font: 600 var(--fs-ui) var(--font); color: var(--text); }
+    .fa-help-f { margin: 10px 0 0; padding-top: 9px; border-top: 1px solid var(--border); font-size: var(--fs-meta); line-height: 1.45; color: var(--text-3); }
     /* Línea de estado */
     .fa-cap { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin-top: 10px; font-size: var(--fs-meta); color: var(--text-3); }
     .fa-grp { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
@@ -501,6 +551,10 @@ const mid = `fa-${mediaType}-${id}`;
         .fa-more { flex: 0 0 44px; }
         .fa-more .btn--icon { border-color: var(--border-strong); }
         .fa-cap { margin-top: 12px; }
+        /* «?»: en móvil va en «···» (la fila no da para más) y la explicación sale como hoja abajo. */
+        .fa-help { display: contents; }
+        .fa-help > .btn { display: none; }
+        .fa-help-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: calc(84px + env(safe-area-inset-bottom)); min-width: 0; max-width: none; z-index: 1000; max-height: calc(100vh - 140px); overflow: auto; }
     }
     @media (min-width: 1024px) {
         .lvl-b { height: 34px; padding: 0 11px; }

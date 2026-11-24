@@ -77,12 +77,12 @@ export async function buildPersonalIndex(): Promise<PersonalIndexItem[]> {
     const movieAgg = aggregate([
         { items: movFavs, label: 'Favoritos' }, { items: movLike, label: 'Me gusta' },
         { items: movVistos, label: 'Vistos' }, { items: movPend, label: 'Pendientes' },
-        { items: movVerPronto, label: 'Ver pronto' },
+        { items: movVerPronto, label: 'Lo próximo' },
     ], 'movie');
     const tvAgg = aggregate([
         { items: tvFavs, label: 'Favoritos' }, { items: tvSig, label: 'Siguiendo' },
         { items: tvLike, label: 'Me gusta' }, { items: tvVistos, label: 'Vistos' },
-        { items: tvPend, label: 'Pendientes' }, { items: tvVerPronto, label: 'Ver pronto' },
+        { items: tvPend, label: 'Pendientes' }, { items: tvVerPronto, label: 'Lo próximo' },
         { items: tvAbandonadas, label: 'Abandonadas' },
     ], 'tv');
 

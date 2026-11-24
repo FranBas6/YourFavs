@@ -1,14 +1,14 @@
 var LIST_NAMES = {
     favorites: 'Favoritos', pendientes: 'Pendientes', vistas: 'Vistas',
-    verPronto: 'Ver Pronto', liked: 'Me gusta', siguiendo: 'Siguiendo',
-    favs: 'Favoritos', verpronto: 'Ver Pronto', viendo: 'Viendo', abandonada: 'Abandonadas'
+    verPronto: 'Lo próximo', liked: 'Me gusta', siguiendo: 'Siguiendo',
+    favs: 'Favoritos', verpronto: 'Lo próximo', viendo: 'Viendo', abandonada: 'Abandonadas'
 };
 
 var TEXT_TOGGLES = {
     'Añadir a Favoritos': 'Quitar de Favoritos',
     'Quitar de Favoritos': 'Añadir a Favoritos',
-    'Ver Pronto': 'Quitar de Ver Pronto',
-    'Quitar de Ver Pronto': 'Ver Pronto',
+    'Lo próximo': 'Quitar de Lo próximo',
+    'Quitar de Lo próximo': 'Lo próximo',
     'Marcar Pendiente': 'Quitar de Pendientes',
     'Quitar de Pendientes': 'Marcar Pendiente',
     'Marcar como Vista': 'Quitar de Vistas',

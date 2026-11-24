@@ -97,7 +97,7 @@ const yearOf = (d?: string | null) => (d ? String(d).slice(0, 4) : '');
 const seriesOrder = seriesVerPronto.map((s) => ({ id: String(s.id), title: s.name, year: yearOf(s.first_air_date), poster: posterUrl(s.poster_path, 'w92') || '/placeholder.jpg' }));
 const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.title, year: yearOf(m.release_date), poster: posterUrl(m.poster_path, 'w92') || '/placeholder.jpg' }));
 ---
-<Layout title="Ver Pronto">
+<Layout title="Lo próximo">
     <ListsNav slot="aside" />
     <section class="px-1 sm:py-8">
         {errorMessage && (
@@ -115,7 +115,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
             </div>
         )}
 
-        <ListTitle title="Ver pronto" subtitle="Contenido que quieres ver próximamente" />
+        <ListTitle title="Lo próximo" subtitle="Lo siguiente que vas a ver, en el orden que tú elijas" />
         {hasContent && (
             <nav class="lh-seg mb-5" aria-label="Tipo de título">
                 <a href="?filter=todos" aria-current={showAll ? 'page' : undefined}>Todo</a>
@@ -166,7 +166,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
                     </div>
 
                     {seriesVerPronto.length === 0 && (
-                        <EmptyState size="sm" title="No tienes series para ver pronto">
+                        <EmptyState size="sm" title="No tienes series en Lo próximo">
                             <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}
@@ -213,7 +213,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
                     </div>
 
                     {peliculasVerPronto.length === 0 && (
-                        <EmptyState size="sm" title="No tienes películas para ver pronto">
+                        <EmptyState size="sm" title="No tienes películas en Lo próximo">
                             <a slot="cta" href="/catalogo/tendencias" class="btn btn--sm">Explorar tendencias</a>
                         </EmptyState>
                     )}

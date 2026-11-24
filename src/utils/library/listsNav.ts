@@ -27,7 +27,7 @@ export const LISTS_NAV: ListsNavGroup[] = [
             { href: '/mislistas/megusta', label: 'Me gusta', icon: 'heart', tone: 'like', countKey: 'megusta' },
             { href: '/mislistas/vistos', label: 'Vistos', icon: 'check', tone: 'visto', countKey: 'vistos' },
             { href: '/mislistas/pendientes', label: 'Pendientes', icon: 'clock', tone: 'pend', countKey: 'pendientes' },
-            { href: '/mislistas/verpronto', label: 'Ver pronto', icon: 'cal', tone: 'pronto', countKey: 'verpronto' },
+            { href: '/mislistas/verpronto', label: 'Lo próximo', icon: 'cal', tone: 'pronto', countKey: 'verpronto' },
             { href: '/mislistas/siguiendo', label: 'Siguiendo', icon: 'eye', tone: 'seguir', countKey: 'siguiendo' },
             { href: '/mislistas/colecciones', label: 'Colecciones', icon: 'folder', tone: 'tint', countKey: 'colecciones' },
             // Sagas que sigues y «Para seguir» (2026-11-23).

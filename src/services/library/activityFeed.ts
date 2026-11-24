@@ -35,14 +35,14 @@ const COLLECTIONS: { name: string; key: keyof LibrarySnapshot; type: 'movie' | '
     { name: 'MovieFavs', key: 'movFavs', type: 'movie', action: 'Añadida a Favoritos' },
     { name: 'MoviesPendientes', key: 'movPend', type: 'movie', action: 'Marcada como pendiente' },
     { name: 'MoviesVistas', key: 'movVistos', type: 'movie', action: 'Marcada como vista' },
-    { name: 'MoviesVerPronto', key: 'movVerPronto', type: 'movie', action: 'Añadida a Ver Pronto' },
+    { name: 'MoviesVerPronto', key: 'movVerPronto', type: 'movie', action: 'Añadida a Lo próximo' },
     { name: 'LikedMovies', key: 'movLike', type: 'movie', action: 'Me gusta' },
     { name: 'SeriesFavs', key: 'tvFavs', type: 'serie', action: 'Añadida a Favoritos' },
     { name: 'SeriesPendiente', key: 'tvPend', type: 'serie', action: 'Marcada como pendiente' },
     { name: 'SeriesVistas', key: 'tvVistos', type: 'serie', action: 'Marcada como vista' },
     { name: 'SeriesSiguiendo', key: 'tvSig', type: 'serie', action: 'Empezaste a seguir' },
     { name: 'LikedSeries', key: 'tvLike', type: 'serie', action: 'Me gusta' },
-    { name: 'SeriesVerPronto', key: 'tvVerPronto', type: 'serie', action: 'Añadida a Ver Pronto' },
+    { name: 'SeriesVerPronto', key: 'tvVerPronto', type: 'serie', action: 'Añadida a Lo próximo' },
 ];
 
 /**
@@ -318,7 +318,7 @@ const REMOVE_LABEL: Record<string, string> = {
     MovieFavs: 'Quitada de Favoritos', SeriesFavs: 'Quitada de Favoritos',
     MoviesPendientes: 'Quitada de Pendientes', SeriesPendiente: 'Quitada de Pendientes',
     MoviesVistas: 'Quitada de Vistas', SeriesVistas: 'Quitada de Vistas',
-    MoviesVerPronto: 'Quitada de Ver Pronto', SeriesVerPronto: 'Quitada de Ver Pronto',
+    MoviesVerPronto: 'Quitada de Lo próximo', SeriesVerPronto: 'Quitada de Lo próximo',
     LikedMovies: 'Quitada de Me gusta', LikedSeries: 'Quitada de Me gusta',
 };
 
