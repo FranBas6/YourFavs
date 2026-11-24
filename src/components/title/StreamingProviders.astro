@@ -191,7 +191,7 @@ const clientPayload = {
                         {/* Filas grandes: lo que puedes ver YA sin pagar nada más. */}
                         {mine.length > 0 && (
                             <div>
-                                <p class="text-[10px] font-mono font-semibold text-emerald-600 uppercase tracking-[.12em] mb-1.5">✓ En tus plataformas</p>
+                                <p class="text-[10px] font-mono font-semibold text-emerald-700 uppercase tracking-[.12em] mb-1.5">✓ En tus plataformas</p>
                                 <div class="space-y-2">
                                     {mine.map((p) => (
                                         <a href={linkFor(p, c.code)} target="_blank" rel="noopener"
@@ -319,7 +319,7 @@ const clientPayload = {
     .cov-badge {
         flex-shrink: 0; padding: 1px 6px; border-radius: 999px;
         font-family: var(--font-mono, monospace); font-size: 10px; font-weight: 600;
-        background: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb;
+        background: #f3f4f6; color: #5F6673; border: 1px solid #e5e7eb;
     }
     .cov-badge.is-partial { background: #fffbeb; color: #b45309; border-color: #fde68a; }
 </style>
@@ -427,7 +427,7 @@ const clientPayload = {
 
                     var inner = '';
                     if (isMine.length) {
-                        inner += section('✓ En tus plataformas', 'text-emerald-600',
+                        inner += section('✓ En tus plataformas', 'text-emerald-700',
                             '<div class="space-y-2">' + isMine.map(function (p) { return rowBig(p, href(p), 'mine', badge(p)); }).join('') + '</div>');
                     } else if (knowsMine) {
                         inner += '<p class="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">'
@@ -437,7 +437,7 @@ const clientPayload = {
                     if (others.length) {
                         inner += knowsMine
                             ? section('Con otra suscripción', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + others.map(function (p) { return chipSmall(p, href(p), badge(p)); }).join('') + '</div>')
-                            : section('✓ Incluido en suscripción', 'text-emerald-600', '<div class="space-y-2">' + others.map(function (p) { return rowBig(p, href(p), 'other', badge(p)); }).join('') + '</div>');
+                            : section('✓ Incluido en suscripción', 'text-emerald-700', '<div class="space-y-2">' + others.map(function (p) { return rowBig(p, href(p), 'other', badge(p)); }).join('') + '</div>');
                     }
                     if (freeList.length) {
                         inner += section('Gratis', 'text-gray-400', '<div class="flex flex-wrap gap-2">' + freeList.map(function (p) { return chipSmall(p, href(p), p.type === 'ads' ? '<span class="text-[10px] text-gray-400 whitespace-nowrap">con anuncios</span>' : ''); }).join('') + '</div>');

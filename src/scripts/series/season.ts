@@ -106,8 +106,8 @@ function init(s: TpState) {
             apply(Object.fromEntries(eps.map((e) => [e, now])), []);
             render(!!btn?.matches('[data-tp-all]'));
             const msg = eps.length === 1 ? `E${eps[0]} marcado como visto` : `${plural(eps.length, 'episodio marcado', 'episodios marcados')} como vistos`;
-            announce(msg);
             if (undoable) showToast(msg, 'success', () => { void unmarkMany(eps, null, { unlog: true, undoable: false }); });
+            else announce(msg); // con toast, lo anuncia #toast-container (H38)
         });
     }
 
@@ -121,8 +121,8 @@ function init(s: TpState) {
             const msg = !o.undoable ? 'Deshecho'
                 : eps.length === 1 ? `E${eps[0]} desmarcado`
                 : s.season === 0 ? 'Especiales desmarcados' : 'Temporada desmarcada';
-            announce(msg);
             if (o.undoable && removed.length) showToast(msg, 'success', () => { void restore(removed, o.unlog); });
+            else announce(msg);
         });
     }
 
@@ -177,7 +177,6 @@ function init(s: TpState) {
             if (!r.ok) throw new Error(String(r.status));
             s.notif = on;
             render();
-            announce(on ? 'Te avisaremos del estreno' : 'Aviso de estreno quitado');
             showToast(on ? 'Te avisaremos cuando se estrene' : 'Ya no te avisaremos del estreno');
         } catch {
             err.hidden = false;

@@ -1,5 +1,6 @@
 ---
 import Header from "../components/shell/Header.astro";
+import { SITE_DESCRIPTION as DEFAULT_DESCRIPTION, SITE_TAGLINE } from "../utils/core/siteCopy";
 import CommandPalette from "../components/shell/CommandPalette.astro";
 import AuthModal from "../components/shell/AuthModal.astro";
 import SaveToPopover from "../components/shell/SaveToPopover.astro";
@@ -45,7 +46,7 @@ interface Props {
 
 const {
     title,
-    description = "Tu plataforma favorita para descubrir películas y series",
+    description = DEFAULT_DESCRIPTION,
     ogImage,
     ogType = "website",
     robots,
@@ -56,6 +57,16 @@ const {
 // Imagen al compartir (QA 1.2, H73/H04): WhatsApp, X, Telegram o Slack necesitan una URL ABSOLUTA. Sin
 // imagen propia de la página, la de la marca (public/og-image.png, 1200×630; antes apuntaba a un archivo
 // que no existía). Las de TMDB ya llegan absolutas y `new URL` las deja igual.
+// Títulos y descripciones (QA 6.3, H03/H47). Cada página pasa su nombre («Cartelera», «El club de la
+// lucha») y aquí se le añade « · YourFavs», una sola vez y con el mismo separador en toda la web (antes,
+// unas lo llevaban con «—», otras con «|» y la mayoría sin él). La que empieza por «YourFavs» (portada)
+// se deja tal cual. La descripción se corta a ~160 caracteres por palabra: la de TMDB puede ser larguísima.
+const BRAND = 'YourFavs';
+const pageTitle = title.startsWith(BRAND) ? title : `${title.replace(/\s*[—|·-]\s*YourFavs\s*$/, '')} · ${BRAND}`;
+const ogTitle = title.startsWith(BRAND) ? title : title.replace(/\s*[—|·-]\s*YourFavs\s*$/, '');
+const clean = description.replace(/\s+/g, ' ').trim();
+const metaDescription = clean.length <= 160 ? clean : `${clean.slice(0, 157).replace(/\s+\S*$/, '')}…`;
+
 const shareImage = new URL(ogImage || '/og-image.png', Astro.url.origin).href;
 const shareUrl = ogUrl || new URL(Astro.url.pathname, Astro.url.origin).href;
 
@@ -75,28 +86,28 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
 <head>
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <!-- Favicon (rediseño, Fase 8 · 8.1): la claqueta de siempre, redibujada en SVG por Claude Design
+    {/* Favicon (rediseño, Fase 8 · 8.1): la claqueta de siempre, redibujada en SVG por Claude Design
          y recortada a su tamaño (antes, `logo_yourfavs.png` a 1024 px con la marca en la mitad del
          lienzo: en la pestaña salía diminuta). Los PNG de 32 y 16 son para navegadores sin SVG; los que
          lo aceptan se quedan con el SVG. Los iconos de la app instalada (apple-touch-icon y manifest)
-         van aparte, aquí debajo, y no cambian. -->
+         van aparte, aquí debajo, y no cambian. */}
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png"/>
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
     <meta name="generator" content={Astro.generator}/>
-    <meta name="description" content={description}/>
+    <meta name="description" content={metaDescription}/>
     <meta name="theme-color" content="#2B63D9"/>
     {canonical && <link rel="canonical" href={Astro.url.href}/>}
-    <!-- App instalable. El `apple-touch-icon` de aquí abajo ya se enlazaba, pero el archivo
+    {/* App instalable. El `apple-touch-icon` de aquí abajo ya se enlazaba, pero el archivo
          NO existía: era un 404, y por eso iOS ponía una captura de la página en la pantalla
-         de inicio en vez del logo. Lo genera `scripts/build-pwa-icons.mjs`. -->
+         de inicio en vez del logo. Lo genera `scripts/build-pwa-icons.mjs`. */}
     <link rel="apple-touch-icon" href="/apple-touch-icon.png"/>
     <link rel="manifest" href="/manifest.webmanifest"/>
     <meta name="apple-mobile-web-app-capable" content="yes"/>
     <meta name="mobile-web-app-capable" content="yes"/>
-    <!-- `default` y no `black-translucent` a propósito: el translúcido mete el contenido bajo
+    {/* `default` y no `black-translucent` a propósito: el translúcido mete el contenido bajo
          la barra de estado, y el layout no tiene padding superior de safe-area (el tabbar sí
-         lo tiene abajo). Con `default`, la cabecera azul empieza donde debe. -->
+         lo tiene abajo). Con `default`, la cabecera azul empieza donde debe. */}
     <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
     <meta name="apple-mobile-web-app-title" content="YourFavs"/>
     <meta property="og:site_name" content="YourFavs"/>
@@ -104,7 +115,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <meta property="og:image" content={shareImage}/>
     {!ogImage && <meta property="og:image:width" content="1200"/>}
     {!ogImage && <meta property="og:image:height" content="630"/>}
-    {!ogImage && <meta property="og:image:alt" content="YourFavs · Lleva todo lo que ves, episodio a episodio"/>}
+    {!ogImage && <meta property="og:image:alt" content={`YourFavs · ${SITE_TAGLINE}`}/>}
     <meta name="twitter:card" content="summary_large_image"/>
     <meta name="twitter:title" content={title}/>
     <meta name="twitter:description" content={description}/>
@@ -131,12 +142,12 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
             } catch {}
         })();
     </script>
-    <meta property="og:title" content={title}/>
-    <meta property="og:description" content={description}/>
+    <meta property="og:title" content={ogTitle}/>
+    <meta property="og:description" content={metaDescription}/>
     <meta property="og:type" content={ogType}/>
     <meta property="og:url" content={shareUrl}/>
     {robots && <meta name="robots" content={robots}/>}
-    <title>{title}</title>
+    <title>{pageTitle}</title>
 </head>
 <body id="top" class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins" data-taste-hint={tasteHintEligible ? 'eligible' : ''}>
 <a href="#content" class="skip-link">Saltar al contenido</a>
@@ -158,7 +169,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
         </div>
     ) : <slot/>}
 
-    <!-- Botón flotante para volver arriba -->
+    {/* Botón flotante para volver arriba */}
     <div class="back-to-top-container">
         <a href="#top" title="Subir al inicio" aria-label="Subir al inicio" class="back-to-top">
             <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
@@ -181,12 +192,12 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
         </div>
     </div>
     {/* Páginas legales (QA 4.1, H59): antes el pie solo tenía «Acerca de». */}
-    <nav class="mt-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-xs text-gray-500" aria-label="Legal">
-        {LEGAL_PAGES.map((p) => <a href={p.href} class="hover:text-blue-600 transition">{p.label}</a>)}
-        <a href={`mailto:${LEGAL.email}`} class="hover:text-blue-600 transition">Contacto</a>
+    <nav class="mt-4 flex flex-wrap justify-center sm:justify-start gap-x-4 text-xs text-gray-500" aria-label="Legal">
+        {LEGAL_PAGES.map((p) => <a href={p.href} class="inline-flex items-center min-h-[24px] py-1 hover:text-blue-600 transition">{p.label}</a>)}
+        <a href={`mailto:${LEGAL.email}`} class="inline-flex items-center min-h-[24px] py-1 hover:text-blue-600 transition">Contacto</a>
     </nav>
-    <!-- Atribución que exigen los términos de TMDB (logo menos prominente que el nuestro + este aviso)
-         y la fuente de «Dónde ver» (JustWatch). -->
+    {/* Atribución que exigen los términos de TMDB (logo menos prominente que el nuestro + este aviso)
+         y la fuente de «Dónde ver» (JustWatch). */}
     <p class="mt-4 text-xs text-gray-400 text-center sm:text-left">
         Este producto usa la API de TMDB pero no está avalado ni certificado por TMDB.
         Disponibilidad en plataformas por <a href="https://www.justwatch.com/" target="_blank" rel="noopener" class="underline hover:text-blue-600">JustWatch</a>.

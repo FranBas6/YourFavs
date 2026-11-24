@@ -144,7 +144,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         <div class="yf-adv-panel">
             <div class="yf-adv-handle" aria-hidden="true"></div>
             <div class="yf-adv-head">
-                <h3>Filtros avanzados</h3>
+                <h2>Filtros avanzados</h2>
                 {hasActive && <a href={buildUrl(clearAll)} class="yf-adv-clear" data-adv-clear>✕ Borrar todo</a>}
             </div>
 
@@ -280,7 +280,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         </div>
     )}
 
-    <!-- Barra "Aplicar" — solo visible en modo hoja (móvil). En 2.3b mostrará el nº de resultados. -->
+    {/* Barra "Aplicar" — solo visible en modo hoja (móvil). En 2.3b mostrará el nº de resultados. */}
     <div class="yf-adv-applybar">
         <button type="button" class="yf-adv-apply-btn" data-adv-apply>Aplicar</button>
     </div>
@@ -558,16 +558,16 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         display: flex; flex-direction: column; gap: 18px;
     }
     .yf-adv-head { display: flex; align-items: center; justify-content: space-between; }
-    .yf-adv-head h3 { margin: 0; font-size: 15px; font-weight: 700; color: var(--text); }
+    .yf-adv-head h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--text); }
     .yf-adv-clear { font-size: 12.5px; font-weight: 500; color: var(--text-3); text-decoration: none; }
-    .yf-adv-clear:hover { color: var(--accent); }
+    .yf-adv-clear:hover { color: var(--accent-ink); }
 
     .yf-filter-group { display: flex; flex-direction: column; gap: 8px; }
     .yf-group-label {
         margin: 0; font-family: var(--font-mono); font-size: 10.5px;
         letter-spacing: .12em; text-transform: uppercase; color: var(--text-3);
     }
-    .yf-group-val { color: var(--accent); margin-left: 6px; }
+    .yf-group-val { color: var(--accent-ink); margin-left: 6px; }
 
     /* Chips */
     .yf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -597,13 +597,23 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
 
     /* Slider de nota */
     .yf-rating-slider { display: flex; align-items: center; gap: 12px; }
+    /* QA 6.2 (H84): el control mide 44 px de alto (zona táctil) y la barra de color de 6 px se pinta
+       en la pista; antes todo el control medía 6 px y era casi imposible acertar con el dedo. */
     .yf-rating-slider input[type="range"] {
         -webkit-appearance: none; appearance: none;
-        flex: 1; height: 6px; border-radius: 999px; outline: none;
+        flex: 1; height: 44px; background: transparent; cursor: pointer;
+    }
+    .yf-rating-slider input[type="range"]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
+    .yf-rating-slider input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px; border-radius: 999px;
+        background: linear-gradient(90deg, #9CA3AF 0%, var(--rating-low) 45%, var(--rating-med) 72%, var(--rating-high) 100%);
+    }
+    .yf-rating-slider input[type="range"]::-moz-range-track {
+        height: 6px; border-radius: 999px;
         background: linear-gradient(90deg, #9CA3AF 0%, var(--rating-low) 45%, var(--rating-med) 72%, var(--rating-high) 100%);
     }
     .yf-rating-slider input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none; appearance: none;
+        -webkit-appearance: none; appearance: none; margin-top: -6px;
         width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: 2px solid var(--accent); cursor: pointer;
         box-shadow: var(--sh-sm);
@@ -631,7 +641,7 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
         font-size: 12px; font-weight: 500; color: var(--text-3);
         text-decoration: none; padding: 5px 8px;
     }
-    .yf-activechip-clear:hover { color: var(--accent); }
+    .yf-activechip-clear:hover { color: var(--accent-ink); }
 
     /* ── 2.3a · Filtros como hoja inferior en móvil (batch + Aplicar) ── */
     .yf-adv-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 1290; }

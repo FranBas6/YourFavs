@@ -152,3 +152,17 @@ details[open] > summary .sr-chev { transform: rotate(180deg); }
     .sr-legend-k { margin-left: 0; }
 }
 .sr-more { font: 600 var(--fs-micro) var(--font); color: var(--text-3); align-self: center; line-height: 12px; }
+
+/* QA 6.2 · Enlaces superpuestos (scripts/series/overlayLinks.ts): el enlace va fuera del <summary> y se
+   coloca encima del título de la temporada o del nombre del episodio. Es invisible (se ve el texto de
+   debajo); el hover y el foco reproducen lo que hacía el enlace de antes. */
+.ovl-wrap { position: relative; }
+.ovl-link {
+    position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 1;
+    color: transparent; overflow: hidden; white-space: nowrap; text-decoration: none; border-radius: 4px;
+}
+.ovl-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ovl-wrap:has(> .ovl-link:hover) > details > summary { background: var(--bg-tint); }
+.ovl-wrap:has(> .ovl-link:hover) .sr-tl b { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--border-strong); }
+.ovl-wrap:has(> .ovl-link:hover) .sr-tl svg { color: var(--text); transform: translateX(2px); }
+.ovl-wrap:has(> .ovl-link:hover) .sr-el-name { text-decoration: underline; text-underline-offset: 2px; }

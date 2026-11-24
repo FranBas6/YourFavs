@@ -142,7 +142,7 @@ const notificationGroups = Array.from(groupsMap.entries())
 
         <ListTitle title="Calendario" subtitle="Estrenos de películas y episodios de tus series" />
 
-        <!-- Toggle vista + Suscripción ICS -->
+        {/* Toggle vista + Suscripción ICS */}
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
             <nav class="lh-seg self-start" aria-label="Vista del calendario">
                 <a href={buildViewUrl('grid')}
@@ -163,13 +163,13 @@ const notificationGroups = Array.from(groupsMap.entries())
             </button>
         </div>
 
-        <!-- Calendario (vista grid) -->
+        {/* Calendario (vista grid) */}
         {view === 'grid' && (
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
-            <!-- Header del mes -->
+            {/* Header del mes */}
             <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
                 <a href={`/mislistas/calendario?year=${prevYear}&month=${prevMonth}`}
-                   class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                   aria-label="Mes anterior" class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -178,14 +178,14 @@ const notificationGroups = Array.from(groupsMap.entries())
                     {monthNames[month - 1]} {year}
                 </h2>
                 <a href={`/mislistas/calendario?year=${nextYear}&month=${nextMonth}`}
-                   class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                   aria-label="Mes siguiente" class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                     </svg>
                 </a>
             </div>
 
-            <!-- Días de la semana -->
+            {/* Días de la semana */}
             <div class="grid grid-cols-7 border-b border-gray-100">
                 {dayNames.map(day => (
                     <div class="py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -194,7 +194,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                 ))}
             </div>
 
-            <!-- Grid del calendario -->
+            {/* Grid del calendario */}
             <div class="grid grid-cols-7">
                 {calendarCells.map((cell) => {
                     const isToday = cell.date === today;
@@ -255,7 +255,7 @@ const notificationGroups = Array.from(groupsMap.entries())
                 })}
             </div>
 
-            <!-- Leyenda -->
+            {/* Leyenda */}
             <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 px-4 py-3 border-t border-gray-100 text-xs text-gray-500">
                 {uid && SOCIAL_PHASE.messages && (
                     <span class="cal-lg-pl flex items-center gap-1.5">
@@ -278,19 +278,19 @@ const notificationGroups = Array.from(groupsMap.entries())
         </div>
         )}
 
-        <!-- Calendario (vista lista) -->
+        {/* Calendario (vista lista) */}
         {view === 'list' && (
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-8">
                 <div class="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-100">
                     <a href={`/mislistas/calendario?year=${prevYear}&month=${prevMonth}&view=list`}
-                       class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                       aria-label="Mes anterior" class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
                         </svg>
                     </a>
                     <h2 class="text-lg sm:text-xl font-semibold text-gray-800">{monthNames[month - 1]} {year}</h2>
                     <a href={`/mislistas/calendario?year=${nextYear}&month=${nextMonth}&view=list`}
-                       class="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
+                       aria-label="Mes siguiente" class="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-3 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                         </svg>
@@ -358,7 +358,7 @@ const notificationGroups = Array.from(groupsMap.entries())
             </div>
         )}
 
-        <!-- Detalle del día seleccionado -->
+        {/* Detalle del día seleccionado */}
         <div id="day-detail-panel" class="mb-6" style="display:none;">
             <div class="flex items-center justify-between mb-3">
                 <h2 id="day-detail-title" class="text-lg font-semibold text-gray-800"></h2>
@@ -367,7 +367,7 @@ const notificationGroups = Array.from(groupsMap.entries())
             <div id="day-detail-list" class="space-y-2"></div>
         </div>
 
-        <!-- Tus notificaciones -->
+        {/* Tus notificaciones */}
         <div>
             <h2 class="text-xl font-semibold text-gray-800 flex items-center gap-2 mb-4">
                 <span class="w-1 h-6 bg-amber-500 rounded-full"></span>

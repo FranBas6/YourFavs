@@ -80,7 +80,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
     <div class="pf-backdrop" aria-hidden="true"></div>
     <div class="pf-panel absolute right-0 top-full mt-2 z-50 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 p-4 space-y-4 shadow-lg">
         <div class="pf-handle" hidden aria-hidden="true"></div>
-        <!-- Tipo -->
+        {/* Tipo */}
         {!hideType && <div class="flex flex-wrap gap-1.5 justify-center">
             {typeFilters.map(f => (
                 <a href={buildUrl(pageUrl, { filter: f.key, search: searchQuery, genre: genreFilter, platforms: platformFilter, tags: tagsFilter })}
@@ -96,7 +96,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             ))}
         </div>}
 
-        <!-- Búsqueda -->
+        {/* Búsqueda */}
         <form method="get" class="relative">
             <input type="hidden" name="filter" value={filter}/>
             {genreFilter && <input type="hidden" name="genre" value={genreFilter}/>}
@@ -115,7 +115,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             />
         </form>
 
-        <!-- Géneros (multi-selección) -->
+        {/* Géneros (multi-selección) */}
         {availableGenres.length > 0 && (
             <div>
                 <p class="text-xs text-gray-400 mb-2">Géneros {activeGenres.length > 0 && `(${activeGenres.length})`}</p>
@@ -140,7 +140,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             </div>
         )}
 
-        <!-- Plataformas -->
+        {/* Plataformas */}
         <div>
             <p class="text-xs text-gray-400 mb-2">Plataformas {activePlatforms.length > 0 && `(${activePlatforms.length})`}</p>
             <div class="flex flex-wrap gap-1.5">
@@ -165,7 +165,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             </div>
         </div>
 
-        <!-- Tags personales -->
+        {/* Tags personales */}
         {availableTags.length > 0 && (
             <div>
                 <p class="text-xs text-gray-400 mb-2">Tus tags {activeTags.length > 0 && `(${activeTags.length})`}</p>
@@ -183,7 +183,7 @@ const activeCount = (searchQuery ? 1 : 0) + activeGenres.length + activePlatform
             </div>
         )}
 
-        <!-- Limpiar filtros -->
+        {/* Limpiar filtros */}
         {hasActiveFilters && (
             <div class="flex justify-center pt-1">
                 <a href={buildUrl(pageUrl, { filter: 'todos', search: '', genre: '', platforms: '', tags: '' })}

@@ -95,20 +95,16 @@ export function convRowHtml(c: ConvSummary, o: { active?: number | null; now?: n
     const group = c.kind === 'group';
     const when = convTime(c.lastAt, o.now);
     const lead = group ? gavHtml(c.faces, 40) : avatarHtml(c.faces[0] ?? GONE, 40);
+    // QA 6.2 (WCAG 2.5.3): sin aria-label que sustituya a lo visible. El nombre del enlace es lo que se ve
+    // (nombre, hora, último mensaje, número) más lo que solo dicen los iconos, en texto oculto (sr-only).
+    const sr = (t: string) => `<span class="sr-only">${esc(t)}</span>`;
     const right = c.muted
-        ? `<span class="cv-mute" title="Silenciada">${icon('bell-off')}</span>`
-        : n > 0 ? `<span class="cv-n">${n > 99 ? '99+' : n}</span>` : '';
+        ? `<span class="cv-mute" title="Silenciada">${icon('bell-off')}${sr(', silenciada')}</span>`
+        : n > 0 ? `<span class="cv-n">${n > 99 ? '99+' : n}${sr(' sin leer')}</span>` : '';
     const ro = c.readOnly ? `<span class="cv-ro">${icon('lock')}Solo lectura</span>` : '';
-    const label = [
-        group ? `Grupo ${c.title}, ${c.count} personas` : c.title,
-        n > 0 ? `${n} sin leer` : '',
-        c.muted ? 'silenciada' : '',
-        c.readOnly ? 'solo lectura' : '',
-        `último mensaje ${when}`,
-    ].filter(Boolean).join(', ');
-    return `<li><a class="cv${on ? ' on' : ''}${n > 0 ? ' un' : ''}" href="${chatHref(c.id)}" data-conv="${c.id}" aria-label="${esc(label)}"${on ? ' aria-current="page"' : ''}>`
+    return `<li><a class="cv${on ? ' on' : ''}${n > 0 ? ' un' : ''}" href="${chatHref(c.id)}" data-conv="${c.id}"${on ? ' aria-current="page"' : ''}>`
         + lead
-        + `<span class="cv-b"><span class="cv-t"><b>${esc(c.title)}</b><time>${esc(when)}</time></span>`
+        + `<span class="cv-b"><span class="cv-t"><b>${esc(c.title)}</b>${group ? sr(`, grupo de ${c.count} personas`) : ''}${sr(', último mensaje')}<time>${esc(when)}</time></span>`
         + `<span class="cv-p">${ro}<span class="tx">${esc(c.preview)}</span>${right}</span></span></a></li>`;
 }
 
@@ -742,7 +738,7 @@ export function infoDirectHtml(chat: ChatView): string {
     return `<div class="ms-id">${avatarHtml(o, 72)}<b>${esc(o.name)}</b>`
         + (o.handle ? `<span class="h">@${esc(o.handle)}</span>` : '')
         + arch + (since ? `<span class="s">${esc(since)}</span>` : '') + acts + `</div>`
-        + `<div class="ms-blk"><h5>Esta conversación</h5>${muteSwitchHtml(chat.me.muted)}</div>`
+        + `<div class="ms-blk"><h2>Esta conversación</h2>${muteSwitchHtml(chat.me.muted)}</div>`
         + `<p class="ms-priv">${icon('lock')}Solo la veis ${esc(firstName(o.name))} y tú.</p>`;
 }
 
@@ -835,7 +831,7 @@ export function infoGroupHtml(chat: ChatView): string {
             + `${icon('user-plus')}Añadir personas</button></div>`
         : '';
     return `<div class="ms-id">${gavHtml(groupFaces(chat), 64)}${name}<span class="s">${chat.members.length} de ${GROUP_MAX} personas${full ? ' · completo' : ''}</span>${add}</div>`
-        + `<div class="ms-blk"><h5>Personas<span>${admin ? 'Eres admin' : admins === 1 ? '1 admin' : `${admins} admins`}</span></h5><div class="mbl">${rows}</div></div>`
+        + `<div class="ms-blk"><h2>Personas<span>${admin ? 'Eres admin' : admins === 1 ? '1 admin' : `${admins} admins`}</span></h2><div class="mbl">${rows}</div></div>`
         + `<div class="ms-blk">${muteSwitchHtml(chat.me.muted)}`
         + `<button type="button" class="ms-dgr" data-gm="leave">${icon('log-out')}Salir del grupo</button></div>`;
 }

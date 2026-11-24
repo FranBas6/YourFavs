@@ -92,7 +92,7 @@ export function serieCard(it: NextEpisodeItem, o: SerieCardOptions = {}): string
         it.vote_average != null && it.vote_average > 0 ? `<span class="nv-rt">${icon('star')}<b>${decimal(it.vote_average)}</b>&nbsp;TMDB</span>` : '',
     ].join('');
     const just = o.just
-        ? `<div class="nv-just" role="status">${icon('check')}<span>${seShort(o.just.season, o.just.episode)} visto</span><button type="button" data-nv-undo="${o.just.season}:${o.just.episode}">${icon('undo-2')}Deshacer</button></div>`
+        ? `<div class="nv-just">${icon('check')}<span>${seShort(o.just.season, o.just.episode)} visto</span><button type="button" data-nv-undo="${o.just.season}:${o.just.episode}">${icon('undo-2')}Deshacer</button></div>`
         : '';
 
     return `<article class="nv" ${serieData(it, !!o.hideStill)} aria-label="${esc(it.name)}, siguiente episodio ${seLabel(s, e)}">`

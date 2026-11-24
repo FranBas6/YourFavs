@@ -206,7 +206,8 @@ const chips = [...regular, ...(specials ? [specials] : [])].map((x) => {
         href: seasonHref(id!, x.season_number),
         cur: x.season_number === season,
         sp: x.season_number === 0 && regular.length > 0,
-        aria: `${seasonLabel(x.season_number)}, ${state}${x.season_number === season ? ', estás aquí' : ''}`,
+        // QA 6.2 (WCAG 2.5.3): el nombre es el texto visible («T2 0/10») más este detalle oculto, no un aria-label que lo sustituya.
+        aria: ` · ${seasonLabel(x.season_number)}, ${state}${x.season_number === season ? ', estás aquí' : ''}`,
     };
 });
 // Selector: de la más reciente a la primera, y los especiales al final.
@@ -365,7 +366,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
         </section>
     ) : d && (
         <article class="ep tp">
-            <!-- Cabecera -->
+            {/* Cabecera */}
             <header class="eh tph">
                 {d.series.backdrop_path && <div class="eh-bg" style={`background-image:url(${backdropUrl(d.series.backdrop_path, 'w1280')})`}></div>}
                 <div class="eh-in">
@@ -439,7 +440,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                     </div>
                 </div>
             </header>
-            <!-- Barra «Tu temporada»: la acción principal, lo que llevas y compartir / ver -->
+            {/* Barra «Tu temporada»: la acción principal, lo que llevas y compartir / ver */}
             {bar && (
                 <div class="ea tea" role="region" aria-label="Tu temporada" data-tp-bar>
                     <div class="tea-slot" data-tp-main set:html={bar.main}></div>
@@ -469,10 +470,10 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
             )}
             {tp && <script type="application/json" id="tp-data" set:html={JSON.stringify(tp).replace(/</g, '\\u003c')} />}
 
-            <!-- Navegación: temporada anterior · tira de temporadas · siguiente -->
+            {/* Navegación: temporada anterior · tira de temporadas · siguiente */}
             <div class:list={['en', 'tnv', { solo: !showCards }]}>
                 {showCards && (prevCard ? (
-                    <a class="enc" href={prevCard.href} aria-label={`Temporada anterior: ${prevCard.title}`}>
+                    <a class="enc" href={prevCard.href}>
                         <span class:list={['th', { ph: !prevCard.thumb }]}>{prevCard.thumb && <img src={posterUrl(prevCard.thumb, 'w92')} alt="" loading="lazy" />}</span>
                         <span class="tx">
                             <span class="k"><Icon name="lucide:chevron-left" aria-hidden="true" />Anterior</span>
@@ -488,7 +489,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                     <div class="etr-h">
                         {picker.length > 1 && (
                             <details class="ssel">
-                                <summary aria-label={`Temporada: ${seasonLabel(season!)}. Cambiar de temporada`}>{season === 0 ? 'Esp.' : `T${season}`}<Icon name="lucide:chevron-down" aria-hidden="true" /></summary>
+                                <summary aria-label={`${season === 0 ? 'Esp.' : `T${season}`}: ${seasonLabel(season!)}. Cambiar de temporada`}>{season === 0 ? 'Esp.' : `T${season}`}<Icon name="lucide:chevron-down" aria-hidden="true" /></summary>
                                 <ul>
                                     {picker.map((x) => (
                                         <li><a href={x.href} aria-current={x.cur ? 'true' : undefined}>
@@ -510,7 +511,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                                 <>
                                     {c.sp && <li class="sp" aria-hidden="true">·</li>}
                                     <li class:list={[{ w: c.done, u: c.announced, cur: c.cur, esp: c.n === 0 }]} aria-current={c.cur ? 'page' : undefined} data-tp-chip={c.cur ? '' : undefined}>
-                                        <a href={c.href} aria-label={c.aria}>{c.label}<small>{c.small}</small>{c.pct != null && <span class="pb"><i style={`width:${c.pct}%`}></i></span>}</a>
+                                        <a href={c.href}>{c.label}<small>{c.small}</small><span class="sr-only">{c.aria}</span>{c.pct != null && <span class="pb"><i style={`width:${c.pct}%`}></i></span>}</a>
                                     </li>
                                 </>
                             ))}
@@ -519,7 +520,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                 </nav>
 
                 {showCards && (nextCard ? (
-                    <a class="enc nx" href={nextCard.href} aria-label={`Temporada siguiente: ${nextCard.title}`}>
+                    <a class="enc nx" href={nextCard.href}>
                         <span class:list={['th', { ph: !nextCard.thumb }]}>{nextCard.thumb && <img src={posterUrl(nextCard.thumb, 'w92')} alt="" loading="lazy" />}</span>
                         <span class="tx">
                             <span class="k">Siguiente<Icon name="lucide:chevron-right" aria-hidden="true" /></span>
@@ -531,7 +532,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                     <span class="enc nx off" aria-disabled="true"><span class="th ph"></span><span class="tx"><span class="k">Siguiente</span><b>Es la última</b></span></span>
                 ))}
             </div>
-            <!-- Cuerpo: episodios (y, en el paso 4, notas, reparto, vídeos y el lateral) -->
+            {/* Cuerpo: episodios (y, en el paso 4, notas, reparto, vídeos y el lateral) */}
             {d && (
                 <div class="eb tpb">
                     <div class="eb-m">
@@ -718,7 +719,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                                 <SectionHeader title="Dirección y guion" icon="clapperboard" color="slate" headingId="tp-crew" />
                                 <dl class="tcw">
                                     {crewRows.map((r) => (
-                                        <div><dt>{r.label}</dt><dd><a href={`/team/${encodeURIComponent(r.name)}`}>{r.name}</a></dd><small>{epWord(r.eps)}</small></div>
+                                        <div><dt>{r.label}</dt><dd><a href={`/team/${encodeURIComponent(r.name)}`}>{r.name}</a></dd><dd class="tcw-n">{epWord(r.eps)}</dd></div>
                                     ))}
                                 </dl>
                             </section>
@@ -766,7 +767,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                                 <dt>Nota TMDB</dt>
                                 <dd>{sideInfo.score ? <span class="ep-rt"><Icon name="lucide:star" aria-hidden="true" />{sideInfo.score}{sideInfo.scoreSmall && <small>{sideInfo.scoreSmall}</small>}</span> : <span class="mu">{status === 'announced' ? 'Sin nota hasta que se emita' : 'Sin votos todavía'}</span>}</dd>
                                 {sideInfo.best && <><dt>Mejor</dt><dd><a href={sideInfo.bestHref}>{sideInfo.best}</a><small>★ {sideInfo.bestSmall}</small></dd></>}
-                                {(sideInfo.director || sideInfo.createdBy.length > 0) && <hr />}
+                                {(sideInfo.director || sideInfo.createdBy.length > 0) && <div class="dl-sep" aria-hidden="true"></div>}
                                 {sideInfo.director && <><dt>Dirección</dt><dd><a href={`/team/${encodeURIComponent(sideInfo.director)}`}>{sideInfo.director}</a>{sideInfo.directorMore && ` ${sideInfo.directorMore}`}</dd></>}
                                 {sideInfo.createdBy.length > 0 && <><dt>Creada por</dt><dd>{sideInfo.createdBy.map((n, i) => <>{i > 0 && (i === sideInfo.createdBy.length - 1 ? ' y ' : ', ')}<a href={`/team/${encodeURIComponent(n)}`}>{n}</a></>)}</dd></>}
                             </dl>
@@ -796,7 +797,7 @@ const pageTitle = d ? `${seriesName} · ${ownName ? `${title} (${seasonLabel(sea
                 </div>
             )}
 
-            <!-- Visor de pósters (CSS :target de detail-common.css, como el de fotogramas del episodio) -->
+            {/* Visor de pósters (CSS :target de detail-common.css, como el de fotogramas del episodio) */}
             {posterList.length > 1 && posterList.map((p, i) => (
                 <div id={`poster-${i}`} class="lightbox ep-lb" role="dialog" aria-label={`Póster ${i + 1} de ${posterList.length}`}>
                     <a href="#posters" class="ep-lb-x" aria-label="Cerrar"></a>

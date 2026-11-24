@@ -488,3 +488,21 @@ export async function getPublicCollection(rawHandle: string, listId: string, vie
         items: (items ?? []).map((i) => ({ media_type: i.media_type, tmdb_id: i.tmdb_id, title: i.title ?? '', poster_path: i.poster_path })),
     };
 }
+
+/**
+ * Perfiles para el sitemap (QA 6.4, H74): SOLO los que su dueño ha dejado públicos para todo el mundo
+ * («public») y ha marcado «que me encuentren los buscadores» (`public_indexable`). Los de «solo amigos»
+ * nunca salen, aunque tengan la casilla. Devuelve el @ y la última modificación.
+ */
+export async function listIndexableProfiles(limit = 5000): Promise<{ handle: string; updatedAt: string | null }[]> {
+    const { data, error } = await supabaseAdmin()
+        .from('profiles')
+        .select('public_handle, updated_at')
+        .eq('public_visibility', 'public')
+        .eq('public_indexable', true)
+        .not('public_handle', 'is', null)
+        .order('updated_at', { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => ({ handle: r.public_handle as string, updatedAt: r.updated_at ?? null }));
+}

@@ -251,21 +251,24 @@ const KNOWN_KEYS = HOME_SECTIONS.map((s) => s.key);
 const savedOrder = (Astro.locals.user?.homeLayout || []).map((x) => x.key).filter((k) => KNOWN_KEYS.includes(k));
 // Orden final: lo guardado primero, luego los bloques que aún no estén en la preferencia; sin ocultos.
 const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.includes(k))].filter((k) => !isHidden(k));
+import { SITE_TAGLINE, SITE_DESCRIPTION } from '../utils/core/siteCopy';
 ---
-<Layout title="YourFavs">     
-    <main class="main-container">
+<Layout title={`YourFavs · ${SITE_TAGLINE}`} description={SITE_DESCRIPTION}>     
+    <div class="main-container">
         {/* 7.1 · Sin sesión: bienvenida (handoff P2) con Tendencias y la banda de Importar. Con sesión, la portada de siempre. */}
         {Astro.locals.user ? (<Fragment>
-        <!-- Hero: Brief diario "Hoy en tu cine" (con sesión y señales) + Trending; con
-             ambos disponibles, un toggle deja elegir cuál ver (preferencia recordada). -->
+        {/* QA 6.2 (H86): con sesión la portada no tenía H1 (el del hero solo sale con «Tendencias»). */}
+        <h1 class="sr-only">Tu inicio en YourFavs</h1>
+        {/* Hero: Brief diario "Hoy en tu cine" (con sesión y señales) + Trending; con
+             ambos disponibles, un toggle deja elegir cuál ver (preferencia recordada). */}
         {(brief.signals.length > 0 || heroMovie) ? (
             <div class="home-hero" id="home-hero">
                 {brief.signals.length > 0 && heroMovie && (
                     <div class="home-hero-switchrow">
                         <span class="home-hero-switchlabel">Tu portada</span>
-                        <div class="home-hero-switch" role="tablist" aria-label="Cambiar portada">
-                            <button type="button" class="is-active" data-hero-pick="brief">Hoy en tu cine</button>
-                            <button type="button" data-hero-pick="trending">Tendencias</button>
+                        <div class="home-hero-switch" role="group" aria-label="Cambiar portada">
+                            <button type="button" class="is-active" aria-pressed="true" data-hero-pick="brief">Hoy en tu cine</button>
+                            <button type="button" aria-pressed="false" data-hero-pick="trending">Tendencias</button>
                         </div>
                     </div>
                 )}
@@ -282,7 +285,7 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                             <div class="hero-backdrop-overlay">
                                 <div class="hero-backdrop-content">
                                     <span class="hero-trending-badge"><Icon name="lucide:trending-up" />En tendencia esta semana</span>
-                                    <h1 class="hero-backdrop-title">{heroMovie.title}</h1>
+                                    <h2 class="hero-backdrop-title">{heroMovie.title}</h2>
                                     <div class="hero-backdrop-meta">
                                         <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average != null ? decimal(heroMovie.vote_average) : ""}</span>
                                         <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
@@ -303,10 +306,10 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
         ) : (
             <div class="hero-section">
                 <div class="hero-content">
-                    <h1 class="hero-title text-coral-red">
+                    <h2 class="hero-title text-coral-red">
                         <span class="hero-icon"><Icon name="lucide:clapperboard" /></span>
                         CATÁLOGO PRINCIPAL
-                    </h1>
+                    </h2>
                     <div class="hero-divider"></div>
                     <p class="hero-description">
                         Descubre miles de películas y series de las mejores plataformas.
@@ -326,7 +329,7 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 var panels = root.querySelectorAll('[data-hero]');
                 function apply(which) {
                     panels.forEach(function (p) { p.hidden = p.getAttribute('data-hero') !== which; });
-                    picks.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-hero-pick') === which); });
+                    picks.forEach(function (b) { var on = b.getAttribute('data-hero-pick') === which; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', String(on)); });
                     try { localStorage.setItem('yf_home_hero', which); } catch (e) {}
                 }
                 var saved = null;
@@ -358,9 +361,9 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
             </script>
         )}
 
-        <!-- Bloques configurables de la Home (§4): orden y visibilidad los define el perfil
+        {/* Bloques configurables de la Home (§4): orden y visibilidad los define el perfil
              (UserProfile.homeLayout). El hero de arriba queda fijo; aquí va todo lo demás
-             en el orden elegido, cada bloque envuelto igual en .content-wrapper. -->
+             en el orden elegido, cada bloque envuelto igual en .content-wrapper. */}
         {orderedKeys.map((key) => (
             <Fragment>
                 {key === 'estas-viendo' && (continueWatching.length > 0 || viendoMovies.length > 0) && (
@@ -418,5 +421,5 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 )}
             </Welcome>
         )}
-    </main>
+    </div>
 </Layout>

@@ -19,7 +19,7 @@
 }
 
 /* Clases de color compartidas (fuente única de verdad) */
-.text-coral-red { color: #E63946; }
+.text-coral-red { color: var(--accent-ink); }
 
 html {
     font-family: 'Poppins', sans-serif;
@@ -221,15 +221,18 @@ a, button, input {
     overflow: hidden;
 }
 
+/* QA 6.2 (H63): fixed y por encima de la cabecera (z 100, sticky), que antes lo tapaba. Colores de
+   texto/fondo invertidos: se lee en claro y en oscuro. */
 .skip-link:focus {
+    position: fixed;
     left: 1rem;
     top: 1rem;
     width: auto;
     height: auto;
     padding: .5rem .75rem;
-    z-index: 100;
-    background: var(--color-primary);
-    color: white;
+    z-index: 1000;
+    background: var(--text);
+    color: var(--bg);
     border-radius: .5rem;
     text-decoration: none;
 }

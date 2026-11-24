@@ -43,11 +43,29 @@ function writeCache(c: Omit<Counts, 'ts'>) {
     try { localStorage.setItem(KEY, JSON.stringify({ ...c, ts: Date.now() })); } catch { /* sin almacenamiento */ }
 }
 
+/**
+ * QA 6.2: un globo dentro de un botón con `aria-label` (campana, pestaña «Perfil» del móvil) dejaba el
+ * número visible fuera del nombre accesible («3» frente a «Notificaciones»). Ahí el globo se oculta al
+ * lector y su texto pasa al nombre del botón: «Notificaciones, 3 notificaciones sin leer». Los globos
+ * dentro de enlaces con texto («Amigos 2») no cambian: su número ya forma parte del nombre.
+ */
+function relabelHost(b: HTMLElement) {
+    const host = b.closest<HTMLElement>('button, a');
+    if (!host) return;
+    if (host.dataset.a11yBase === undefined) host.dataset.a11yBase = host.getAttribute('aria-label') ?? '';
+    const base = host.dataset.a11yBase;
+    if (!base) return;
+    b.setAttribute('aria-hidden', 'true');
+    const extra = [...host.querySelectorAll<HTMLElement>('[data-sr]')].filter((x) => !x.hidden).map((x) => x.dataset.sr);
+    host.setAttribute('aria-label', [base, ...extra].join(', '));
+}
+
 function paint(selector: string, n: number, label: (n: number) => string) {
     const txt = n > 9 ? '9+' : String(n);
     document.querySelectorAll<HTMLElement>(selector).forEach((b) => {
         b.hidden = n <= 0;
-        if (n > 0) { b.textContent = txt; b.setAttribute('aria-label', label(n)); }
+        if (n > 0) { b.textContent = txt; b.setAttribute('aria-label', label(n)); b.dataset.sr = label(n); }
+        relabelHost(b);
     });
     // Filas que cambian de aspecto con pendientes (la de «Amigos» en la hoja Perfil).
     if (selector === '.js-pending-badge') {
@@ -72,10 +90,13 @@ function paintMessages(n: number) {
         const num = b.querySelector('.js-msg-n');
         if (num) num.textContent = n > 99 ? '99+' : String(n);
         b.setAttribute('aria-label', label);
+        b.dataset.sr = label;
+        relabelHost(b);
     });
     document.querySelectorAll<HTMLElement>('.js-msg-dot').forEach((d) => {
         d.hidden = n <= 0;
-        if (n > 0) d.setAttribute('aria-label', label);
+        if (n > 0) { d.setAttribute('aria-label', label); d.dataset.sr = label; }
+        relabelHost(d);
     });
 }
 

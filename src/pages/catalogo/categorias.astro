@@ -107,7 +107,7 @@ function buildCategoryUrl(slug: string) {
     return `?${p.toString()}`;
 }
 ---
-<Layout title={`Categoría: ${categoryLabel}`}>
+<Layout title={`Categoría: ${categoryLabel}`} description={category === 'proximamente' ? 'Los próximos estrenos de películas y series: qué llega pronto y cuándo.' : `Películas y series de ${categoryLabel.toLowerCase()}: las más populares, las mejor valoradas y dónde verlas.`}>
     <section class="px-1 sm:py-8">
         <CatalogHeader
             kicker="Categoría"
@@ -118,7 +118,7 @@ function buildCategoryUrl(slug: string) {
             <CatalogModes slot="nav" current={type} buildUrl={buildTypeUrl} />
         </CatalogHeader>
 
-        <!-- Categorías: desplegable en móvil, pills en desktop -->
+        {/* Categorías: desplegable en móvil, pills en desktop */}
         <details class="mb-6 sm:hidden group">
             <summary class="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200 shadow-sm cursor-pointer text-sm font-medium text-gray-700">
                 Cambiar categoría
@@ -163,7 +163,7 @@ function buildCategoryUrl(slug: string) {
             </div>
         </div>
 
-        <!-- Películas -->
+        {/* Películas */}
         {(type === 'all' || type === 'movies') && latestMovies.length > 0 && (
             <div class="mb-12" id="peliculas">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -188,7 +188,7 @@ function buildCategoryUrl(slug: string) {
             </div>
         )}
 
-        <!-- Series -->
+        {/* Series */}
         {(type === 'all' || type === 'series') && latestSeries.length > 0 && (
             <div class="mb-12" id="series">
                 <h2 class="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">

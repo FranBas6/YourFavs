@@ -77,12 +77,12 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
 ---
 <header class="header-main">
     <div class="header-inner">
-        <!-- Logo -->
+        {/* Logo */}
         <a href="/" class="header-logo">
             <span class="header-logo-text">YOURFAVS</span>
         </a>
 
-        <!-- Nav desktop: 5 items (Inicio · Tendencias · Cartelera · Descubrir▾ · Plataformas) -->
+        {/* Nav desktop: 5 items (Inicio · Tendencias · Cartelera · Descubrir▾ · Plataformas) */}
         <nav aria-label="Navegación principal" class="header-nav-desktop">
             {navMain.map(item => (
                 <a href={withMode(item.href, catalogMode)}
@@ -92,7 +92,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </a>
             ))}
 
-            <!-- Descubrir + dropdown -->
+            {/* Descubrir + dropdown */}
             <div class="header-discover" id="discover">
                 <button type="button"
                         class={`header-nav-link header-discover-btn ${discoverActive ? 'is-active' : ''}`}
@@ -119,7 +119,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </div>
             </div>
 
-            <!-- Mis listas + dropdown (solo con sesión) -->
+            {/* Mis listas + dropdown (solo con sesión) */}
             {user && (
                 <div class="header-discover" id="mislistas">
                     <button type="button"
@@ -157,7 +157,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
 
         </nav>
 
-        <!-- Acciones desktop: búsqueda + theme toggle -->
+        {/* Acciones desktop: búsqueda + theme toggle */}
         <div class="header-actions">
             <form action="/catalogo/busqueda" method="get" class="header-search-form">
                 <label for="header-search" class="sr-only">Buscar películas y series</label>
@@ -173,7 +173,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </button>
             </form>
 
-            <!-- Calendario desktop: dropdown -->
+            {/* Calendario desktop: dropdown */}
             <button class="header-calendar-btn" id="calendar-toggle-btn" aria-label="Abrir calendario de estrenos" title="Calendario de estrenos">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -202,9 +202,9 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </div>
             </div>
 
-            <!-- Mensajes (M3b): acceso rápido junto a la campana, con el contador neutro de mensajes sin
+            {/* Mensajes (M3b): acceso rápido junto a la campana, con el contador neutro de mensajes sin
                  leer. En escritorio abre las conversaciones recientes; en móvil lleva a Mensajes, igual que
-                 la campana. Lo atiende scripts/social/messages/headerMsgs.ts; el número, bell.ts. -->
+                 la campana. Lo atiende scripts/social/messages/headerMsgs.ts; el número, bell.ts. */}
             {user && SOCIAL_PHASE.messages && (
                 <div class="header-notif header-msgs" id="msgs">
                     <a class="header-notif-btn" id="msgs-toggle-btn" href="/mislistas/amigos/mensajes" aria-label="Mensajes" title="Mensajes" aria-haspopup="true" aria-expanded="false">
@@ -224,7 +224,7 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </div>
             )}
 
-            <!-- Campana (Bloque 4): buzón de notificaciones (solo con sesión) -->
+            {/* Campana (Bloque 4): buzón de notificaciones (solo con sesión) */}
             {user && (
                 <div class="header-notif" id="notif">
                     <button class="header-notif-btn" id="notif-toggle-btn" aria-label="Notificaciones" title="Notificaciones" aria-haspopup="true" aria-expanded="false">
@@ -257,13 +257,13 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
                 </button>
             )}
 
-            <!-- Usuario: sin sesión → "Entrar"; con sesión → avatar + menú de cuenta (Tema vive ahí) -->
+            {/* Usuario: sin sesión → "Entrar"; con sesión → avatar + menú de cuenta (Tema vive ahí) */}
             {user ? (
                 <div class="header-account" id="account">
                     <button type="button" class="header-avatar-btn" id="account-btn" aria-haspopup="true" aria-expanded="false" aria-label="Tu cuenta" title={displayName}>
                         {user.picture
                             ? <img src={user.picture} alt="" referrerpolicy="no-referrer" />
-                            : <span class="header-avatar-initials">{avatarInitials}</span>}
+                            : <span class="header-avatar-initials" aria-hidden="true">{avatarInitials}</span>}
                     </button>
                     <div class="account-menu" id="account-menu" role="menu" aria-label="Menú de cuenta">
                         <div class="account-menu-head">
@@ -337,8 +337,8 @@ const myListsActive = myListsItems.some((i) => currentPath.startsWith(i.href));
             )}
         </div>
 
-        <!-- Móvil: la navegación vive en el tab bar inferior (MobileTabBar) + hojas
-             (MobileNavSheets). El header móvil queda mínimo: logo + calendario. -->
+        {/* Móvil: la navegación vive en el tab bar inferior (MobileTabBar) + hojas
+             (MobileNavSheets). El header móvil queda mínimo: logo + calendario. */}
     </div>
 </header>
 

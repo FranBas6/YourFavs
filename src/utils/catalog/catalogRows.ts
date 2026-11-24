@@ -198,7 +198,7 @@ export function decadeRowDef(decade: number): CatalogRowDef {
     const to = decade + 9;
     return {
         key: 'decada',
-        title: `Lo mejor de los ${decade}`,
+        title: `Lo mejor de los ${decade < 2000 ? String(decade % 100).padStart(2, '0') : decade}`, // «los 90», «los 2000» (H47)
         subtitle: 'Las mejor valoradas de esa década, no las más famosas.',
         why: `${decade}–${to}, por nota`,
         media: 'movie',
