@@ -33,6 +33,36 @@ function showToast(message, type) {
 }
 
 /**
+ * Aviso de error que NO desaparece solo (QA 3.1, H64): «No se ha guardado (sin conexión) · Reintentar».
+ * Antes salía «Error al guardar» 2,5 s y el cambio se quedaba pintado como si se hubiera guardado.
+ * Uno por formulario: reintentar o cerrar lo quita; un nuevo fallo del mismo lo sustituye.
+ */
+function showSaveError(form, message, retry) {
+    var container = document.getElementById('toast-container');
+    if (!container) return;
+    if (form.__yfErrToast) form.__yfErrToast.remove();
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-error so-undo-toast';
+    toast.setAttribute('role', 'alert');
+    var text = document.createElement('span');
+    text.textContent = message;
+    toast.appendChild(text);
+    var again = document.createElement('button');
+    again.type = 'button';
+    again.textContent = 'Reintentar';
+    again.addEventListener('click', function () { toast.remove(); form.__yfErrToast = null; retry(); });
+    toast.appendChild(again);
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.setAttribute('aria-label', 'Cerrar');
+    close.textContent = '×';
+    close.addEventListener('click', function () { toast.remove(); form.__yfErrToast = null; });
+    toast.appendChild(close);
+    container.appendChild(toast);
+    form.__yfErrToast = toast;
+}
+
+/**
  * Handler genérico de POST optimista.
  * options:
  *   successMsg: string | function(formData) — mensaje de toast en éxito
@@ -58,6 +88,8 @@ function submitOptimistic(form, options) {
         fetch(window.location.pathname, { method: 'POST', body: formData })
             .then(function (res) {
                 if (!res.ok && !res.redirected) throw new Error();
+                // La ficha captura sus errores y redirige igual: con ?guardado=error no es un éxito (QA 3.1).
+                if (res.redirected && /[?&]guardado=error\b/.test(res.url)) throw new Error('servidor');
                 // La ficha redirige a ?seguida=1 si marcar un episodio pasó la serie a Siguiendo (QA 2.4):
                 // lo cuenta scripts/series/autoFollow.ts, con «Deshacer».
                 if (res.redirected && /[?&]seguida=1\b/.test(res.url)) document.dispatchEvent(new CustomEvent('yf:auto-follow'));
@@ -69,20 +101,27 @@ function submitOptimistic(form, options) {
                 }
             })
             .catch(function () {
+                // Deshacer lo pintado antes de tiempo y avisar hasta que el usuario reintente o cierre.
                 if (options.onError) options.onError(form, btn, formData);
-                showToast(options.errorMsg || 'Error al guardar', 'error');
+                var offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+                showSaveError(form, offline ? 'No se ha guardado: no hay conexión' : (options.errorMsg || 'No se ha guardado'), function () {
+                    if (form.requestSubmit) form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);
+                    else form.dispatchEvent(new Event('submit', { cancelable: true }));
+                });
             })
             .finally(function () { btn.classList.remove('is-submitting'); });
     });
 }
 
-function handleWatchedEpisodeForm(form) {
-    submitOptimistic(form, {
-        onBeforeSubmit: function (_f, btn, formData) {
+/**
+ * Invierte en pantalla el estado de un episodio (botón, fila, celda de la tira, contador de la temporada y
+ * total de la serie) a partir de lo que hay pintado. Se usa al enviar y, si falla, otra vez para
+ * deshacerlo (QA 3.1, H64: sin red, el episodio se quedaba en «Visto» y el progreso subido).
+ */
+function flipEpisodeUI(btn, formData) {
             // Botón del sistema (rediseño 4.8): el estado va en aria-pressed; el texto no cambia.
             var sysBtn = btn.classList.contains('btn');
             var isWatched = sysBtn ? btn.getAttribute('aria-pressed') === 'true' : btn.classList.contains('bg-green-500');
-            btn.dataset.wasWatched = isWatched ? '1' : '0';
 
             if (sysBtn) {
                 btn.setAttribute('aria-pressed', isWatched ? 'false' : 'true');
@@ -139,7 +178,17 @@ function handleWatchedEpisodeForm(form) {
                     totalBarWrap.style.display = currentTotal > 0 ? '' : 'none';
                 }
             }
+}
+
+function handleWatchedEpisodeForm(form) {
+    submitOptimistic(form, {
+        onBeforeSubmit: function (_f, btn, formData) {
+            var sysBtn = btn.classList.contains('btn');
+            var isWatched = sysBtn ? btn.getAttribute('aria-pressed') === 'true' : btn.classList.contains('bg-green-500');
+            btn.dataset.wasWatched = isWatched ? '1' : '0';
+            flipEpisodeUI(btn, formData);
         },
+        onError: function (_f, btn, formData) { flipEpisodeUI(btn, formData); },
         successMsg: function (formData) {
             // Reconstruye el mensaje usando el flag guardado antes del toggle
             var ep = 'T' + formData.get('season') + ' E' + formData.get('episode');
@@ -211,6 +260,7 @@ function handleNotificationForm(form) {
     submitOptimistic(form, {
         onBeforeSubmit: function (f, btn, formData) {
             var action = formData.get('action');
+            btn.dataset.wasPressed = btn.getAttribute('aria-pressed') || '';
             // Barra de las fichas (rediseño, Fase 4): botón del sistema con estado; recarga al guardar.
             if (btn.classList.contains('btn')) {
                 if (btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', action === 'add' ? 'true' : 'false');
@@ -230,7 +280,18 @@ function handleNotificationForm(form) {
             return formData.get('action') === 'add' ? 'Notificación activada' : 'Notificación desactivada';
         },
         reload: form.hasAttribute('data-reload'),
-        reloadDelay: 300
+        reloadDelay: 300,
+        onError: function (f, btn, formData) {
+            if (btn.classList.contains('btn')) {
+                if (btn.dataset.wasPressed) btn.setAttribute('aria-pressed', btn.dataset.wasPressed);
+                return;
+            }
+            // Botón antiguo: volver al valor de `action` y al color de antes.
+            var actionInput = f.querySelector('input[name="action"]');
+            if (actionInput) actionInput.value = formData.get('action');
+            var on = formData.get('action') !== 'add';
+            btn.classList.toggle('bg-amber-500', on); btn.classList.toggle('text-white', on);
+        }
     });
 }
 
@@ -321,6 +382,17 @@ function initOptimisticActions() {
 }
 
 initOptimisticActions();
+
+// La ficha volvió con ?guardado=error (envío sin JavaScript, o recarga): avisar y limpiar la URL (QA 3.1).
+(function () {
+    try {
+        var u = new URL(location.href);
+        if (u.searchParams.get('guardado') !== 'error') return;
+        u.searchParams.delete('guardado');
+        history.replaceState(history.state, '', u.pathname + u.search + u.hash);
+        showToast('No se ha guardado. Inténtalo otra vez', 'error');
+    } catch (e) {}
+})();
 
 // ── Fase F · Acceso C — pista post-guardado (no bloqueante, nunca modal) ──────
 // Tras guardar un título, si el usuario es elegible (sesión + onboarding no hecho)

@@ -126,7 +126,8 @@ if (Astro.request.method === 'POST') {
         return Astro.redirect(redirectUrl);
     } catch (error) {
         console.error('Error al gestionar la serie:', error);
-        return Astro.redirect(`/serie/${id}`);
+        // Con la marca de error: el navegador no lo da por guardado y lo deshace (QA 3.1).
+        return Astro.redirect(`/serie/${id}?guardado=error`);
     }
 }
 
