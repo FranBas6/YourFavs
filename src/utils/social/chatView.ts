@@ -95,20 +95,16 @@ export function convRowHtml(c: ConvSummary, o: { active?: number | null; now?: n
     const group = c.kind === 'group';
     const when = convTime(c.lastAt, o.now);
     const lead = group ? gavHtml(c.faces, 40) : avatarHtml(c.faces[0] ?? GONE, 40);
+    // QA 6.2 (WCAG 2.5.3): sin aria-label que sustituya a lo visible. El nombre del enlace es lo que se ve
+    // (nombre, hora, último mensaje, número) más lo que solo dicen los iconos, en texto oculto (sr-only).
+    const sr = (t: string) => `<span class="sr-only">${esc(t)}</span>`;
     const right = c.muted
-        ? `<span class="cv-mute" title="Silenciada">${icon('bell-off')}</span>`
-        : n > 0 ? `<span class="cv-n">${n > 99 ? '99+' : n}</span>` : '';
+        ? `<span class="cv-mute" title="Silenciada">${icon('bell-off')}${sr(', silenciada')}</span>`
+        : n > 0 ? `<span class="cv-n">${n > 99 ? '99+' : n}${sr(' sin leer')}</span>` : '';
     const ro = c.readOnly ? `<span class="cv-ro">${icon('lock')}Solo lectura</span>` : '';
-    const label = [
-        group ? `Grupo ${c.title}, ${c.count} personas` : c.title,
-        n > 0 ? `${n} sin leer` : '',
-        c.muted ? 'silenciada' : '',
-        c.readOnly ? 'solo lectura' : '',
-        `último mensaje ${when}`,
-    ].filter(Boolean).join(', ');
-    return `<li><a class="cv${on ? ' on' : ''}${n > 0 ? ' un' : ''}" href="${chatHref(c.id)}" data-conv="${c.id}" aria-label="${esc(label)}"${on ? ' aria-current="page"' : ''}>`
+    return `<li><a class="cv${on ? ' on' : ''}${n > 0 ? ' un' : ''}" href="${chatHref(c.id)}" data-conv="${c.id}"${on ? ' aria-current="page"' : ''}>`
         + lead
-        + `<span class="cv-b"><span class="cv-t"><b>${esc(c.title)}</b><time>${esc(when)}</time></span>`
+        + `<span class="cv-b"><span class="cv-t"><b>${esc(c.title)}</b>${group ? sr(`, grupo de ${c.count} personas`) : ''}${sr(', último mensaje')}<time>${esc(when)}</time></span>`
         + `<span class="cv-p">${ro}<span class="tx">${esc(c.preview)}</span>${right}</span></span></a></li>`;
 }
 

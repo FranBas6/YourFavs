@@ -910,11 +910,12 @@ const jsonLd = item ? {
                         {epLines.length > 0 && (
                             <div class="sr-eps">
                                 {epLines.map((l) => (
+                                    <div class="ovl-wrap">{/* QA 6.2: el enlace va fuera del <summary> (no anidado) y scripts/series/overlayLinks.ts lo pone encima del nombre */}
                                     <details class="sr-el">
                                         <summary>
                                             <span class:list={['sr-el-k', { 'is-next': l.label === 'Próximo' }]}>{l.label}</span>
                                             <span class="sr-el-code">T{l.ep.season_number}·E{l.ep.episode_number}</span>
-                                            <a href={episodeHref(id, l.ep.season_number, l.ep.episode_number)} class="sr-el-name" onclick="event.stopPropagation()">{l.ep.name}</a>
+                                            <span class="sr-el-name" data-ovl-anchor>{l.ep.name}</span>
                                             {l.mark && <span class="sr-el-mark" title={l.mark.title}>{l.mark.label}</span>}
                                             <span class="sr-el-when">{l.when}</span>
                                             {l.ep.vote_average > 0 && l.label === 'Último' && (!spoilerFree || l.seen) && <span class="sr-el-r">★ {l.ep.vote_average.toFixed(1).replace('.', ',')}</span>}
@@ -933,6 +934,8 @@ const jsonLd = item ? {
                                             </div>
                                         )}
                                     </details>
+                                    <a class="ovl-link" data-ovl-link href={episodeHref(id, l.ep.season_number, l.ep.episode_number)}>{l.ep.name}</a>
+                                    </div>
                                 ))}
                             </div>
                         )}
@@ -944,6 +947,7 @@ const jsonLd = item ? {
                                 const seasonTotal = seasonEpisodes.length;
                                 const isSeasonComplete = seasonTotal > 0 && seasonWatched === seasonTotal;
                                 return (
+                                    <div class="ovl-wrap">{/* QA 6.2: ver arriba (enlace a la ficha de la temporada fuera del <summary>) */}
                                     <details id={`season-${season.season_number}`} class="sr scroll-mt-20">
                                         {/* 4.6 · Una fila por temporada: póster · nombre · tira de episodios · vistos · nota */}
                                         <summary class="sr-row">
@@ -952,10 +956,10 @@ const jsonLd = item ? {
                                                 <div class="sr-head">
                                                     <span class="sr-t">
                                                         {/* El título lleva a la ficha de la temporada; el resto de la fila abre y cierra. */}
-                                                        <a class="sr-tl" href={seasonHref(id, season.season_number)} onclick="event.stopPropagation()" aria-label={`Ficha de ${season.season_number === 0 ? 'los especiales' : `la temporada ${season.season_number}`}`}>
+                                                        <span class="sr-tl" data-ovl-anchor>
                                                             <b>{season.season_number === 0 ? 'Especiales' : `Temporada ${season.season_number}`}</b>
                                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
-                                                        </a>
+                                                        </span>
                                                         {season.air_date && <small>{season.air_date.slice(0, 4)}</small>}
                                                     </span>
                                                     {seasonTotal > 0 && <span class="sr-n" data-season-count={season.season_number}>{seasonWatched}/{seasonTotal}</span>}
@@ -1120,6 +1124,8 @@ const jsonLd = item ? {
                                             )}
                                         </div>
                                     </details>
+                                    <a class="ovl-link" data-ovl-link href={seasonHref(id, season.season_number)}>{season.season_number === 0 ? 'Ficha de los especiales' : `Ficha de la temporada ${season.season_number}`}</a>
+                                    </div>
                                 );
                             })}
                         </div>
@@ -1183,6 +1189,7 @@ const jsonLd = item ? {
     // solo lo marcado con `.yf-blur`. CSS y script compartidos con la ficha de episodio (TMDB D4):
     // `styles/shared/spoil.css` y `scripts/ui/spoil.ts`.
     import '../../scripts/ui/spoil';
+    import '../../scripts/series/overlayLinks';
 </script>
 <script is:inline>
     // Confirmación al cambiar el modo sin spoilers de esta serie (flag `sp` en la URL tras el POST).
