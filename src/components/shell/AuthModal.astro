@@ -22,6 +22,7 @@
  * público), el registro enseña «Te invita Ana · @ana». Con `SIGNUP_MODE=invite` y sin invitación, la
  * pestaña Crear cuenta sale deshabilitada y el aviso lo explica. `?auth=invite` = Google rechazado.
  */
+import { LEGAL } from "../../utils/legal/legalInfo";
 import { signupMode } from '../../services/social/signupMode';
 const mode = signupMode();
 
@@ -133,6 +134,18 @@ const I = {
                 </div>
 
                 <div class="auth-msg" id="auth-msg" role="alert" hidden></div>
+
+                {/* Edad mínima y aviso legal (QA 4.2, H11/H61). La casilla solo en «Crear cuenta», y vale también
+                    para «Registrarte con Google»; el aviso, en los dos modos con su texto. */}
+                <label class="auth-age" id="auth-age" hidden>
+                    <input type="checkbox" id="auth-age-cb" aria-describedby="auth-age-err" />
+                    <span>Tengo {LEGAL.minAge} años o más</span>
+                </label>
+                <span class="auth-hint is-er" id="auth-age-err" hidden></span>
+                <p class="auth-legal" id="auth-legal">
+                    <span id="auth-legal-lead">Al entrar aceptas</span> los <a href="/terminos" target="_blank" rel="noopener">Términos</a>
+                    y la <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a>.
+                </p>
 
                 <div class="auth-foot">
                     <button type="submit" class="btn btn--pri auth-submit" id="auth-submit"><span class="auth-spin" aria-hidden="true" hidden></span><span id="auth-submit-l">Entrar</span></button>
@@ -314,6 +327,12 @@ const I = {
     .auth-hint svg { width: 14px; height: 14px; flex-shrink: 0; }
     .auth-hint.is-ok { color: var(--ok-ink); }
     .auth-hint.is-er { color: var(--accent-dark); }
+    /* Edad y aviso legal (QA 4.2) */
+    .auth-age { display: flex; align-items: center; gap: 10px; min-height: 40px; font: 500 var(--fs-ui) var(--font); color: var(--text); cursor: pointer; }
+    .auth-age input { width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0; }
+    .auth-age.is-er span { color: var(--accent-dark); }
+    .auth-legal { margin: 0; font-size: var(--fs-meta); line-height: 1.45; color: var(--text-3); }
+    .auth-legal a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
     /* Indicador de fuerza de la contraseña (QA 4.5): tres tramos que se llenan. */
     .auth-meter { display: inline-flex; gap: 3px; margin-right: 2px; }
     .auth-meter i { width: 16px; height: 4px; border-radius: 2px; background: var(--border-strong); }
@@ -407,6 +426,7 @@ const I = {
     import type * as AuthActions from '../../scripts/auth/authActions';
     import { SOCIAL_PHASE } from '../../utils/social/social';
     import { PASSWORD_MIN } from '../../utils/core/textLimits';
+    import { LEGAL } from '../../utils/legal/legalInfo';
     import { obviousPasswordReason, passwordStrength, STRENGTH_LABEL } from '../../utils/core/passwordCheck';
 
     const overlay = document.getElementById('auth-modal') as HTMLElement | null;
@@ -432,6 +452,12 @@ const I = {
         const passHint = $('auth-pass-hint');
         const emailErr = $('auth-email-err');
         const fineEl = $('auth-fine');
+        const ageEl = $('auth-age');
+        const ageCb = $<HTMLInputElement>('auth-age-cb');
+        const ageErr = $('auth-age-err');
+        const legalLead = $('auth-legal-lead');
+        const ageError = (on: boolean) => { ageEl.classList.toggle('is-er', on); ageErr.hidden = !on; ageErr.textContent = on ? `Marca la casilla: para crear una cuenta hay que tener al menos ${LEGAL.minAge} años.` : ''; if (on) ageCb.focus(); };
+        ageCb.addEventListener('change', () => { if (ageCb.checked) ageError(false); });
         const forgotBtn = overlay.querySelector('[data-auth-forgot]') as HTMLButtonElement;
         const pendingEl = $('auth-pending');
         const pendingIco = $('auth-pending-ico');
@@ -664,6 +690,9 @@ const I = {
             submitL.textContent = submitText();
             forgotBtn.hidden = !isLogin;
             fineEl.hidden = isLogin;
+            ageEl.hidden = isLogin;
+            ageError(false);
+            legalLead.textContent = isLogin ? 'Al entrar aceptas' : 'Al crear la cuenta aceptas';
             $('auth-line').hidden = isLogin;
             clearFieldErrors();
             if (!isLogin) fillPosters();
@@ -904,6 +933,7 @@ const I = {
         googleBtn.addEventListener('click', async () => {
             clearMsg();
             clearNote();
+            if (mode === 'register' && !ageCb.checked) { ageError(true); return; }
             setGoogleLoading(true);
             const a = await getActions();
             const res = await a.loginGoogle();
@@ -940,9 +970,11 @@ const I = {
             }
             if (mode === 'register' && password.length < PASSWORD_MIN) { fieldError(passInput, passHint, `La contraseña tiene que tener al menos ${PASSWORD_MIN} caracteres · te faltan ${PASSWORD_MIN - password.length}`); passInput.focus(); return; }
 
+            if (mode === 'register' && !ageCb.checked) { ageError(true); return; }
+
             setLoading(true);
             const a = await getActions();
-            const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
+            const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password, ageCb.checked);
             if (res.ok && res.pendingConfirmation) { showPending(email); return; }
             if (res.ok) { writeSeen('email'); afterAuth(res); return; }
             if (res.code === 'invite_only') { setMode('login'); setLoading(false); showMsg(res.error); return; }

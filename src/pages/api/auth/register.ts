@@ -25,6 +25,7 @@
  */
 import type { APIRoute } from 'astro';
 import { PASSWORD_MIN } from '../../../utils/core/textLimits';
+import { LEGAL } from '../../../utils/legal/legalInfo';
 import { obviousPasswordReason } from '../../../utils/core/passwordCheck';
 import { isPwnedPassword } from '../../../services/db/pwnedPasswords';
 import { json, mapAuthError, safeNext, setSessionFlag } from '../../../services/db/authHttp';
@@ -38,6 +39,8 @@ export const POST: APIRoute = async ({ request, locals, cookies, url }) => {
     const email = typeof body?.email === 'string' ? body.email.trim() : '';
     const password = typeof body?.password === 'string' ? body.password : '';
     if (!email || !password) return json({ ok: false, error: 'Rellena email y contraseña.' }, 400);
+    // Edad mínima (QA 4.2, H61; LOPDGDD art. 7): la casilla «Tengo 14 años o más» del registro.
+    if (body?.adult !== true) return json({ ok: false, code: 'age_required', error: `Para crear una cuenta hay que tener al menos ${LEGAL.minAge} años.` }, 400);
     if (password.length < PASSWORD_MIN) return json({ ok: false, error: mapAuthError('weak_password') }, 400);
     // Obvia (repetición, secuencia, tu email) o filtrada en alguna brecha de datos (QA 4.5).
     const obvious = obviousPasswordReason(password, email);
