@@ -23,7 +23,14 @@ const hasSession = Boolean(Astro.locals.user);
                     <form class="np-form" id="np-form" novalidate>
                         <label class="np-field">
                             <span>Nueva contraseña</span>
-                            <input type="password" id="np-password" required minlength={PASSWORD_MIN} autocomplete="new-password" placeholder={`Mínimo ${PASSWORD_MIN} caracteres`} aria-describedby="np-hint" data-email={Astro.locals.user?.email ?? ''}/>
+                            {/* QA 8.7: botón para ver la contraseña que escribes, como en «Entrar». */}
+                            <span class="np-pass-wrap">
+                                <input type="password" id="np-password" required minlength={PASSWORD_MIN} autocomplete="new-password" placeholder={`Mínimo ${PASSWORD_MIN} caracteres`} aria-describedby="np-hint" data-email={Astro.locals.user?.email ?? ''}/>
+                                <button type="button" class="np-pass-toggle" id="np-pass-toggle" aria-label="Mostrar contraseña" aria-pressed="false">
+                                    <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+                                    <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                </button>
+                            </span>
                         </label>
                         <p class="np-hint" id="np-hint" aria-live="polite"></p>
                         <p class="np-msg" id="np-msg" role="alert" hidden></p>
@@ -45,6 +52,18 @@ const hasSession = Boolean(Astro.locals.user);
 </Layout>
 
 <style>
+    .np-pass-wrap { position: relative; display: block; }
+    .np-pass-wrap input { width: 100%; padding-right: 46px; }
+    .np-pass-toggle {
+        position: absolute; top: 50%; right: 6px; transform: translateY(-50%); width: 32px; height: 32px;
+        display: flex; align-items: center; justify-content: center; border: none; background: none;
+        color: var(--text-3); cursor: pointer; border-radius: var(--r-sm);
+    }
+    .np-pass-toggle:hover { color: var(--text); }
+    .np-pass-toggle[aria-pressed="true"] { color: var(--text); background: var(--bg-tint); }
+    .np-pass-toggle svg { width: 17px; height: 17px; }
+    .np-pass-toggle .eye-off, .np-pass-toggle[aria-pressed="true"] .eye { display: none; }
+    .np-pass-toggle[aria-pressed="true"] .eye-off { display: block; }
     .np-wrap { display: flex; justify-content: center; padding: 6vh 0 10vh; }
     .np-card {
         width: 420px;
@@ -97,6 +116,14 @@ const hasSession = Boolean(Astro.locals.user);
     const form = document.getElementById('np-form') as HTMLFormElement | null;
     if (form) {
         const input = document.getElementById('np-password') as HTMLInputElement;
+        const passToggle = document.getElementById('np-pass-toggle');
+        passToggle?.addEventListener('click', () => {
+            const show = input.type === 'password';
+            input.type = show ? 'text' : 'password';
+            passToggle.setAttribute('aria-pressed', String(show));
+            passToggle.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
+            input.focus();
+        });
         // Pista en vivo (QA 4.5): lo que falta, si es obvia, o la fuerza (orientativa).
         const hint = document.getElementById('np-hint') as HTMLElement;
         const paintHint = () => {

@@ -101,6 +101,9 @@ function init(root: HTMLElement) {
     const results = new Map<string, Resolved>();
     /** Dudosos: clave → tmdb_id elegido (o null = «Ninguna»). */
     const choices = new Map<string, number | null>();
+    /** QA 8.3 (H53): lo que quitas en «Ver los encontrados» (no se importa) y lo que cambias por otra versión. */
+    const removed = new Set<string>();
+    const overrides = new Map<string, Pick>();
 
     const show = (stage: string) => {
         root.querySelectorAll<HTMLElement>('[data-imp-stage]').forEach((el) => { el.hidden = el.dataset.impStage !== stage; });
@@ -278,6 +281,8 @@ function init(root: HTMLElement) {
         lb = null;
         results.clear();
         choices.clear();
+        removed.clear();
+        overrides.clear();
         lookups = [];
         for (const [k, t] of acc.titles) {
             lookups.push({ key: k, label: t.year ? `${t.title} (${t.year})` : t.title, req: {} });
@@ -379,6 +384,8 @@ function init(root: HTMLElement) {
         show('progress');
         results.clear();
         choices.clear();
+        removed.clear();
+        overrides.clear();
         let pending: Lookup[] = [];
         let done = 0;
         progress('Buscando en TMDB…', 0, lookups.length);
@@ -417,6 +424,9 @@ function init(root: HTMLElement) {
 
     /** El título elegido para una clave: el encontrado, o la candidata pulsada en un dudoso. */
     function pickFor(key: string): Pick | null {
+        if (removed.has(key)) return null;
+        const changed = overrides.get(key);
+        if (changed) return changed;
         const r = results.get(key);
         if (r?.status === 'found') return { media_type: r.media_type!, tmdb_id: r.tmdb_id!, title: r.title ?? '', poster_path: r.poster_path ?? null, have: !!r.have };
         if (r?.status === 'ambiguous') {
@@ -433,7 +443,12 @@ function init(root: HTMLElement) {
         const found = all.filter(([, r]) => r.status === 'found');
         const amb = all.filter(([, r]) => r.status === 'ambiguous');
         const missing = lookups.filter((l) => results.get(l.key)?.status === 'missing');
-        const set = (k: string, v: number) => { $(`[data-imp-n="${k}"]`).textContent = num(v); };
+        const set = (k: string, v: number) => {
+            $(`[data-imp-n="${k}"]`).textContent = num(v);
+            // QA 8.3 (H54): «1 no encontrado», no «1 no encontrados».
+            const l = root.querySelector<HTMLElement>(`[data-imp-l="${k}"]`);
+            if (l) l.textContent = v === 1 ? l.dataset.one! : l.dataset.many!;
+        };
         set('found', found.length);
         set('have', found.filter(([, r]) => r.have).length);
         set('ambiguous', amb.length);
@@ -455,6 +470,7 @@ function init(root: HTMLElement) {
         }
 
         renderAmbiguous(amb);
+        renderFound();
 
         const miss = $<HTMLDetailsElement>('[data-imp-missing]');
         const list = $('[data-imp-missing-list]');
@@ -511,6 +527,130 @@ function init(root: HTMLElement) {
             li('Episodios', `${num(plan.episodes.length)} vistos en ${count(series, 'serie', 'series')}, con su fecha`);
         }
         $<HTMLButtonElement>('[data-imp-apply]').disabled = !plan.items.length && !plan.log.length && !plan.lists.length && !plan.episodes.length;
+    }
+
+    // --- 3b · «Ver los encontrados» (QA 8.3, H53): con qué se ha emparejado cada línea del fichero,
+    // con su póster y su año, para quitarlo o (en Letterboxd, que busca por título y año) cambiarlo por otra
+    // versión. Se pinta por tandas al abrirlo: un ratings.csv de IMDb puede traer más de mil.
+    const FOUND_PAGE = 100;
+    let foundShown = 0;
+    function foundKeys(): string[] {
+        return lookups.map((l) => l.key).filter((k) => results.get(k)?.status === 'found');
+    }
+    function renderFoundSummary() {
+        const keys = foundKeys();
+        const off = keys.filter((k) => removed.has(k)).length;
+        $('[data-imp-found-sum]').textContent = (keys.length === 1 ? 'Ver el encontrado' : `Ver los ${num(keys.length)} encontrados`)
+            + (off ? ` · ${count(off, 'quitado', 'quitados')}` : '');
+    }
+    function renderFound() {
+        const box = $<HTMLDetailsElement>('[data-imp-found]');
+        const keys = foundKeys();
+        box.hidden = !keys.length;
+        $('[data-imp-found-list]').innerHTML = '';
+        foundShown = 0;
+        renderFoundSummary();
+        if (box.open) renderFoundMore();
+    }
+    function renderFoundMore() {
+        const keys = foundKeys();
+        const list = $('[data-imp-found-list]');
+        for (const key of keys.slice(foundShown, foundShown + FOUND_PAGE)) list.append(foundRow(key));
+        foundShown = Math.min(keys.length, foundShown + FOUND_PAGE);
+        const more = $<HTMLButtonElement>('[data-imp-found-more]');
+        more.hidden = foundShown >= keys.length;
+        more.textContent = `Ver ${num(Math.min(FOUND_PAGE, keys.length - foundShown))} más`;
+    }
+    function foundRow(key: string): HTMLLIElement {
+        const li = document.createElement('li');
+        li.className = 'aj-imp-fr';
+        const paint = () => {
+            const r = results.get(key)!;
+            const p = overrides.get(key) ?? { media_type: r.media_type!, tmdb_id: r.tmdb_id!, title: r.title ?? '', poster_path: r.poster_path ?? null, have: !!r.have };
+            const year = overrides.has(key) ? (overrides.get(key) as Pick & { year?: number | null }).year : r.year;
+            const off = removed.has(key);
+            li.classList.toggle('is-off', off);
+            li.innerHTML = '';
+            const img = document.createElement('img');
+            img.alt = ''; img.loading = 'lazy';
+            if (p.poster_path) img.src = `${POSTER}${p.poster_path}`;
+            const text = document.createElement('div');
+            text.className = 'aj-imp-fr-t';
+            const b = document.createElement('a');
+            b.href = `/${p.media_type === 'tv' ? 'serie' : 'movie'}/${p.tmdb_id}`;
+            b.target = '_blank'; b.rel = 'noopener';
+            b.textContent = p.title;
+            const y = document.createElement('span');
+            y.textContent = `${year ? ` · ${year}` : ''}${p.media_type === 'tv' ? ' · serie' : ''}`;
+            text.append(b, y);
+            const label = lookups.find((l) => l.key === key)?.label;
+            if (label && label.toLowerCase() !== `${p.title}${year ? ` (${year})` : ''}`.toLowerCase()) {
+                const small = document.createElement('small');
+                small.textContent = `En el fichero: ${label}`;
+                text.append(small);
+            }
+            if (overrides.has(key)) { const t = document.createElement('em'); t.textContent = 'Cambiado'; text.append(t); }
+            else if (p.have) { const t = document.createElement('em'); t.textContent = 'Ya en tus listas'; text.append(t); }
+            const acts = document.createElement('div');
+            acts.className = 'aj-imp-fr-acts';
+            if (source === 'letterboxd' && !off) {
+                const change = document.createElement('button');
+                change.type = 'button'; change.className = 'btn btn--sm btn--ghost aj-btn';
+                change.textContent = 'Cambiar';
+                change.addEventListener('click', () => openAlternatives(key, label ?? p.title, li));
+                acts.append(change);
+            }
+            const toggle = document.createElement('button');
+            toggle.type = 'button'; toggle.className = 'btn btn--sm btn--ghost aj-btn';
+            toggle.textContent = off ? 'Devolver' : 'Quitar';
+            toggle.setAttribute('aria-label', `${off ? 'Devolver' : 'Quitar'} «${p.title}»`);
+            toggle.addEventListener('click', () => {
+                if (removed.has(key)) removed.delete(key); else removed.add(key);
+                paint(); renderFoundSummary(); renderDest();
+            });
+            acts.append(toggle);
+            li.append(img, text, acts);
+        };
+        paint();
+        (li as HTMLLIElement & { _paint?: () => void })._paint = paint;
+        return li;
+    }
+    /** «Cambiar» (Letterboxd): otras películas con ese título, para elegir la buena. */
+    async function openAlternatives(key: string, label: string, li: HTMLLIElement) {
+        li.querySelector('.aj-imp-fr-alt')?.remove();
+        const box = document.createElement('div');
+        box.className = 'aj-imp-amb-opts aj-imp-fr-alt';
+        box.textContent = 'Buscando…';
+        li.append(box);
+        const q = label.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+        try {
+            const res = await fetch(`/api/search/multi?q=${encodeURIComponent(q)}`);
+            const data = res.ok ? await res.json() : null;
+            const items: any[] = (data?.movies ?? data?.items ?? data?.results ?? []).filter((x: any) => x.media_type === 'movie').slice(0, 6);
+            box.textContent = '';
+            if (!items.length) { box.textContent = 'No hay otras versiones con ese título.'; return; }
+            const current = pickFor(key)?.tmdb_id;
+            for (const c of items) {
+                const btn = document.createElement('button');
+                btn.type = 'button'; btn.className = 'aj-imp-cand';
+                btn.setAttribute('aria-pressed', String(c.id === current));
+                const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy';
+                if (c.poster_path) img.src = `${POSTER}${c.poster_path}`;
+                const name = document.createElement('span'); name.className = 'aj-imp-cand-t'; name.textContent = c.title;
+                const year = document.createElement('span'); year.className = 'aj-imp-cand-y'; year.textContent = parseInt(c.subtitle, 10) ? String(parseInt(c.subtitle, 10)) : '—'; // «2015 · Película» → «2015»
+                btn.append(img, name, year);
+                btn.addEventListener('click', () => {
+                    const r = results.get(key);
+                    if (r && c.id === r.tmdb_id) overrides.delete(key);
+                    else overrides.set(key, { media_type: 'movie', tmdb_id: c.id, title: c.title, poster_path: c.poster_path ?? null, have: false, year: parseInt(c.subtitle, 10) || null } as Pick);
+                    (li as HTMLLIElement & { _paint?: () => void })._paint?.();
+                    renderDest();
+                });
+                box.append(btn);
+            }
+        } catch {
+            box.textContent = 'No se ha podido buscar. Inténtalo otra vez.';
+        }
     }
 
     function renderAmbiguous(amb: [string, Resolved][]) {
@@ -637,11 +777,15 @@ function init(root: HTMLElement) {
 
         // Cuenta de TMDB: ya viene un título por id; Favoritos > Vistas (valorada) > Pendientes.
         if (source === 'tmdb') {
-            for (const t of tmdb!.titles.values()) {
+            for (const [k, t] of tmdb!.titles) {
+                if (removed.has(k)) continue; // quitado en «Ver los encontrados» (QA 8.3)
                 const kind = t.favorite ? 'favorite' : t.rating ? 'seen' : t.watchlist ? 'watchlist' : null;
                 if (kind) items.push({ media_type: t.media_type, tmdb_id: t.tmdb_id, kind, ...opt(t.rating, kind === 'watchlist' ? undefined : t.rated_on) });
             }
-            for (const l of tmdb!.lists) if (l.items.length) lists.push(l);
+            for (const l of tmdb!.lists) {
+                const its = l.items.filter((it) => !removed.has(`${it.media_type}:${it.tmdb_id}`));
+                if (its.length) lists.push({ ...l, items: its });
+            }
             return { items, log, lists, episodes };
         }
 
@@ -824,6 +968,10 @@ function init(root: HTMLElement) {
 
     $('[data-imp-cancel]').addEventListener('click', () => show('pick'));
     $('[data-imp-apply]').addEventListener('click', apply);
+    $<HTMLDetailsElement>('[data-imp-found]').addEventListener('toggle', (e) => {
+        if ((e.currentTarget as HTMLDetailsElement).open && foundShown === 0) renderFoundMore();
+    });
+    $('[data-imp-found-more]').addEventListener('click', renderFoundMore);
     $('[data-imp-again]').addEventListener('click', () => show('pick'));
 }
 

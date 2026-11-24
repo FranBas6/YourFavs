@@ -77,7 +77,9 @@ interface FetchContext {
  * Ojo, aprendido a base de despistarse: el adaptador de Netlify **emula los blobs también en
  * `astro dev`**, así que esta caché está viva en local y reiniciar el servidor NO la limpia.
  */
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5'; // v5: «Joyas» con tope de popularidad (QA 8.1)
+/** Páginas de TMDB que se recorren como mucho para llenar una fila con tope de popularidad. */
+const MAX_POP_PAGES = 3;
 
 function cacheKey(rowKey: string, media: 'movie' | 'tv', ctx: FetchContext): string {
     const day = appDateParts(Date.now()).key;
@@ -105,14 +107,28 @@ async function fetchOne<T>(
         }
     }
 
-    const raw = await discoverContent<T>(media, ctx.filters, {
+    const discoverPage = (page: string | undefined) => discoverContent<T>(media, ctx.filters, {
         sort_by: def.sortBy,
         voteCountMin: def.voteCountMin,
-        page: ctx.page,
+        page,
         providers: ctx.providers,
         region: ctx.region,
         extraParams: { ...def.params, ...(media === 'movie' ? def.movieParams : def.tvParams) },
     });
+    const maxPop = def.maxPopularity?.[media];
+    let raw: T[];
+    if (maxPop == null) {
+        raw = await discoverPage(ctx.page);
+    } else {
+        // Tope de popularidad (QA 8.1): la página N de la fila son las páginas 3N-2..3N de TMDB, filtradas.
+        const first = (Math.max(1, Number(ctx.page) || 1) - 1) * MAX_POP_PAGES + 1;
+        raw = [];
+        for (let p = first; p < first + MAX_POP_PAGES && raw.length < 20; p++) {
+            const batch = await discoverPage(String(p));
+            raw.push(...batch.filter((it) => ((it as { popularity?: number }).popularity ?? 0) <= maxPop));
+            if (batch.length < 20) break;
+        }
+    }
     // TMDB devuelve 20 por página y la fila pinta 10, así que quitar sagas repetidas no deja hueco.
     const data = dedupeFranchises(raw as { title?: string; name?: string }[]) as T[];
 

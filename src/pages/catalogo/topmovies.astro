@@ -3,7 +3,8 @@ import Layout from "../../layouts/Layout.astro";
 import CatalogHeader from "../../components/catalog/CatalogHeader.astro";
 import CardMovie from "../../components/cards/CardMovie.astro";
 import {getTopRatedMovies} from "../../services/movies/movieCatalog";
-import {discoverContent, parseAdvancedFilters, hasActiveFilters, sortByFor} from "../../services/catalog/tmdbDiscoverService";
+import {discoverContent, parseAdvancedFilters, hasActiveFilters, sortByFor, getTopRatedTotalPages} from "../../services/catalog/tmdbDiscoverService";
+import { TOP_MIN_VOTES } from '../../utils/catalog/voteThresholds';
 import {getGenreName} from "../../utils/titles/genres";
 import {posterUrl} from "../../services/tmdb/tmdbClient";
 import AdvancedFilters from "../../components/catalog/AdvancedFilters.astro";
@@ -28,13 +29,14 @@ const myRegion = Astro.locals.user?.region || 'ES';
 const useDiscover = filtersActive || !!filters.sort || !!myProviders;
 
 const popularMovies = useDiscover
-    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'vote_average.desc', voteCountMin: '300', page: pageStr, providers: myProviders, region: myRegion })
+    ? await discoverContent<Movie>('movie', filters, { sort_by: sortByFor(filters.sort, 'movie') || 'vote_average.desc', voteCountMin: String(TOP_MIN_VOTES.movie), page: pageStr, providers: myProviders, region: myRegion })
     : await getTopRatedMovies({page: pageStr});
 
-const totalPages = 500;
+// Sin filtros, las páginas de verdad del Top (QA 8.1: con el mínimo de votos son ~56, no 500).
+const totalPages = useDiscover ? 500 : await getTopRatedTotalPages('movie').catch(() => 500);
 
-// Contexto para el contador en vivo del sheet (2.3b): mismo vote_count.gte (300) que el discover.
-const countCtx = [{ type: 'movie' as const, base: { 'vote_count.gte': '300' } }];
+// Contexto para el contador en vivo del sheet (2.3b): mismo vote_count.gte que el discover (TOP_MIN_VOTES, QA 8.1).
+const countCtx = [{ type: 'movie' as const, base: { 'vote_count.gte': String(TOP_MIN_VOTES.movie) } }];
 
 function buildFilterUrl(changes: Record<string, string | null>) {
     const p = new URLSearchParams(urlParams);
@@ -87,6 +89,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
                                     img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                     title={item.title}
                                     vote_average={item.vote_average}
+                                    vote_count={item.vote_count}
                                     overview={item.overview}
                                     release_date={item.release_date}
                                     genres={item.genre_ids?.map(id => ({id, name: getGenreName(id)}))}

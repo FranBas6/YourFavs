@@ -157,7 +157,8 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
             </div>
         )}
 
-        <div class="space-y-10">
+        {/* QA 8.5 (H36): con «Todo», si no hay series pero sí películas, las películas van primero. */}
+        <div class="flex flex-col gap-10">
             {/* Series */}
             {(showSeries || showAll) && (
                 <section id="series-section" class="scroll-mt-20 vpo-section" data-vpo-section>
@@ -180,6 +181,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                         name={item.name}
                                         vote_average={item.vote_average}
+                                        vote_count={item.vote_count}
                                         overview={item.overview}
                                         first_air_date={item.first_air_date}
                                         seasons={item.seasons}
@@ -207,7 +209,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
 
             {/* Películas */}
             {(showMovies || showAll) && (
-                <section id="movies-section" class="scroll-mt-20 vpo-section" data-vpo-section>
+                <section id="movies-section" class:list={["scroll-mt-20 vpo-section", { "order-first": showAll && seriesVerPronto.length === 0 && peliculasVerPronto.length > 0 }]} data-vpo-section>
                     <div class="lg-h"><h2>Películas</h2><span class="n">{peliculasVerPronto.length}</span>
                         {peliculasVerPronto.length > 1 && <button type="button" class="btn btn--sm vpo-toggle" data-vpo-toggle aria-expanded="false">Ordenar</button>}
                     </div>
@@ -227,6 +229,7 @@ const moviesOrder = peliculasVerPronto.map((m) => ({ id: String(m.id), title: m.
                                         img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                         title={item.title}
                                         vote_average={item.vote_average}
+                                        vote_count={item.vote_count}
                                         overview={item.overview}
                                         release_date={item.release_date}
                                         genres={item.genre_ids?.map((gId: number) => ({ id: gId, name: getGenreName(gId) }))}

@@ -102,7 +102,7 @@ export function convRowHtml(c: ConvSummary, o: { active?: number | null; now?: n
         ? `<span class="cv-mute" title="Silenciada">${icon('bell-off')}${sr(', silenciada')}</span>`
         : n > 0 ? `<span class="cv-n">${n > 99 ? '99+' : n}${sr(' sin leer')}</span>` : '';
     const ro = c.readOnly ? `<span class="cv-ro">${icon('lock')}Solo lectura</span>` : '';
-    return `<li><a class="cv${on ? ' on' : ''}${n > 0 ? ' un' : ''}" href="${chatHref(c.id)}" data-conv="${c.id}"${on ? ' aria-current="page"' : ''}>`
+    return `<li><a class="cv${on ? ' on' : ''}${n > 0 ? ' un' : ''}" href="${chatHref(c.id)}" data-conv="${c.id}" title="${esc(c.title)}"${on ? ' aria-current="page"' : ''}>`
         + lead
         + `<span class="cv-b"><span class="cv-t"><b>${esc(c.title)}</b>${group ? sr(`, grupo de ${c.count} personas`) : ''}${sr(', último mensaje')}<time>${esc(when)}</time></span>`
         + `<span class="cv-p">${ro}<span class="tx">${esc(c.preview)}</span>${right}</span></span></a></li>`;

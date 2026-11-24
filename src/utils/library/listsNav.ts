@@ -4,6 +4,8 @@
  * la fila activa se tiñe con él; Social y Números usan el tinte neutro.
  * `countKey` es la clave de /api/lists/counts (los contadores se piden al cargar, no en el SSR).
  */
+import { SOCIAL_PHASE } from '../social/social';
+
 export type ListsNavTone = 'fav' | 'like' | 'visto' | 'pend' | 'pronto' | 'seguir' | 'ep' | 'person' | 'rating' | 'tint';
 
 export interface ListsNavItem {
@@ -15,7 +17,7 @@ export interface ListsNavItem {
     /** Rutas que también la activan (subpáginas). */
     match?: string[];
     /** Globos que rellena scripts/notifications/bell.ts. */
-    badge?: 'pending' | 'notif';
+    badge?: 'pending' | 'notif' | 'msg';
 }
 
 export interface ListsNavGroup { key: string; label: string; items: ListsNavItem[] }
@@ -39,6 +41,9 @@ export const LISTS_NAV: ListsNavGroup[] = [
     {
         key: 'social', label: 'Social', items: [
             { href: '/mislistas/amigos', label: 'Amigos', icon: 'users', tone: 'tint', badge: 'pending' },
+            // QA 8.4 (H48): Mensajes en el lateral de siempre (antes, Amigos y Mensajes cambiaban el
+            // lateral por uno propio). Con la mensajería apagada no sale (`SOCIAL_PHASE.messages`).
+            ...(SOCIAL_PHASE.messages ? [{ href: '/mislistas/amigos/mensajes', label: 'Mensajes', icon: 'msg', tone: 'tint' as const, badge: 'msg' as const }] : []),
             { href: '/mislistas/actividad', label: 'Actividad', icon: 'activity', tone: 'tint' },
             { href: '/mislistas/notificaciones', label: 'Notificaciones', icon: 'bell', tone: 'tint', badge: 'notif' },
         ],

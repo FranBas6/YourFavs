@@ -28,6 +28,22 @@ function init(shell: HTMLElement) {
     } catch { /* sin almacenamiento */ }
     const active = Number(shell.dataset.active) || null;
 
+    // Plegar la columna a solo los avatares (escritorio). Se recuerda en `yf:chat-rail` (la clase la pone
+    // antes de pintar el script de MessagesShell).
+    const railToggle = shell.querySelector<HTMLButtonElement>('[data-ms-rail-toggle]');
+    const paintToggle = () => {
+        const mini = shell.classList.contains('rail-mini');
+        railToggle?.setAttribute('aria-pressed', String(mini));
+        railToggle?.setAttribute('aria-label', mini ? 'Desplegar la lista de conversaciones' : 'Plegar la lista de conversaciones');
+        if (railToggle) railToggle.title = mini ? 'Desplegar la lista' : 'Plegar la lista';
+    };
+    paintToggle();
+    railToggle?.addEventListener('click', () => {
+        const mini = shell.classList.toggle('rail-mini');
+        try { localStorage.setItem('yf:chat-rail', mini ? 'mini' : 'full'); } catch { /* sin almacenamiento */ }
+        paintToggle();
+    });
+
     // ---- Altura del panel (escritorio) -------------------------------------------------
     const desk = window.matchMedia('(min-width: 1024px)');
     const fit = () => {

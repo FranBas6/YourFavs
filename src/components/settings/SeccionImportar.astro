@@ -99,14 +99,23 @@ const knownHashes = Object.fromEntries(
         </div>
         <p class="aj-imp-from" data-imp-from></p>
         <div class="aj-imp-stats">
-            <div><b data-imp-n="found">0</b><span>encontrados</span></div>
+            {/* QA 8.3 (H54): la etiqueta va en singular o plural según el número (scripts/settings/importar.ts). */}
+            <div><b data-imp-n="found">0</b><span data-imp-l="found" data-one="encontrado" data-many="encontrados">encontrados</span></div>
             <div><b data-imp-n="have">0</b><span>ya en tus listas</span></div>
-            <div data-imp-stat-amb hidden><b data-imp-n="ambiguous">0</b><span>dudosos</span></div>
-            <div><b data-imp-n="missing">0</b><span>no encontrados</span></div>
-            <div><b data-imp-n="ignored">0</b><span>ignorados</span></div>
+            <div data-imp-stat-amb hidden><b data-imp-n="ambiguous">0</b><span data-imp-l="ambiguous" data-one="dudoso" data-many="dudosos">dudosos</span></div>
+            <div><b data-imp-n="missing">0</b><span data-imp-l="missing" data-one="no encontrado" data-many="no encontrados">no encontrados</span></div>
+            <div><b data-imp-n="ignored">0</b><span data-imp-l="ignored" data-one="ignorado" data-many="ignorados">ignorados</span></div>
         </div>
         <ul class="aj-imp-dest" data-imp-dest></ul>
         <div class="aj-imp-posters" data-imp-posters aria-hidden="true"></div>
+
+        {/* QA 8.3 (H53): con qué se ha emparejado cada línea, para comprobarlo antes de añadir. */}
+        <details class="aj-imp-found" data-imp-found hidden>
+            <summary data-imp-found-sum>Ver los encontrados</summary>
+            <p class="aj-imp-note">Comprueba que cada uno es el bueno. «Quitar» lo deja fuera de la importación; en Letterboxd, «Cambiar» te deja elegir otra película con ese título.</p>
+            <ul class="aj-imp-found-list" data-imp-found-list></ul>
+            <button type="button" class="btn btn--sm btn--ghost aj-btn aj-imp-found-more" data-imp-found-more hidden>Ver más</button>
+        </details>
 
         <section class="aj-imp-amb" data-imp-amb hidden aria-labelledby="imp-amb-t">
             <h3 id="imp-amb-t" class="aj-grpt">Dudosos · elige cuál es</h3>

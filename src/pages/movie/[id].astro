@@ -311,7 +311,7 @@ const jsonLd = item ? {
                     <ol>
                         <li><a href="/">Inicio</a></li>
                         <li aria-hidden="true">/</li>
-                        <li><a href="/catalogo/topmovies">Películas</a></li>
+                        <li><a href="/catalogo?type=movies">Películas</a></li>
                         <li aria-hidden="true">/</li>
                         <li><b>{item?.title}</b></li>
                     </ol>
@@ -337,7 +337,8 @@ const jsonLd = item ? {
                             {item?.runtime > 0 && <span>{Math.floor(item.runtime / 60)} h {item.runtime % 60} min</span>}
                             {(() => { const r = additionalInfo.content_ratings?.length ? getContentRating(additionalInfo.content_ratings) : null; return r ? <span class="fh-age" title={r.text}>{r.rating}</span> : null; })()}
                             <span class="fh-lang" title="Idioma original">{(item?.original_language || '').toUpperCase()} · {getLanguageDisplayName(item?.original_language).toLowerCase()}</span>
-                            {item?.hasSpanishTranslation && <span title="Disponible en español"><svg viewBox="0 0 750 500" class="fh-flag" aria-hidden="true"><rect width="750" height="500" fill="#AA151B"/><rect width="750" height="250" y="125" fill="#F1BF00"/></svg></span>}
+                            {/* QA 8.7 (H29): un idioma no es un país — icono de idiomas y la palabra, no la bandera de España. */}
+                            {item?.hasSpanishTranslation && <span class="fh-lang" title="Disponible en español"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>Español</span>}
                         </div>
                         {item?.genres && item.genres.length > 0 && (
                             <div class="fh-gs">
@@ -626,4 +627,10 @@ const jsonLd = item ? {
     </article>
 </Layout>
 
+<script>
+    // QA 8.6: siempre, aunque al cargar no haya tarjeta de nota ni «Ocultar de mi perfil»: la recarga suave
+    // (optimistic-actions.js) puede traerlas después.
+    import '../../scripts/ui/starRating';
+    import '../../scripts/social/hideFromProfile';
+</script>
 <script is:inline src="/js/optimistic-actions.js"></script>

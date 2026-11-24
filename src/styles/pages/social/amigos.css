@@ -103,8 +103,13 @@
 .am-copy-u {
     flex: 1; min-width: 0; height: 38px; padding: 0 10px; display: flex; align-items: center;
     border-radius: 8px; background: var(--bg-tint); border: 1px solid var(--border);
-    font: 500 12px var(--font-mono); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font: 500 12px var(--font-mono); color: var(--text); white-space: nowrap; overflow: hidden;
 }
+/* QA 8.4 (H49): en un flex, `text-overflow` no recorta el texto suelto (salía «yourfavs.app/u/» a secas).
+   El dominio cede y lleva «…»; el @ no se encoge. */
+.am-copy-d { flex: 0 1 auto; min-width: 2.4em; overflow: hidden; text-overflow: ellipsis; color: var(--text-3); }
+/* El @ no se encoge (así no lo recorta medio píxel de redondeo); solo si no cabe ni dejando 2,4em al dominio. */
+.am-copy-u b { flex: 0 0 auto; max-width: calc(100% - 2.4em); overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
 .am-rel { display: grid; grid-template-columns: 28px 1fr; gap: 4px 10px; margin-top: 12px; font-size: 12.5px; line-height: 1.45; color: var(--text-2); }
 .am-rel b { color: var(--text); font-weight: 600; }
 .am-rel > div { padding-bottom: 10px; }

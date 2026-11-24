@@ -21,12 +21,16 @@ interface Props {
     items: SagaBarItem[];
     /** Más alta (10 px), para «Tu progreso». */
     large?: boolean;
+    /** Sin sesión no hay progreso tuyo (QA 8.5, H70): la frase cuenta la saga, no «Has visto 0 de 8». */
+    guest?: boolean;
 }
-const { items, large = false } = Astro.props;
+const { items, large = false, guest = false } = Astro.props;
 const released = items.filter((i) => !i.upcoming);
 const seen = released.filter((i) => i.tier).length;
 const up = items.length - released.length;
-const label = up > 0
+const label = guest
+    ? `${released.length} estrenada${released.length === 1 ? '' : 's'}${up > 0 ? `; ${up} ${up === 1 ? 'próxima' : 'próximas'}` : ''}`
+    : up > 0
     ? `Has visto ${seen} de ${released.length} estrenada${released.length === 1 ? '' : 's'}; ${up} ${up === 1 ? 'próxima' : 'próximas'}`
     : `Has visto ${seen} de ${released.length}`;
 const cls = (i: SagaBarItem) => i.upcoming ? 't-u' : i.tier === 'fav' ? 't-fav' : i.tier === 'like' ? 't-like' : i.tier ? 't-v' : '';

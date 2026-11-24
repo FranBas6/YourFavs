@@ -23,6 +23,7 @@ import OwnerEmptyRow from '../../../components/social/OwnerEmptyRow.astro';
 import { Icon } from 'astro-icon/components';
 import ProfileActions from '../../../components/social/ProfileActions.astro';
 import { getPublicProfile } from '../../../services/social/publicProfile';
+import { normalizeHandle } from '../../../services/social/handles';
 import { shouldSuggestFriend } from '../../../services/social/referral';
 import { avatarHtml, initialsOf, stampFor } from '../../../utils/social/ui';
 import { SOCIAL_PHASE } from '../../../utils/social/social';
@@ -36,6 +37,12 @@ const handle = String(Astro.params.handle ?? '');
 const viewerId = Astro.locals.user?.uid ?? null;
 const view = await safeFetch(getPublicProfile(handle, viewerId), `u/${handle}`, null);
 if (!view) {
+    // QA 8.5 (H77): si es TU dirección y tu perfil está desactivado, no un 404 genérico: a Ajustes, donde
+    // se activa, con un aviso que lo explica (desde «Copiar mi enlace» se llegaba aquí sin entender nada).
+    const me = Astro.locals.user;
+    if (me?.publicHandle && me.publicVisibility === 'off' && normalizeHandle(handle) === normalizeHandle(me.publicHandle)) {
+        return Astro.redirect('/perfil/publico?aviso=desactivado');
+    }
     Astro.response.status = 404;
     return Astro.rewrite('/404');
 }
@@ -222,10 +229,10 @@ const commonSub = common
                 {b.id === 'best' && (
                     <section class="pf-row" aria-labelledby="pf-sec-best">
                         <SectionHeader
-                            headingId="pf-sec-best" title={`Mejor valoradas por ${firstName}`} color="pink" icon="star"
-                            cap={`Sus ${view.best.length} mejores`}
-                            subtitle={`La nota es la de ${firstName}, de 0,5 a 10. No la de TMDB ni la tuya.`}
-                            why={`notas de ${firstName}`}
+                            headingId="pf-sec-best" title={`Mejor valoradas por ${view.name}`} color="pink" icon="star"
+                            cap={view.best.length === 1 ? 'Su mejor' : `Sus ${view.best.length} mejores`}
+                            subtitle={`La nota es la de ${view.name}, de 0,5 a 10. No la de TMDB ni la tuya.`}
+                            why={`notas de ${view.name}`}
                         />
                         <div class="pf-lane">
                             {view.best.map((t) => (

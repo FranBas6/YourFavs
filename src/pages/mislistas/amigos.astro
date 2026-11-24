@@ -56,7 +56,7 @@ const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
 ---
 <Layout title="Amigos · YourFavs" robots="noindex, nofollow">
     {/* Estas páginas ya tienen su columna: Mis listas va como botón (también en escritorio) */}
-    <ListsNav compact />
+    <ListsNav slot="aside" />{/* QA 8.4 (H48): el lateral de siempre, no el desplegable */}
     <div class="am" data-am data-tab={tab} data-my-handle={myHandle ?? ''} data-url={publicUrl}>
 
         {!user ? (
@@ -122,7 +122,8 @@ const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
                             <>
                                 <p>Quien se registre desde él te seguirá{SOCIAL_PHASE.friends ? ' y podrá pedirte amistad' : ''}.</p>
                                 <div class="am-copy">
-                                    <span class="am-copy-u">yourfavs.app/u/{myHandle}</span>
+                                    {/* QA 8.4 (H49): el dominio se recorta con «…»; tu @ se ve siempre entero. */}
+                                    <span class="am-copy-u" title={`yourfavs.app/u/${myHandle}`}><span class="am-copy-d">yourfavs.app/u/</span><b>{myHandle}</b></span>
                                     <button type="button" class="pf-btn sm" data-am-copy><Icon name="lucide:copy" />Copiar</button>
                                 </div>
                             </>
@@ -141,7 +142,7 @@ const publicUrl = myHandle ? `https://yourfavs.app/u/${myHandle}` : '';
                             <div><b>Seguir</b> es libre y en un sentido. No pide permiso.</div>
                             <span class="am-rel-st" style="--sb: var(--stamp-pink); --si: var(--stamp-pink-ink)"><Icon name="lucide:handshake" /></span>
                             <div>{SOCIAL_PHASE.friends
-                                ? <Fragment><b>Amigos</b> es por solicitud. Desbloquea perfiles «Solo amigos» y, pronto, recomendaros cosas.</Fragment>
+                                ? <Fragment><b>Amigos</b> es por solicitud. Desbloquea perfiles «Solo amigos» y podéis recomendaros cosas.</Fragment>
                                 : <Fragment><b>Amigos</b> será por solicitud: la otra persona acepta o no. Llega muy pronto.</Fragment>}</div>
                         </div>
                         <p class="am-note"><Icon name="lucide:eye-off" />{SOCIAL_PHASE.friends ? 'Rechazar o bloquear no avisa a nadie.' : 'Bloquear no avisa a nadie.'}</p>
