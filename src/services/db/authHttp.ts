@@ -1,6 +1,7 @@
 /**
  * Piezas comunes de las rutas de `src/pages/api/auth/` y de `/auth/callback`.
  */
+import { PASSWORD_MIN } from '../../utils/core/textLimits';
 import type { AstroCookies } from 'astro';
 
 export function json(data: unknown, status = 200): Response {
@@ -46,7 +47,7 @@ export function mapAuthError(code: string | undefined): string {
         case 'validation_failed':
             return 'El email no es válido.';
         case 'weak_password':
-            return 'La contraseña debe tener al menos 6 caracteres.';
+            return `La contraseña debe tener al menos ${PASSWORD_MIN} caracteres.`;
         case 'same_password':
             return 'La nueva contraseña tiene que ser distinta de la anterior.';
         case 'invalid_credentials':

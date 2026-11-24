@@ -6,10 +6,11 @@
  * toman color al pasar por encima. Antes «Eliminar cuenta» era un botón rojo permanente
  * compitiendo por la atención con todo lo demás.
  *
- * «Descargar tus datos» se pinta pero va deshabilitada: volcar listas + notas + valoraciones
- * es la operación más caro-en-lecturas de la app y venimos de ponerla a dieta. Anotada en
- * `docs/TODO.md` con el guard que necesitaría.
+ * «Descargar tus datos» (QA 4.3): un JSON con todo lo tuyo desde `/api/profile/export` (como mucho una
+ * vez por minuto). Es también lo que se recomienda hacer antes de eliminar la cuenta.
  */
+import { DELETE_WORD } from "../../utils/core/textLimits";
+
 interface Props {
     user: { email?: string | null; provider?: string | null };
 }
@@ -22,9 +23,9 @@ const { user } = Astro.props;
         </span>
         <span class="aj-row-text">
             <span class="aj-row-title">{user.provider === 'google' ? 'Sesión iniciada con Google' : 'Sesión iniciada con tu correo'}</span>
-            <p class="aj-row-desc">{user.email}</p>
+            <p class="aj-row-desc">{user.email} · «Cerrar sesión» la cierra en todos tus dispositivos</p>
         </span>
-        <button type="button" class="btn btn--sm aj-btn" data-auth-logout>Cerrar sesión</button>
+        <button type="button" class="btn btn--sm aj-btn" data-auth-logout title="Cierra la sesión aquí y en cualquier otro móvil u ordenador">Cerrar sesión</button>
     </div>
 </div>
 
@@ -37,10 +38,10 @@ const { user } = Astro.props;
     <div class="aj-adv-list">
         <div class="aj-adv-row">
             <span class="aj-adv-row-text">
-                <span class="aj-row-title">Descargar tus datos <span class="aj-soon">Pronto</span></span>
-                <p class="aj-row-desc">Un JSON con tus listas, notas y valoraciones.</p>
+                <span class="aj-row-title">Descargar tus datos</span>
+                <p class="aj-row-desc">Un archivo con todo lo tuyo: perfil, listas, notas, diario, episodios, colecciones, gustos, lo que sigues y tus mensajes.</p>
             </span>
-            <button type="button" class="aj-adv-btn" disabled>Descargar</button>
+            <a class="aj-adv-btn" href="/api/profile/export" download data-export>Descargar</a>
         </div>
 
         <div class="aj-adv-row">
@@ -54,12 +55,48 @@ const { user } = Astro.props;
         <div class="aj-adv-row">
             <span class="aj-adv-row-text">
                 <span class="aj-row-title">Eliminar la cuenta</span>
-                <p class="aj-row-desc">Se borra todo, sin vuelta atrás.</p>
+                <p class="aj-row-desc">Se borra todo, sin vuelta atrás. Si quieres conservar algo, descarga antes tus datos.</p>
             </span>
             <button type="button" class="aj-adv-btn" id="account-delete">Eliminar</button>
         </div>
     </div>
 </details>
+
+{/* Eliminar la cuenta (QA 4.5, H72): escribir la palabra en vez de un confirm() del navegador. */}
+<dialog class="aj-del" id="account-delete-dlg" aria-labelledby="aj-del-t">
+    <form method="dialog" class="aj-del-in">
+        <h2 id="aj-del-t">Eliminar tu cuenta</h2>
+        <p>Se borrarán para siempre tus listas, notas, diario, colecciones, tu perfil público y tus mensajes. <b>No se puede deshacer.</b></p>
+        <p class="aj-del-dl">¿Quieres conservar algo? <a href="/api/profile/export" download>Descarga antes tus datos</a>.</p>
+        <label class="aj-del-l" for="aj-del-in">Escribe <b>{DELETE_WORD}</b> para confirmar</label>
+        <input id="aj-del-in" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" data-word={DELETE_WORD} />
+        <p class="aj-del-err" id="aj-del-err" role="alert" hidden></p>
+        <div class="aj-del-act">
+            <button type="submit" class="btn btn--sm" value="cancel">Cancelar</button>
+            <button type="button" class="btn btn--sm btn--dgr-solid" id="aj-del-go" disabled>Eliminar la cuenta</button>
+        </div>
+    </form>
+</dialog>
+
+<style is:global>
+    /* Global: con el estilo con ámbito de Astro, el fondo del diálogo no se oscurecía. */
+    #account-delete-dlg::backdrop { background: rgba(0, 0, 0, .5); }
+</style>
+<style>
+    .aj-del { width: min(440px, calc(100vw - 32px)); padding: 0; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg-elev); color: var(--text); box-shadow: var(--sh-lg); }
+    .aj-del-in { display: flex; flex-direction: column; gap: 12px; padding: 22px; }
+    .aj-del h2 { margin: 0; font: 700 var(--fs-sub) var(--font); }
+    .aj-del p { margin: 0; font-size: var(--fs-ui); line-height: 1.5; color: var(--text-2); }
+    .aj-del p b { color: var(--text); }
+    .aj-del-dl a { color: var(--primary); font-weight: 600; }
+    .aj-del-l { font-size: var(--fs-ui); color: var(--text-2); }
+    .aj-del input { height: 42px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--bg); color: var(--text); font: 600 15px var(--font-mono); letter-spacing: .06em; }
+    .aj-del input:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+    .aj-del-err { color: var(--accent-dark) !important; font-weight: 600; }
+    .aj-del-act { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    .btn--dgr-solid { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+    .btn--dgr-solid:disabled { opacity: .45; cursor: not-allowed; }
+</style>
 
 <script>
     // --- Reiniciar gustos ---
@@ -80,23 +117,38 @@ const { user } = Astro.props;
         }
     });
 
-    // --- Eliminar cuenta ---
+    // --- Eliminar cuenta: diálogo en el que hay que escribir la palabra (QA 4.5) ---
     const delBtn = document.getElementById('account-delete') as HTMLButtonElement | null;
-    delBtn?.addEventListener('click', async () => {
-        if (!confirm('¿Eliminar tu cuenta? Se borrarán TODAS tus listas y tu perfil. Esta acción NO se puede deshacer.')) return;
-        delBtn.disabled = true;
-        delBtn.textContent = 'Eliminando…';
+    const dlg = document.getElementById('account-delete-dlg') as HTMLDialogElement | null;
+    const word = dlg?.querySelector<HTMLInputElement>('#aj-del-in');
+    const go = dlg?.querySelector<HTMLButtonElement>('#aj-del-go');
+    const err = dlg?.querySelector<HTMLElement>('#aj-del-err');
+    const target = word?.dataset.word ?? 'ELIMINAR';
+    delBtn?.addEventListener('click', () => {
+        if (!dlg || !word || !go) return;
+        word.value = ''; go.disabled = true; if (err) err.hidden = true;
+        dlg.showModal(); word.focus();
+    });
+    word?.addEventListener('input', () => { if (go) go.disabled = word.value.trim().toUpperCase() !== target; });
+    word?.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (go && !go.disabled) go.click(); } });
+    go?.addEventListener('click', async () => {
+        if (!word || word.value.trim().toUpperCase() !== target) return;
+        go.disabled = true;
+        go.textContent = 'Eliminando…';
         try {
-            const res = await fetch('/api/auth/delete-account', { method: 'POST' });
+            const res = await fetch('/api/auth/delete-account', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ confirm: word.value.trim().toUpperCase() }),
+            });
             if (!res.ok) throw new Error();
             // El servidor ya ha borrado las cookies de sesión junto con la cuenta.
             // La cuenta ya no existe: el navegador deja de recordar que entraste (aviso del modal de acceso, 7.4c).
             try { localStorage.removeItem('yf_auth_seen'); } catch { /* noop */ }
             location.href = '/';
         } catch {
-            delBtn.disabled = false;
-            delBtn.textContent = 'Eliminar';
-            alert('No se pudo eliminar la cuenta. Inténtalo de nuevo.');
+            go.disabled = false;
+            go.textContent = 'Eliminar la cuenta';
+            if (err) { err.textContent = 'No se ha podido eliminar la cuenta. Inténtalo otra vez.'; err.hidden = false; }
         }
     });
 </script>

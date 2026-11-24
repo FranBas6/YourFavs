@@ -1,4 +1,5 @@
 ---
+import { PASSWORD_MIN } from '../../utils/core/textLimits';
 /**
  * /auth/nueva-contrasena — destino del enlace de «¿Olvidaste la contraseña?».
  *
@@ -22,8 +23,9 @@ const hasSession = Boolean(Astro.locals.user);
                     <form class="np-form" id="np-form" novalidate>
                         <label class="np-field">
                             <span>Nueva contraseña</span>
-                            <input type="password" id="np-password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres"/>
+                            <input type="password" id="np-password" required minlength={PASSWORD_MIN} autocomplete="new-password" placeholder={`Mínimo ${PASSWORD_MIN} caracteres`} aria-describedby="np-hint" data-email={Astro.locals.user?.email ?? ''}/>
                         </label>
+                        <p class="np-hint" id="np-hint" aria-live="polite"></p>
                         <p class="np-msg" id="np-msg" role="alert" hidden></p>
                         <button type="submit" class="np-submit" id="np-submit">Guardar contraseña</button>
                     </form>
@@ -83,20 +85,41 @@ const hasSession = Boolean(Astro.locals.user);
         cursor: pointer;
     }
     .np-submit:disabled { opacity: .6; cursor: default; }
+    .np-hint { margin: -6px 0 0; min-height: 1.2em; font-size: var(--fs-meta); color: var(--text-3); }
+    .np-hint.is-ok { color: var(--ok-ink); }
+    .np-hint.is-er { color: var(--accent-dark); }
     @media (max-width: 480px) { .np-card { padding: 24px 20px 18px; } }
 </style>
 
 <script>
+    import { PASSWORD_MIN } from '../../utils/core/textLimits';
+    import { obviousPasswordReason, passwordStrength, STRENGTH_LABEL } from '../../utils/core/passwordCheck';
     const form = document.getElementById('np-form') as HTMLFormElement | null;
     if (form) {
         const input = document.getElementById('np-password') as HTMLInputElement;
+        // Pista en vivo (QA 4.5): lo que falta, si es obvia, o la fuerza (orientativa).
+        const hint = document.getElementById('np-hint') as HTMLElement;
+        const paintHint = () => {
+            const n = input.value.length;
+            hint.classList.remove('is-ok', 'is-er');
+            if (!n) { hint.textContent = ''; return; }
+            if (n < PASSWORD_MIN) { hint.textContent = `Mínimo ${PASSWORD_MIN} caracteres · te faltan ${PASSWORD_MIN - n}`; return; }
+            const obvious = obviousPasswordReason(input.value, input.dataset.email);
+            if (obvious) { hint.textContent = obvious; hint.classList.add('is-er'); return; }
+            const st = passwordStrength(input.value, PASSWORD_MIN);
+            hint.textContent = `Fuerza: ${STRENGTH_LABEL[st]}${st < 2 ? ' · mejor una frase larga' : ''}`;
+            if (st >= 2) hint.classList.add('is-ok');
+        };
+        input.addEventListener('input', paintHint);
         const msg = document.getElementById('np-msg') as HTMLElement;
         const btn = document.getElementById('np-submit') as HTMLButtonElement;
         const show = (text: string, ok = false) => { msg.textContent = text; msg.classList.toggle('is-ok', ok); msg.hidden = false; };
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (input.value.length < 6) { show('La contraseña debe tener al menos 6 caracteres.'); return; }
+            if (input.value.length < PASSWORD_MIN) { show(`La contraseña debe tener al menos ${PASSWORD_MIN} caracteres.`); return; }
+            const obvious = obviousPasswordReason(input.value, input.dataset.email);
+            if (obvious) { show(obvious); return; }
             btn.disabled = true;
             btn.textContent = 'Un momento…';
             try {

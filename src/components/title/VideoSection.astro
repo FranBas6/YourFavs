@@ -1,5 +1,6 @@
 ---
-import { formatTrailerUrl } from "../../utils/titles/mediaHelpers";
+import { youtubeId } from "../../utils/titles/mediaHelpers";
+import YouTubeFacade from "./YouTubeFacade.astro";
 
 interface Video {
     name: string;
@@ -15,6 +16,8 @@ interface Props {
 
 const { trailerUrl, clips = [], behindScenes = [], teasers = [] } = Astro.props;
 const extrasTotal = clips.length + behindScenes.length + teasers.length;
+// Sin nada de YouTube hasta que se pulsa ▶ (QA 4.4): miniatura y, al pulsar, youtube-nocookie.
+const trailerId = youtubeId(trailerUrl);
 // Rediseño 4.5: «Más vídeos» agrupado por tipo (hasta 4 de cada), con su rótulo.
 const groups = [
     { label: 'Clips', items: clips.slice(0, 4) },
@@ -22,11 +25,11 @@ const groups = [
     { label: 'Detrás de las cámaras', items: behindScenes.slice(0, 4) },
 ].filter((g) => g.items.length > 0);
 ---
-{trailerUrl && (
+{trailerId && (
     <section>
         <div class="fsec-h"><h2>Tráiler y vídeos</h2>{groups.length > 0 && <span class="n">{1 + groups.reduce((n, g) => n + g.items.length, 0)}</span>}</div>
         <div class="aspect-video rounded-xl overflow-hidden fvid">
-            <iframe src={formatTrailerUrl(trailerUrl)} class="w-full h-full" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+            <YouTubeFacade id={trailerId} title="Tráiler" />
         </div>
     </section>
 )}
@@ -43,7 +46,7 @@ const groups = [
                             <div>
                                 <p class="text-xs text-gray-500 mb-1 truncate">{video.name}</p>
                                 <div class="aspect-video rounded-lg overflow-hidden">
-                                    <iframe src={formatTrailerUrl(video.key)} class="w-full h-full" allowfullscreen loading="lazy"></iframe>
+                                    {youtubeId(video.key) && <YouTubeFacade id={youtubeId(video.key)!} title={video.name} />}
                                 </div>
                             </div>
                         ))}

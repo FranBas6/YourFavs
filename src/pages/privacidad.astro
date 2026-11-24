@@ -1,0 +1,145 @@
+---
+/**
+ * Política de privacidad (QA 4.1, H59). Escrita a partir de cómo funciona la web de verdad (qué tablas,
+ * qué cookies, qué proveedores): si cambia algo de eso, hay que tocar aquí. Pendiente de revisión por
+ * alguien que sepa de RGPD (paso 4.6 de docs/QA/PLAN_ARREGLOS.md).
+ */
+import LegalPage from '../components/legal/LegalPage.astro';
+import { LEGAL } from '../utils/legal/legalInfo';
+---
+<LegalPage
+    title="Política de privacidad"
+    description="Qué datos guarda YourFavs, para qué, con quién se comparten y cómo ejercer tus derechos."
+    summary={`${LEGAL.service} es un proyecto personal y sin ánimo de lucro. Guardamos lo que tú apuntas (tus listas, notas, mensajes…) para que la web funcione, no lo vendemos ni hay publicidad, y puedes descargarlo o borrarlo todo cuando quieras desde Ajustes.`}
+>
+    <h2>1. Quién es el responsable</h2>
+    <p>
+        El responsable de tus datos es <b>{LEGAL.owner}</b>, titular de {LEGAL.service}. Para cualquier cosa sobre
+        privacidad escribe a <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
+    </p>
+
+    <h2>2. Qué datos guardamos</h2>
+    <h3>Tu cuenta</h3>
+    <ul>
+        <li>Tu email y tu contraseña. La contraseña nunca se guarda en claro: la gestiona nuestro proveedor de cuentas cifrada.</li>
+        <li>Si entras con Google: tu nombre, tu email y tu foto de Google.</li>
+        <li>Tu nombre visible, tu avatar y tus preferencias (idioma, país, tema, plataformas, avisos, modo sin spoilers).</li>
+    </ul>
+    <h3>Lo que apuntas</h3>
+    <ul>
+        <li>Tus listas (Favoritos, Me gusta, Vistos, Pendientes, Lo próximo, Siguiendo…), tus notas, tus opiniones y etiquetas.</li>
+        <li>Tu diario de visionados, los episodios que marcas, tus colecciones, tus gustos y las personas y sagas que sigues.</li>
+        <li>Lo que importes desde IMDb, Letterboxd, TMDB o Trakt. Si importas desde una cuenta de otra web, solo leemos tus listas durante la importación, con tu permiso.</li>
+    </ul>
+    <h3>La parte social</h3>
+    <ul>
+        <li>Tu perfil público, <b>solo si lo activas</b>: tu @, tu bio y las secciones que elijas.</li>
+        <li>Tus amistades, solicitudes, a quién sigues, a quién bloqueas, tus recomendaciones, tus mensajes, tus planes para ver algo y las denuncias que hagas.</li>
+    </ul>
+    <h3>Datos técnicos</h3>
+    <ul>
+        <li>Como cualquier web, nuestros proveedores registran datos técnicos de cada visita (dirección IP, navegador, hora) para que el servicio funcione y sea seguro.</li>
+    </ul>
+
+    <h2>3. Para qué y con qué base legal</h2>
+    <div class="lg-tw"><table>
+        <thead><tr><th>Para qué</th><th>Base legal</th></tr></thead>
+        <tbody>
+            <tr><td>Darte el servicio: guardar tus listas, calcular tu progreso, tus estadísticas y tus recomendaciones, enviarte los avisos de la campana y los emails de tu cuenta (confirmar el email, recuperar la contraseña).</td><td>Ejecución del contrato que aceptas al registrarte (art. 6.1.b del RGPD).</td></tr>
+            <tr><td>Mostrar tu perfil público y que aparezca en buscadores, si tú lo activas.</td><td>Tu consentimiento, que retiras apagándolo en Ajustes (art. 6.1.a).</td></tr>
+            <tr><td>Mantener la web segura: evitar abusos, revisar las denuncias y comprobar que tu contraseña no ha aparecido en filtraciones.</td><td>Interés legítimo en proteger el servicio y a quienes lo usan (art. 6.1.f).</td></tr>
+        </tbody>
+    </table></div>
+    <p>
+        No usamos tus datos para publicidad, no los vendemos ni hacemos perfiles comerciales. Las recomendaciones
+        «Para ti» salen de tus listas y solo sirven para sugerirte qué ver: no tienen ningún efecto más allá.
+    </p>
+
+    <h2>4. Cuánto tiempo los guardamos</h2>
+    <p>
+        Mientras tengas la cuenta. Si la eliminas (Ajustes › Cuenta y datos), se borra en ese momento todo lo tuyo:
+        listas, notas, diario, colecciones, perfil, amistades, recomendaciones y el resto. <b>Los mensajes que enviaste
+        se quedan en las conversaciones de las otras personas</b>, porque también son parte de su historial, pero sin
+        tu nombre: aparecen como de una cuenta eliminada. Las copias de seguridad de nuestros proveedores pueden
+        conservarlo todo un tiempo limitado hasta que se renuevan. Las denuncias se guardan lo necesario para resolverlas.
+    </p>
+
+    <h2>5. Con quién se comparten</h2>
+    <p>Solo con los proveedores que necesitamos para que la web funcione, que tratan los datos por encargo nuestro:</p>
+    <div class="lg-tw"><table>
+        <thead><tr><th>Proveedor</th><th>Para qué</th><th>Dónde</th></tr></thead>
+        <tbody>
+            <tr><td>Supabase Inc.</td><td>Base de datos, cuentas y archivos (avatares).</td><td>Estados Unidos</td></tr>
+            <tr><td>Netlify Inc.</td><td>Alojamiento de la web y su servidor.</td><td>Estados Unidos</td></tr>
+            <tr><td>Google LLC</td><td>Envío de los emails de tu cuenta (Gmail) y, si lo usas, el inicio de sesión con Google.</td><td>Estados Unidos</td></tr>
+        </tbody>
+    </table></div>
+    <p>
+        Como algunos están en Estados Unidos, hay una <b>transferencia internacional de datos</b>. Se hace con las
+        garantías del RGPD: el Marco de Privacidad de Datos UE-EE. UU., cuando la empresa está adherida, o las
+        cláusulas contractuales tipo aprobadas por la Comisión Europea que incluyen sus acuerdos de tratamiento.
+    </p>
+    <p>Además, al navegar por la web:</p>
+    <ul>
+        <li><b>Las imágenes de películas y series</b> se cargan desde The Movie Database (TMDB), que recibe tu dirección IP como al visitar cualquier web.</li>
+        <li><b>Los vídeos de YouTube</b> no se cargan hasta que pulsas ▶. Hasta entonces solo se ve una miniatura; al pulsar, se usa el modo de privacidad mejorada de YouTube (youtube-nocookie.com).</li>
+        <li><b>Al crear o cambiar la contraseña</b>, comprobamos si ha aparecido en filtraciones con el servicio Have I Been Pwned. Solo se envían los 5 primeros caracteres de un resumen cifrado de la contraseña: ni la contraseña ni nada que te identifique sale de nuestro servidor.</li>
+    </ul>
+    <p>
+        <b>Lo que ven otras personas:</b> tu nombre y tu avatar, las personas con las que tienes relación en la parte
+        social (amigos, solicitudes, conversaciones). Tu perfil público, y que te encuentren en el buscador de personas,
+        solo si lo activas. Tus mensajes, solo quienes participan en la conversación, y tus recomendaciones, quien las recibe.
+    </p>
+    <p>No cedemos tus datos a nadie más, salvo obligación legal.</p>
+
+    <h2>6. Tus derechos</h2>
+    <p>Puedes ejercer en cualquier momento tus derechos de:</p>
+    <ul>
+        <li><b>Acceso y portabilidad</b>: Ajustes › Cuenta y datos › «Descargar tus datos» te da un archivo con todo lo tuyo.</li>
+        <li><b>Rectificación</b>: casi todo se cambia desde Ajustes o desde cada ficha.</li>
+        <li><b>Supresión</b>: Ajustes › Cuenta y datos › «Eliminar la cuenta».</li>
+        <li><b>Oposición y limitación</b>, o cualquier otra cosa: escribe a <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>. Te contestaremos en un plazo máximo de un mes.</li>
+    </ul>
+    <p>
+        Si crees que no hemos atendido bien tus derechos, puedes reclamar ante la Agencia Española de Protección de
+        Datos (<a href="https://www.aepd.es/" target="_blank" rel="noopener">aepd.es</a>).
+    </p>
+
+    <h2>7. Edad mínima</h2>
+    <p>
+        Para crear una cuenta tienes que tener al menos <b>{LEGAL.minAge} años</b> (art. 7 de la Ley Orgánica de
+        Protección de Datos). Si sabemos que una cuenta es de alguien menor, la eliminaremos.
+    </p>
+
+    <h2>8. Cookies y almacenamiento del navegador</h2>
+    <p>
+        Solo usamos cookies <b>técnicas</b>, imprescindibles para que la web funcione, así que no hace falta pedirte
+        permiso. No hay cookies de análisis ni de publicidad.
+    </p>
+    <div class="lg-tw"><table>
+        <thead><tr><th>Nombre</th><th>Para qué</th></tr></thead>
+        <tbody>
+            <tr><td><code>sb-…</code></td><td>Tu sesión: que sigas dentro al cambiar de página.</td></tr>
+            <tr><td><code>has_session</code></td><td>Saber si hay sesión sin consultar el servidor.</td></tr>
+            <tr><td><code>yf_catalogo_type</code></td><td>Recordar si miras películas o series en el catálogo.</td></tr>
+            <tr><td><code>yf_ref</code></td><td>Saber quién te invitó, si llegaste desde el enlace de alguien.</td></tr>
+            <tr><td>Las del inicio con Google</td><td>Completar el inicio de sesión con Google; duran unos minutos.</td></tr>
+        </tbody>
+    </table></div>
+    <p>
+        En el almacenamiento de tu navegador guardamos también algunas preferencias de la interfaz (el tema claro u
+        oscuro, el borrador de un mensaje…). Se quedan en tu dispositivo.
+    </p>
+
+    <h2>9. Seguridad</h2>
+    <p>
+        La conexión va siempre cifrada (HTTPS), las contraseñas se guardan cifradas y la base de datos solo deja a cada
+        persona leer y cambiar sus propias filas. Aun así, ninguna web es invulnerable: si pasara algo que afectara a
+        tus datos, te lo contaríamos.
+    </p>
+
+    <h2>10. Cambios en esta política</h2>
+    <p>
+        Si la cambiamos, actualizaremos la fecha de arriba y, si el cambio es importante, te avisaremos en la web.
+    </p>
+</LegalPage>

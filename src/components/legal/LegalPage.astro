@@ -1,0 +1,40 @@
+---
+/**
+ * Marco común de las páginas legales (QA 4.1): título, fecha de revisión, navegación entre ellas y el
+ * texto en una columna cómoda de leer. El contenido va en el slot (h2, p, ul…), con estilo de
+ * `styles/pages/legal.css` (solo tokens: el modo oscuro va solo).
+ */
+import Layout from '../../layouts/Layout.astro';
+import { LEGAL, LEGAL_PAGES } from '../../utils/legal/legalInfo';
+import '../../styles/pages/legal.css';
+
+interface Props {
+    title: string;
+    description: string;
+    /** Resumen en dos o tres líneas, antes del texto completo. */
+    summary?: string;
+}
+const { title, description, summary } = Astro.props;
+const here = Astro.url.pathname.replace(/\/$/, '');
+---
+<Layout title={`${title} · ${LEGAL.service}`} description={description}>
+    <article class="lg">
+        <header class="lg-h">
+            <p class="lg-k">Legal</p>
+            <h1>{title}</h1>
+            <p class="lg-d">Última revisión: {LEGAL.updated}</p>
+            <nav class="lg-nav" aria-label="Páginas legales">
+                {LEGAL_PAGES.map((p) => (
+                    <a href={p.href} aria-current={p.href === here ? 'page' : undefined}>{p.label}</a>
+                ))}
+            </nav>
+        </header>
+        {summary && <p class="lg-sum">{summary}</p>}
+        <div class="lg-body">
+            <slot />
+        </div>
+        <footer class="lg-f">
+            ¿Dudas? Escríbenos a <a href={`mailto:${LEGAL.email}`}>{LEGAL.email}</a>.
+        </footer>
+    </article>
+</Layout>

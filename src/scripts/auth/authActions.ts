@@ -52,8 +52,9 @@ export function loginEmail(email: string, password: string): Promise<AuthResult>
     return post('/api/auth/login', { email, password });
 }
 
-export function registerEmail(email: string, password: string): Promise<AuthResult> {
-    return post('/api/auth/register', { email, password, next: location.pathname + location.search });
+/** `adult`: la casilla «Tengo 14 años o más» (QA 4.2); el servidor la exige. */
+export function registerEmail(email: string, password: string, adult = false): Promise<AuthResult> {
+    return post('/api/auth/register', { email, password, adult, next: location.pathname + location.search });
 }
 
 /** Reenvía el email de confirmación (pantalla «Revisa tu correo»). */

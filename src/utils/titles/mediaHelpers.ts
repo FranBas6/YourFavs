@@ -127,6 +127,13 @@ export function getRatingStars(rating: number): string {
     return "★".repeat(fullStars) + (halfStar ? "½" : "") + "☆".repeat(emptyStars);
 }
 
+/** Id de un vídeo de YouTube a partir de su URL (embed, watch, youtu.be) o del `key` de TMDB; null si no lo es. */
+export function youtubeId(urlOrKey: string | null | undefined): string | null {
+    if (!urlOrKey) return null;
+    const embed = formatTrailerUrl(urlOrKey).match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{6,})/);
+    return embed ? embed[1] : null;
+}
+
 export function formatTrailerUrl(url: string): string {
     if (url.includes('youtube.com/embed/')) return url;
 

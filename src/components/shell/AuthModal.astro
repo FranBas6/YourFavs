@@ -22,6 +22,7 @@
  * público), el registro enseña «Te invita Ana · @ana». Con `SIGNUP_MODE=invite` y sin invitación, la
  * pestaña Crear cuenta sale deshabilitada y el aviso lo explica. `?auth=invite` = Google rechazado.
  */
+import { LEGAL } from "../../utils/legal/legalInfo";
 import { signupMode } from '../../services/social/signupMode';
 const mode = signupMode();
 
@@ -123,7 +124,7 @@ const I = {
                         <button type="button" class="auth-forgot" data-auth-forgot>¿La has olvidado?</button>
                     </div>
                     <div class="auth-pass-wrap">
-                        <input type="password" name="password" id="auth-password" required autocomplete="current-password" minlength="6" placeholder="Tu contraseña" aria-describedby="auth-pass-hint"/>
+                        <input type="password" name="password" id="auth-password" required autocomplete="current-password" minlength="1" placeholder="Tu contraseña" aria-describedby="auth-pass-hint"/>
                         <button type="button" class="auth-pass-toggle" id="auth-pass-toggle" aria-label="Mostrar contraseña" aria-pressed="false">
                             <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
                             <svg class="eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -133,6 +134,18 @@ const I = {
                 </div>
 
                 <div class="auth-msg" id="auth-msg" role="alert" hidden></div>
+
+                {/* Edad mínima y aviso legal (QA 4.2, H11/H61). La casilla solo en «Crear cuenta», y vale también
+                    para «Registrarte con Google»; el aviso, en los dos modos con su texto. */}
+                <label class="auth-age" id="auth-age" hidden>
+                    <input type="checkbox" id="auth-age-cb" aria-describedby="auth-age-err" />
+                    <span>Tengo {LEGAL.minAge} años o más</span>
+                </label>
+                <span class="auth-hint is-er" id="auth-age-err" hidden></span>
+                <p class="auth-legal" id="auth-legal">
+                    <span id="auth-legal-lead">Al entrar aceptas</span> los <a href="/terminos" target="_blank" rel="noopener">Términos</a>
+                    y la <a href="/privacidad" target="_blank" rel="noopener">Política de privacidad</a>.
+                </p>
 
                 <div class="auth-foot">
                     <button type="submit" class="btn btn--pri auth-submit" id="auth-submit"><span class="auth-spin" aria-hidden="true" hidden></span><span id="auth-submit-l">Entrar</span></button>
@@ -314,6 +327,18 @@ const I = {
     .auth-hint svg { width: 14px; height: 14px; flex-shrink: 0; }
     .auth-hint.is-ok { color: var(--ok-ink); }
     .auth-hint.is-er { color: var(--accent-dark); }
+    /* Edad y aviso legal (QA 4.2) */
+    .auth-age { display: flex; align-items: center; gap: 10px; min-height: 40px; font: 500 var(--fs-ui) var(--font); color: var(--text); cursor: pointer; }
+    .auth-age input { width: 18px; height: 18px; accent-color: var(--primary); flex-shrink: 0; }
+    .auth-age.is-er span { color: var(--accent-dark); }
+    .auth-legal { margin: 0; font-size: var(--fs-meta); line-height: 1.45; color: var(--text-3); }
+    .auth-legal a { color: var(--text-2); text-decoration: underline; text-underline-offset: 2px; }
+    /* Indicador de fuerza de la contraseña (QA 4.5): tres tramos que se llenan. */
+    .auth-meter { display: inline-flex; gap: 3px; margin-right: 2px; }
+    .auth-meter i { width: 16px; height: 4px; border-radius: 2px; background: var(--border-strong); }
+    .auth-meter[data-s="1"] i:nth-child(-n+1) { background: var(--a-pronto, #F97316); }
+    .auth-meter[data-s="2"] i:nth-child(-n+2) { background: var(--a-rating, #EAB308); }
+    .auth-meter[data-s="3"] i { background: var(--ok-ink, #059669); }
     [data-theme="dark"] .auth-hint.is-er { color: var(--stamp-red-ink); }
 
     .auth-msg {
@@ -400,6 +425,9 @@ const I = {
 <script>
     import type * as AuthActions from '../../scripts/auth/authActions';
     import { SOCIAL_PHASE } from '../../utils/social/social';
+    import { PASSWORD_MIN } from '../../utils/core/textLimits';
+    import { LEGAL } from '../../utils/legal/legalInfo';
+    import { obviousPasswordReason, passwordStrength, STRENGTH_LABEL } from '../../utils/core/passwordCheck';
 
     const overlay = document.getElementById('auth-modal') as HTMLElement | null;
     if (overlay) {
@@ -424,6 +452,12 @@ const I = {
         const passHint = $('auth-pass-hint');
         const emailErr = $('auth-email-err');
         const fineEl = $('auth-fine');
+        const ageEl = $('auth-age');
+        const ageCb = $<HTMLInputElement>('auth-age-cb');
+        const ageErr = $('auth-age-err');
+        const legalLead = $('auth-legal-lead');
+        const ageError = (on: boolean) => { ageEl.classList.toggle('is-er', on); ageErr.hidden = !on; ageErr.textContent = on ? `Marca la casilla: para crear una cuenta hay que tener al menos ${LEGAL.minAge} años.` : ''; if (on) ageCb.focus(); };
+        ageCb.addEventListener('change', () => { if (ageCb.checked) ageError(false); });
         const forgotBtn = overlay.querySelector('[data-auth-forgot]') as HTMLButtonElement;
         const pendingEl = $('auth-pending');
         const pendingIco = $('auth-pending-ico');
@@ -571,14 +605,21 @@ const I = {
             paintPassHint();
         }
 
-        // Pista de la contraseña: en Crear cuenta, en vivo («te faltan 2» → «✓ Tiene 6 caracteres o más»).
+        // Pista de la contraseña: en Crear cuenta, en vivo («te faltan 2» → «✓ Tiene 8 caracteres o más»).
+        // Mínimo de 8 (QA 4.5, H08); al entrar no se exige: quien la creó de 6 o 7 sigue pudiendo entrar.
         const OK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
         function paintPassHint() {
             if (mode !== 'register') { passHint.hidden = true; return; }
             const n = passInput.value.length;
             passHint.hidden = false;
-            if (n >= 6) { passHint.className = 'auth-hint is-ok'; passHint.innerHTML = `${OK_ICON}Tiene 6 caracteres o más`; }
-            else { passHint.className = 'auth-hint'; passHint.textContent = n ? `Mínimo 6 caracteres · te faltan ${6 - n}` : 'Mínimo 6 caracteres'; }
+            if (n < PASSWORD_MIN) { passHint.className = 'auth-hint'; passHint.textContent = n ? `Mínimo ${PASSWORD_MIN} caracteres · te faltan ${PASSWORD_MIN - n}` : `Mínimo ${PASSWORD_MIN} caracteres`; return; }
+            // Obvia (repetición, secuencia, tu email): se avisa ya; el servidor la rechaza igualmente.
+            const obvious = obviousPasswordReason(passInput.value, emailInput.value);
+            if (obvious) { passHint.className = 'auth-hint is-er'; passHint.textContent = obvious; return; }
+            // Fuerza orientativa (no bloquea): anima a una frase larga.
+            const st = passwordStrength(passInput.value, PASSWORD_MIN);
+            passHint.className = st >= 2 ? 'auth-hint is-ok' : 'auth-hint';
+            passHint.innerHTML = `<span class="auth-meter" data-s="${st}" aria-hidden="true"><i></i><i></i><i></i></span>${STRENGTH_LABEL[st]}${st < 2 ? ' · mejor una frase larga' : ''}`;
         }
         passInput.addEventListener('input', () => { if (passInput.getAttribute('aria-invalid')) passInput.removeAttribute('aria-invalid'); paintPassHint(); });
         emailInput.addEventListener('input', () => { if (emailInput.getAttribute('aria-invalid')) { emailInput.removeAttribute('aria-invalid'); emailErr.hidden = true; } });
@@ -645,9 +686,13 @@ const I = {
             passLabel.textContent = isLogin ? 'Contraseña' : 'Elige una contraseña';
             passInput.placeholder = isLogin ? 'Tu contraseña' : 'Crea una contraseña';
             passInput.setAttribute('autocomplete', isLogin ? 'current-password' : 'new-password');
+            passInput.minLength = isLogin ? 1 : PASSWORD_MIN;
             submitL.textContent = submitText();
             forgotBtn.hidden = !isLogin;
             fineEl.hidden = isLogin;
+            ageEl.hidden = isLogin;
+            ageError(false);
+            legalLead.textContent = isLogin ? 'Al entrar aceptas' : 'Al crear la cuenta aceptas';
             $('auth-line').hidden = isLogin;
             clearFieldErrors();
             if (!isLogin) fillPosters();
@@ -888,6 +933,7 @@ const I = {
         googleBtn.addEventListener('click', async () => {
             clearMsg();
             clearNote();
+            if (mode === 'register' && !ageCb.checked) { ageError(true); return; }
             setGoogleLoading(true);
             const a = await getActions();
             const res = await a.loginGoogle();
@@ -918,11 +964,17 @@ const I = {
             if (!email) { fieldError(emailInput, emailErr, 'Escribe tu email'); emailInput.focus(); return; }
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fieldError(emailInput, emailErr, 'Ese email no es válido'); emailInput.focus(); return; }
             if (!password) { fieldError(passInput, passHint, 'Escribe tu contraseña'); passInput.focus(); return; }
-            if (mode === 'register' && password.length < 6) { fieldError(passInput, passHint, `La contraseña tiene que tener al menos 6 caracteres · te faltan ${6 - password.length}`); passInput.focus(); return; }
+            if (mode === 'register' && password.length >= PASSWORD_MIN) {
+                const obvious = obviousPasswordReason(password, email);
+                if (obvious) { fieldError(passInput, passHint, obvious); passInput.focus(); return; }
+            }
+            if (mode === 'register' && password.length < PASSWORD_MIN) { fieldError(passInput, passHint, `La contraseña tiene que tener al menos ${PASSWORD_MIN} caracteres · te faltan ${PASSWORD_MIN - password.length}`); passInput.focus(); return; }
+
+            if (mode === 'register' && !ageCb.checked) { ageError(true); return; }
 
             setLoading(true);
             const a = await getActions();
-            const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password);
+            const res = mode === 'login' ? await a.loginEmail(email, password) : await a.registerEmail(email, password, ageCb.checked);
             if (res.ok && res.pendingConfirmation) { showPending(email); return; }
             if (res.ok) { writeSeen('email'); afterAuth(res); return; }
             if (res.code === 'invite_only') { setMode('login'); setLoading(false); showMsg(res.error); return; }
