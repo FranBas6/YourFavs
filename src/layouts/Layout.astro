@@ -9,6 +9,7 @@ import MobileTabBar from "../components/shell/MobileTabBar.astro";
 import MobileNavSheets from "../components/shell/MobileNavSheets.astro";
 import SocialLayer from "../components/social/SocialLayer.astro";
 import MiniChat from "../components/social/MiniChat.astro";
+import { LEGAL, LEGAL_PAGES } from "../utils/legal/legalInfo";
 import "../styles/tokens.css";
 import "../styles/layout.css";
 import "@fontsource/poppins/400.css";
@@ -179,6 +180,11 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
             </a>
         </div>
     </div>
+    {/* Páginas legales (QA 4.1, H59): antes el pie solo tenía «Acerca de». */}
+    <nav class="mt-4 flex flex-wrap justify-center sm:justify-start gap-x-4 gap-y-1 text-xs text-gray-500" aria-label="Legal">
+        {LEGAL_PAGES.map((p) => <a href={p.href} class="hover:text-blue-600 transition">{p.label}</a>)}
+        <a href={`mailto:${LEGAL.email}`} class="hover:text-blue-600 transition">Contacto</a>
+    </nav>
     <!-- Atribución que exigen los términos de TMDB (logo menos prominente que el nuestro + este aviso)
          y la fuente de «Dónde ver» (JustWatch). -->
     <p class="mt-4 text-xs text-gray-400 text-center sm:text-left">
