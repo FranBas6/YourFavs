@@ -265,9 +265,9 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 {brief.signals.length > 0 && heroMovie && (
                     <div class="home-hero-switchrow">
                         <span class="home-hero-switchlabel">Tu portada</span>
-                        <div class="home-hero-switch" role="tablist" aria-label="Cambiar portada">
-                            <button type="button" class="is-active" data-hero-pick="brief">Hoy en tu cine</button>
-                            <button type="button" data-hero-pick="trending">Tendencias</button>
+                        <div class="home-hero-switch" role="group" aria-label="Cambiar portada">
+                            <button type="button" class="is-active" aria-pressed="true" data-hero-pick="brief">Hoy en tu cine</button>
+                            <button type="button" aria-pressed="false" data-hero-pick="trending">Tendencias</button>
                         </div>
                     </div>
                 )}
@@ -328,7 +328,7 @@ const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.incl
                 var panels = root.querySelectorAll('[data-hero]');
                 function apply(which) {
                     panels.forEach(function (p) { p.hidden = p.getAttribute('data-hero') !== which; });
-                    picks.forEach(function (b) { b.classList.toggle('is-active', b.getAttribute('data-hero-pick') === which); });
+                    picks.forEach(function (b) { var on = b.getAttribute('data-hero-pick') === which; b.classList.toggle('is-active', on); b.setAttribute('aria-pressed', String(on)); });
                     try { localStorage.setItem('yf_home_hero', which); } catch (e) {}
                 }
                 var saved = null;

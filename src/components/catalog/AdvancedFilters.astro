@@ -597,13 +597,23 @@ const chipClass = (active: boolean) => `yf-chip${active ? ' is-active' : ''}`;
 
     /* Slider de nota */
     .yf-rating-slider { display: flex; align-items: center; gap: 12px; }
+    /* QA 6.2 (H84): el control mide 44 px de alto (zona táctil) y la barra de color de 6 px se pinta
+       en la pista; antes todo el control medía 6 px y era casi imposible acertar con el dedo. */
     .yf-rating-slider input[type="range"] {
         -webkit-appearance: none; appearance: none;
-        flex: 1; height: 6px; border-radius: 999px; outline: none;
+        flex: 1; height: 44px; background: transparent; cursor: pointer;
+    }
+    .yf-rating-slider input[type="range"]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 8px; }
+    .yf-rating-slider input[type="range"]::-webkit-slider-runnable-track {
+        height: 6px; border-radius: 999px;
+        background: linear-gradient(90deg, #9CA3AF 0%, var(--rating-low) 45%, var(--rating-med) 72%, var(--rating-high) 100%);
+    }
+    .yf-rating-slider input[type="range"]::-moz-range-track {
+        height: 6px; border-radius: 999px;
         background: linear-gradient(90deg, #9CA3AF 0%, var(--rating-low) 45%, var(--rating-med) 72%, var(--rating-high) 100%);
     }
     .yf-rating-slider input[type="range"]::-webkit-slider-thumb {
-        -webkit-appearance: none; appearance: none;
+        -webkit-appearance: none; appearance: none; margin-top: -6px;
         width: 18px; height: 18px; border-radius: 50%;
         background: #fff; border: 2px solid var(--accent); cursor: pointer;
         box-shadow: var(--sh-sm);

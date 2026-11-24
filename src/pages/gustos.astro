@@ -72,8 +72,8 @@ const prefill = {
                 <p class="tw-sub">Elige los que más te gusten (con 3 o más acertamos mejor). Nos ayuda a entender por dónde empezar con tus recomendaciones.</p>
                 <div class="tw-chips" data-tw-genres>
                     {TASTE_GENRES.map((g) => (
-                        <button type="button" class:list={["tw-chip", selectedGenres.has(g.movie) && "is-on"]} data-genre-id={g.movie}>
-                            <span class="tw-chip-check">✓</span>{g.name}
+                        <button type="button" class:list={["tw-chip", selectedGenres.has(g.movie) && "is-on"]} aria-pressed={selectedGenres.has(g.movie) ? 'true' : 'false'} data-genre-id={g.movie}>
+                            <span class="tw-chip-check" aria-hidden="true">✓</span>{g.name}
                         </button>
                     ))}
                 </div>
@@ -300,6 +300,8 @@ const prefill = {
 
     // Estado de selección
     const selGenres = new Set();
+    /** QA 6.2 (H15): «elegido» también para lectores de pantalla (aria-pressed), no solo con el color. */
+    const setOn = (el, on) => { if (!el) return; el.classList.toggle('is-on', on); el.setAttribute('aria-pressed', String(on)); };
     card.querySelectorAll('.tw-chip.is-on').forEach((c) => selGenres.add(Number(c.dataset.genreId)));
     const selMovies = new Map();
     (prefill.movies || []).forEach((t) => selMovies.set(tkey(t), t));
@@ -338,7 +340,7 @@ const prefill = {
     function titleCard(t, sel) {
         const on = sel.has(tkey(t));
         const src = t.image || IMG(t.poster_path);
-        return '<button type="button" class="tw-poster' + (on ? ' is-on' : '') + '" data-tkey="' + tkey(t) + '">'
+        return '<button type="button" class="tw-poster' + (on ? ' is-on' : '') + '" aria-pressed="' + on + '" data-tkey="' + tkey(t) + '">'
             + '<span class="tw-poster-img"><img src="' + src + '" alt="" loading="lazy"></span>'
             + '<span class="tw-check">✓</span>'
             + '<span class="tw-label">' + escapeHtml(t.title || '') + '</span>'
@@ -347,7 +349,7 @@ const prefill = {
     function personCard(p) {
         const on = selPeople.has(p.id);
         const src = p.image || IMG(p.profile_path);
-        return '<button type="button" class="tw-person' + (on ? ' is-on' : '') + '" data-pid="' + p.id + '">'
+        return '<button type="button" class="tw-person' + (on ? ' is-on' : '') + '" aria-pressed="' + on + '" data-pid="' + p.id + '">'
             + '<span class="tw-person-img"><img src="' + src + '" alt="" loading="lazy"></span>'
             + '<span class="tw-check">✓</span>'
             + '<span class="tw-label">' + escapeHtml(p.name || '') + '</span></button>';
@@ -408,10 +410,10 @@ const prefill = {
             const k = b.dataset.untray;
             if (kind === 'people') {
                 selPeople.delete(Number(k));
-                card.querySelector('[data-grid="people"] [data-pid="' + k + '"]')?.classList.remove('is-on');
+                setOn(card.querySelector('[data-grid="people"] [data-pid="' + k + '"]'), false);
             } else {
                 selOf(kind).delete(k);
-                card.querySelector('[data-grid="' + kind + '"] [data-tkey="' + k + '"]')?.classList.remove('is-on');
+                setOn(card.querySelector('[data-grid="' + kind + '"] [data-tkey="' + k + '"]'), false);
             }
             updateCounts();
         });
@@ -490,10 +492,10 @@ const prefill = {
     card.querySelector('[data-tw-genres]').addEventListener('click', (e) => {
         const chip = e.target.closest('.tw-chip'); if (!chip) return;
         const id = Number(chip.dataset.genreId);
-        if (selGenres.has(id)) { selGenres.delete(id); chip.classList.remove('is-on'); }
+        if (selGenres.has(id)) { selGenres.delete(id); setOn(chip, false); }
         else {
             if (selGenres.size >= MAX) { flash('Máximo ' + MAX + ' géneros'); return; }
-            selGenres.add(id); chip.classList.add('is-on');
+            selGenres.add(id); setOn(chip, true);
         }
         updateCounts();
     });
@@ -504,13 +506,13 @@ const prefill = {
         card.querySelector('[data-grid="' + kind + '"]').addEventListener('click', (e) => {
             const btn = e.target.closest('.tw-poster'); if (!btn) return;
             const k = btn.dataset.tkey;
-            if (sel.has(k)) { sel.delete(k); btn.classList.remove('is-on'); }
+            if (sel.has(k)) { sel.delete(k); setOn(btn, false); }
             else {
                 if (sel.size >= MAX) { flash('Máximo ' + MAX + ' ' + nounPlural); return; }
                 const d = titleData.get(k);
                 if (!d) return;
                 sel.set(k, { id: d.id, media_type: d.media_type, title: d.title || '', poster_path: d.poster_path ?? null, year: d.year ?? null });
-                btn.classList.add('is-on');
+                setOn(btn, true);
             }
             updateCounts();
         });
@@ -522,13 +524,13 @@ const prefill = {
     card.querySelector('[data-grid="people"]').addEventListener('click', (e) => {
         const btn = e.target.closest('.tw-person'); if (!btn) return;
         const id = Number(btn.dataset.pid);
-        if (selPeople.has(id)) { selPeople.delete(id); btn.classList.remove('is-on'); }
+        if (selPeople.has(id)) { selPeople.delete(id); setOn(btn, false); }
         else {
             if (selPeople.size >= MAX) { flash('Máximo ' + MAX + ' personas'); return; }
             const d = peopleData.get(id);
             if (!d) return;
             selPeople.set(id, { id: d.id, name: d.name || '', profile_path: d.profile_path ?? null });
-            btn.classList.add('is-on');
+            setOn(btn, true);
         }
         updateCounts();
     });

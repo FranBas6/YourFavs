@@ -263,7 +263,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                         ) : (
                             <div class="st16">
                                 <img src={stillUrl(still, 'w780')} alt={`Fotograma de ${title}`} />
-                                {stills.length > 1 && <a class="cnt" href="#still-0" aria-label={`Ver los ${stills.length} fotogramas`}><Icon name="lucide:image" aria-hidden="true" />1 / {stills.length}</a>}
+                                {stills.length > 1 && <a class="cnt" href="#still-0" aria-label={`1 / ${stills.length}: ver los fotogramas`}><Icon name="lucide:image" aria-hidden="true" />1 / {stills.length}</a>}
                             </div>
                         ))}
                     </div>
@@ -371,7 +371,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                 </nav>
 
                 {next ? (
-                    <a class="enc nx" href={next.href} aria-label={next.label}>
+                    <a class="enc nx" href={next.href}>
                         <span class:list={['th', { ph: !next.thumb }]}>{next.thumb && <img src={next.thumb} alt="" loading="lazy" />}</span>
                         <span class="tx">
                             <span class="k">Siguiente · {next.code}<Icon name="lucide:chevron-right" aria-hidden="true" /></span>
@@ -476,7 +476,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                             <dd>{score ? <span class="ep-rt"><Icon name="lucide:star" aria-hidden="true" />{score} · {votes.toLocaleString('es-ES')} {votes === 1 ? 'voto' : 'votos'}</span> : <span class="mu">{air === 'aired' ? 'Sin votos todavía' : 'Sin nota hasta que se emita'}</span>}</dd>
                             <dt>Tipo</dt>
                             <dd>{episodeKind(season!, ep.episode_type)}</dd>
-                            {crewRows.length > 0 && <hr />}
+                            {crewRows.length > 0 && <div class="dl-sep" aria-hidden="true"></div>}
                             {crewRows.map(([label, names]) => (
                                 <>
                                     <dt>{label}</dt>
