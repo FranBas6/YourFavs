@@ -251,8 +251,9 @@ const KNOWN_KEYS = HOME_SECTIONS.map((s) => s.key);
 const savedOrder = (Astro.locals.user?.homeLayout || []).map((x) => x.key).filter((k) => KNOWN_KEYS.includes(k));
 // Orden final: lo guardado primero, luego los bloques que aún no estén en la preferencia; sin ocultos.
 const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.includes(k))].filter((k) => !isHidden(k));
+import { SITE_TAGLINE, SITE_DESCRIPTION } from '../utils/core/siteCopy';
 ---
-<Layout title="YourFavs">     
+<Layout title={`YourFavs · ${SITE_TAGLINE}`} description={SITE_DESCRIPTION}>     
     <div class="main-container">
         {/* 7.1 · Sin sesión: bienvenida (handoff P2) con Tendencias y la banda de Importar. Con sesión, la portada de siempre. */}
         {Astro.locals.user ? (<Fragment>

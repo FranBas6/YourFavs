@@ -44,6 +44,11 @@ const myRegion = Astro.locals.user?.region || 'ES';
 
 const MODE_LABEL: Record<string, string> = { all: 'películas y series', movies: 'películas', series: 'series' };
 const MODE_TITLE: Record<string, string> = { all: 'Catálogo', movies: 'Películas', series: 'Series' };
+const CATALOG_DESC: Record<string, string> = {
+    all: 'Descubre películas y series por criterio: lo nuevo en streaming, lo mejor valorado, por década, por plataforma y por tema.',
+    movies: 'Descubre películas por criterio: estrenos en streaming, las mejor valoradas, por década, por plataforma y por tema.',
+    series: 'Descubre series por criterio: lo que se estrena esta semana, las mejor valoradas, por plataforma y por tema.',
+};
 
 // Filas del modo: primero las curadas (cada una con su criterio a la vista), luego los géneros del
 // día. Rotan por DÍA, no al azar en cada carga, para que la caché sirva y recargar no baile.
@@ -94,7 +99,7 @@ const countCtx = [
     ...((type === 'all' || type === 'series') ? [{ type: 'tv' as const, base: { 'vote_count.gte': '150' } }] : []),
 ];
 ---
-<Layout title={`${MODE_TITLE[type]} · Catálogo`}>
+<Layout title={type === 'all' ? 'Catálogo' : `${MODE_TITLE[type]} · Catálogo`} description={CATALOG_DESC[type] ?? CATALOG_DESC.all}>
     <div class="px-1 sm:py-8">
         <CatalogHeader
             title="Catálogo"

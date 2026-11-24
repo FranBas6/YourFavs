@@ -1,5 +1,6 @@
 ---
 import Header from "../components/shell/Header.astro";
+import { SITE_DESCRIPTION as DEFAULT_DESCRIPTION, SITE_TAGLINE } from "../utils/core/siteCopy";
 import CommandPalette from "../components/shell/CommandPalette.astro";
 import AuthModal from "../components/shell/AuthModal.astro";
 import SaveToPopover from "../components/shell/SaveToPopover.astro";
@@ -45,7 +46,7 @@ interface Props {
 
 const {
     title,
-    description = "Tu plataforma favorita para descubrir películas y series",
+    description = DEFAULT_DESCRIPTION,
     ogImage,
     ogType = "website",
     robots,
@@ -56,6 +57,16 @@ const {
 // Imagen al compartir (QA 1.2, H73/H04): WhatsApp, X, Telegram o Slack necesitan una URL ABSOLUTA. Sin
 // imagen propia de la página, la de la marca (public/og-image.png, 1200×630; antes apuntaba a un archivo
 // que no existía). Las de TMDB ya llegan absolutas y `new URL` las deja igual.
+// Títulos y descripciones (QA 6.3, H03/H47). Cada página pasa su nombre («Cartelera», «El club de la
+// lucha») y aquí se le añade « · YourFavs», una sola vez y con el mismo separador en toda la web (antes,
+// unas lo llevaban con «—», otras con «|» y la mayoría sin él). La que empieza por «YourFavs» (portada)
+// se deja tal cual. La descripción se corta a ~160 caracteres por palabra: la de TMDB puede ser larguísima.
+const BRAND = 'YourFavs';
+const pageTitle = title.startsWith(BRAND) ? title : `${title.replace(/\s*[—|·-]\s*YourFavs\s*$/, '')} · ${BRAND}`;
+const ogTitle = title.startsWith(BRAND) ? title : title.replace(/\s*[—|·-]\s*YourFavs\s*$/, '');
+const clean = description.replace(/\s+/g, ' ').trim();
+const metaDescription = clean.length <= 160 ? clean : `${clean.slice(0, 157).replace(/\s+\S*$/, '')}…`;
+
 const shareImage = new URL(ogImage || '/og-image.png', Astro.url.origin).href;
 const shareUrl = ogUrl || new URL(Astro.url.pathname, Astro.url.origin).href;
 
@@ -84,7 +95,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg"/>
     <meta name="generator" content={Astro.generator}/>
-    <meta name="description" content={description}/>
+    <meta name="description" content={metaDescription}/>
     <meta name="theme-color" content="#2B63D9"/>
     {canonical && <link rel="canonical" href={Astro.url.href}/>}
     <!-- App instalable. El `apple-touch-icon` de aquí abajo ya se enlazaba, pero el archivo
@@ -104,7 +115,7 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
     <meta property="og:image" content={shareImage}/>
     {!ogImage && <meta property="og:image:width" content="1200"/>}
     {!ogImage && <meta property="og:image:height" content="630"/>}
-    {!ogImage && <meta property="og:image:alt" content="YourFavs · Lleva todo lo que ves, episodio a episodio"/>}
+    {!ogImage && <meta property="og:image:alt" content={`YourFavs · ${SITE_TAGLINE}`}/>}
     <meta name="twitter:card" content="summary_large_image"/>
     <meta name="twitter:title" content={title}/>
     <meta name="twitter:description" content={description}/>
@@ -131,12 +142,12 @@ const hideTabbar = ['/gustos', '/login', '/registro'].some(p => _tbPath === p ||
             } catch {}
         })();
     </script>
-    <meta property="og:title" content={title}/>
-    <meta property="og:description" content={description}/>
+    <meta property="og:title" content={ogTitle}/>
+    <meta property="og:description" content={metaDescription}/>
     <meta property="og:type" content={ogType}/>
     <meta property="og:url" content={shareUrl}/>
     {robots && <meta name="robots" content={robots}/>}
-    <title>{title}</title>
+    <title>{pageTitle}</title>
 </head>
 <body id="top" class="bg-light-gray min-h-screen pb-16 sm:pb-24 md:pb-32 font-poppins" data-taste-hint={tasteHintEligible ? 'eligible' : ''}>
 <a href="#content" class="skip-link">Saltar al contenido</a>

@@ -5,7 +5,7 @@ export const allCategories = [
     {slug: 'crimen', name: 'CRIMEN', label: 'Crimen'},
     {slug: 'aventura', name: 'AVENTURA', label: 'Aventura'},
     {slug: 'fantasia', name: 'FANTASÍA', label: 'Fantasía'},
-    {slug: 'ciencia_ficcion', name: 'CIENCIA FICCIÓN', label: 'Ciencia Ficción'},
+    {slug: 'ciencia_ficcion', name: 'CIENCIA FICCIÓN', label: 'Ciencia ficción'},
     {slug: 'misterio', name: 'MISTERIO', label: 'Misterio'},
     {slug: 'terror', name: 'TERROR', label: 'Terror'},
     {slug: 'animacion', name: 'ANIMACIÓN', label: 'Animación'},
