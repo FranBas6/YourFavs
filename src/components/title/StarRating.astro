@@ -4,8 +4,13 @@ interface Props {
     tmdbRating: number;
     itemId: string;
     mediaType: 'movie' | 'serie';
+    /**
+     * Solo la fila de estrellas, sin tarjeta (QA 3.3, H26): la barra de acciones la pone tras verla y sin
+     * nota («¿Qué te ha parecido?»), para no tener que bajar a «Tu nota».
+     */
+    compact?: boolean;
 }
-const { currentRating, tmdbRating, itemId, mediaType } = Astro.props;
+const { currentRating, tmdbRating, itemId, mediaType, compact = false } = Astro.props;
 const isSerie = mediaType === 'serie';
 /**
  * DIEZ estrellas, una por punto. Con 5 estrellas cada una valía 2 puntos y medio punto salía
@@ -26,6 +31,29 @@ const label = currentRating !== null ? fmtScore(currentRating) : '';
 
 const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z";
 ---
+{compact ? (
+<div class="rate-quick">
+    <span class="rq-q">¿Qué te ha parecido?</span>
+    <form method="POST" class="rating-form" data-rating={currentRating ?? 0}>
+        <input type="hidden" name="id" value={itemId} />
+        {isSerie && <input type="hidden" name="serie_id" value={itemId} />}
+        <input type="hidden" name="action" value="save_rating" />
+        <input type="hidden" name="actionType" value="rating" />
+        <div class="rating-stars">
+            {stars.map((starIdx) => (
+                <span class="star-pair" data-star={starIdx}>
+                    <svg class="star-base" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d={STAR_PATH}/></svg>
+                    <svg class="star-fill" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true" style="clip-path: inset(0 100% 0 0);"><path d={STAR_PATH}/></svg>
+                </span>
+            ))}
+            <input type="range" class="rating-range" name="rating" min="0" max="10" step="0.5" value="0"
+                aria-label="Tu nota, de 0,5 a 10 en pasos de medio punto" aria-valuetext="sin nota" />
+        </div>
+        <button type="submit" class="rating-save btn btn--sm">Guardar nota</button>
+    </form>
+    <span class="rate-val"><span class="rating-label" data-default-label=""></span><span class="rating-scale" hidden>/10</span></span>
+</div>
+) : (
 <div class="fcard">
     {/* F4 social: «Te la recomendó Ana» (RecommendedBlock), encima de tu nota y dentro de su tarjeta. */}
     <slot />
@@ -101,6 +129,7 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
         </form>
     )}
 </div>
+)}
 
 <style>
     /* Las 10 estrellas se REPARTEN el ancho disponible (flex: 1) en vez de tener un tamaño
@@ -131,6 +160,12 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
     .rating-range:focus-visible { outline: none; }
     .rating-stars:has(.rating-range:focus-visible) { outline: 2px solid #2563eb; outline-offset: 3px; border-radius: 6px; }
 
+    /* Fila compacta de la barra de acciones (QA 3.3). */
+    .rate-quick { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 12px; padding: 10px 12px; border-radius: var(--r-md); background: var(--a-rating-bg, var(--bg-tint)); }
+    .rate-quick .rq-q { font: 600 var(--fs-ui) var(--font); color: var(--text); }
+    .rate-quick .rating-form { flex: 1 1 220px; min-width: 0; max-width: 20rem; }
+    .rate-quick .rate-val { font: 700 var(--fs-ui) var(--font-mono); color: var(--text); }
+    .rate-quick .rating-scale { font-size: 11px; color: var(--text-3); }
     .rating-form:has(button.is-submitting) .rating-stars {
         pointer-events: none;
         opacity: 0.5;
@@ -165,14 +200,31 @@ const STAR_PATH = "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25
 
         // `input` = pintar mientras se arrastra. `change` = al soltar, guardar.
         range.addEventListener('input', () => paint(Number(range.value)));
-        range.addEventListener('change', () => {
+        const commit = () => {
             // El 0 existe solo para que la posición cuadre con las estrellas; como nota no
             // vale, se sube al mínimo real antes de enviar.
             if (Number(range.value) < 0.5) { range.value = '0.5'; paint(0.5); }
             // Se dispara un click en el botón (en vez de requestSubmit) porque la capa
             // optimista lee `e.submitter`: sin botón asociado abortaría el envío.
             if (save) save.click();
+        };
+        // Teclado (QA 3.3, H27): cada flecha disparaba `change`, guardaba y recargaba la página, así que no
+        // se podía llegar a la nota deseada. Con teclado se guarda al pulsar Intro, al salir del control o
+        // tras un segundo sin tocarlo; con ratón o dedo, al soltar, como siempre.
+        let viaKey = false;
+        let pending: number | undefined;
+        const flush = () => { if (pending !== undefined) { window.clearTimeout(pending); pending = undefined; commit(); } };
+        range.addEventListener('pointerdown', () => { viaKey = false; });
+        range.addEventListener('keydown', (e) => {
+            viaKey = true;
+            if (e.key === 'Enter') { e.preventDefault(); if (pending === undefined) pending = 0; flush(); }
         });
+        range.addEventListener('change', () => {
+            if (!viaKey) { commit(); return; }
+            window.clearTimeout(pending);
+            pending = window.setTimeout(() => { pending = undefined; commit(); }, 1000);
+        });
+        range.addEventListener('blur', flush);
 
         // Con JS el guardado es automático al soltar → el botón solo existe para el
         // camino sin JS y para que la capa optimista tenga un `submitter`.
