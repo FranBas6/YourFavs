@@ -1,8 +1,10 @@
-import { tmdbFetch, tmdbFetchList } from "../tmdb/tmdbClient";
+import { tmdbFetchList } from "../tmdb/tmdbClient";
+import { getTitleDetails } from "../tmdb/tmdbTitleCache";
 import { processBatch } from "../../utils/core/processBatch";
 import { getMovieCollectionInfo, type MovieCollectionInfo } from "../movies/movieDetail";
 import { getLibrarySnapshot } from "../library/librarySnapshot";
-import { getCurrentUid } from "../db/userScope";
+import { getCurrentUid, getCurrentLanguage } from "../db/userScope";
+import { getCached, setCached, invalidateCached } from "../cache/recsBlobCache";
 import { onLibraryChange } from '../library/libraryChanges';
 import { toTimestamp } from "../../utils/titles/mediaHelpers";
 import { SEED_COLLECTION_IDS } from "../../utils/catalog/featuredCollections";
@@ -19,21 +21,18 @@ const userCache = new Map<string, CacheEntry<MovieCollectionInfo[]>>();
 // Tus sagas se vacían solas cuando cambian tus listas (services/library/libraryChanges.ts).
 onLibraryChange(['lists'], () => invalidateUserCollectionsCache());
 
+/**
+ * Saga de cada película. QA 7.1: las fichas salen de `getTitleDetails` (tabla `tmdb_cache`, compartida
+ * entre instancias y guardada solo mientras TMDB la da por buena), no de un `/movie/{id}` por película
+ * en cada instancia nueva: era la mayor parte de las ~160 llamadas de /catalogo/colecciones.
+ */
 async function extractCollectionIds(movieIds: string[]): Promise<number[]> {
-    const results = await processBatch(
-        movieIds,
-        async (id: string): Promise<number | null> => {
-            try {
-                const d = await tmdbFetch<any>(`/movie/${id}`);
-                return d?.belongs_to_collection?.id ?? null;
-            } catch {
-                return null;
-            }
-        },
-        10
-    );
+    const details = await getTitleDetails('movie', movieIds).catch(() => [] as any[]);
     const unique = new Set<number>();
-    for (const id of results) if (typeof id === 'number') unique.add(id);
+    for (const d of details) {
+        const id = d?.belongs_to_collection?.id;
+        if (typeof id === 'number') unique.add(id);
+    }
     return Array.from(unique);
 }
 
@@ -42,8 +41,17 @@ async function loadCollections(ids: number[]): Promise<MovieCollectionInfo[]> {
     return results.filter((c): c is MovieCollectionInfo => c !== null);
 }
 
+/** QA 7.1: la lista montada también en Blobs (la misma hora que en memoria), para que una instancia
+ *  nueva la lea de una vez en vez de reconstruirla saga a saga. Lleva el idioma: los nombres cambian. */
+const popularKey = () => `collections/popular_v1/${getCurrentLanguage()}`;
+
 export async function getPopularCollections(): Promise<MovieCollectionInfo[]> {
     if (popularCache && popularCache.expires > Date.now()) return popularCache.data;
+    const shared = await getCached<MovieCollectionInfo[]>(popularKey());
+    if (shared?.length) {
+        popularCache = { data: shared, expires: Date.now() + POPULAR_TTL_MS };
+        return shared;
+    }
     try {
         // Estrategia híbrida: semilla curada + descubrimiento dinámico
         // Dinámico: top_rated + discover por vote_count (anclas de franquicia más valoradas)
@@ -90,6 +98,7 @@ export async function getPopularCollections(): Promise<MovieCollectionInfo[]> {
             });
 
         popularCache = { data: filtered, expires: Date.now() + POPULAR_TTL_MS };
+        if (filtered.length) void setCached(popularKey(), filtered, POPULAR_TTL_MS);
         return filtered;
     } catch (error) {
         console.error("Error al cargar colecciones populares:", error);
@@ -134,6 +143,7 @@ export async function getUserCollections(): Promise<MovieCollectionInfo[]> {
 export function invalidateCollectionsCache(): void {
     popularCache = null;
     userCache.clear();
+    void invalidateCached(popularKey());
 }
 
 /** Solo las sagas del usuario de la petición; sin uid (fuera de una petición) se vacía todo. */

@@ -2,7 +2,8 @@ import { tmdbFetch, tmdbFetchList, posterUrl } from '../tmdb/tmdbClient';
 import { getSeriesSiguiendo } from '../series/serieLibrary';
 import { getAllNotificationSubs } from '../notifications/notificationSubs';
 import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
-import { fetchSerieDetails } from '../series/serieCatalog';
+import { getTitleDetails } from '../tmdb/tmdbTitleCache';
+import { tmdbFetchFresh } from '../tmdb/tmdbFreshCache';
 import { getCurrentRegion } from '../db/userScope';
 import { processBatch } from '../../utils/core/processBatch';
 import { episodeTypeLabel } from '../../utils/titles/episodeType';
@@ -192,7 +193,9 @@ export async function getCalendarData(
     const allSerieIdsToFetch = [...followedAndSubIds, ...popularToFetch];
 
     const [seriesDetails, extraMovies] = await Promise.all([
-        processBatch(allSerieIdsToFetch, (id) => fetchSerieDetails(id), 10),
+        // QA 7.1: fichas de la caché compartida (`tmdb_cache`, válidas mientras TMDB lo diga), no una
+        // llamada por serie en cada instancia nueva.
+        getTitleDetails('tv', allSerieIdsToFetch),
         // Con `release_dates` en la misma llamada: de las que tienes aviso, la fecha en tu país.
         processBatch(movieNotifIds, (id) => tmdbFetch<any>(`/movie/${id}`, { append_to_response: 'release_dates' }).catch(() => null), 10),
     ]);
@@ -284,6 +287,18 @@ export async function getCalendarData(
     // Set de IDs que son seguidas o suscritas (para estas hacemos fetch de temporada completa)
     const personalSerieIds = new Set([...followedSeriesIds, ...serieNotifIds]);
 
+    // QA 7.1: las temporadas de tus series, todas a la vez (antes, una tras otra dentro del bucle) y
+    // guardadas mientras TMDB las dé por buenas. La que falle se queda sin datos, como antes.
+    const seasonOf = (serie: any): number | undefined =>
+        serie.next_episode_to_air?.season_number || serie.last_episode_to_air?.season_number;
+    const personalWithSeason = seriesDetails.filter((x: any) => x && personalSerieIds.has(String(x.id)) && seasonOf(x));
+    const seasonsById = new Map<string, any>();
+    await processBatch(personalWithSeason, async (x: any) => {
+        const n = seasonOf(x);
+        const data = await tmdbFetchFresh<any>(`/tv/${x.id}/season/${n}`).catch(() => null);
+        if (data) seasonsById.set(`${x.id}/${n}`, data);
+    }, 10);
+
     for (const serie of seriesDetails) {
         if (!serie) continue;
         const serieIdStr = String(serie.id);
@@ -300,7 +315,8 @@ export async function getCalendarData(
         // Para series seguidas/suscritas: fetch temporada completa para obtener TODOS los episodios del mes
         if (isPersonal && currentSeasonNum) {
             try {
-                const seasonData = await tmdbFetch<any>(`/tv/${serie.id}/season/${currentSeasonNum}`);
+                const seasonData = seasonsById.get(`${serie.id}/${currentSeasonNum}`);
+                if (!seasonData) throw new Error('temporada sin datos');
                 const episodes = seasonData.episodes || [];
                 const monthEpisodes = episodes.filter((ep: any) => ep.air_date && isInMonth(ep.air_date, year, month));
 

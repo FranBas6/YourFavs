@@ -1,0 +1,58 @@
+---
+/**
+ * Episodios de UNA temporada, en HTML suelto (partial), para la ficha de serie (QA 7.3, H82).
+ *
+ * La ficha ya no lleva en su HTML los episodios de todas las temporadas (Juego de Tronos: ~27.000 de
+ * sus ~31.000 nodos, aunque estuvieran plegadas): deja el hueco y `scripts/series/seasonEpisodes.ts`
+ * pide aquí la temporada al abrirla. Es el mismo componente (`SeasonEpisodes`) con los mismos datos que
+ * usaba la ficha: tus vistos, el modo sin spoilers de esta serie y las marcas de FINAL.
+ *
+ * Sin caché: lleva tus vistos, que cambian al marcar. Los datos de TMDB sí vienen de caché
+ * (`getEpisodesBySeasonNumber` → `tmdbFetchFresh`, `getTitleDetails` → `tmdb_cache`).
+ */
+import SeasonEpisodes from '../../../../components/title/SeasonEpisodes.astro';
+import { getEpisodesBySeasonNumber } from '../../../../services/series/serieDetail';
+import { getWatchedProgress } from '../../../../services/series/serieLibrary';
+import { getSpoilerPref } from '../../../../services/titles/spoilerPrefs';
+import { getTitleDetails } from '../../../../services/tmdb/tmdbTitleCache';
+import { spoilerView } from '../../../../utils/titles/episodeRows';
+import { safeFetch } from '../../../../utils/core/safeFetch';
+
+export const partial = true;
+export const prerender = false;
+
+const id = String(Astro.params.id ?? '');
+const season = Number(Astro.params.season);
+if (!/^\d+$/.test(id) || !Number.isInteger(season) || season < 0) {
+    return new Response(null, { status: 404 });
+}
+
+const user = Astro.locals.user;
+const [[detail], seasonEpisodes, watchedProgress, spoilerPref] = await Promise.all([
+    getTitleDetails('tv', [id]).catch(() => [null]),
+    getEpisodesBySeasonNumber(id, season),
+    user ? safeFetch(getWatchedProgress(id), `serie/${id}/episodios/watched`, null as any) : Promise.resolve(null),
+    user ? safeFetch(getSpoilerPref(id), `serie/${id}/episodios/spoilerpref`, null as boolean | null) : Promise.resolve(null),
+]);
+if (!detail) return new Response(null, { status: 404 });
+
+const watchedSet = new Set<string>(
+    (watchedProgress?.watched_episodes ?? []).map((ep: { season: number; episode: number }) => `${ep.season}-${ep.episode}`),
+);
+const { hideStills, hideSynopsis } = spoilerView(user, spoilerPref);
+const status = detail.status ?? '';
+const regularSeasons = (detail.seasons ?? []).filter((s: any) => s.season_number > 0);
+const lastRegularSeasonNumber = Math.max(0, ...regularSeasons.map((s: any) => s.season_number));
+
+Astro.response.headers.set('Cache-Control', 'private, no-store');
+---
+<SeasonEpisodes
+    id={id}
+    season={season}
+    seasonEpisodes={seasonEpisodes}
+    watchedSet={watchedSet}
+    hideStills={hideStills}
+    hideSynopsis={hideSynopsis}
+    seriesIsOver={status === 'Ended' || status === 'Canceled'}
+    lastRegularSeasonNumber={lastRegularSeasonNumber}
+/>

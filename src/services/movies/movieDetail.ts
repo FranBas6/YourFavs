@@ -1,6 +1,7 @@
 import { type Movie } from "../../types/ApiMovie.ts";
 import { getCurrentLanguage, getCurrentRegion } from "../db/userScope";
 import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../tmdb/tmdbClient';
+import { tmdbFetchFresh } from '../tmdb/tmdbFreshCache';
 import { cleanCollectionName } from '../../utils/titles/collectionName';
 import {
     mapAndDeduplicateProviders,
@@ -102,12 +103,13 @@ export const getMovieCollectionInfo = async (
     collectionId: number
 ): Promise<MovieCollectionInfo | null> => {
     try {
-        const data = await tmdbFetch<any>(`/collection/${collectionId}`, { append_to_response: 'translations' });
+        // QA 7.1: guardada mientras TMDB la dé por buena (memoria + Blobs), no pedida en cada instancia.
+        const data = await tmdbFetchFresh<any>(`/collection/${collectionId}`, { append_to_response: 'translations' });
         // Las películas que solo vienen con el título original (anime anunciado…): su título en inglés,
         // que se entiende mejor que el japonés. Una llamada más, solo si hace falta.
         let enTitles = new Map<number, string>();
         if ((data.parts ?? []).some(untranslated)) {
-            const en = await tmdbFetch<any>(`/collection/${collectionId}`, { language: 'en-US' }).catch(() => null);
+            const en = await tmdbFetchFresh<any>(`/collection/${collectionId}`, { language: 'en-US' }).catch(() => null);
             enTitles = new Map((en?.parts ?? []).map((p: any) => [p.id, p.title]));
         }
         const { name, overview } = pickCollectionText(data);

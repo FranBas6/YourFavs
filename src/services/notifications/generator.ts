@@ -67,9 +67,25 @@ function safeId(s: string): string {
 
 const syncedDay = new Map<string, string>(); // uid → "YYYY-MM-DD" ya materializado
 
-export async function syncNotifications(platforms: number[] = [], force = false): Promise<void> {
+/** Sincronizaciones en marcha por usuario (QA 7.1): `counts` puede dejar una terminando en segundo
+ *  plano; si llega otra petición mientras tanto, se une a esa en vez de repetir el trabajo. */
+const inflight = new Map<string, Promise<void>>();
+
+export function syncNotifications(platforms: number[] = [], force = false): Promise<void> {
     const uid = getCurrentUid();
-    if (!uid) return;
+    if (!uid) return Promise.resolve();
+    if (!force) {
+        const running = inflight.get(uid);
+        if (running) return running;
+    }
+    const run = doSyncNotifications(uid, platforms, force).finally(() => {
+        if (inflight.get(uid) === run) inflight.delete(uid);
+    });
+    inflight.set(uid, run);
+    return run;
+}
+
+async function doSyncNotifications(uid: string, platforms: number[], force: boolean): Promise<void> {
     const day = appDateParts(Date.now()).key;
     if (!force && syncedDay.get(uid) === day) return; // fast-path (proceso caliente)
 

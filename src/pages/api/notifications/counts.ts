@@ -20,10 +20,24 @@ import { SOCIAL_PHASE } from '../../../utils/social/social';
 
 export const prerender = false;
 
+/**
+ * QA 7.1 (H83): el generador de avisos va una vez al día por persona, pero esa primera vez llama a TMDB
+ * (~40 llamadas). Se le espera como mucho SYNC_WAIT_MS: casi siempre llega y el globo sale al día; si no,
+ * se responde con lo que hay y el generador termina después de responder (`waitUntil` de Netlify), así
+ * que en la página siguiente ya estará. Sin `waitUntil` (p. ej. en `astro dev`), el proceso sigue vivo
+ * igualmente y la promesa termina sola.
+ */
+const SYNC_WAIT_MS = 1500;
+
 export const GET: APIRoute = async ({ locals }) => {
     if (!locals.user) return jsonNoStore({ unread: 0, pendingFriends: 0, messages: 0 });
     try {
-        await syncNotifications(locals.user.platforms ?? []);
+        const sync = syncNotifications(locals.user.platforms ?? []).catch((err) => {
+            console.error('[api/notifications/counts] sync:', (err as Error).message);
+        });
+        const waitUntil = (locals as any).netlify?.context?.waitUntil as ((p: Promise<unknown>) => void) | undefined;
+        waitUntil?.(sync);
+        await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, SYNC_WAIT_MS))]);
         const [unread, pendingFriends, messages] = await Promise.all([
             unreadCount(),
             SOCIAL_PHASE.friends ? pendingReceivedCount(locals.user.uid) : Promise.resolve(0),

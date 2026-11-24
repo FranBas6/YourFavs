@@ -68,6 +68,9 @@ const { mediaType, id, title, img, density = 'std' } = p;
 const isTv = mediaType === 'tv';
 const href = `/${isTv ? 'serie' : 'movie'}/${id}`;
 const placeholderImg = '/placeholder.jpg';
+// QA 7.4 (H58): póster del tamaño justo (utils/titles/posterSrcset.ts).
+const posterSrcset = posterSrcsetFromUrl(img);
+const posterSizes = posterSrcset ? POSTER_SIZES : undefined;
 
 // ---- Contexto (decide qué insignias caben) ----
 const path = Astro.url.pathname;
@@ -130,11 +133,12 @@ const progressPct = isTv && p.watchedEpisodes && p.totalEpisodes ? Math.min(100,
 // ⊕ Guardar: acción de descubrimiento. Dentro de Mis listas solo donde el marcado reubica la tarjeta.
 const showSaveBtn = !path.startsWith('/mislistas') || path.startsWith('/mislistas/recomendaciones')
     || path.startsWith('/mislistas/pendientes') || path.startsWith('/mislistas/vistos') || path.startsWith('/mislistas/favoritos');
+import { posterSrcsetFromUrl, POSTER_SIZES } from '../../utils/titles/posterSrcset';
 ---
 <div class:list={['media-card', 'ytc', `ytc--${density}`, 'group']}>
     <a href={href} class="ytc-link">
         <div class="ytc-poster">
-            <img src={img || placeholderImg} alt="" loading="lazy" decoding="async"
+            <img src={img || placeholderImg} srcset={posterSrcset} sizes={posterSizes} alt="" loading="lazy" decoding="async"
                  onerror={`this.onerror=null; this.src='${placeholderImg}'`} />
             {badgeA && density !== 'detail' && (
                 <span class="chip-state ytc-badge-a" data-tone={badgeA.tone} title={badgeA.title}>{badgeA.text}</span>
