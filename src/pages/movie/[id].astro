@@ -299,11 +299,11 @@ const jsonLd = item ? {
     ogType="video.movie"
 >
     {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
-    <!-- Sin fondo propio: va sobre el gris de la página, como la ficha de episodio y el resto de la web
-         (antes `bg-gray-50` hacía un «doble fondo», un panel más claro con franjas a los lados). -->
+    {/* Sin fondo propio: va sobre el gris de la página, como la ficha de episodio y el resto de la web
+         (antes `bg-gray-50` hacía un «doble fondo», un panel más claro con franjas a los lados). */}
     <article>
-        <!-- Hero inmersivo (piel v2, 4.8c): fondo oscuro de la casa con la imagen al 55 %, póster con borde,
-             línea de datos, géneros como chips y sinopsis ancha. En móvil, el póster va pequeño encima del título. -->
+        {/* Hero inmersivo (piel v2, 4.8c): fondo oscuro de la casa con la imagen al 55 %, póster con borde,
+             línea de datos, géneros como chips y sinopsis ancha. En móvil, el póster va pequeño encima del título. */}
         <div class="fh">
             <div class="fh-bg" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}></div>
             <div class="fh-in">
@@ -357,8 +357,8 @@ const jsonLd = item ? {
             </div>
         </div>
 
-        <!-- Barra de acciones (rediseño, Fase 4 · 4.1): principal según el estado, Nivel, Pendiente,
-             Ver pronto y, debajo, «La has visto N veces». Mismos formularios que antes. -->
+        {/* Barra de acciones (rediseño, Fase 4 · 4.1): principal según el estado, Nivel, Pendiente,
+             Ver pronto y, debajo, «La has visto N veces». Mismos formularios que antes. */}
         <FichaActions
             mediaType="movie"
             id={item?.id}
@@ -391,15 +391,15 @@ const jsonLd = item ? {
             { id: 'sec-parecidas', label: 'Parecidas', mo: 7 },
         ]} />
 
-        <!-- Layout 2 columnas -->
+        {/* Layout 2 columnas */}
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="ficha-cols flex flex-col md:flex-row gap-8">
 
-                <!-- Sidebar izquierda -->
+                {/* Sidebar izquierda */}
                 <div class="md:w-1/3 space-y-4">
                     <h2 class="sr-only">Datos de la película</h2>{/* QA 6.2 (H57): las tarjetas son h3 */}
 
-                    <!-- Información (piel v2, 4.8): lista de dos columnas, clasificación como sello, enlaces como botones -->
+                    {/* Información (piel v2, 4.8): lista de dos columnas, clasificación como sello, enlaces como botones */}
                     <div id="sec-detalles" data-fs class="mo-1 fcard">
                         <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Información</h3>
                         <dl class="fdl">
@@ -443,7 +443,7 @@ const jsonLd = item ? {
                         )}
                     </div>
 
-                    <!-- Dónde ver -->
+                    {/* Dónde ver */}
                     <div id="sec-donde" data-fs class="mo-2">
                     <StreamingProviders
                         providersByCountry={item?.providersByCountry || {}}
@@ -452,12 +452,12 @@ const jsonLd = item ? {
                     />
                     </div>
 
-                    <!-- Amigos que la han visto (F5 social) -->
+                    {/* Amigos que la han visto (F5 social) */}
                     <div class="mo mo-7">
                     <FriendsSeen mediaType="movie" tmdbId={item?.id} />
                     </div>
 
-                    <!-- Nota personal -->
+                    {/* Nota personal */}
                     <div class="mo mo-8">
                     {!(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && <RecommendedBlock mediaType="movie" tmdbId={item?.id} alone />}
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
@@ -470,7 +470,7 @@ const jsonLd = item ? {
                     )}
                     </div>
 
-                    <!-- Opinión -->
+                    {/* Opinión */}
                     <div class="mo mo-9">
                     {(isInFavorites || isInPendientes || isInVistas || isInVerPronto || isInLiked) && (
                         <div class="fcard">
@@ -507,7 +507,7 @@ const jsonLd = item ? {
                     )}
                     </div>
 
-                    <!-- Tus tags + notas (C15) -->
+                    {/* Tus tags + notas (C15) */}
                     <div class="mo mo-10">
                     {inAnyCollection && (
                         <div class="fcard">
@@ -541,7 +541,7 @@ const jsonLd = item ? {
                     )}
                     </div>
 
-                    <!-- Palabras clave de TMDB (aparte de tus etiquetas) -->
+                    {/* Palabras clave de TMDB (aparte de tus etiquetas) */}
                     <div class="mo mo-14">
                     {movieKeywords.length > 0 && (
                         <>
@@ -571,49 +571,49 @@ const jsonLd = item ? {
 
                 </div>
 
-                <!-- Columna derecha -->
+                {/* Columna derecha */}
                 <div class="md:w-2/3 space-y-8">
 
-                    <!-- Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: vídeos y saga,
-                         reparto y equipo, imágenes, productoras, reseñas y, al final, «También en TV» y parecidas. -->
+                    {/* Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: vídeos y saga,
+                         reparto y equipo, imágenes, productoras, reseñas y, al final, «También en TV» y parecidas. */}
 
-                    <!-- Tráiler + más vídeos -->
+                    {/* Tráiler + más vídeos */}
                     <div id="sec-videos" data-fs class="mo-3"><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
 
-                    <!-- Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), justo tras los vídeos (Fran) -->
+                    {/* Colección/Saga con progreso (✓ vista / TE FALTA / PRÓX.), justo tras los vídeos (Fran) */}
                     <div class="mo mo-4">
                     {sagaDetail && sagaDetail.parts.length > 1 && (
                         <SagaProgress saga={sagaDetail} currentId={item?.id} />
                     )}
                     </div>
 
-                    <!-- Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com) -->
+                    {/* Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com) */}
                     <div id="sec-reparto" data-fs class="mo-5 space-y-8">
                         <CastGrid cast={cast} seenWith={seenWithMap} />
                         <CrewGrid crew={directors} />
                         <DubbingSection type="movie" tmdbId={id} />
                     </div>
 
-                    <!-- Pósters y fondos -->
+                    {/* Pósters y fondos */}
                     <div id="sec-imagenes" data-fs class="mo-11 space-y-8">
                         <LightboxGallery posters={posters} prefix="poster" />
                         <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
                     </div>
 
-                    <!-- Productoras -->
+                    {/* Productoras */}
                     <div class="mo mo-12">
                     <ProductionCompanies companies={item?.production_companies || []} />
                     </div>
 
-                    <!-- Reviews de TMDB -->
+                    {/* Reviews de TMDB */}
                     <div id="sec-resenas" data-fs class="mo-13"><ReviewsSection reviews={reviews} /></div>
 
-                    <!-- La saga al otro lado: series de esta misma película -->
+                    {/* La saga al otro lado: series de esta misma película */}
                     <div class="mo mo-15">
                     <CrossMediaSection items={crossMediaSeries} mediaType="tv" />
                     </div>
 
-                    <!-- Recomendaciones -->
+                    {/* Recomendaciones */}
                     <div id="sec-parecidas" data-fs class="mo-16"><RecommendationsCarousel
                         items={moviesRecommendations}
                         mediaType="movie"

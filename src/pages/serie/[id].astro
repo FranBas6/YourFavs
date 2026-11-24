@@ -530,11 +530,11 @@ const jsonLd = item ? {
     ogType="video.tv_show"
 >
     {jsonLd && <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
-    <!-- Sin fondo propio: va sobre el gris de la página, como la ficha de episodio y el resto de la web
-         (antes `bg-gray-50` hacía un «doble fondo», un panel más claro con franjas a los lados). -->
+    {/* Sin fondo propio: va sobre el gris de la página, como la ficha de episodio y el resto de la web
+         (antes `bg-gray-50` hacía un «doble fondo», un panel más claro con franjas a los lados). */}
     <article>
-        <!-- Hero inmersivo (piel v2, 4.8c): fondo oscuro de la casa con la imagen al 55 %, póster con borde,
-             línea de datos, géneros como chips y sinopsis ancha. En móvil, el póster va pequeño encima del título. -->
+        {/* Hero inmersivo (piel v2, 4.8c): fondo oscuro de la casa con la imagen al 55 %, póster con borde,
+             línea de datos, géneros como chips y sinopsis ancha. En móvil, el póster va pequeño encima del título. */}
         <div class="fh">
             <div class="fh-bg" style={`background-image: url(${item?.backdrop_path ? originalUrl(item.backdrop_path) : '/assets/background.svg'})`}></div>
             <div class="fh-in">
@@ -590,8 +590,8 @@ const jsonLd = item ? {
             </div>
         </div>
 
-        <!-- Barra de acciones (rediseño, Fase 4 · 4.2): Seguir / Siguiendo ▾ / Retomar, Nivel, Pendiente,
-             Ver pronto, Nuevas temporadas y, debajo, visionados, progreso y posición en Favoritos. -->
+        {/* Barra de acciones (rediseño, Fase 4 · 4.2): Seguir / Siguiendo ▾ / Retomar, Nivel, Pendiente,
+             Ver pronto, Nuevas temporadas y, debajo, visionados, progreso y posición en Favoritos. */}
         <FichaActions
             mediaType="tv"
             id={id}
@@ -626,15 +626,15 @@ const jsonLd = item ? {
             { id: 'sec-parecidas', label: 'Parecidas', mo: 8 },
         ]} />
 
-        <!-- Layout 2 columnas -->
+        {/* Layout 2 columnas */}
         <div class="max-w-6xl mx-auto px-4 py-8">
             <div class="ficha-cols flex flex-col md:flex-row gap-8">
 
-                <!-- Sidebar izquierda -->
+                {/* Sidebar izquierda */}
                 <div class="md:w-1/3 space-y-4">
                     <h2 class="sr-only">Datos de la serie</h2>{/* QA 6.2 (H57): las tarjetas son h3 */}
 
-                    <!-- Información (piel v2, 4.8): lista de dos columnas, clasificación como sello, enlaces como botones -->
+                    {/* Información (piel v2, 4.8): lista de dos columnas, clasificación como sello, enlaces como botones */}
                     <div id="sec-detalles" data-fs class="mo-1 fcard">
                         <h3 class="fcard-h"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>Información</h3>
                         <dl class="fdl">
@@ -676,7 +676,7 @@ const jsonLd = item ? {
                         )}
                     </div>
 
-                    <!-- Dónde ver -->
+                    {/* Dónde ver */}
                     <div id="sec-donde" data-fs class="mo-2">
                     <StreamingProviders
                         providersByCountry={(item as any)?.providersByCountry || {}}
@@ -691,12 +691,12 @@ const jsonLd = item ? {
                     />
                     </div>
 
-                    <!-- Amigos que la han visto (F5 social) -->
+                    {/* Amigos que la han visto (F5 social) */}
                     <div class="mo mo-6">
                     <FriendsSeen mediaType="tv" tmdbId={item?.id} />
                     </div>
 
-                    <!-- Nota personal -->
+                    {/* Nota personal */}
                     <div class="mo mo-7">
                     {!(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && <RecommendedBlock mediaType="tv" tmdbId={item?.id} alone />}
                     {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
@@ -709,7 +709,7 @@ const jsonLd = item ? {
                     )}
                     </div>
 
-                    <!-- Opinión -->
+                    {/* Opinión */}
                     <div class="mo mo-8">
                     {(isInFavorites || isInPendientes || isInVistas || isInSiguiendo || isInLiked || isInVerPronto) && (
                         <div class="fcard">
@@ -749,7 +749,7 @@ const jsonLd = item ? {
                     )}
                     </div>
 
-                    <!-- Tus tags + notas (C15) -->
+                    {/* Tus tags + notas (C15) */}
                     <div class="mo mo-9">
                     {inAnyCollection && (
                         <div class="fcard">
@@ -793,7 +793,7 @@ const jsonLd = item ? {
                     )}
                     </div>
 
-                    <!-- Palabras clave de TMDB (aparte de tus etiquetas): plegadas en móvil -->
+                    {/* Palabras clave de TMDB (aparte de tus etiquetas): plegadas en móvil */}
                     <div class="mo mo-14">
                     {serieKeywords.length > 0 && (
                         <>
@@ -822,12 +822,12 @@ const jsonLd = item ? {
 
                 </div>
 
-                <!-- Columna derecha -->
+                {/* Columna derecha */}
                 <div class="md:w-2/3 space-y-8">
 
-                    <!-- Temporadas (ancla de la barra de secciones): próximo y último episodio, calidad y acordeón -->
+                    {/* Temporadas (ancla de la barra de secciones): próximo y último episodio, calidad y acordeón */}
                     <div id="sec-temporadas" data-fs class="mo-3 space-y-8">
-                    <!-- Temporadas con acordeón -->
+                    {/* Temporadas con acordeón */}
                     <div class="fcard ftemps">
                         <div class="fsec-h">
                             <h2>Temporadas y episodios</h2>
@@ -1131,44 +1131,44 @@ const jsonLd = item ? {
                         </div>
                     </div>
 
-                    <!-- Mapa de calidad por episodio, plegado al final (4.6; datos ya cargados, cero fetches) -->
+                    {/* Mapa de calidad por episodio, plegado al final (4.6; datos ya cargados, cero fetches) */}
                     <SeasonHeatmap seasons={regularSeasons} episodesBySeason={allSeasonEpisodes} spoilerFree={spoilerFree} watchedSet={watchedSet} />
 
                     </div>
 
-                    <!-- Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: temporadas, vídeos,
-                         reparto y equipo, imágenes, productoras, reseñas y, al final, «También en cine» y parecidas. -->
+                    {/* Orden de la columna (rediseño 4.5), el mismo que la barra de secciones: temporadas, vídeos,
+                         reparto y equipo, imágenes, productoras, reseñas y, al final, «También en cine» y parecidas. */}
 
-                    <!-- Tráiler + más vídeos -->
+                    {/* Tráiler + más vídeos */}
                     <div id="sec-videos" data-fs class="mo-10"><VideoSection trailerUrl={trailerUrl} clips={clips} behindScenes={behindScenes} teasers={teasers} /></div>
 
-                    <!-- Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com, por temporada) -->
+                    {/* Reparto (12 + el resto plegado), equipo y dobladores en español (lazy, eldoblaje.com, por temporada) */}
                     <div id="sec-reparto" data-fs class="mo-4 space-y-8">
                         <CastGrid cast={cast} seenWith={seenWithMap} />
                         <CrewGrid crew={directors} />
                         <DubbingSection type="tv" tmdbId={id} />
                     </div>
 
-                    <!-- Pósters y fondos -->
+                    {/* Pósters y fondos */}
                     <div id="sec-imagenes" data-fs class="mo-11 space-y-8">
                         <LightboxGallery posters={posters} prefix="poster" />
                         <LightboxGallery posters={bundle?.backdrops ?? []} prefix="backdrop" title="Fondos" variant="backdrop" />
                     </div>
 
-                    <!-- Productoras -->
+                    {/* Productoras */}
                     <div class="mo mo-12">
                     <ProductionCompanies companies={item?.production_companies || []} />
                     </div>
 
-                    <!-- Reviews TMDB -->
+                    {/* Reviews TMDB */}
                     <div id="sec-resenas" data-fs class="mo-13"><ReviewsSection reviews={reviews} /></div>
 
-                    <!-- La saga al otro lado: películas de esta misma serie, encima de las parecidas -->
+                    {/* La saga al otro lado: películas de esta misma serie, encima de las parecidas */}
                     <div class="mo mo-15">
                     <CrossMediaSection items={crossMediaMovies} mediaType="movie" />
                     </div>
 
-                    <!-- Recomendaciones -->
+                    {/* Recomendaciones */}
                     <div id="sec-parecidas" data-fs class="mo-16"><RecommendationsCarousel
                         items={seriesRecommendations}
                         mediaType="tv"

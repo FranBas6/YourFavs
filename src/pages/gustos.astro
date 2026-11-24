@@ -38,7 +38,7 @@ const prefill = {
         <div class="tw-card">
             {/* QA 6.2 (H86): un solo H1 fijo; los pasos (también el de bienvenida y el final) son h2. */}
             <h1 class="sr-only">Tus gustos</h1>
-            <!-- Cabecera: pasos + omitir -->
+            {/* Cabecera: pasos + omitir */}
             <div class="tw-head" data-tw-head hidden={welcome}>
                 <div class="tw-dots">
                     <span class="tw-dot" data-dot="1"></span>
@@ -50,7 +50,7 @@ const prefill = {
                 <button type="button" class="tw-skip" data-tw-skip>Omitir por ahora</button>
             </div>
 
-            <!-- Paso 0 · Bienvenida (solo ?welcome=1) -->
+            {/* Paso 0 · Bienvenida (solo ?welcome=1) */}
             <section class="tw-step tw-center" data-step="0" hidden={!welcome}>
                 <span class="tw-hero-ic">✨</span>
                 <p class="tw-kicker">Te damos la bienvenida a YourFavs</p>
@@ -63,7 +63,7 @@ const prefill = {
                 <p class="tw-fineprint">Podrás hacerlo más tarde desde tu perfil</p>
             </section>
 
-            <!-- Paso 1 · Géneros -->
+            {/* Paso 1 · Géneros */}
             <section class="tw-step" data-step="1" hidden>
                 <div class="tw-step-head">
                     <h2 class="tw-h2">¿Qué géneros te gustan?</h2>
@@ -79,7 +79,7 @@ const prefill = {
                 </div>
             </section>
 
-            <!-- Paso 2 · Películas -->
+            {/* Paso 2 · Películas */}
             <section class="tw-step" data-step="2" hidden>
                 <div class="tw-step-head">
                     <h2 class="tw-h2">Películas que te encantan</h2>
@@ -91,7 +91,7 @@ const prefill = {
                 <div class="tw-grid tw-grid-titles" data-grid="movies"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
 
-            <!-- Paso 3 · Series -->
+            {/* Paso 3 · Series */}
             <section class="tw-step" data-step="3" hidden>
                 <div class="tw-step-head">
                     <h2 class="tw-h2">Series que te encantan</h2>
@@ -103,7 +103,7 @@ const prefill = {
                 <div class="tw-grid tw-grid-titles" data-grid="series"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
 
-            <!-- Paso 4 · Actores (opcional) -->
+            {/* Paso 4 · Actores (opcional) */}
             <section class="tw-step" data-step="4" hidden>
                 <div class="tw-step-head">
                     <h2 class="tw-h2">Actores y directores</h2>
@@ -115,7 +115,7 @@ const prefill = {
                 <div class="tw-grid tw-grid-people" data-grid="people"><p class="tw-state">Cargando tendencias…</p></div>
             </section>
 
-            <!-- Paso 5 · Confirmación -->
+            {/* Paso 5 · Confirmación */}
             <section class="tw-step tw-center" data-step="5" hidden>
                 <span class="tw-hero-ic tw-ok">✓</span>
                 <h2 class="tw-title-xl">¡Listo, ya te conocemos!</h2>
@@ -125,7 +125,7 @@ const prefill = {
                 </div>
             </section>
 
-            <!-- Pie: navegación -->
+            {/* Pie: navegación */}
             <div class="tw-foot" data-tw-foot hidden={welcome}>
                 <button type="button" class="btn" data-tw-back hidden>← Atrás</button>
                 <span class="tw-minnote" data-minnote>Máximo 10</span>
@@ -137,12 +137,12 @@ const prefill = {
     </div>
 </Layout>
 
-<!--
+{/*
   is:global a propósito: los grids de títulos/personas se crean por JS con
   innerHTML, y los estilos scoped de Astro NO alcanzan a elementos creados en
   cliente (no llevan el data-astro-cid). Todas las clases van con prefijo `tw-`
   y se acotan a .tw-shell/.tw-card, así que no se filtran a otras páginas.
--->
+*/}
 <style is:global>
     /* `hidden` debe ganar a los display:flex de abajo (header/footer y pasos
        centrados), si no se solapan la bienvenida y la confirmación. */
