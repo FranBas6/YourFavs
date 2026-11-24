@@ -11,13 +11,12 @@
  * 1 fetch por serie en seguimiento. Cacheado por **uid + día** (L1 + L2 Blobs).
  * `count` (badge) = nº total de novedades.
  */
-import { fetchSerieDetails } from '../series/serieCatalog';
+import { getTitleDetails } from '../tmdb/tmdbTitleCache';
 import { getSeriesSiguiendo } from '../series/serieLibrary';
 import { getUpcomingFromFollowedPeople } from '../people/upcomingReleases';
 import { getPendientesOnMyPlatforms } from './dailyBrief';
 import { getCurrentUid } from '../db/userScope';
 import { getCached, setCached } from '../cache/recsBlobCache';
-import { processBatch } from '../../utils/core/processBatch';
 import { appDateParts } from '../../utils/core/appTime';
 
 export interface RadarItem {
@@ -90,11 +89,8 @@ export async function getRadar(platforms: number[] = []): Promise<Radar> {
     ]);
 
     // ① Próximos episodios (esta semana) de series en seguimiento.
-    const details = await processBatch(
-        followed.map((s: any) => String(s.id)),
-        (id) => fetchSerieDetails(id).catch(() => null),
-        10,
-    );
+    // QA 7.2: fichas de la caché compartida (`tmdb_cache`), no una llamada por serie en cada instancia.
+    const details = await getTitleDetails('tv', followed.map((s: any) => String(s.id))).catch(() => [] as any[]);
     const episodes: RadarItem[] = [];
     for (const d of details) {
         const ep = d?.next_episode_to_air;

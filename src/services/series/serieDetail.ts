@@ -1,5 +1,6 @@
 import { type Serie } from "../../types/ApiSerie.ts";
 import { tmdbFetch, posterUrl, backdropUrl, originalUrl } from '../tmdb/tmdbClient';
+import { tmdbFetchFresh } from '../tmdb/tmdbFreshCache';
 import { getCurrentLanguage, getCurrentRegion } from "../db/userScope";
 import { getGenreName } from "../../utils/titles/genres";
 import {
@@ -61,7 +62,8 @@ interface CastMember {
 
 export async function getEpisodesBySeasonNumber(serieId: number | string, seasonNumber: number): Promise<any[]> {
     try {
-        const data = await tmdbFetch<{ episodes?: any[] }>(`/tv/${serieId}/season/${seasonNumber}`);
+        // QA 7.2: guardada mientras TMDB la dé por buena (memoria + Blobs).
+        const data = await tmdbFetchFresh<{ episodes?: any[] }>(`/tv/${serieId}/season/${seasonNumber}`);
         return data.episodes || [];
     } catch (error) {
         console.error("Error en getEpisodesBySeasonNumber:", error);

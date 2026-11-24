@@ -1,5 +1,6 @@
 import { getSeriesSiguiendo, getWatchedProgress } from './serieLibrary';
 import { fetchSerieDetails } from './serieCatalog';
+import { getTitleDetails } from '../tmdb/tmdbTitleCache';
 import { getEpisodesBySeasonNumber } from './serieDetail';
 import { processBatch } from '../../utils/core/processBatch';
 import type { WatchedProgress } from '../../types/DbSerie';
@@ -136,11 +137,14 @@ export async function getNextEpisodesData(): Promise<NextEpisodeItem[]> {
 
     if (candidates.length === 0) return [];
 
+    // QA 7.2: todas las fichas de una vez, de la caché compartida (`tmdb_cache`).
+    const details = await getTitleDetails('tv', candidates.map((c) => c.id)).catch(() => [] as any[]);
+    const detailById = new Map(candidates.map((c, i) => [c.id, details[i] ?? null]));
     const items = await processBatch(
         candidates,
         async (c) => {
             try {
-                const detail = await fetchSerieDetails(c.id);
+                const detail = detailById.get(c.id);
                 if (!detail) return null;
                 return await computeNextEpisode(c.id, detail, c.progress);
             } catch {
