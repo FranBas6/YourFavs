@@ -40,6 +40,8 @@ import { streamingRowDef } from "../utils/catalog/catalogRows";
 import '../styles/components/catalog-row.css';
 import '../styles/pages/index.css';
 import Welcome from '../components/home/Welcome.astro';
+import { SITE_TAGLINE, SITE_DESCRIPTION } from '../utils/core/siteCopy';
+import { dedupeHomeRows } from '../utils/home/dedupeRows';
 
 const page = Number(Astro.request.url.split('?page=')[1] || 1);
 const pageStr = page.toString();
@@ -251,7 +253,25 @@ const KNOWN_KEYS = HOME_SECTIONS.map((s) => s.key);
 const savedOrder = (Astro.locals.user?.homeLayout || []).map((x) => x.key).filter((k) => KNOWN_KEYS.includes(k));
 // Orden final: lo guardado primero, luego los bloques que aún no estén en la preferencia; sin ocultos.
 const orderedKeys = [...savedOrder, ...KNOWN_KEYS.filter((k) => !savedOrder.includes(k))].filter((k) => !isHidden(k));
-import { SITE_TAGLINE, SITE_DESCRIPTION } from '../utils/core/siteCopy';
+
+// QA 8.2 (H23): sin títulos repetidos entre filas — gana la de más arriba (utils/home/dedupeRows.ts).
+// Solo con sesión: la bienvenida de invitados usa sus propias filas. El cartel de Tendencias cuenta si es
+// la portada que se ve (sin brief).
+if (Astro.locals.user) {
+    dedupeHomeRows(
+        orderedKeys.map((key) => {
+            if (key === 'estas-viendo') return { key, fixed: [
+                ...continueWatching.map((x: any) => ({ kind: 'tv' as const, id: x.id })),
+                ...viendoMovies.map((x: any) => ({ kind: 'movie' as const, id: x.id })),
+            ] };
+            if (key === 'para-ti') return { key, fixed: forYou.map((x: any) => ({ kind: x.kind === 'movie' ? 'movie' as const : 'tv' as const, id: x.id })) };
+            if (key === 'rescatar') return { key, fixed: stalledSeries.map((x: any) => ({ kind: 'tv' as const, id: x.id })) };
+            if (key === 'engancha') return { key, fixed: (hookRow?.items ?? []).map((x) => ({ kind: 'tv' as const, id: x.id })) };
+            return { key, row: sectionByKey[key] };
+        }),
+        heroMovie && brief.signals.length === 0 ? [{ kind: 'movie', id: heroMovie.id }] : [],
+    );
+}
 ---
 <Layout title={`YourFavs · ${SITE_TAGLINE}`} description={SITE_DESCRIPTION}>     
     <div class="main-container">
@@ -287,7 +307,9 @@ import { SITE_TAGLINE, SITE_DESCRIPTION } from '../utils/core/siteCopy';
                                     <span class="hero-trending-badge"><Icon name="lucide:trending-up" />En tendencia esta semana</span>
                                     <h2 class="hero-backdrop-title">{heroMovie.title}</h2>
                                     <div class="hero-backdrop-meta">
-                                        <span class="hero-backdrop-rating"><Icon name="lucide:star" />{heroMovie.vote_average != null ? decimal(heroMovie.vote_average) : ""}</span>
+                                        {/* La nota de la película se enseña siempre que la haya (decisión de Fran, QA 8.2: aquí no
+                                            aplica el mínimo de votos de las tarjetas); sin ninguna, nada en vez de «★ 0,0». */}
+                                        {heroMovie.vote_average > 0 && <span class="hero-backdrop-rating"><Icon name="lucide:star" />{decimal(heroMovie.vote_average)}</span>}
                                         <span class="hero-backdrop-year">{heroMovie.release_date?.split('-')[0]}</span>
                                     </div>
                                     <p class="hero-backdrop-overview">{heroMovie.overview}</p>
@@ -398,11 +420,18 @@ import { SITE_TAGLINE, SITE_DESCRIPTION } from '../utils/core/siteCopy';
                         <SocialRow items={socialItems} />
                     </div>
                 )}
+                {/* QA 8.2 (H24): antes, un botón suelto a la derecha que parecía un resto de maquetación. Ahora una
+                    banda que dice qué hace; el botón y la ruleta son los de siempre (WhatToWatch). */}
                 {key === 'que-veo' && (
                     <div class="content-wrapper">
-                        <div class="flex justify-end mb-2">
+                        <section class="wtw-band" aria-labelledby="wtw-band-h">
+                            <span class="wtw-band-ico" aria-hidden="true"><Icon name="lucide:dices" /></span>
+                            <div class="wtw-band-text">
+                                <h2 id="wtw-band-h" class="wtw-band-t">¿Qué veo esta noche?</h2>
+                                <p class="wtw-band-s">Dinos con quién lo ves, cuánto tiempo tienes y el ánimo, y te proponemos un plan.</p>
+                            </div>
                             <WhatToWatch />
-                        </div>
+                        </section>
                     </div>
                 )}
                 {sectionByKey[key] && (sectionByKey[key].movies.length > 0 || sectionByKey[key].series.length > 0) && (
