@@ -879,7 +879,8 @@ export async function calculateYearStats(year: StatsScope): Promise<YearStats> {
         },
         ratingCompare,
         topDirectors,
-        availableYears: Array.from(allYears).sort((a, b) => b - a),
+        // QA 8.7 (H52): sin años que aún no han llegado (salían de fechas futuras, p. ej. un estreno apuntado).
+        availableYears: Array.from(allYears).filter((y) => y <= appDateParts(Date.now()).year).sort((a, b) => b - a),
         hasData: moviesAdded + seriesAdded + episodesWatched + addedOfYear.length > 0,
     };
 

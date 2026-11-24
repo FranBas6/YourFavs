@@ -254,10 +254,11 @@ import { posterSrcset, POSTER_SIZES } from '../../../utils/titles/posterSrcset';
                     Una serie sale en CADA mes en que viste algo, con los episodios de ese mes. */}
                 {stats.timeline.length > 0 && (
                     <section>
-                        <div class="lg-h"><h2>Mes a mes</h2><span class="n">{timelineTotal}</span></div>
+                        {/* QA 8.7 (H52): la cifra sola («29») no se entendía. */}
+                        <div class="lg-h"><h2>Mes a mes</h2><span class="n">{timelineTotal} {timelineTotal === 1 ? 'entrada' : 'entradas'}</span></div>
                         <p class="text-xs text-gray-500 mb-4">
-                            Lo que viste cada mes del {yearNum}, en orden de visionado. Una serie aparece en cada mes
-                            en que viste algún episodio, con los de ese mes.
+                            Lo que viste cada mes del {yearNum}, en orden de visionado. Cada película es una entrada; una serie
+                            aparece en cada mes en que viste algún episodio, con los de ese mes.
                         </p>
                         <div class="ym-list">
                             {stats.timeline.map((m, i, arr) => (

@@ -1,4 +1,6 @@
 ---
+import { jobEs } from '../../utils/titles/teamHelpers';
+
 interface CrewMember {
     name: string;
     job: string;
@@ -9,7 +11,16 @@ interface Props {
     title?: string;
 }
 
-const { crew, title = "Equipo" } = Astro.props;
+const { crew: rawCrew, title = "Equipo" } = Astro.props;
+// QA 8.7 (H28): puestos en español (`jobEs`) y por importancia: antes salían en inglés y en el orden de TMDB,
+// con la producción ejecutiva delante de la dirección. Los que no están en la lista, al final y en su orden.
+const ROLE_ORDER = ['Director', 'Creator', 'Screenplay', 'Writer', 'Teleplay', 'Story', 'Novel', 'Original Music Composer',
+    'Director of Photography', 'Editor', 'Visual Effects', 'Producer', 'Executive Producer'];
+const rank = (job: string) => { const i = ROLE_ORDER.indexOf(job); return i < 0 ? ROLE_ORDER.length : i; };
+const crew = rawCrew
+    .map((m, i) => ({ ...m, i }))
+    .sort((a, b) => rank(a.job) - rank(b.job) || a.i - b.i)
+    .map(({ i: _i, ...m }) => ({ ...m, job: jobEs(m.job) }));
 // Rediseño 4.5: 9 a la vista (tres filas); el resto se muestra con «Ver todo el equipo».
 const SHOWN = crew.length <= 12 ? crew.length : 9; // plegar 1–3 no compensa
 ---
