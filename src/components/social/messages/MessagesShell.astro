@@ -42,9 +42,13 @@ const groups = enabled && SOCIAL_PHASE.groups;
             columnas laterales no cabía el contenido. */}
         {on !== 'home' && <aside class="ms-rail" aria-label="Conversaciones">
             <div class="ms-sec"><span id="ms-sec-l">Mensajes</span>
-                {groups && canGroup && (
-                    <button type="button" class="pf-btn sm" data-ms-newgroup aria-haspopup="dialog"><Icon name="lucide:plus" />Nuevo grupo</button>
-                )}
+                <span class="ms-sec-acts">
+                    {groups && canGroup && (
+                        <button type="button" class="pf-btn sm" data-ms-newgroup aria-haspopup="dialog" aria-label="Nuevo grupo"><Icon name="lucide:plus" /><span class="ms-ng-t">Nuevo grupo</span></button>
+                    )}
+                    {/* Plegar la columna a solo los avatares (petición de Fran, 2026-11-24): más sitio para el chat. */}
+                    <button type="button" class="pf-btn ico sm ms-rail-tg" data-ms-rail-toggle aria-pressed="false" aria-label="Plegar la lista de conversaciones" title="Plegar la lista"><Icon name="lucide:panel-left-close" class="ms-rail-tg-c" /><Icon name="lucide:panel-left-open" class="ms-rail-tg-o" /></button>
+                </span>
             </div>
             <ul class="ms-l" aria-labelledby="ms-sec-l" data-ms-list set:html={railListHtml(convs, { active })}></ul>
         </aside>}
@@ -56,6 +60,13 @@ const groups = enabled && SOCIAL_PHASE.groups;
         <slot name="main" />
         <slot name="info" />
     </div>
+)}
+
+{/* La columna de conversaciones plegada (solo avatares) si la dejaste así: antes de pintar, sin salto. */}
+{enabled && on !== 'home' && (
+    <script is:inline>
+        try { if (localStorage.getItem('yf:chat-rail') === 'mini') document.querySelector('[data-ms-shell]')?.classList.add('rail-mini'); } catch (e) {}
+    </script>
 )}
 
 {/* La columna de información, antes de pintar y sin salto: plegada salvo que la dejaras abierta con ⓘ

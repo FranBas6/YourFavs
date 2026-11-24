@@ -755,3 +755,36 @@ dialog.wv::backdrop { background: rgba(11, 17, 32, .5); }
     .ms-chat .ctag { height: 36px; }
     .ms-chat .ctag button { width: 32px; height: 32px; }
 }
+
+/* ---- Columna de conversaciones plegada: solo avatares (petición de Fran, 2026-11-24) ----------
+   `.rail-mini` en .ms-shell (botón [data-ms-rail-toggle], scripts/social/messages/rail.ts). El texto de
+   cada fila se oculta solo a la vista: el enlace conserva su nombre para el lector de pantalla. */
+.ms-sec-acts { display: inline-flex; align-items: center; gap: 6px; }
+.ms-rail-tg { width: 30px; height: 30px; padding: 0; }
+.ms-rail-tg svg { width: 16px; height: 16px; }
+.ms-rail-tg-o { display: none; }
+@media (max-width: 1023.98px) { .ms-rail-tg { display: none; } }
+@media (min-width: 1024px) {
+    .ms-shell.rail-mini { grid-template-columns: 76px minmax(0, 1fr) 300px; }
+    .ms-shell.rail-mini.noinfo { grid-template-columns: 76px minmax(0, 1fr); }
+    .ms-shell.rail-mini .ms-rail-tg-c { display: none; }
+    .ms-shell.rail-mini .ms-rail-tg-o { display: block; }
+    .ms-shell.rail-mini .ms-sec { flex-direction: column; justify-content: center; padding: 12px 0 8px; }
+    .ms-shell.rail-mini .ms-sec-acts { flex-direction: column-reverse; gap: 8px; }
+    .ms-shell.rail-mini #ms-sec-l,
+    .ms-shell.rail-mini .ms-ng-t,
+    .ms-shell.rail-mini .cv-b {
+        position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+        clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .ms-shell.rail-mini [data-ms-newgroup] { width: 30px; padding: 0; justify-content: center; }
+    .ms-shell.rail-mini .ms-l { padding: 4px 0 10px; align-items: center; gap: 8px; }
+    .ms-shell.rail-mini .cv { justify-content: center; width: 56px; min-height: 0; padding: 6px; border-radius: 14px; }
+    .ms-shell.rail-mini .cv.on { background: none; box-shadow: none; }
+    .ms-shell.rail-mini .cv > .so-av, .ms-shell.rail-mini .cv > .gav { border-radius: 50%; box-shadow: 0 0 0 1px var(--border-strong); }
+    .ms-shell.rail-mini .cv.on > .so-av, .ms-shell.rail-mini .cv.on > .gav { box-shadow: 0 0 0 2px var(--bg-tint), 0 0 0 4px var(--primary); }
+    .ms-shell.rail-mini .cv.un::after {
+        content: ''; position: absolute; top: 5px; right: 5px; width: 11px; height: 11px; border-radius: 50%;
+        background: var(--accent); box-shadow: 0 0 0 2px var(--bg-tint);
+    }
+}
