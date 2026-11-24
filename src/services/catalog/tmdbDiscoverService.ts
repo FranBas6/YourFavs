@@ -1,4 +1,5 @@
-import { tmdbFetchList, type MediaType } from '../tmdb/tmdbClient';
+import { tmdbFetch, tmdbFetchList, type MediaType } from '../tmdb/tmdbClient';
+import { TOP_MIN_VOTES } from '../../utils/catalog/voteThresholds';
 
 // Proveedores de streaming (IDs de TMDB)
 export const PROVIDERS = {
@@ -285,22 +286,33 @@ export async function getMostPopular<T extends { popularity: number }>(
 }
 
 /**
- * Obtener contenido mejor valorado (mínimo 50 votos)
+ * «Top películas» y «Top series»: lo mejor valorado CON muchos votos (QA 8.1, H21). Antes era
+ * `/top_rated` de TMDB, que casi no exige votos: un estreno con 9,1 y 400 votos adelantaba a «Cadena
+ * perpetua». Ahora, discover ordenado por nota con el mínimo de `TOP_MIN_VOTES` (5.000 / 2.000).
  */
 export async function getTopRated<T extends { vote_average: number; vote_count?: number; popularity: number }>(
     mediaType: MediaType,
     page: string = "1"
 ): Promise<T[]> {
-    const results = await tmdbFetchList<T>(`/${mediaType}/top_rated`, { page });
+    return tmdbFetchList<T>(`/discover/${mediaType}`, {
+        page,
+        sort_by: 'vote_average.desc',
+        'vote_count.gte': String(TOP_MIN_VOTES[mediaType]),
+    });
+}
 
-    return results
-        .filter(item => (item.vote_count ?? 0) >= 50)
-        .sort((a, b) => {
-            if (b.vote_average !== a.vote_average) {
-                return b.vote_average - a.vote_average;
-            }
-            return b.popularity - a.popularity;
-        });
+/** Páginas que tiene el Top (TMDB lo dice en cada respuesta). Cambia poco: se guarda 12 h. */
+const topPagesCache = new Map<MediaType, { pages: number; expires: number }>();
+export async function getTopRatedTotalPages(mediaType: MediaType): Promise<number> {
+    const hit = topPagesCache.get(mediaType);
+    if (hit && hit.expires > Date.now()) return hit.pages;
+    const r = await tmdbFetch<{ total_pages?: number }>(`/discover/${mediaType}`, {
+        sort_by: 'vote_average.desc',
+        'vote_count.gte': String(TOP_MIN_VOTES[mediaType]),
+    });
+    const pages = Math.max(1, Math.min(500, r.total_pages ?? 1));
+    topPagesCache.set(mediaType, { pages, expires: Date.now() + 12 * 60 * 60 * 1000 });
+    return pages;
 }
 
 /**

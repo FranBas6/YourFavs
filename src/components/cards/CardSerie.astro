@@ -11,6 +11,8 @@ interface Props {
     name: string;
     img: string;
     vote_average: number;
+    /** Votos de TMDB: con menos de 50 la tarjeta no enseña la nota (QA 8.1). */
+    vote_count?: number;
     overview: string;
     first_air_date?: string;
     seasons?: { air_date: string; episode_count: number; id: number; name: string; overview: string; poster_path: string; season_number: number; vote_average?: number }[];
@@ -55,6 +57,7 @@ const airPeriod = startYear
     title={p.name}
     img={p.img}
     vote_average={p.vote_average}
+    vote_count={p.vote_count}
     overview={p.overview}
     date={p.first_air_date}
     genres={p.genres}

@@ -37,6 +37,12 @@ export interface CatalogRowDef {
     sortBy?: string;
     /** `vote_count.gte`: el suelo de fiabilidad de la fila. */
     voteCountMin?: string;
+    /**
+     * Tope de popularidad de TMDB por medio (discover no deja filtrar por ella): se aplica al recibir los
+     * resultados, pidiendo hasta 3 páginas si hace falta. Lo usa «Joyas» para quitar lo que todo el mundo
+     * está viendo ahora (QA 8.1, H46).
+     */
+    maxPopularity?: { movie?: number; tv?: number };
     color: 'red' | 'amber' | 'blue' | 'green' | 'purple' | 'pink' | 'slate';
     icon: string;
     /** A dónde lleva «Ver más», ya con el modo puesto. */
@@ -129,11 +135,16 @@ const JOYAS: CatalogRowDef = {
     key: 'joyas',
     title: 'Joyas poco vistas',
     subtitle: 'Muy bien valoradas y sin llegar al gran público.',
-    why: 'nota ≥ 7,5 y pocos votos',
+    why: 'nota ≥ 7,5 y fuera de lo popular',
     media: 'movie',
     params: { 'vote_average.gte': '7.5' },
     movieParams: { 'vote_count.gte': '2500', 'vote_count.lte': '8000' },
-    tvParams: { 'vote_count.gte': '1500', 'vote_count.lte': '6000' },
+    // QA 8.1 (H46): en series el suelo baja a 800 (con 1.500 casi no quedaba nada tras quitar lo
+    // popular) y, sobre todo, se quita lo que es popular ahora: con solo los votos salían One Piece,
+    // Avatar: La leyenda de Aang o Spider-Man. Medido el 2026-11-24: lo que es tendencia no baja de ~31
+    // de popularidad; Cinema Paradiso, Los siete samuráis o Primal están entre 10 y 18.
+    tvParams: { 'vote_count.gte': '800', 'vote_count.lte': '6000' },
+    maxPopularity: { movie: 20, tv: 25 },
     sortBy: 'vote_average.desc',
     color: 'pink',
     icon: 'gem',

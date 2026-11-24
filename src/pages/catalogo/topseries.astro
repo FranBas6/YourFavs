@@ -3,7 +3,8 @@ import Layout from "../../layouts/Layout.astro";
 import CatalogHeader from "../../components/catalog/CatalogHeader.astro";
 import CardSerie from "../../components/cards/CardSerie.astro";
 import {getTopRatedSeries} from "../../services/series/serieCatalog";
-import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor} from "../../services/catalog/tmdbDiscoverService";
+import {NETWORKS, parseAdvancedFilters, hasActiveFilters, buildDiscoverFilterParams, sortByFor, getTopRatedTotalPages} from "../../services/catalog/tmdbDiscoverService";
+import { TOP_MIN_VOTES } from '../../utils/catalog/voteThresholds';
 import {tmdbFetchList} from "../../services/tmdb/tmdbClient";
 
 const NETWORK_OPTIONS = [
@@ -42,7 +43,7 @@ if (networkId || filtersActive || filters.sort || myProviders) {
     const params: Record<string, string> = {
         page: pageStr,
         sort_by: sortByFor(filters.sort, 'tv') || 'vote_average.desc',
-        'vote_count.gte': '100',
+        'vote_count.gte': String(TOP_MIN_VOTES.tv),
         ...buildDiscoverFilterParams(filters, 'tv'),
     };
     if (networkId) params.with_networks = networkId.toString();
@@ -52,10 +53,11 @@ if (networkId || filtersActive || filters.sort || myProviders) {
     popularSeries = await getTopRatedSeries({page: pageStr});
 }
 
-const totalPages = 113;
+// Sin filtros, las páginas de verdad del Top (QA 8.1: con el mínimo de votos son ~13, no 113).
+const totalPages = (networkId || filtersActive || filters.sort || myProviders) ? 113 : await getTopRatedTotalPages('tv').catch(() => 113);
 
-// Contexto para el contador en vivo del sheet (2.3b): vote_count.gte 100 + cadena si está activa.
-const _tsBase: Record<string, string> = { 'vote_count.gte': '100' };
+// Contexto para el contador en vivo del sheet (2.3b): TOP_MIN_VOTES.tv (QA 8.1) + cadena si está activa.
+const _tsBase: Record<string, string> = { 'vote_count.gte': String(TOP_MIN_VOTES.tv) };
 if (networkId) _tsBase.with_networks = networkId.toString();
 const countCtx = [{ type: 'tv' as const, base: _tsBase }];
 
@@ -121,6 +123,7 @@ function buildFilterUrl(changes: Record<string, string | null>) {
                                     img={posterUrl(item.poster_path) || "/placeholder.jpg"}
                                     name={item.name}
                                     vote_average={item.vote_average}
+                                    vote_count={item.vote_count}
                                     overview={item.overview}
                                     first_air_date={item.first_air_date}
                                     seasons={item.seasons}
