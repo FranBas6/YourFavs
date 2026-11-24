@@ -96,8 +96,16 @@ function submitOptimistic(form, options) {
                 var msg = typeof options.successMsg === 'function' ? options.successMsg(formData) : options.successMsg;
                 if (msg) showToast(msg, 'success');
                 if (options.onSuccess) options.onSuccess(formData);
+                if (options.soft) {
+                    // QA 8.6 (H30): la respuesta ya es la ficha nueva (el servidor redirige a la misma
+                    // página): se cambian solo las zonas que han cambiado, sin recargar ni moverte.
+                    var same = res.redirected && new URL(res.url).pathname === window.location.pathname;
+                    return (same ? res.text() : fetch(window.location.href, { credentials: 'same-origin' }).then(function (r) { return r.text(); }))
+                        .then(function (html) { if (!softReload(html, form)) hardReload(); })
+                        .catch(hardReload);
+                }
                 if (options.reload) {
-                    setTimeout(function () { window.location.reload(); }, options.reloadDelay || 500);
+                    setTimeout(hardReload, options.reloadDelay || 500);
                 }
             })
             .catch(function () {
@@ -112,6 +120,90 @@ function submitOptimistic(form, options) {
             .finally(function () { btn.classList.remove('is-submitting'); });
     });
 }
+
+/* ---------------------------------------------------------------------------------------------
+ * Recarga suave (QA 8.6, H30). Antes, cada acción de la ficha recargaba la página entera: parpadeo,
+ * espera y, en el móvil, perdías por dónde ibas. Ahora, con la ficha nueva en la mano, se comparan sus
+ * zonas con las de la página — la barra de acciones (`[data-fa]`), cada bloque de la rejilla (`mo-N`) y lo
+ * marcado con `[data-soft]` — y solo se cambian las distintas. Los scripts de esas zonas se reenganchan
+ * con el evento `yf:soft-swap` (StarRating, FichaSections…) y los formularios con initOptimisticActions().
+ * Zonas con `[data-soft-keep]` dentro (Dónde ver, dobladores: cargan cosas tras pintar) no se tocan.
+ * Si algo sale mal, recarga normal.
+ * --------------------------------------------------------------------------------------------- */
+var SOFT_SEL = '[data-fa], [data-soft], [class*="mo-"]';
+function softKey(el) {
+    if (el.hasAttribute('data-fa')) return 'fa';
+    if (el.hasAttribute('data-soft')) return 'soft:' + el.getAttribute('data-soft');
+    for (var i = 0; i < el.classList.length; i++) if (/^mo-\d+$/.test(el.classList[i])) return el.classList[i];
+    return null;
+}
+function softMap(root) {
+    var map = {};
+    root.querySelectorAll(SOFT_SEL).forEach(function (el) {
+        var k = softKey(el);
+        if (k && !map[k] && !el.closest('[data-soft-keep]') && !el.querySelector('[data-soft-keep]')) map[k] = el;
+    });
+    return map;
+}
+/** El HTML de una zona sin lo que añaden los scripts al arrancar, para comparar con el del servidor. */
+function softSig(el) {
+    var c = el.cloneNode(true);
+    c.querySelectorAll('[data-optimistic], [data-star-init]').forEach(function (x) { x.removeAttribute('data-optimistic'); x.removeAttribute('data-star-init'); });
+    c.querySelectorAll('.star-fill').forEach(function (x) { x.removeAttribute('style'); });
+    c.querySelectorAll('.rating-save').forEach(function (x) { x.removeAttribute('hidden'); });
+    c.querySelectorAll('[aria-expanded]').forEach(function (x) { x.setAttribute('aria-expanded', 'false'); });
+    c.querySelectorAll('.is-submitting').forEach(function (x) { x.classList.remove('is-submitting'); });
+    // En `astro dev` el HTML trae data-astro-source-* y la barra de desarrollo los quita del DOM: fuera.
+    return c.outerHTML.replace(/\s*data-astro-source-(file|loc)="[^"]*"/g, '').replace(/\s+/g, ' ');
+}
+function softReload(html, anchorEl) {
+    try {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var oldMap = softMap(document), newMap = softMap(doc);
+        if (!newMap.fa && !Object.keys(newMap).length) return false;
+        // Para no moverte: la zona donde pulsaste se queda a la misma altura de la pantalla.
+        var anchorKey = null, anchorTop = 0;
+        var host = anchorEl && anchorEl.closest(SOFT_SEL);
+        while (host && !softKey(host)) host = host.parentElement && host.parentElement.closest(SOFT_SEL);
+        if (host) { anchorKey = softKey(host); anchorTop = host.getBoundingClientRect().top; }
+        var swapped = [];
+        Object.keys(newMap).forEach(function (k) {
+            var o = oldMap[k];
+            if (!o || !o.isConnected) return;
+            if (softSig(o) === softSig(newMap[k])) return;
+            var n = document.importNode(newMap[k], true);
+            o.replaceWith(n);
+            swapped.push(n);
+        });
+        if (anchorKey) {
+            var now = softMap(document)[anchorKey];
+            if (now) window.scrollBy(0, now.getBoundingClientRect().top - anchorTop);
+        }
+        if (swapped.length) document.dispatchEvent(new CustomEvent('yf:soft-swap', { detail: { roots: swapped } }));
+        initOptimisticActions();
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+/** Recarga normal, pero volviendo a donde estabas (marcar temporada o serie entera cambia demasiado). */
+function hardReload() {
+    try { sessionStorage.setItem('yf:scroll', JSON.stringify({ p: location.pathname, y: window.scrollY })); } catch (e) {}
+    window.location.reload();
+}
+(function restoreScroll() {
+    try {
+        var raw = sessionStorage.getItem('yf:scroll');
+        if (!raw) return;
+        sessionStorage.removeItem('yf:scroll');
+        var v = JSON.parse(raw);
+        if (v && v.p === location.pathname) {
+            if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+            var go = function () { window.scrollTo(0, v.y); };
+            go(); window.addEventListener('load', go, { once: true });
+        }
+    } catch (e) {}
+})();
 
 /**
  * Invierte en pantalla el estado de un episodio (botón, fila, celda de la tira, contador de la temporada y
@@ -222,7 +314,7 @@ function handleOpinionForm(form) {
         successMsg: function (formData) {
             return formData.get('action') === 'delete_opinion' ? 'Opinión eliminada' : 'Opinión guardada';
         },
-        reload: true,
+        soft: true, // QA 8.6: recarga suave (antes, reload)
         reloadDelay: 400
     });
 }
@@ -238,7 +330,7 @@ function handleRatingForm(form) {
                 ? 'Nota ' + r.toLocaleString('es-ES', { maximumFractionDigits: 1 }) + '/10 guardada'
                 : 'Nota guardada';
         },
-        reload: true,
+        soft: true, // QA 8.6: recarga suave (antes, reload)
         reloadDelay: 400
     });
 }
@@ -251,7 +343,7 @@ function handleMediaTagsForm(form) {
             if (!tags && !notes) return 'Tags y notas eliminados';
             return 'Tags y notas guardados';
         },
-        reload: true,
+        soft: true, // QA 8.6: recarga suave (antes, reload)
         reloadDelay: 400
     });
 }
@@ -339,7 +431,7 @@ function handleGenericFavAction(form) {
             }
         },
         errorMsg: 'Error al procesar la acción',
-        reload: true,
+        soft: true, // QA 8.6: recarga suave (antes, reload)
         reloadDelay: 300,
         onError: function () {
             if (state.pressedBtn) state.pressedBtn.setAttribute('aria-pressed', state.pressed);
@@ -375,7 +467,7 @@ function initOptimisticActions() {
         var action = actionInput ? actionInput.value : '';
         if (action === 'save_opinion' || action === 'delete_opinion') return handleOpinionForm(form);
         // "Terminada" (Bloque 2): cierra la sesión de visionado; recarga para reflejar el estado.
-        if (action === 'finish_viewing') return submitOptimistic(form, { successMsg: 'Marcada como vista', reload: true, reloadDelay: 300 });
+        if (action === 'finish_viewing') return submitOptimistic(form, { successMsg: 'Marcada como vista', soft: true });
 
         handleGenericFavAction(form);
     });

@@ -114,6 +114,15 @@ const { items } = Astro.props;
                     mark();
                 }, { rootMargin: '-60px 0px -' + Math.max(0, window.innerHeight - 140) + 'px 0px' });
                 targets.forEach(function (x) { io.observe(x.t); });
+                // QA 8.6: la recarga suave de la ficha cambia bloques por otros iguales con el mismo id.
+                document.addEventListener('yf:soft-swap', function () {
+                    targets.forEach(function (x) {
+                        if (x.t.isConnected) return;
+                        var n = document.getElementById(x.t.id);
+                        if (!n) return;
+                        io.unobserve(x.t); x.t = n; io.observe(n);
+                    });
+                });
                 }
             })();
         </script>
