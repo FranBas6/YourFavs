@@ -16,6 +16,7 @@
  *     fotogramas (con su visor) y vídeos; al lado, «Este episodio», dónde verlo, amigos e IMDb.
  *     Sin ver y con el modo sin spoilers: sinopsis, invitados y fotogramas ocultos hasta «Mostrar».
  */
+import YouTubeFacade from '../../../../components/title/YouTubeFacade.astro';
 import Layout from '../../../../layouts/Layout.astro';
 import { Icon } from 'astro-icon/components';
 import '../../../../styles/shared/spoil.css';
@@ -455,7 +456,7 @@ const pageTitle = d ? `${seriesName} · ${epCode(season!, episode!)} ${title}` :
                             <div class="vids">
                                 {videos.slice(0, 4).map((v) => (
                                     <figure class="vid">
-                                        <div class="st16"><iframe src={`https://www.youtube-nocookie.com/embed/${v.key}`} title={v.name} loading="lazy" allowfullscreen allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe></div>
+                                        <div class="st16"><YouTubeFacade id={v.key} title={v.name} /></div>
                                         <figcaption><b>{v.name}</b><span>{v.type}</span></figcaption>
                                     </figure>
                                 ))}
