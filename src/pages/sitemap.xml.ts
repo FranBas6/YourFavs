@@ -4,14 +4,14 @@
  * las encuentra siguiendo los enlaces del catálogo. Si la base de datos falla, sale sin los perfiles.
  */
 import type { APIRoute } from 'astro';
-import { allCategories } from '../utils/catalog/categories';
 import { LEGAL_PAGES } from '../utils/legal/legalInfo';
 import { listIndexableProfiles } from '../services/social/publicProfile';
 
 export const prerender = false;
 
 const STATIC = [
-    '/', '/about', '/catalogo', '/catalogo?type=movies', '/catalogo?type=series',
+    // Sin direcciones con «?»: robots.txt no deja rastrearlas (rastreo masivo de 2026-11-27).
+    '/', '/about', '/catalogo',
     '/catalogo/maspopulares', '/catalogo/tendencias', '/catalogo/cartelera', '/catalogo/ultimoslanzamientos',
     '/catalogo/topmovies', '/catalogo/topseries', '/catalogo/plataformas', '/catalogo/colecciones',
 ];
@@ -22,7 +22,6 @@ export const GET: APIRoute = async ({ url }) => {
     const abs = (path: string) => esc(new URL(path, url.origin).href);
     const entries: string[] = [
         ...STATIC.map((p) => `<url><loc>${abs(p)}</loc></url>`),
-        ...allCategories.map((c) => `<url><loc>${abs(`/catalogo/categorias?categoria=${c.slug}`)}</loc></url>`),
         ...LEGAL_PAGES.map((p) => `<url><loc>${abs(p.href)}</loc></url>`),
     ];
     try {
