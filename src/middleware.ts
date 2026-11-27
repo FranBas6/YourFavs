@@ -82,14 +82,21 @@ function crossSiteWrite(request: Request, selfOrigin: string): boolean {
 
 /**
  * TEMPORAL (rastreo masivo de 2026-11-26/27): apunta en los registros de la función qué robot pide qué, para
- * saber quién es y si hace caso a robots.txt. Solo lo que no parece un navegador. Quitar cuando esté resuelto.
+ * saber quién es y si hace caso a robots.txt. Quitar cuando esté resuelto.
+ * - `[bot]`: todo lo que se presenta como robot (o no se presenta).
+ * - `[visita]`: 1 de cada 20 peticiones que dicen ser un navegador. El 27-11 más del 90 % de las ejecuciones
+ *   no dejaban línea `[bot]`: algo se hace pasar por Chrome. `cookies: no` en casi todas = no es una persona
+ *   (un navegador de verdad trae al menos la marca de sesión o el modo del catálogo tras la primera página).
  */
 const BOT_UA = /bot|crawl|spider|slurp|scrap|fetch|python|curl|wget|http-?client|java\/|go-http|axios|node-fetch|headless|okhttp|libwww/i;
+const BROWSER_SAMPLE = 20;
 function logBot(request: Request, url: URL): void {
     const ua = request.headers.get('user-agent') ?? '';
-    if (ua && /Mozilla\//.test(ua) && !BOT_UA.test(ua)) return;
+    const looksBrowser = !!ua && /Mozilla\//.test(ua) && !BOT_UA.test(ua);
+    if (looksBrowser && Math.random() * BROWSER_SAMPLE >= 1) return;
     const ip = request.headers.get('x-nf-client-connection-ip') ?? '';
-    console.log(`[bot] ${request.method} ${url.pathname}${url.search} · ${ip} · ${ua.slice(0, 160) || '(sin user-agent)'}`);
+    const tag = looksBrowser ? `[visita] cookies: ${request.headers.get('cookie') ? 'sí' : 'no'} ·` : '[bot]';
+    console.log(`${tag} ${request.method} ${url.pathname}${url.search} · ${ip} · ${ua.slice(0, 160) || '(sin user-agent)'}`);
 }
 
 export const onRequest = defineMiddleware(async (context, next) => {
