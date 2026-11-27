@@ -31,8 +31,12 @@ import { CATALOG_MODE_COOKIE, CATALOG_MODE_COOKIE_MAX_AGE, isCatalogMode } from 
  */
 // `/u/` es el perfil público (F1 social): para un invitado es la misma página para todos, perfil
 // encendido, apagado o inexistente (404). Con sesión, como todo, `private, no-store`.
-const PUBLIC_CACHEABLE_PREFIXES = ['/catalogo', '/movie/', '/serie/', '/actor/', '/u/'];
-const GUEST_CACHE = 'public, s-maxage=300, max-age=60, stale-while-revalidate=600';
+const PUBLIC_CACHEABLE_PREFIXES = ['/catalogo', '/movie/', '/serie/', '/actor/', '/team/', '/productora/', '/u/'];
+// Rastreo masivo (2026-11-26/27, ~180.000 ejecuciones en un día): para invitados, el navegador guarda 1 min y
+// el CDN de Netlify 6 h en su caché DURADERA (compartida por todos sus nodos; con `s-maxage` a secas cada
+// nodo pedía la página otra vez). Pasadas las 6 h sirve lo guardado mientras la renueva (hasta 1 día).
+const GUEST_CACHE = 'public, max-age=60';
+const GUEST_CDN_CACHE = 'public, durable, s-maxage=21600, stale-while-revalidate=86400';
 
 function applyCacheHeaders(res: Response, path: string, hasSession: boolean): void {
     try {
@@ -45,6 +49,7 @@ function applyCacheHeaders(res: Response, path: string, hasSession: boolean): vo
         const cacheable = path === '/' || PUBLIC_CACHEABLE_PREFIXES.some((p) => path.startsWith(p));
         if (!cacheable) return;
         res.headers.set('Cache-Control', GUEST_CACHE);
+        res.headers.set('Netlify-CDN-Cache-Control', GUEST_CDN_CACHE);
         // Sin esto, el CDN podría servirle a un usuario con sesión la versión de invitado que
         // guardó antes (saldría "desconectado"). Los invitados comparten cabecera de cookie, así
         // que no fragmenta; y donde sí la tienen (el modo del catálogo) es que el contenido
@@ -75,7 +80,20 @@ function crossSiteWrite(request: Request, selfOrigin: string): boolean {
     return from !== selfOrigin;
 }
 
+/**
+ * TEMPORAL (rastreo masivo de 2026-11-26/27): apunta en los registros de la función qué robot pide qué, para
+ * saber quién es y si hace caso a robots.txt. Solo lo que no parece un navegador. Quitar cuando esté resuelto.
+ */
+const BOT_UA = /bot|crawl|spider|slurp|scrap|fetch|python|curl|wget|http-?client|java\/|go-http|axios|node-fetch|headless|okhttp|libwww/i;
+function logBot(request: Request, url: URL): void {
+    const ua = request.headers.get('user-agent') ?? '';
+    if (ua && /Mozilla\//.test(ua) && !BOT_UA.test(ua)) return;
+    const ip = request.headers.get('x-nf-client-connection-ip') ?? '';
+    console.log(`[bot] ${request.method} ${url.pathname}${url.search} · ${ip} · ${ua.slice(0, 160) || '(sin user-agent)'}`);
+}
+
 export const onRequest = defineMiddleware(async (context, next) => {
+    logBot(context.request, context.url);
     if (crossSiteWrite(context.request, context.url.origin)) {
         return new Response(JSON.stringify({ ok: false, error: 'Envío desde otra web no permitido' }), {
             status: 403, headers: { 'Content-Type': 'application/json' },
