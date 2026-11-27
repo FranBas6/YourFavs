@@ -225,7 +225,7 @@ las comprueba `npm run check:structure`. El detalle y el porqué de cada regla: 
 
 ---
 
-Más sobre este proyecto y el resto de mi trabajo en mi portfolio: [franbasguil.netlify.app](https://franbasguil.netlify.app/es/proyectos/yourfavs/)
+Más sobre este proyecto y el resto de mi trabajo en mi portfolio: [franbasguil.pages.dev](https://franbasguil.pages.dev/es/proyectos/yourfavs/)
 
 ---
 

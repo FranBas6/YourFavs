@@ -222,7 +222,7 @@ checked by `npm run check:structure`. Details and the reasoning behind each rule
 
 ---
 
-More about this project and my other work on my portfolio: [franbasguil.netlify.app](https://franbasguil.netlify.app/en/projects/yourfavs/)
+More about this project and my other work on my portfolio: [franbasguil.pages.dev](https://franbasguil.pages.dev/en/projects/yourfavs/)
 
 ---
 
